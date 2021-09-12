@@ -70,6 +70,9 @@ btc_output_update(hash256_t *ctx, const btc_output_t *x) {
   btc_script_update(ctx, &x->script);
 }
 
+/* XXX */
+#define btc_get_min_fee(x, y) 1
+
 int64_t
 btc_output_dust_threshold(const btc_output_t *x, int64_t rate) {
   int scale = BTC_WITNESS_SCALE_FACTOR;
