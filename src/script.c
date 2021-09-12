@@ -354,7 +354,7 @@ void
 btc_opcode_copy(btc_opcode_t *z, const btc_opcode_t *x) {
   z->value = x->value;
   z->data = x->data;
-  z->length = z->length;
+  z->length = x->length;
 }
 
 int
@@ -2461,12 +2461,9 @@ btc_script_verify_program(const btc_stack_t *witness,
   size_t i;
 
   CHECK((flags & BTC_SCRIPT_VERIFY_WITNESS) != 0);
+  CHECK(btc_script_get_program(&program, output));
 
   btc_stack_init(&stack);
-
-  if (!btc_script_get_program(&program, output))
-    THROW(BTC_SCRIPT_ERR_WITNESS_PROGRAM_MISMATCH);
-
   btc_stack_copy(&stack, witness);
 
   if (program.version == 0) {

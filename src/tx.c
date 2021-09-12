@@ -987,16 +987,10 @@ btc_tx_read(btc_tx_t *z, const uint8_t **xp, size_t *xn) {
     *xn -= 2;
   }
 
-  if (!btc_uint8_read(&flags, xp, xn))
-    return 0;
-
   if (!btc_inpvec_read(&z->inputs, xp, xn))
     return 0;
 
   if (!btc_outvec_read(&z->outputs, xp, xn))
-    return 0;
-
-  if (!btc_uint32_read(&z->locktime, xp, xn))
     return 0;
 
   if (flags & 1) {
@@ -1009,6 +1003,15 @@ btc_tx_read(btc_tx_t *z, const uint8_t **xp, size_t *xn) {
   }
 
   if (flags != 0)
+    return 0;
+
+  /* We'll never be able to reserialize
+     this to get the regular txid, and
+     there's no way it's valid anyway. */
+  if (z->inputs.length == 0 && z->outputs.length != 0)
+    return 0;
+
+  if (!btc_uint32_read(&z->locktime, xp, xn))
     return 0;
 
   return 1;
