@@ -16,4 +16,4 @@
  * Input Vector
  */
 
-DEFINE_SERIALIZABLE_VECTOR(btc_inpvec, btc_input, SCOPE_EXTERN)
+DEFINE_HASHABLE_VECTOR(btc_inpvec, btc_input, SCOPE_EXTERN)

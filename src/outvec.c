@@ -16,4 +16,4 @@
  * Output Vector
  */
 
-DEFINE_SERIALIZABLE_VECTOR(btc_outvec, btc_output, SCOPE_EXTERN)
+DEFINE_HASHABLE_VECTOR(btc_outvec, btc_output, SCOPE_EXTERN)

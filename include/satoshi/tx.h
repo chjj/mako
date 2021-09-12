@@ -113,13 +113,13 @@ btc_output_update(btc_hash256_t *ctx, const btc_output_t *x);
  * Input Vector
  */
 
-BTC_DEFINE_SERIALIZABLE_VECTOR(btc_inpvec, btc_input, BTC_EXTERN)
+BTC_DEFINE_HASHABLE_VECTOR(btc_inpvec, btc_input, BTC_EXTERN)
 
 /*
  * Output Vector
  */
 
-BTC_DEFINE_SERIALIZABLE_VECTOR(btc_outvec, btc_output, BTC_EXTERN)
+BTC_DEFINE_HASHABLE_VECTOR(btc_outvec, btc_output, BTC_EXTERN)
 
 /*
  * Transaction

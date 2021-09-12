@@ -93,7 +93,7 @@ btc_scriptnum_import(const uint8_t *xp, size_t xn) {
  * Stack
  */
 
-DEFINE_SERIALIZABLE_VECTOR(btc_stack, btc_buffer, SCOPE_EXTERN)
+DEFINE_HASHABLE_VECTOR(btc_stack, btc_buffer, SCOPE_EXTERN)
 
 const btc_buffer_t *
 btc_stack_get(const btc_stack_t *stack, int index) {

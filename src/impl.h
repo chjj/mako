@@ -262,16 +262,23 @@ name ## _read(name ## _t *z, const uint8_t **xp, size_t *xn) { \
   }                                                            \
                                                                \
   return 1;                                                    \
-}                                                              \
-                                                               \
-scope void                                                     \
-name ## _update(struct sha256_s *ctx, const name ## _t *x) {   \
-  size_t i;                                                    \
-                                                               \
-  btc_size_update(ctx, x->length);                             \
-                                                               \
-  for (i = 0; i < x->length; i++)                              \
-    child ## _update(ctx, x->items[i]);                        \
+}
+
+/*
+ * Serializable & Hashable Vector
+ */
+
+#define DEFINE_HASHABLE_VECTOR(name, child, scope)           \
+DEFINE_SERIALIZABLE_VECTOR(name, child, scope)               \
+                                                             \
+scope void                                                   \
+name ## _update(struct sha256_s *ctx, const name ## _t *x) { \
+  size_t i;                                                  \
+                                                             \
+  btc_size_update(ctx, x->length);                           \
+                                                             \
+  for (i = 0; i < x->length; i++)                            \
+    child ## _update(ctx, x->items[i]);                      \
 }
 
 /*
