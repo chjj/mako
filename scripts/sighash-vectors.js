@@ -18,7 +18,6 @@ function parseSighashTest(data) {
     script: script,
     index: index,
     type: type,
-    hash: hash,
     expected: expected,
     comments: expected.toString('hex')
   };
@@ -56,8 +55,7 @@ console.log(`typedef struct test_sighash_vector_s {
   size_t script_len;
   size_t index;
   int type;
-  unsigned char hash[32];
-  unsigned char expected[32];
+  uint8_t expected[32];
   const char *comments;
 } test_sighash_vector_t;
 `);
@@ -100,9 +98,6 @@ for (let i = 0; i < tests.length; i++) {
   console.log('    %d,', test.script.getSize());
   console.log('    %d,', test.index);
   console.log('    %d,', test.type);
-  console.log('    {');
-  toBytes(test.hash, '      ');
-  console.log('    },');
   console.log('    {');
   toBytes(test.expected, '      ');
   console.log('    },');

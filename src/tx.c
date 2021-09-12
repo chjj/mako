@@ -85,12 +85,13 @@ btc_tx_digest(uint8_t *hash, const btc_tx_t *tx, int witness) {
 
   btc_inpvec_update(&ctx, &tx->inputs);
   btc_outvec_update(&ctx, &tx->outputs);
-  btc_uint32_update(&ctx, tx->locktime);
 
   if (witness) {
     for (i = 0; i < tx->inputs.length; i++)
       btc_stack_update(&ctx, &tx->inputs.items[i]->witness);
   }
+
+  btc_uint32_update(&ctx, tx->locktime);
 
   hash256_final(&ctx, hash);
 }
@@ -963,12 +964,13 @@ btc_tx_write(uint8_t *zp, const btc_tx_t *tx) {
 
   zp = btc_inpvec_write(zp, &tx->inputs);
   zp = btc_outvec_write(zp, &tx->outputs);
-  zp = btc_uint32_write(zp, tx->locktime);
 
   if (witness) {
     for (i = 0; i < tx->inputs.length; i++)
       zp = btc_stack_write(zp, &tx->inputs.items[i]->witness);
   }
+
+  zp = btc_uint32_write(zp, tx->locktime);
 
   return zp;
 }

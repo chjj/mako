@@ -123,7 +123,7 @@ for (const json of scriptVectors) {
   tests.push(parseScriptTest(json));
 }
 
-console.log(`typedef struct script_vector_s {
+console.log(`typedef struct test_script_vector_s {
   const uint8_t *prev_raw;
   size_t prev_len;
   const uint8_t *tx_raw;
@@ -131,31 +131,31 @@ console.log(`typedef struct script_vector_s {
   unsigned int flags;
   int expected;
   const char *comments;
-} script_vector_t;
+} test_script_vector_t;
 `);
 
 for (let i = 0; i < tests.length; i++) {
   const test = tests[i];
 
-  console.log('static const uint8_t script_prev_raw_%d[] = {', i);
+  console.log('static const uint8_t test_script_prev_%d[] = {', i);
   toBytes(test.prev.toRaw(), '  ');
   console.log('};');
   console.log('');
-  console.log('static const uint8_t script_tx_raw_%d[] = {', i);
+  console.log('static const uint8_t test_script_tx_%d[] = {', i);
   toBytes(test.tx.toRaw(), '  ');
   console.log('};');
   console.log('');
 }
 
-console.log('static const script_vector_t script_vectors[] = {');
+console.log('static const test_script_vector_t test_script_vectors[] = {');
 
 for (let i = 0; i < tests.length; i++) {
   const test = tests[i];
 
   console.log('  {');
-  console.log('    script_prev_raw_%d,', i);
+  console.log('    test_script_prev_%d,', i);
   console.log('    %d,', test.prev.getSize());
-  console.log('    script_tx_raw_%d,', i);
+  console.log('    test_script_tx_%d,', i);
   console.log('    %d,', test.tx.getSize());
   console.log('    %s,', test.flags.join(' | '));
   console.log('    %s,', 'BTC_SCRIPT_ERR_' + test.expected);
