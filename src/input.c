@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <satoshi/script.h>
 #include <satoshi/tx.h>
 #include <torsion/hash.h>
 #include "impl.h"
@@ -29,7 +30,7 @@ btc_input_init(btc_input_t *z) {
 void
 btc_input_clear(btc_input_t *z) {
   btc_outpoint_clear(&z->prevout);
-  btc_script_clear(&z->prevout);
+  btc_script_clear(&z->script);
   btc_stack_clear(&z->witness);
 }
 

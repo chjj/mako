@@ -293,7 +293,7 @@ btc_uint8_update(struct sha256_s *ctx, uint8_t x) {
 
 BTC_UNUSED static uint8_t *
 btc_int8_write(uint8_t *zp, int8_t x) {
-  btc_uint8_write(zp, (uint8_t)x);
+  return btc_uint8_write(zp, (uint8_t)x);
 }
 
 BTC_UNUSED static int
@@ -336,7 +336,7 @@ btc_uint16_update(struct sha256_s *ctx, uint16_t x) {
 
 BTC_UNUSED static uint8_t *
 btc_int16_write(uint8_t *zp, int16_t x) {
-  btc_uint16_write(zp, (uint16_t)x);
+  return btc_uint16_write(zp, (uint16_t)x);
 }
 
 BTC_UNUSED static int
@@ -383,7 +383,7 @@ btc_uint32_update(struct sha256_s *ctx, uint32_t x) {
 
 BTC_UNUSED static uint8_t *
 btc_int32_write(uint8_t *zp, int32_t x) {
-  btc_uint32_write(zp, (uint32_t)x);
+  return btc_uint32_write(zp, (uint32_t)x);
 }
 
 BTC_UNUSED static int
@@ -438,7 +438,7 @@ btc_uint64_update(struct sha256_s *ctx, uint64_t x) {
 
 BTC_UNUSED static uint8_t *
 btc_int64_write(uint8_t *zp, int64_t x) {
-  btc_uint64_write(zp, (uint64_t)x);
+  return btc_uint64_write(zp, (uint64_t)x);
 }
 
 BTC_UNUSED static int

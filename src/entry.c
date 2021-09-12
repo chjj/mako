@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <satoshi/entry.h>
+#include <satoshi/header.h>
+#include <torsion/mpi.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -120,7 +122,7 @@ btc_entry_set_header(btc_entry_t *entry,
                      const btc_entry_t *prev) {
   btc_header_hash(entry->hash, hdr);
 
-  entry->header = hdr;
+  entry->header = *hdr;
   entry->height = prev->height + 1;
 
   btc_entry_get_chainwork(entry->chainwork, entry, prev);

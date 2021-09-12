@@ -35,7 +35,7 @@ BTC_EXTERN int
 btc_outpoint_equal(const btc_outpoint_t *x, const btc_outpoint_t *y);
 
 BTC_EXTERN int
-btc_outpoint_is_null(const btc_tx_t *x);
+btc_outpoint_is_null(const btc_outpoint_t *x);
 
 BTC_EXTERN size_t
 btc_outpoint_size(const btc_outpoint_t *x);
@@ -177,50 +177,50 @@ btc_tx_sign_input(btc_tx_t *tx,
                   btc_tx_cache_t *cache);
 
 BTC_EXTERN int
-btc_tx_is_rbf(const btc_tx *tx);
+btc_tx_is_rbf(const btc_tx_t *tx);
 
 BTC_EXTERN int
-btc_tx_is_final(const btc_tx *tx, uint32_t height, uint32_t time);
+btc_tx_is_final(const btc_tx_t *tx, uint32_t height, uint32_t time);
 
 BTC_EXTERN int
-btc_tx_verify_locktime(const btc_tx *tx, size_t index, uint32_t predicate);
+btc_tx_verify_locktime(const btc_tx_t *tx, size_t index, uint32_t predicate);
 
 BTC_EXTERN int
-btc_tx_verify_sequence(const btc_tx *tx, size_t index, uint32_t predicate);
+btc_tx_verify_sequence(const btc_tx_t *tx, size_t index, uint32_t predicate);
 
 BTC_EXTERN int64_t
-btc_tx_input_value(const btc_tx *tx, btc_view_t *view);
+btc_tx_input_value(const btc_tx_t *tx, btc_view_t *view);
 
 BTC_EXTERN int64_t
-btc_tx_output_value(const btc_tx *tx);
+btc_tx_output_value(const btc_tx_t *tx);
 
 BTC_EXTERN int64_t
-btc_tx_fee(const btc_tx *tx, btc_view_t *view);
+btc_tx_fee(const btc_tx_t *tx, btc_view_t *view);
 
 BTC_EXTERN int
-btc_tx_legacy_sigops(const btc_tx *tx);
+btc_tx_legacy_sigops(const btc_tx_t *tx);
 
 BTC_EXTERN int
-btc_tx_p2sh_sigops(const btc_tx *tx, btc_view_t *view);
+btc_tx_p2sh_sigops(const btc_tx_t *tx, btc_view_t *view);
 
 BTC_EXTERN int
-btc_tx_witness_sigops(const btc_tx *tx, btc_view_t *view);
+btc_tx_witness_sigops(const btc_tx_t *tx, btc_view_t *view);
 
 BTC_EXTERN int
-btc_tx_sigops_cost(const btc_tx *tx, btc_view_t *view, unsigned int flags);
+btc_tx_sigops_cost(const btc_tx_t *tx, btc_view_t *view, unsigned int flags);
 
 BTC_EXTERN int
-btc_tx_sigops(const btc_tx *tx, btc_view_t *view, unsigned int flags);
+btc_tx_sigops(const btc_tx_t *tx, btc_view_t *view, unsigned int flags);
 
 BTC_EXTERN int
 btc_tx_has_duplicate_inputs(const btc_tx_t *tx);
 
 BTC_EXTERN int
-btc_tx_check_sanity(btc_verify_error_t *err, const btc_tx *tx);
+btc_tx_check_sanity(btc_verify_error_t *err, const btc_tx_t *tx);
 
 BTC_EXTERN int
 btc_check_inputs(btc_verify_error_t *err,
-                 const btc_tx *tx,
+                 const btc_tx_t *tx,
                  btc_view_t *view,
                  uint32_t height);
 

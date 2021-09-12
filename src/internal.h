@@ -45,6 +45,21 @@
 #endif
 
 /*
+ * Builtins
+ */
+
+#undef LIKELY
+#undef UNLIKELY
+
+#if BTC_GNUC_PREREQ(3, 0) || BTC_HAS_BUILTIN(__builtin_expect)
+#  define LIKELY(x) __builtin_expect(x, 1)
+#  define UNLIKELY(x) __builtin_expect(x, 0)
+#else
+#  define LIKELY(x) (x)
+#  define UNLIKELY(x) (x)
+#endif
+
+/*
  * Sanity Checks
  */
 

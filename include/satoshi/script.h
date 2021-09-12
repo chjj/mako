@@ -229,9 +229,9 @@ enum {
   /* expansion */
   BTC_OP_NOP1 = 0xb0,
   BTC_OP_CHECKLOCKTIMEVERIFY = 0xb1,
-  BTC_OP_NOP2 = OP_CHECKLOCKTIMEVERIFY,
+  BTC_OP_NOP2 = BTC_OP_CHECKLOCKTIMEVERIFY,
   BTC_OP_CHECKSEQUENCEVERIFY = 0xb2,
-  BTC_OP_NOP3 = OP_CHECKSEQUENCEVERIFY,
+  BTC_OP_NOP3 = BTC_OP_CHECKSEQUENCEVERIFY,
   BTC_OP_NOP4 = 0xb3,
   BTC_OP_NOP5 = 0xb4,
   BTC_OP_NOP6 = 0xb5,
@@ -506,10 +506,10 @@ btc_script_verify(const btc_script_t *input,
  */
 
 BTC_EXTERN void
-btc_reader_init(btc_reader_t *z, const btc_script *x);
+btc_reader_init(btc_reader_t *z, const btc_script_t *x);
 
 BTC_EXTERN int
-btc_reader_next(btc_opcode *z, btc_reader_t *x);
+btc_reader_next(btc_opcode_t *z, btc_reader_t *x);
 
 /*
  * Writer

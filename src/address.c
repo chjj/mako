@@ -40,10 +40,16 @@ btc_address_copy(btc_address_t *z, const btc_address_t *x) {
 
 int
 btc_address_set_str(btc_address_t *addr, const char *str, const char *expect) {
+  (void)addr;
+  (void)str;
+  (void)expect;
   return 1;
 }
 
 int
 btc_address_get_str(char *str, const btc_address_t *addr, const char *hrp) {
+  (void)str;
+  (void)addr;
+  (void)hrp;
   return 1;
 }

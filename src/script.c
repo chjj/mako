@@ -4,11 +4,17 @@
  * https://github.com/chjj/libsatoshi
  */
 
+#include <limits.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <satoshi/buffer.h>
+#include <satoshi/consensus.h>
 #include <satoshi/crypto.h>
+#include <satoshi/policy.h>
 #include <satoshi/script.h>
+#include <satoshi/tx.h>
+#include <torsion/hash.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -279,6 +285,7 @@ btc_stack_swap(btc_stack_t *stack, int i1, int i2) {
 
 typedef struct btc_state_s {
   uint8_t *items;
+  size_t alloc;
   size_t length;
 } btc_state_t;
 
@@ -291,8 +298,6 @@ btc_state_init(btc_state_t *z) {
 
 static void
 btc_state_clear(btc_state_t *z) {
-  size_t i;
-
   if (z->alloc > 0)
     free(z->items);
 
@@ -636,7 +641,7 @@ btc_script_read(btc_script_t *z, const uint8_t **xp, size_t *xn) {
   return btc_buffer_read(z, xp, xn);
 }
 
-static void
+void
 btc_script_update(hash256_t *ctx, const btc_script_t *x) {
   btc_buffer_update(ctx, x);
 }
@@ -2670,14 +2675,14 @@ done:
  */
 
 void
-btc_reader_init(btc_reader_t *z, const btc_script *x) {
+btc_reader_init(btc_reader_t *z, const btc_script_t *x) {
   z->data = x->data;
   z->length = x->length;
   z->ip = -1;
 }
 
 int
-btc_reader_next(btc_opcode *z, btc_reader_t *x) {
+btc_reader_next(btc_opcode_t *z, btc_reader_t *x) {
   int ret = btc_opcode_read(z, &x->data, &x->length);
   z->ip += ret;
   return ret;

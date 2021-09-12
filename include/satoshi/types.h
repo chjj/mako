@@ -24,6 +24,7 @@ typedef struct btc_buffer_s {
 
 typedef struct btc_stack_s {
   btc_buffer_t **items;
+  size_t alloc;
   size_t length;
 } btc_stack_t;
 
@@ -43,6 +44,7 @@ typedef struct btc_reader_s {
 
 typedef struct btc_writer_s {
   btc_opcode_t **items;
+  size_t alloc;
   size_t length;
 } btc_writer_t;
 
@@ -72,17 +74,19 @@ typedef struct btc_output_s {
 
 typedef struct btc_program_s {
   unsigned int version;
-  uint8_t hash[40];
+  uint8_t data[40];
   size_t length;
 } btc_program_t;
 
 typedef struct btc_inpvec_s {
   btc_input_t **items;
+  size_t alloc;
   size_t length;
 } btc_inpvec_t;
 
 typedef struct btc_outvec_s {
   btc_output_t **items;
+  size_t alloc;
   size_t length;
 } btc_outvec_t;
 
@@ -95,6 +99,7 @@ typedef struct btc_tx_s {
 
 typedef struct btc_txvec_s {
   btc_tx_t **items;
+  size_t alloc;
   size_t length;
 } btc_txvec_t;
 
@@ -131,6 +136,7 @@ typedef struct btc_coin_s {
 
 typedef struct btc_undo_s {
   btc_coin_t **items;
+  size_t alloc;
   size_t length;
 } btc_undo_t;
 

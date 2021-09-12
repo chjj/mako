@@ -9,6 +9,7 @@
 #include <string.h>
 #include <satoshi/tx.h>
 #include <torsion/hash.h>
+#include <torsion/util.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -54,7 +55,7 @@ btc_outpoint_equal(const btc_outpoint_t *x, const btc_outpoint_t *y) {
 }
 
 int
-btc_outpoint_is_null(const btc_tx_t *x) {
+btc_outpoint_is_null(const btc_outpoint_t *x) {
   static const btc_outpoint_t zero = {{0}, 0xffffffff};
   return btc_outpoint_equal(x, &zero);
 }

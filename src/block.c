@@ -8,6 +8,11 @@
 #include <stdint.h>
 #include <string.h>
 #include <satoshi/block.h>
+#include <satoshi/consensus.h>
+#include <satoshi/crypto.h>
+#include <satoshi/header.h>
+#include <satoshi/script.h>
+#include <satoshi/tx.h>
 #include <torsion/hash.h>
 #include "impl.h"
 #include "internal.h"

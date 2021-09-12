@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <satoshi/coins.h>
+#include <torsion/mpi.h>
 #include "impl.h"
 #include "internal.h"
 

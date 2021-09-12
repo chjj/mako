@@ -533,7 +533,7 @@ btc_tx_sign_input(btc_tx_t *tx,
 }
 
 int
-btc_tx_is_rbf(const btc_tx *tx) {
+btc_tx_is_rbf(const btc_tx_t *tx) {
   size_t i;
 
   if (tx->version == 2)
@@ -548,7 +548,7 @@ btc_tx_is_rbf(const btc_tx *tx) {
 }
 
 int
-btc_tx_is_final(const btc_tx *tx, uint32_t height, uint32_t time) {
+btc_tx_is_final(const btc_tx_t *tx, uint32_t height, uint32_t time) {
   size_t i;
 
   if (tx->locktime == 0)
@@ -566,7 +566,7 @@ btc_tx_is_final(const btc_tx *tx, uint32_t height, uint32_t time) {
 }
 
 int
-btc_tx_verify_locktime(const btc_tx *tx, size_t index, uint32_t predicate) {
+btc_tx_verify_locktime(const btc_tx_t *tx, size_t index, uint32_t predicate) {
   static const uint32_t threshold = BTC_LOCKTIME_THRESHOLD;
   const btc_input_t *input = tx->inputs.items[index];
 
@@ -584,7 +584,7 @@ btc_tx_verify_locktime(const btc_tx *tx, size_t index, uint32_t predicate) {
 }
 
 int
-btc_tx_verify_sequence(const btc_tx *tx, size_t index, uint32_t predicate) {
+btc_tx_verify_sequence(const btc_tx_t *tx, size_t index, uint32_t predicate) {
   static const uint32_t disable_flag = BTC_SEQUENCE_DISABLE_FLAG;
   static const uint32_t type_flag = BTC_SEQUENCE_TYPE_FLAG;
   static const uint32_t mask = BTC_SEQUENCE_MASK;
@@ -615,7 +615,7 @@ btc_tx_verify_sequence(const btc_tx *tx, size_t index, uint32_t predicate) {
 }
 
 int64_t
-btc_tx_input_value(const btc_tx *tx, btc_view_t *view) {
+btc_tx_input_value(const btc_tx_t *tx, btc_view_t *view) {
   const btc_input_t *input;
   const btc_coin_t *coin;
   int64_t total = 0;
@@ -635,7 +635,7 @@ btc_tx_input_value(const btc_tx *tx, btc_view_t *view) {
 }
 
 int64_t
-btc_tx_output_value(const btc_tx *tx) {
+btc_tx_output_value(const btc_tx_t *tx) {
   int64_t total = 0;
   size_t i;
 
@@ -646,7 +646,7 @@ btc_tx_output_value(const btc_tx *tx) {
 }
 
 int64_t
-btc_tx_fee(const btc_tx *tx, btc_view_t *view) {
+btc_tx_fee(const btc_tx_t *tx, btc_view_t *view) {
   int64_t value = btc_tx_input_value(tx, view);
 
   if (value < 0)
@@ -656,7 +656,7 @@ btc_tx_fee(const btc_tx *tx, btc_view_t *view) {
 }
 
 int
-btc_tx_legacy_sigops(const btc_tx *tx) {
+btc_tx_legacy_sigops(const btc_tx_t *tx) {
   const btc_input_t *input;
   const btc_output_t *output;
   int total = 0;
@@ -676,7 +676,7 @@ btc_tx_legacy_sigops(const btc_tx *tx) {
 }
 
 int
-btc_tx_p2sh_sigops(const btc_tx *tx, btc_view_t *view) {
+btc_tx_p2sh_sigops(const btc_tx_t *tx, btc_view_t *view) {
   const btc_input_t *input;
   const btc_coin_t *coin;
   int total = 0;
@@ -702,7 +702,7 @@ btc_tx_p2sh_sigops(const btc_tx *tx, btc_view_t *view) {
 }
 
 int
-btc_tx_witness_sigops(const btc_tx *tx, btc_view_t *view) {
+btc_tx_witness_sigops(const btc_tx_t *tx, btc_view_t *view) {
   const btc_input_t *input;
   const btc_coin_t *coin;
   int total = 0;
@@ -727,7 +727,7 @@ btc_tx_witness_sigops(const btc_tx *tx, btc_view_t *view) {
 }
 
 int
-btc_tx_sigops_cost(const btc_tx *tx, btc_view_t *view, unsigned int flags) {
+btc_tx_sigops_cost(const btc_tx_t *tx, btc_view_t *view, unsigned int flags) {
   int cost = btc_tx_legacy_sigops(tx) * BTC_WITNESS_SCALE_FACTOR;
 
   if (flags & BTC_SCRIPT_VERIFY_P2SH)
@@ -740,7 +740,7 @@ btc_tx_sigops_cost(const btc_tx *tx, btc_view_t *view, unsigned int flags) {
 }
 
 int
-btc_tx_sigops(const btc_tx *tx, btc_view_t *view, unsigned int flags) {
+btc_tx_sigops(const btc_tx_t *tx, btc_view_t *view, unsigned int flags) {
   int cost = btc_tx_sigops_cost(tx, view, flags);
   return (cost + BTC_WITNESS_SCALE_FACTOR - 1) / BTC_WITNESS_SCALE_FACTOR;
 }
@@ -784,7 +784,7 @@ btc_tx_has_duplicate_inputs(const btc_tx_t *tx) {
 } while (0)
 
 int
-btc_tx_check_sanity(btc_verify_error_t *err, const btc_tx *tx) {
+btc_tx_check_sanity(btc_verify_error_t *err, const btc_tx_t *tx) {
   const btc_input_t *input;
   const btc_output_t *output;
   int64_t total = 0;
@@ -836,7 +836,7 @@ btc_tx_check_sanity(btc_verify_error_t *err, const btc_tx *tx) {
 
 int
 btc_check_inputs(btc_verify_error_t *err,
-                 const btc_tx *tx,
+                 const btc_tx_t *tx,
                  btc_view_t *view,
                  uint32_t height) {
   const btc_input_t *input;

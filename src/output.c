@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <satoshi/consensus.h>
+#include <satoshi/script.h>
 #include <satoshi/tx.h>
 #include <torsion/hash.h>
 #include "impl.h"

@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <satoshi/mine.h>
+#include <satoshi/util.h>
 #include <torsion/hash.h>
 #include "impl.h"
 #include "internal.h"

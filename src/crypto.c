@@ -11,6 +11,7 @@
 #include <torsion/hash.h>
 #include <torsion/ecc.h>
 #include <torsion/rand.h>
+#include <torsion/util.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -144,12 +145,13 @@ btc_ecdsa_pubkey_tweak_add(uint8_t *out,
 
 int
 btc_ecdsa_is_low_der(const uint8_t *der, size_t der_len) {
+  const wei_curve_t *ec = btc_curve();
   uint8_t sig[64];
 
   if (!ecdsa_sig_import(ec, sig, der, der_len))
     return 0;
 
-  return ecdsa_is_low_s(btc_curve(), sig);
+  return ecdsa_is_low_s(ec, sig);
 }
 
 int
