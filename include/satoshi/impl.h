@@ -98,6 +98,9 @@ scope uint8_t *                                               \
 name ## _write(uint8_t *zp, const name ## _t *x);             \
                                                               \
 scope int                                                     \
-name ## _read(name ## _t *z, const uint8_t **xp, size_t *xn);
+name ## _read(name ## _t *z, const uint8_t **xp, size_t *xn); \
+                                                              \
+scope void                                                    \
+name ## _update(btc_hash256_t *ctx, const name ## _t *x);
 
 #endif /* BTC_IMPL_H */

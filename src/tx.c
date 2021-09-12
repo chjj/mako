@@ -7,6 +7,11 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <satoshi/coins.h>
+#include <satoshi/consensus.h>
+#include <satoshi/crypto.h>
+#include <satoshi/policy.h>
+#include <satoshi/script.h>
 #include <satoshi/tx.h>
 #include <torsion/hash.h>
 #include "impl.h"
@@ -63,31 +68,31 @@ btc_tx_has_witness(const btc_tx_t *tx) {
 
 static void
 btc_tx_digest(uint8_t *hash, const btc_tx_t *tx, int witness) {
-  hash256_t hash;
+  hash256_t ctx;
   size_t i;
 
   if (witness)
     witness = btc_tx_has_witness(tx);
 
-  hash256_init(&hash);
+  hash256_init(&ctx);
 
-  btc_uint32_update(&hash, tx->version);
+  btc_uint32_update(&ctx, tx->version);
 
   if (witness) {
-    btc_uint8_update(&hash, 0);
-    btc_uint8_update(&hash, 1);
+    btc_uint8_update(&ctx, 0);
+    btc_uint8_update(&ctx, 1);
   }
 
-  btc_inpvec_update(&hash, &tx->inputs);
-  btc_outvec_update(&hash, &tx->outputs);
-  btc_uint32_update(&hash, tx->locktime);
+  btc_inpvec_update(&ctx, &tx->inputs);
+  btc_outvec_update(&ctx, &tx->outputs);
+  btc_uint32_update(&ctx, tx->locktime);
 
   if (witness) {
     for (i = 0; i < tx->inputs.length; i++)
-      btc_stack_update(&hash, &tx->inputs.items[i]->witness);
+      btc_stack_update(&ctx, &tx->inputs.items[i]->witness);
   }
 
-  hash256_final(&hash, hash);
+  hash256_final(&ctx, hash);
 }
 
 void
@@ -506,7 +511,7 @@ btc_tx_sign_input(btc_tx_t *tx,
     }
 
     btc_writer_init(&writer);
-    btc_writer_push_data(&writer, program->data, program->length);
+    btc_writer_push_data(&writer, program.data, program.length);
     btc_writer_compile(&input->script, &writer);
     btc_writer_clear(&writer);
     btc_script_clear(&program);
@@ -639,7 +644,7 @@ btc_tx_output_value(const btc_tx_t *tx) {
   int64_t total = 0;
   size_t i;
 
-  for (i = 0; i < tx->outputs.length; i++) {
+  for (i = 0; i < tx->outputs.length; i++)
     total += tx->outputs.items[i]->value;
 
   return total;
@@ -745,7 +750,7 @@ btc_tx_sigops(const btc_tx_t *tx, btc_view_t *view, unsigned int flags) {
   return (cost + BTC_WITNESS_SCALE_FACTOR - 1) / BTC_WITNESS_SCALE_FACTOR;
 }
 
-KHASH_SET_INIT_OUTPOINT(outpoints)
+KHASH_SET_INIT_CONST_OUTPOINT(outpoints)
 
 int
 btc_tx_has_duplicate_inputs(const btc_tx_t *tx) {
@@ -818,7 +823,7 @@ btc_tx_check_sanity(btc_verify_error_t *err, const btc_tx_t *tx) {
     THROW("bad-txns-inputs-duplicate", 100);
 
   if (btc_tx_is_coinbase(tx)) {
-    size = tx->inputs[0]->script.length;
+    size = tx->inputs.items[0]->script.length;
 
     if (size < 2 || size > 100)
       THROW("bad-cb-length", 100);
@@ -840,6 +845,7 @@ btc_check_inputs(btc_verify_error_t *err,
                  btc_view_t *view,
                  uint32_t height) {
   const btc_input_t *input;
+  const btc_coin_t *coin;
   int64_t value, fee;
   int64_t total = 0;
   size_t i;
@@ -889,7 +895,6 @@ btc_check_inputs(btc_verify_error_t *err,
 size_t
 btc_tx_base_size(const btc_tx_t *tx) {
   size_t size = 0;
-  size_t i;
 
   size += 4;
   size += btc_inpvec_size(&tx->inputs);
@@ -1016,7 +1021,7 @@ btc_tx_coin(const btc_tx_t *tx, uint32_t index, uint32_t height) {
   coin->version = tx->version;
   coin->height = height;
   coin->coinbase = btc_tx_is_coinbase(tx);
-  coin->output = tx->outputs.items[index];
+  coin->output = *tx->outputs.items[index];
 
   return coin;
 }

@@ -282,16 +282,16 @@ btc_stack_get_int(int *num,
 BTC_EXTERN int
 btc_stack_get_bool(const btc_stack_t *stack, int index);
 
-BTC_EXTERN int
+BTC_EXTERN void
 btc_stack_push_data(btc_stack_t *stack, const uint8_t *data, size_t length);
 
-BTC_EXTERN int
+BTC_EXTERN void
 btc_stack_push_num(btc_stack_t *stack, int64_t num);
 
-BTC_EXTERN int
+BTC_EXTERN void
 btc_stack_push_int(btc_stack_t *stack, int num);
 
-BTC_EXTERN int
+BTC_EXTERN void
 btc_stack_push_bool(btc_stack_t *stack, int value);
 
 /*
@@ -434,19 +434,19 @@ btc_script_set_program(btc_script_t *script, const btc_program_t *program);
 BTC_EXTERN int
 btc_script_get_program(btc_program_t *program, const btc_script_t *script);
 
-BTC_EXTERN void
+BTC_EXTERN int
 btc_script_is_p2wpkh(const btc_script_t *script);
 
-BTC_EXTERN void
+BTC_EXTERN int
 btc_script_get_p2wpkh(uint8_t *hash, const btc_script_t *script);
 
 BTC_EXTERN void
 btc_script_set_p2wpkh(btc_script_t *script, const uint8_t *hash);
 
-BTC_EXTERN void
+BTC_EXTERN int
 btc_script_is_p2wsh(const btc_script_t *script);
 
-BTC_EXTERN void
+BTC_EXTERN int
 btc_script_get_p2wsh(uint8_t *hash, const btc_script_t *script);
 
 BTC_EXTERN void

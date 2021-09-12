@@ -11,6 +11,11 @@
 #include <stdint.h>
 #include "internal.h"
 
+struct sha256_s;
+
+void
+hash256_update(struct sha256_s *ctx, const void *data, size_t len);
+
 #define SCOPE_STATIC static
 #define SCOPE_EXTERN
 
@@ -257,16 +262,21 @@ name ## _read(name ## _t *z, const uint8_t **xp, size_t *xn) { \
   }                                                            \
                                                                \
   return 1;                                                    \
+}                                                              \
+                                                               \
+scope void                                                     \
+name ## _update(struct sha256_s *ctx, const name ## _t *x) {   \
+  size_t i;                                                    \
+                                                               \
+  btc_size_update(ctx, x->length);                             \
+                                                               \
+  for (i = 0; i < x->length; i++)                              \
+    child ## _update(ctx, x->items[i]);                        \
 }
 
 /*
  * Encoding
  */
-
-struct sha256_s;
-
-void
-hash256_update(struct sha256_s *ctx, const void *data, size_t len);
 
 BTC_UNUSED static uint8_t *
 btc_uint8_write(uint8_t *zp, uint8_t x) {

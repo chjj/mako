@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <satoshi/coins.h>
+#include <satoshi/tx.h>
 #include "impl.h"
 #include "internal.h"
 #include "map.h"
@@ -197,7 +198,7 @@ btc_view_spend(btc__view_t *view,
   size_t i;
 
   for (i = 0; i < tx->inputs.length; i++) {
-    prevout = &tx->inputs[i]->prevout;
+    prevout = &tx->inputs.items[i]->prevout;
     coins = btc_view_ensure(view, prevout->hash);
     coin = btc_coins_get(coins, prevout->index);
 

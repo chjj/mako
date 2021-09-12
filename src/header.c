@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <satoshi/header.h>
+#include <satoshi/util.h>
 #include <torsion/hash.h>
 #include "impl.h"
 #include "internal.h"
@@ -95,6 +96,8 @@ btc_header_read(btc_header_t *z, const uint8_t **xp, size_t *xn) {
 
 void
 btc_header_hash(uint8_t *hash, const btc_header_t *hdr) {
+  hash256_t ctx;
+
   hash256_init(&ctx);
 
   btc_uint32_update(&ctx, hdr->version);

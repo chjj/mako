@@ -35,20 +35,20 @@
   KHASH_INIT(name, const unsigned char *, khval_t, 1, kh_hash_hash_func,  \
                                                       kh_hash_hash_equal)
 
-#define KHASH_SET_INIT_OUTPOINT(name)                           \
-  KHASH_INIT(name, fp_outpoint_t *, char, 0, fp_outpoint_hash,  \
-                                             fp_outpoint_equal)
+#define KHASH_SET_INIT_OUTPOINT(name)                             \
+  KHASH_INIT(name, btc_outpoint_t *, char, 0, btc_outpoint_hash,  \
+                                              btc_outpoint_equal)
 
-#define KHASH_MAP_INIT_OUTPOINT(name, khval_t)                     \
-  KHASH_INIT(name, fp_outpoint_t *, khval_t, 1, fp_outpoint_hash,  \
-                                                fp_outpoint_equal)
+#define KHASH_MAP_INIT_OUTPOINT(name, khval_t)                       \
+  KHASH_INIT(name, btc_outpoint_t *, khval_t, 1, btc_outpoint_hash,  \
+                                                 btc_outpoint_equal)
 
-#define KHASH_SET_INIT_CONST_OUTPOINT(name)                           \
-  KHASH_INIT(name, const fp_outpoint_t *, char, 0, fp_outpoint_hash,  \
-                                                   fp_outpoint_equal)
+#define KHASH_SET_INIT_CONST_OUTPOINT(name)                             \
+  KHASH_INIT(name, const btc_outpoint_t *, char, 0, btc_outpoint_hash,  \
+                                                    btc_outpoint_equal)
 
-#define KHASH_MAP_INIT_CONST_OUTPOINT(name, khval_t)                     \
-  KHASH_INIT(name, const fp_outpoint_t *, khval_t, 1, fp_outpoint_hash,  \
-                                                      fp_outpoint_equal)
+#define KHASH_MAP_INIT_CONST_OUTPOINT(name, khval_t)                       \
+  KHASH_INIT(name, const btc_outpoint_t *, khval_t, 1, btc_outpoint_hash,  \
+                                                       btc_outpoint_equal)
 
 #endif /* BTC_MAP_H */

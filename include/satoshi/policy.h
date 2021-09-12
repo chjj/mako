@@ -143,7 +143,7 @@
  * Maximum block weight to be mined.
  */
 
-#define BTC_MAX_BLOCK_WEIGHT (1000000 * BTC_WITNESS_SCALE_FACTOR)
+#define BTC_MAX_BLOCK_WEIGHT_ (1000000 * BTC_WITNESS_SCALE_FACTOR)
 
 /**
  * How much of the block should be dedicated to

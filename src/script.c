@@ -164,14 +164,14 @@ btc_stack_get_bool(const btc_stack_t *stack, int index) {
   return 0;
 }
 
-int
+void
 btc_stack_push_data(btc_stack_t *stack, const uint8_t *data, size_t length) {
   btc_buffer_t *item = btc_buffer_create();
   btc_buffer_set(item, data, length);
   btc_stack_push(stack, item);
 }
 
-int
+void
 btc_stack_push_num(btc_stack_t *stack, int64_t num) {
   btc_buffer_t *item = btc_buffer_create();
 
@@ -182,12 +182,12 @@ btc_stack_push_num(btc_stack_t *stack, int64_t num) {
   btc_stack_push(stack, item);
 }
 
-int
+void
 btc_stack_push_int(btc_stack_t *stack, int num) {
   btc_stack_push_num(stack, num);
 }
 
-int
+void
 btc_stack_push_bool(btc_stack_t *stack, int value) {
   btc_buffer_t *item = btc_buffer_create();
 
@@ -886,7 +886,7 @@ btc_script_get_nulldata(uint8_t *data,
     return 0;
 
   if (script->data[1] <= 0x4b) {
-    if (2 + script->data[1] != script->length)
+    if (2 + (size_t)script->data[1] != script->length)
       return 0;
 
     memcpy(data, script->data + 2, script->data[1]);
@@ -900,7 +900,7 @@ btc_script_get_nulldata(uint8_t *data,
     return 0;
 
   if (script->data[1] == BTC_OP_PUSHDATA1) {
-    if (3 + script->data[2] != script->length)
+    if (3 + (size_t)script->data[2] != script->length)
       return 0;
 
     memcpy(data, script->data + 3, script->data[2]);
@@ -958,7 +958,7 @@ btc_script_is_program(const btc_script_t *script) {
     return 0;
   }
 
-  if (script->data[1] + 2 != script->length)
+  if ((size_t)script->data[1] + 2 != script->length)
     return 0;
 
   return 1;
@@ -992,14 +992,14 @@ btc_script_get_program(btc_program_t *program, const btc_script_t *script) {
   return 1;
 }
 
-void
+int
 btc_script_is_p2wpkh(const btc_script_t *script) {
   return script->length == 22
       && script->data[0] == BTC_OP_0
       && script->data[1] == 20;
 }
 
-void
+int
 btc_script_get_p2wpkh(uint8_t *hash, const btc_script_t *script) {
   if (!btc_script_is_p2wpkh(script))
     return 0;
@@ -1021,14 +1021,14 @@ btc_script_set_p2wpkh(btc_script_t *script, const uint8_t *hash) {
   script->length = 22;
 }
 
-void
+int
 btc_script_is_p2wsh(const btc_script_t *script) {
   return script->length == 34
       && script->data[0] == BTC_OP_0
       && script->data[1] == 32;
 }
 
-void
+int
 btc_script_get_p2wsh(uint8_t *hash, const btc_script_t *script) {
   if (!btc_script_is_p2wsh(script))
     return 0;
@@ -1216,7 +1216,7 @@ btc_script_witness_sigops(const btc_script_t *script,
     if (program.length == 20)
       return 1;
 
-    if (program.length == 32 && witness->items.length > 0) {
+    if (program.length == 32 && witness->length > 0) {
       const btc_script_t *item = btc_stack_get(witness, -1);
       return btc_script_sigops(item, 1);
     }
@@ -1838,8 +1838,8 @@ btc_script_execute(const btc_script_t *script,
         v2 = btc_stack_get(stack, -5);
 
         btc_stack_erase(stack, -6, -4);
-        btc_stack_push(stack, v1);
-        btc_stack_push(stack, v2);
+        btc_stack_push(stack, (btc_buffer_t *)v1); /* XXX */
+        btc_stack_push(stack, (btc_buffer_t *)v2); /* XXX */
 
         break;
       }
@@ -1891,7 +1891,7 @@ btc_script_execute(const btc_script_t *script,
         break;
       }
       case BTC_OP_NIP: {
-        const btc_buffer_t *val;
+        btc_buffer_t *val;
 
         if (stack->length < 2)
           THROW(BTC_SCRIPT_ERR_INVALID_STACK_OPERATION);
@@ -1934,7 +1934,7 @@ btc_script_execute(const btc_script_t *script,
 
         if (op.value == BTC_OP_ROLL) {
           btc_stack_remove(stack, -num - 1);
-          btc_stack_push(stack, val);
+          btc_stack_push(stack, (btc_buffer_t *)val); /* XXX */
         } else {
           btc_stack_push(stack, btc_buffer_clone(val)); /* no alloc */
         }
@@ -2285,8 +2285,8 @@ btc_script_execute(const btc_script_t *script,
         }
 
         if (!res && (flags & BTC_SCRIPT_VERIFY_NULLFAIL)) {
-          if (sig.length != 0)
-            THROW(BTC_SCRIPT_ERR_NULLFAIL);
+          if (sig->length != 0)
+            THROW(BTC_SCRIPT_ERR_SIG_NULLFAIL);
         }
 
         btc_stack_drop(stack);
@@ -2305,7 +2305,7 @@ btc_script_execute(const btc_script_t *script,
       }
       case BTC_OP_CHECKMULTISIG:
       case BTC_OP_CHECKMULTISIGVERIFY: {
-        int i, j, n, okey, ikey, isig, res;
+        int i, j, m, n, okey, ikey, isig, res;
         const btc_buffer_t *sig, *key;
         unsigned int type;
         uint8_t hash[32];
@@ -2335,7 +2335,7 @@ btc_script_execute(const btc_script_t *script,
         ikey = i;
         i += n;
 
-        if (stack->length < i)
+        if (stack->length < (size_t)i)
           THROW(BTC_SCRIPT_ERR_INVALID_STACK_OPERATION);
 
         if (!btc_stack_get_int(&m, stack, -i, minimal, 4))
@@ -2348,7 +2348,7 @@ btc_script_execute(const btc_script_t *script,
         isig = i;
         i += m;
 
-        if (stack->length < i)
+        if (stack->length < (size_t)i)
           THROW(BTC_SCRIPT_ERR_INVALID_STACK_OPERATION);
 
         btc_script_get_subscript(&subscript, script, lastsep);
@@ -2394,7 +2394,7 @@ btc_script_execute(const btc_script_t *script,
         while (i > 1) {
           if (!res && (flags & BTC_SCRIPT_VERIFY_NULLFAIL)) {
             if (okey == 0 && btc_stack_get(stack, -1)->length != 0)
-              THROW(BTC_SCRIPT_ERR_NULLFAIL);
+              THROW(BTC_SCRIPT_ERR_SIG_NULLFAIL);
           }
 
           if (okey > 0)
@@ -2547,7 +2547,6 @@ btc_script_verify(const btc_script_t *input,
   /* Setup a stack. */
   btc_stack_init(&stack);
   btc_stack_init(&copy);
-  btc_script_init(&redeem);
 
   if (flags & BTC_SCRIPT_VERIFY_SIGPUSHONLY) {
     if (!btc_script_is_push_only(input))
@@ -2656,7 +2655,7 @@ btc_script_verify(const btc_script_t *input,
   /* If we had a witness but no witness program, fail. */
   if (flags & BTC_SCRIPT_VERIFY_WITNESS) {
     CHECK((flags & BTC_SCRIPT_VERIFY_P2SH) != 0);
-    if (!had_witness && witness->items.length > 0)
+    if (!had_witness && witness->length > 0)
       THROW(BTC_SCRIPT_ERR_WITNESS_UNEXPECTED);
   }
 
@@ -2684,7 +2683,7 @@ btc_reader_init(btc_reader_t *z, const btc_script_t *x) {
 int
 btc_reader_next(btc_opcode_t *z, btc_reader_t *x) {
   int ret = btc_opcode_read(z, &x->data, &x->length);
-  z->ip += ret;
+  x->ip += ret;
   return ret;
 }
 
