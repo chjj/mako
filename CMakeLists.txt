@@ -5,24 +5,53 @@
 cmake_minimum_required(VERSION 3.4)
 project(satoshi LANGUAGES C)
 
-include(deps/torsion/cmake/AppendCCompilerFlag.cmake)
-
-set(satoshi_cflags)
+set(satoshi_sources)
 set(satoshi_defines)
+set(satoshi_cflags)
+set(satoshi_includes)
+set(satoshi_ldflags)
+set(satoshi_libs)
+
+list(APPEND satoshi_sources src/address.c
+                            src/block.c
+                            src/buffer.c
+                            src/coin.c
+                            src/compact.c
+                            src/crypto.c
+                            src/entry.c
+                            src/impl.h
+                            src/input.c
+                            src/inpvec.c
+                            src/internal.c
+                            src/mine.c
+                            src/outpoint.c
+                            src/output.c
+                            src/outvec.c
+                            src/script.c
+                            src/tx.c
+                            src/undo.c
+                            src/util.c
+                            src/view.c)
 
 if(MSVC)
-  append_c_compiler_flag(satoshi_cflags /wd4244
-                                        /wd4267)
+  list(APPEND satoshi_cflags /wd4244
+                             /wd4267)
 else()
-  append_c_compiler_flag(satoshi_cflags -Wall
-                                        -Wextra
-                                        -Wcast-align
-                                        -Wshadow)
+  list(APPEND satoshi_cflags -Wall
+                             -Wextra
+                             -Wcast-align
+                             -Wshadow)
 endif()
 
-add_subdirectory(deps/torsion)
+list(APPEND satoshi_includes ${PROJECT_SOURCE_DIR}/include
+                             ${PROJECT_SOURCE_DIR}/deps/torsion/include)
 
-add_library(satoshi STATIC src/btc.c)
-target_compile_definitions(satoshi PRIVATE ${satoshi_defines})
-target_compile_options(satoshi PRIVATE ${satoshi_cflags})
-target_link_libraries(satoshi INTERFACE torsion)
+# add_subdirectory(deps/torsion)
+# list(APPEND satoshi_libs torsion)
+
+add_library(satoshi STATIC ${satoshi_sources})
+target_compile_definitions(satoshi PUBLIC ${satoshi_defines})
+target_compile_options(satoshi PUBLIC ${satoshi_cflags})
+target_include_directories(satoshi PUBLIC ${satoshi_includes})
+target_link_options(satoshi INTERFACE ${satoshi_ldflags})
+target_link_libraries(satoshi INTERFACE ${satoshi_libs})

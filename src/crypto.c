@@ -1,3 +1,19 @@
+/*!
+ * crypto.c - crypto for libsatoshi
+ * Copyright (c) 2021, Christopher Jeffrey (MIT License).
+ * https://github.com/chjj/libsatoshi
+ */
+
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <satoshi/crypto.h>
+#include <torsion/hash.h>
+#include <torsion/ecc.h>
+#include <torsion/rand.h>
+#include "impl.h"
+#include "internal.h"
+
 static wei_curve_t *btc_secp256k1;
 
 void
