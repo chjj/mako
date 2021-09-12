@@ -1,5 +1,6 @@
 # CMakeLists.txt - cmake build for libsatoshi
 # Copyright (c) 2020, Christopher Jeffrey (MIT License).
+# https://github.com/chjj/libsatoshi
 
 cmake_minimum_required(VERSION 3.4)
 project(satoshi LANGUAGES C)
