@@ -1026,7 +1026,8 @@ btc_tx_coin(const btc_tx_t *tx, uint32_t index, uint32_t height) {
   coin->version = tx->version;
   coin->height = height;
   coin->coinbase = btc_tx_is_coinbase(tx);
-  coin->output = *tx->outputs.items[index];
+
+  btc_output_copy(&coin->output, tx->outputs.items[index]);
 
   return coin;
 }

@@ -69,9 +69,8 @@ function toBytes(raw, pad) {
 
 const type = process.argv[2] || 'valid';
 
-console.log(`struct test_${type}_coins_s {
-  const uint8_t *prevout_raw;
-  size_t prevout_len;
+console.log(`typedef struct test_${type}_coins_s {
+  btc_outpoint_t outpoint;
   const uint8_t *output_raw;
   size_t output_len;
 } test_${type}_coins_t;
@@ -79,7 +78,7 @@ console.log(`struct test_${type}_coins_s {
 typedef struct test_${type}_vector_t {
   const uint8_t *tx_raw;
   size_t tx_len;
-  const test_coins_t *coins;
+  const test_${type}_coins_t *coins;
   size_t coins_len;
   unsigned int flags;
   const char *comments;
@@ -110,12 +109,7 @@ for (let i = 0; i < tests.length; i++) {
   console.log('');
 
   for (let j = 0; j < test.coins.length; j++) {
-    const [prevout, output] = test.coins[j];
-
-    console.log(`static const uint8_t test_${type}_prevout_%d_%d[] = {`, i, j);
-    toBytes(prevout.toRaw(), '  ');
-    console.log('};');
-    console.log('');
+    const [, output] = test.coins[j];
 
     console.log(`static const uint8_t test_${type}_output_%d_%d[] = {`, i, j);
     toBytes(output.toRaw(), '  ');
@@ -129,8 +123,12 @@ for (let i = 0; i < tests.length; i++) {
     const [prevout, output] = test.coins[j];
 
     console.log('  {');
-    console.log(`    test_${type}_prevout_%d_%d,`, i, j);
-    console.log('    %d,', prevout.getSize());
+    console.log('    {');
+    console.log('      {');
+    toBytes(prevout.hash, '        ');
+    console.log('      },');
+    console.log('      %d', prevout.index);
+    console.log('    },');
     console.log(`    test_${type}_output_%d_%d,`, i, j);
     console.log('    %d', output.getSize());
     console.log('  },');
