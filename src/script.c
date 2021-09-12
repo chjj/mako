@@ -1838,8 +1838,8 @@ btc_script_execute(const btc_script_t *script,
         v2 = btc_stack_get(stack, -5);
 
         btc_stack_erase(stack, -6, -4);
-        btc_stack_push(stack, (btc_buffer_t *)v1); /* XXX */
-        btc_stack_push(stack, (btc_buffer_t *)v2); /* XXX */
+        btc_stack_push(stack, (btc_buffer_t *)v1);
+        btc_stack_push(stack, (btc_buffer_t *)v2);
 
         break;
       }
@@ -1930,13 +1930,11 @@ btc_script_execute(const btc_script_t *script,
         if (num < 0 || (size_t)num >= stack->length)
           THROW(BTC_SCRIPT_ERR_INVALID_STACK_OPERATION);
 
-        val = btc_stack_get(stack, -num - 1);
-
         if (op.value == BTC_OP_ROLL) {
-          btc_stack_remove(stack, -num - 1);
-          btc_stack_push(stack, (btc_buffer_t *)val); /* XXX */
+          btc_stack_push(stack, btc_stack_remove(stack, -num - 1));
         } else {
-          btc_stack_push(stack, btc_buffer_clone(val)); /* no alloc */
+          val = btc_stack_get(stack, -num - 1);
+          btc_stack_push(stack, btc_buffer_clone(val));
         }
 
         break;

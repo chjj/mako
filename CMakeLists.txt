@@ -12,6 +12,8 @@ set(satoshi_includes)
 set(satoshi_ldflags)
 set(satoshi_libs)
 
+set(CMAKE_C_VISIBILITY_PRESET hidden)
+
 list(APPEND satoshi_sources src/address.c
                             src/block.c
                             src/buffer.c
@@ -46,12 +48,27 @@ endif()
 list(APPEND satoshi_includes ${PROJECT_SOURCE_DIR}/include
                              ${PROJECT_SOURCE_DIR}/deps/torsion/include)
 
-# add_subdirectory(deps/torsion)
-# list(APPEND satoshi_libs torsion)
+add_subdirectory(deps/torsion)
+list(APPEND satoshi_libs torsion)
 
-add_library(satoshi STATIC ${satoshi_sources})
-target_compile_definitions(satoshi PUBLIC ${satoshi_defines})
-target_compile_options(satoshi PUBLIC ${satoshi_cflags})
-target_include_directories(satoshi PUBLIC ${satoshi_includes})
-target_link_options(satoshi INTERFACE ${satoshi_ldflags})
-target_link_libraries(satoshi INTERFACE ${satoshi_libs})
+add_library(satoshi_static STATIC ${satoshi_sources})
+target_compile_definitions(satoshi_static PUBLIC ${satoshi_defines})
+target_compile_options(satoshi_static PUBLIC ${satoshi_cflags})
+target_include_directories(satoshi_static PUBLIC ${satoshi_includes})
+target_link_options(satoshi_static INTERFACE ${satoshi_ldflags})
+target_link_libraries(satoshi_static INTERFACE ${satoshi_libs})
+set_property(TARGET satoshi_static PROPERTY OUTPUT_NAME satoshi)
+
+add_library(satoshi_shared SHARED ${satoshi_sources})
+target_compile_definitions(satoshi_shared PUBLIC ${satoshi_defines}
+                                          PRIVATE BTC_EXPORT)
+target_compile_options(satoshi_shared PUBLIC ${satoshi_cflags})
+target_include_directories(satoshi_shared PUBLIC ${satoshi_includes})
+target_link_options(satoshi_shared PUBLIC ${satoshi_ldflags})
+target_link_options(satoshi_shared PRIVATE -Wl,-z,now)
+target_link_libraries(satoshi_shared PRIVATE ${satoshi_libs})
+set_property(TARGET satoshi_shared PROPERTY OUTPUT_NAME satoshi)
+
+add_executable(satoshi_test test/test.c)
+target_link_options(satoshi_test PRIVATE -Wl,-z,now)
+target_link_libraries(satoshi_test PRIVATE satoshi_shared)

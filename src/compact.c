@@ -13,12 +13,6 @@
 #include "internal.h"
 
 /*
- * Undo Coins
- */
-
-DEFINE_SERIALIZABLE_VECTOR(btc_undo, btc_coin, SCOPE_EXTERN)
-
-/*
  * Compact
  */
 
@@ -116,4 +110,3 @@ btc_compact_import(const uint8_t *target) {
 
   return bits;
 }
-
