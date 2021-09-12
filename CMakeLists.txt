@@ -19,7 +19,7 @@ list(APPEND satoshi_sources src/address.c
                             src/compact.c
                             src/crypto.c
                             src/entry.c
-                            src/impl.h
+                            src/header.c
                             src/input.c
                             src/inpvec.c
                             src/internal.c
