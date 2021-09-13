@@ -8,8 +8,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <satoshi/tx.h>
+#include <satoshi/util.h>
 #include <torsion/hash.h>
-#include <torsion/util.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -40,7 +40,7 @@ uint32_t
 btc_outpoint_hash(const btc_outpoint_t *x) {
   uint8_t tmp[36];
   btc_outpoint_write(tmp, x);
-  return murmur3_sum(tmp, 36, 0xfba4c795);
+  return btc_murmur3_sum(tmp, 36, 0xfba4c795);
 }
 
 int

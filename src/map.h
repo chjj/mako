@@ -7,33 +7,35 @@
 #ifndef BTC_MAP_H
 #define BTC_MAP_H
 
+#include <stdint.h>
 #include <string.h>
 #include <satoshi/types.h>
-#include <torsion/util.h>
+#include <satoshi/util.h>
+#include "internal.h"
 
 #define kh_inline BTC_INLINE
 #define kh_unused BTC_UNUSED
 
 #include "khash.h"
 
-#define kh_hash_hash_func(x) murmur3_sum(x, 32, 0xfba4c795)
+#define kh_hash_hash_func(x) btc_murmur3_sum(x, 32, 0xfba4c795)
 #define kh_hash_hash_equal(x, y) (memcmp(x, y, 32) == 0)
 
-#define KHASH_SET_INIT_HASH(name)                                \
-  KHASH_INIT(name, unsigned char *, char, 0, kh_hash_hash_func,  \
+#define KHASH_SET_INIT_HASH(name)                          \
+  KHASH_INIT(name, uint8_t *, char, 0, kh_hash_hash_func,  \
+                                       kh_hash_hash_equal)
+
+#define KHASH_MAP_INIT_HASH(name, khval_t)                    \
+  KHASH_INIT(name, uint8_t *, khval_t, 1, kh_hash_hash_func,  \
+                                          kh_hash_hash_equal)
+
+#define KHASH_SET_INIT_CONST_HASH(name)                          \
+  KHASH_INIT(name, const uint8_t *, char, 0, kh_hash_hash_func,  \
                                              kh_hash_hash_equal)
 
-#define KHASH_MAP_INIT_HASH(name, khval_t)                          \
-  KHASH_INIT(name, unsigned char *, khval_t, 1, kh_hash_hash_func,  \
+#define KHASH_MAP_INIT_CONST_HASH(name, khval_t)                    \
+  KHASH_INIT(name, const uint8_t *, khval_t, 1, kh_hash_hash_func,  \
                                                 kh_hash_hash_equal)
-
-#define KHASH_SET_INIT_CONST_HASH(name)                                \
-  KHASH_INIT(name, const unsigned char *, char, 0, kh_hash_hash_func,  \
-                                                   kh_hash_hash_equal)
-
-#define KHASH_MAP_INIT_CONST_HASH(name, khval_t)                          \
-  KHASH_INIT(name, const unsigned char *, khval_t, 1, kh_hash_hash_func,  \
-                                                      kh_hash_hash_equal)
 
 #define KHASH_SET_INIT_OUTPOINT(name)                             \
   KHASH_INIT(name, btc_outpoint_t *, char, 0, btc_outpoint_hash,  \
