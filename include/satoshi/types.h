@@ -160,4 +160,6 @@ typedef struct btc_view_s btc_view_t;
 struct sha256_s;
 typedef struct sha256_s btc_hash256_t;
 
+struct btc_network_s;
+
 #endif /* BTC_TYPES_H */

@@ -25,6 +25,7 @@ list(APPEND satoshi_sources src/address.c
                             src/input.c
                             src/inpvec.c
                             src/internal.c
+                            src/mainnet.c
                             src/mine.c
                             src/outpoint.c
                             src/output.c

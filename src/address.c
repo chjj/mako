@@ -8,8 +8,15 @@
 #include <stdint.h>
 #include <string.h>
 #include <satoshi/address.h>
+#include <torsion/encoding.h>
 #include "impl.h"
 #include "internal.h"
+
+enum {
+  BTC_ADDRESS_P2PKH,
+  BTC_ADDRESS_P2SH,
+  BTC_ADDRESS_WITNESS
+};
 
 /*
  * Address
