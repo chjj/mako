@@ -38,6 +38,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/inpvec.c
                             src/internal.c
                             src/mainnet.c
+                            src/mpi.c
                             src/murmur3.c
                             src/outpoint.c
                             src/output.c
@@ -55,6 +56,7 @@ else()
   list(APPEND satoshi_cflags -Wall
                              -Wextra
                              -Wcast-align
+                             -Wno-implicit-fallthrough
                              -Wshadow)
 endif()
 

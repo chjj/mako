@@ -9,7 +9,7 @@
 #include <string.h>
 #include <satoshi/entry.h>
 #include <satoshi/header.h>
-#include <torsion/mpi.h>
+#include <satoshi/mpi.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -80,32 +80,6 @@ btc_entry_read(btc_entry_t *z, const uint8_t **xp, size_t *xn) {
   return 1;
 }
 
-/* XXX */
-static void
-mpz_set_compact(mpz_t z, uint32_t bits) {
-  uint32_t exponent, negative, mantissa;
-
-  if (bits == 0) {
-    mpz_set_ui(z, 0);
-    return;
-  }
-
-  exponent = bits >> 24;
-  negative = (bits >> 23) & 1;
-  mantissa = bits & 0x7fffff;
-
-  if (exponent <= 3) {
-    mantissa >>= 8 * (3 - exponent);
-    mpz_set_ui(z, mantissa);
-  } else {
-    mpz_set_ui(z, mantissa);
-    mpz_mul_2exp(z, z, 8 * (exponent - 3));
-  }
-
-  if (negative)
-    mpz_neg(z, z);
-}
-
 void
 btc_entry_get_chainwork(uint8_t *chainwork,
                         const btc_entry_t *entry,
@@ -160,4 +134,3 @@ btc_entry_set_block(btc_entry_t *entry,
                     const btc_entry_t *prev) {
   btc_entry_set_header(entry, &block->header, prev);
 }
-

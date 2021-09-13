@@ -23,6 +23,30 @@
 #endif
 
 /*
+ * Compiler Compat
+ */
+
+/* Ignore the GCC impersonators. */
+#if defined(__GNUC__) && !defined(__clang__)        \
+                      && !defined(__llvm__)         \
+                      && !defined(__INTEL_COMPILER) \
+                      && !defined(__ICC)            \
+                      && !defined(__CC_ARM)         \
+                      && !defined(__TINYC__)        \
+                      && !defined(__PCC__)          \
+                      && !defined(__NWCC__)
+#  define BTC_GNUC
+#endif
+
+/* Ignore the MSVC impersonators. */
+#if defined(_MSC_VER) && !defined(__clang__)        \
+                      && !defined(__llvm__)         \
+                      && !defined(__INTEL_COMPILER) \
+                      && !defined(__ICL)
+#  define BTC_MSVC
+#endif
+
+/*
  * GNUC Compat
  */
 
@@ -50,6 +74,7 @@
 
 #undef LIKELY
 #undef UNLIKELY
+#undef UNPREDICTABLE
 
 #if BTC_GNUC_PREREQ(3, 0) || BTC_HAS_BUILTIN(__builtin_expect)
 #  define LIKELY(x) __builtin_expect(x, 1)
@@ -57,6 +82,12 @@
 #else
 #  define LIKELY(x) (x)
 #  define UNLIKELY(x) (x)
+#endif
+
+#if BTC_HAS_BUILTIN(__builtin_unpredictable)
+#  define UNPREDICTABLE __builtin_unpredictable
+#else
+#  define UNPREDICTABLE(x) (x)
 #endif
 
 /*
@@ -69,7 +100,7 @@
 
 #define CHECK_ALWAYS(expr) do { \
   if (UNLIKELY(!(expr)))        \
-    btc__abort();           \
+    btc__abort();               \
 } while (0)
 
 #define CHECK_NEVER(expr) do { \
@@ -117,7 +148,7 @@
 #  define STATIC_ASSERT(expr) static_assert(expr)
 #elif BTC_CPP_VERSION >= 201103L
 #  define STATIC_ASSERT(expr) static_assert(expr, "check failed")
-#elif BTC_GNUC_PREREQ(2, 7) || defined(__clang__)
+#elif BTC_GNUC_PREREQ(2, 7) || defined(__clang__) || defined(__TINYC__)
 #  define STATIC_ASSERT_2(x, y) \
      typedef char btc__assert_ ## y[(x) ? 1 : -1] __attribute__((unused))
 #  define STATIC_ASSERT_1(x, y) STATIC_ASSERT_2(x, y)
@@ -148,6 +179,18 @@
 #  define BTC_INLINE
 #endif
 
+#if BTC_STDC_VERSION >= 199901L
+#  define BTC_RESTRICT restrict
+#elif BTC_GNUC_PREREQ(3, 0)
+#  define BTC_RESTRICT __restrict__
+#elif defined(_MSC_VER) && _MSC_VER >= 1400
+#  define BTC_RESTRICT __restrict
+#elif defined(__SUNPRO_C) && __SUNPRO_C >= 0x530
+#  define BTC_RESTRICT _Restrict
+#else
+#  define BTC_RESTRICT
+#endif
+
 #if BTC_STDC_VERSION >= 201112L
 #  define BTC_NORETURN _Noreturn
 #elif BTC_CPP_VERSION >= 201103L
@@ -167,11 +210,60 @@
 #  define BTC_UNUSED [[maybe_unused]]
 #elif BTC_CPP_VERSION >= 201703L
 #  define BTC_UNUSED [[maybe_unused]]
-#elif BTC_GNUC_PREREQ(2, 7) || defined(__clang__)
+#elif BTC_GNUC_PREREQ(2, 7) || defined(__clang__) || defined(__TINYC__)
 #  define BTC_UNUSED __attribute__((unused))
 #else
 #  define BTC_UNUSED
 #endif
+
+#if defined(__GNUC__) && __GNUC__ >= 2
+#  define BTC_EXTENSION __extension__
+#else
+#  define BTC_EXTENSION
+#endif
+
+/*
+ * Types
+ */
+
+#ifdef BTC_HAVE_INT128
+BTC_EXTENSION typedef unsigned __int128 btc_uint128_t;
+BTC_EXTENSION typedef signed __int128 btc_int128_t;
+#endif
+
+/*
+ * Value Barrier
+ */
+
+#if defined(BTC_HAVE_ASM)
+#define BTC_BARRIER(type, prefix) \
+static BTC_INLINE type            \
+prefix ## _barrier(type x) {      \
+  __asm__ ("" : "+r" (x));        \
+  return x;                       \
+}
+#else
+#define BTC_BARRIER(type, prefix) \
+static BTC_INLINE type            \
+prefix ## _barrier(type x) {      \
+  return x;                       \
+}
+#endif
+
+/*
+ * Sanity Checks
+ */
+
+#if (-1 & 3) != 3
+#  error "Two's complement is required."
+#endif
+
+/*
+ * Macros
+ */
+
+#define ENTROPY_SIZE 32
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 /*
  * Helpers
