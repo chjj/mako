@@ -162,6 +162,12 @@ btc_address_set_script(btc_address_t *addr, const btc_script_t *script) {
     return 1;
   }
 
+  if (btc_script_is_multisig(script)) {
+    addr->type = BTC_ADDRESS_P2SH;
+    btc_hash160(addr->hash, script->data, script->length);
+    return 1;
+  }
+
   return 0;
 }
 

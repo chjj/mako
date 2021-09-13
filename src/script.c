@@ -785,6 +785,112 @@ btc_script_get_p2pkh(uint8_t *hash, const btc_script_t *script) {
 }
 
 int
+btc_script_is_multisig(const btc_script_t *script) {
+  return btc_script_get_multisig(NULL, script);
+}
+
+void
+btc_script_set_multisig(btc_script_t *script, const btc_multisig_t *multi) {
+  btc_writer_t writer;
+  int i;
+
+  CHECK(multi->m >= 1 && multi->m <= multi->n);
+  CHECK(multi->n >= 1 && multi->n <= 16);
+
+  btc_writer_init(&writer);
+  btc_writer_push_op(&writer, multi->m + 0x50);
+
+  for (i = 0; i < multi->n; i++)
+    btc_writer_push_data(&writer, multi->keys[i], multi->lengths[i]);
+
+  btc_writer_push_op(&writer, multi->n + 0x50);
+  btc_writer_push_op(&writer, BTC_OP_CHECKMULTISIG);
+  btc_writer_compile(script, &writer);
+  btc_writer_clear(&writer);
+}
+
+int
+btc_script_get_multisig(btc_multisig_t *multi, const btc_script_t *script) {
+  btc_reader_t reader;
+  btc_opcode_t op;
+  int state = 0;
+  int total = 0;
+  int m = 0;
+  int n = 0;
+
+  btc_reader_init(&reader, script);
+
+  while (btc_reader_next(&op, &reader)) {
+    switch (state) {
+      case 0: {
+        if (op.value < BTC_OP_1 || op.value > BTC_OP_16)
+          return 0;
+
+        m = op.value - 0x50;
+
+        if (multi != NULL)
+          multi->m = m;
+
+        state = 1;
+
+        break;
+      }
+      case 1: {
+        if (op.value >= BTC_OP_1 && op.value >= BTC_OP_16) {
+          n = op.value - 0x50;
+
+          if (multi != NULL)
+            multi->n = n;
+
+          if (m > n)
+            return 0;
+
+          if (n != total)
+            return 0;
+
+          state = 2;
+        } else {
+          if (op.length != 33 && op.length != 65)
+            return 0;
+
+          if (total == 16)
+            return 0;
+
+          if (multi != NULL)
+            multi->keys[total] = op.data;
+
+          if (multi != NULL)
+            multi->lengths[total] = op.length;
+
+          total += 1;
+        }
+
+        break;
+      }
+      case 2: {
+        if (op.value != BTC_OP_CHECKMULTISIG)
+          return 0;
+
+        state = 3;
+
+        break;
+      }
+      case 3: {
+        return 0;
+      }
+    }
+  }
+
+  if (state != 3)
+    return 0;
+
+  if (op.value == -1)
+    return 0;
+
+  return 1;
+}
+
+int
 btc_script_is_p2sh(const btc_script_t *script) {
   return script->length == 23
       && script->data[0] == BTC_OP_HASH160

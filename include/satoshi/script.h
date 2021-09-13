@@ -397,6 +397,15 @@ BTC_EXTERN int
 btc_script_get_p2pkh(uint8_t *hash, const btc_script_t *script);
 
 BTC_EXTERN int
+btc_script_is_multisig(const btc_script_t *script);
+
+BTC_EXTERN void
+btc_script_set_multisig(btc_script_t *script, const btc_multisig_t *multi);
+
+BTC_EXTERN int
+btc_script_get_multisig(btc_multisig_t *multi, const btc_script_t *script);
+
+BTC_EXTERN int
 btc_script_is_p2sh(const btc_script_t *script);
 
 BTC_EXTERN void

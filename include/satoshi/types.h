@@ -140,6 +140,13 @@ typedef struct btc_undo_s {
   size_t length;
 } btc_undo_t;
 
+typedef struct btc_multisig_s {
+  const uint8_t *keys[16];
+  size_t lengths[16];
+  int m;
+  int n;
+} btc_multisig_t;
+
 typedef struct btc_tx_cache_s {
   uint8_t prevouts[32];
   uint8_t sequences[32];
