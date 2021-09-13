@@ -9,9 +9,9 @@
 #include <string.h>
 #include <satoshi/address.h>
 #include <satoshi/crypto.h>
+#include <satoshi/encoding.h>
 #include <satoshi/network.h>
 #include <satoshi/script.h>
-#include <torsion/encoding.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -47,17 +47,14 @@ btc_address_set_str(btc_address_t *addr,
                     const char *str,
                     const btc_network_t *network) {
   const char *expect = network->address.bech32;
-  char hrp[BECH32_MAX_HRP_SIZE + 1];
+  char hrp[83 + 1];
   uint8_t checksum[32];
   uint8_t data[55];
   size_t len;
 
   btc_address_init(addr);
 
-  if (bech32_decode(hrp, &addr->version, addr->hash, &addr->length, str)) {
-    if (addr->version > 16)
-      return 0;
-
+  if (btc_bech32_decode(hrp, &addr->version, addr->hash, &addr->length, str)) {
     if (addr->version == 0) {
       if (addr->length != 20 && addr->length != 32)
         return 0;
@@ -76,7 +73,7 @@ btc_address_set_str(btc_address_t *addr,
   if (len > sizeof(data))
     return 0;
 
-  if (!base58_decode(data, &len, str, len))
+  if (!btc_base58_decode(data, &len, str, len))
     return 0;
 
   if (len != 25)
@@ -120,14 +117,18 @@ btc_address_get_str(char *str,
 
       memcpy(data + 21, checksum, 4);
 
-      CHECK(base58_encode(str, NULL, data, 25));
+      CHECK(btc_base58_encode(str, NULL, data, 25));
 
       break;
     }
 
     case BTC_ADDRESS_WITNESS: {
       const char *hrp = network->address.bech32;
-      CHECK(bech32_encode(str, hrp, addr->version, addr->hash, addr->length));
+
+      CHECK(btc_bech32_encode(str, hrp, addr->version,
+                                        addr->hash,
+                                        addr->length));
+
       break;
     }
 

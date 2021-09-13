@@ -10,7 +10,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "common.h"
-#include "impl.h"
 #include "types.h"
 
 enum btc_address_type {
@@ -18,6 +17,8 @@ enum btc_address_type {
   BTC_ADDRESS_P2SH,
   BTC_ADDRESS_WITNESS
 };
+
+#define BTC_ADDRESS_MAXLEN 90
 
 /*
  * Address

@@ -15,6 +15,8 @@ set(satoshi_libs)
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 
 list(APPEND satoshi_sources src/address.c
+                            src/base58.c
+                            src/bech32.c
                             src/block.c
                             src/buffer.c
                             src/coin.c
