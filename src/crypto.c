@@ -7,82 +7,18 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/crypto.h>
-#include <torsion/hash.h>
 #include <torsion/ecc.h>
-#include <torsion/rand.h>
-#include <torsion/util.h>
+#include <satoshi/crypto.h>
+#include <satoshi/crypto/hash.h>
+#include <satoshi/crypto/rand.h>
+#include <satoshi/util.h>
 #include "impl.h"
 #include "internal.h"
 
 static wei_curve_t *btc_secp256k1;
 
-void
-btc_ripemd160(uint8_t *out, const uint8_t *data, size_t size) {
-  ripemd160_t ctx;
-  ripemd160_init(&ctx);
-  ripemd160_update(&ctx, data, size);
-  ripemd160_final(&ctx, out);
-}
-
-void
-btc_sha1(uint8_t *out, const uint8_t *data, size_t size) {
-  sha1_t ctx;
-  sha1_init(&ctx);
-  sha1_update(&ctx, data, size);
-  sha1_final(&ctx, out);
-}
-
-void
-btc_sha256(uint8_t *out, const uint8_t *data, size_t size) {
-  sha256_t ctx;
-  sha256_init(&ctx);
-  sha256_update(&ctx, data, size);
-  sha256_final(&ctx, out);
-}
-
-void
-btc_hash160(uint8_t *out, const uint8_t *data, size_t size) {
-  hash160_t ctx;
-  hash160_init(&ctx);
-  hash160_update(&ctx, data, size);
-  hash160_final(&ctx, out);
-}
-
-void
-btc_hash256(uint8_t *out, const uint8_t *data, size_t size) {
-  hash256_t ctx;
-  hash256_init(&ctx);
-  hash256_update(&ctx, data, size);
-  hash256_final(&ctx, out);
-}
-
-void
-btc_getrandom(void *dst, size_t size) {
-  CHECK(torsion_getrandom(dst, size));
-}
-
-uint32_t
-btc_random(void) {
-  uint32_t z;
-
-  CHECK(torsion_random(&z));
-
-  return z;
-}
-
-uint32_t
-btc_uniform(uint32_t max) {
-  uint32_t z;
-
-  CHECK(torsion_uniform(&z, max));
-
-  return z;
-}
-
 static const wei_curve_t *
 btc_curve(void) {
-  /* TODO: Add a constructor for this. */
   if (btc_secp256k1 == NULL)
     btc_secp256k1 = wei_curve_create(WEI_CURVE_SECP256K1);
 
@@ -97,7 +33,7 @@ btc_ecdsa_privkey_generate(uint8_t *out) {
 
   ecdsa_privkey_generate(btc_curve(), out, entropy);
 
-  torsion_memzero(entropy, 32);
+  btc_memzero(entropy, 32);
 }
 
 int
@@ -258,7 +194,7 @@ btc_bip340_sign(uint8_t *sig, const uint8_t *msg, const uint8_t *priv) {
 
   ret = bip340_sign(btc_curve(), sig, msg, 32, priv, aux);
 
-  torsion_memzero(aux, 32);
+  btc_memzero(aux, 32);
 
   return ret;
 }
@@ -347,7 +283,7 @@ int
 btc_merkle_root(uint8_t *root, uint8_t *nodes, size_t size) {
   uint8_t *left, *right, *last;
   int malleated = 0;
-  hash256_t ctx;
+  btc_hash256_t ctx;
   size_t i;
 
   if (size == 0) {
@@ -371,10 +307,10 @@ btc_merkle_root(uint8_t *root, uint8_t *nodes, size_t size) {
 
       last = &nodes[(i / 2) * 32];
 
-      hash256_init(&ctx);
-      hash256_update(&ctx, left, 32);
-      hash256_update(&ctx, right, 32);
-      hash256_final(&ctx, last);
+      btc_hash256_init(&ctx);
+      btc_hash256_update(&ctx, left, 32);
+      btc_hash256_update(&ctx, right, 32);
+      btc_hash256_final(&ctx, last);
     }
 
     size = (size + 1) / 2;

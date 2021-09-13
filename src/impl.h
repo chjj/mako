@@ -11,10 +11,10 @@
 #include <stdint.h>
 #include "internal.h"
 
-struct sha256_s;
+struct btc_sha256_s;
 
 void
-torsion_hash256_update(struct sha256_s *ctx, const void *data, size_t len);
+btc_hash256_update(struct btc_sha256_s *ctx, const void *data, size_t len);
 
 #define SCOPE_STATIC static
 #define SCOPE_EXTERN
@@ -268,17 +268,17 @@ name ## _read(name ## _t *z, const uint8_t **xp, size_t *xn) { \
  * Serializable & Hashable Vector
  */
 
-#define DEFINE_HASHABLE_VECTOR(name, child, scope)           \
-DEFINE_SERIALIZABLE_VECTOR(name, child, scope)               \
-                                                             \
-scope void                                                   \
-name ## _update(struct sha256_s *ctx, const name ## _t *x) { \
-  size_t i;                                                  \
-                                                             \
-  btc_size_update(ctx, x->length);                           \
-                                                             \
-  for (i = 0; i < x->length; i++)                            \
-    child ## _update(ctx, x->items[i]);                      \
+#define DEFINE_HASHABLE_VECTOR(name, child, scope)               \
+DEFINE_SERIALIZABLE_VECTOR(name, child, scope)                   \
+                                                                 \
+scope void                                                       \
+name ## _update(struct btc_sha256_s *ctx, const name ## _t *x) { \
+  size_t i;                                                      \
+                                                                 \
+  btc_size_update(ctx, x->length);                               \
+                                                                 \
+  for (i = 0; i < x->length; i++)                                \
+    child ## _update(ctx, x->items[i]);                          \
 }
 
 /*
@@ -304,8 +304,8 @@ btc_uint8_read(uint8_t *zp, const uint8_t **xp, size_t *xn) {
 }
 
 BTC_UNUSED static void
-btc_uint8_update(struct sha256_s *ctx, uint8_t x) {
-  torsion_hash256_update(ctx, &x, 1);
+btc_uint8_update(struct btc_sha256_s *ctx, uint8_t x) {
+  btc_hash256_update(ctx, &x, 1);
 }
 
 BTC_UNUSED static uint8_t *
@@ -319,7 +319,7 @@ btc_int8_read(int8_t *zp, const uint8_t **xp, size_t *xn) {
 }
 
 BTC_UNUSED static void
-btc_int8_update(struct sha256_s *ctx, int8_t x) {
+btc_int8_update(struct btc_sha256_s *ctx, int8_t x) {
   btc_uint8_update(ctx, (uint8_t)x);
 }
 
@@ -345,10 +345,10 @@ btc_uint16_read(uint16_t *zp, const uint8_t **xp, size_t *xn) {
 }
 
 BTC_UNUSED static void
-btc_uint16_update(struct sha256_s *ctx, uint16_t x) {
+btc_uint16_update(struct btc_sha256_s *ctx, uint16_t x) {
   uint8_t tmp[2];
   btc_uint16_write(tmp, x);
-  torsion_hash256_update(ctx, tmp, 2);
+  btc_hash256_update(ctx, tmp, 2);
 }
 
 BTC_UNUSED static uint8_t *
@@ -362,7 +362,7 @@ btc_int16_read(int16_t *zp, const uint8_t **xp, size_t *xn) {
 }
 
 BTC_UNUSED static void
-btc_int16_update(struct sha256_s *ctx, int16_t x) {
+btc_int16_update(struct btc_sha256_s *ctx, int16_t x) {
   btc_uint16_update(ctx, (uint16_t)x);
 }
 
@@ -392,10 +392,10 @@ btc_uint32_read(uint32_t *zp, const uint8_t **xp, size_t *xn) {
 }
 
 BTC_UNUSED static void
-btc_uint32_update(struct sha256_s *ctx, uint32_t x) {
+btc_uint32_update(struct btc_sha256_s *ctx, uint32_t x) {
   uint8_t tmp[4];
   btc_uint32_write(tmp, x);
-  torsion_hash256_update(ctx, tmp, 4);
+  btc_hash256_update(ctx, tmp, 4);
 }
 
 BTC_UNUSED static uint8_t *
@@ -409,7 +409,7 @@ btc_int32_read(int32_t *zp, const uint8_t **xp, size_t *xn) {
 }
 
 BTC_UNUSED static void
-btc_int32_update(struct sha256_s *ctx, int32_t x) {
+btc_int32_update(struct btc_sha256_s *ctx, int32_t x) {
   btc_uint32_update(ctx, (uint32_t)x);
 }
 
@@ -447,10 +447,10 @@ btc_uint64_read(uint64_t *zp, const uint8_t **xp, size_t *xn) {
 }
 
 BTC_UNUSED static void
-btc_uint64_update(struct sha256_s *ctx, uint64_t x) {
+btc_uint64_update(struct btc_sha256_s *ctx, uint64_t x) {
   uint8_t tmp[8];
   btc_uint64_write(tmp, x);
-  torsion_hash256_update(ctx, tmp, 8);
+  btc_hash256_update(ctx, tmp, 8);
 }
 
 BTC_UNUSED static uint8_t *
@@ -464,7 +464,7 @@ btc_int64_read(int64_t *zp, const uint8_t **xp, size_t *xn) {
 }
 
 BTC_UNUSED static void
-btc_int64_update(struct sha256_s *ctx, int64_t x) {
+btc_int64_update(struct btc_sha256_s *ctx, int64_t x) {
   btc_uint64_update(ctx, (uint64_t)x);
 }
 
@@ -557,11 +557,11 @@ btc_varint_read(uint64_t *zp, const uint8_t **xp, size_t *xn) {
 }
 
 BTC_UNUSED static void
-btc_varint_update(struct sha256_s *ctx, uint64_t x) {
+btc_varint_update(struct btc_sha256_s *ctx, uint64_t x) {
   uint8_t tmp[9];
   uint8_t *end = btc_varint_write(tmp, x);
 
-  torsion_hash256_update(ctx, tmp, end - tmp);
+  btc_hash256_update(ctx, tmp, end - tmp);
 }
 
 BTC_UNUSED static size_t
@@ -590,7 +590,7 @@ btc_size_read(size_t *zp, const uint8_t **xp, size_t *xn) {
 }
 
 BTC_UNUSED static void
-btc_size_update(struct sha256_s *ctx, size_t x) {
+btc_size_update(struct btc_sha256_s *ctx, size_t x) {
   return btc_varint_update(ctx, x);
 }
 
@@ -618,8 +618,8 @@ btc_raw_read(uint8_t *zp, size_t zn,
 }
 
 BTC_UNUSED static void
-btc_raw_update(struct sha256_s *ctx, const uint8_t *xp, size_t xn) {
-  torsion_hash256_update(ctx, xp, xn);
+btc_raw_update(struct btc_sha256_s *ctx, const uint8_t *xp, size_t xn) {
+  btc_hash256_update(ctx, xp, xn);
 }
 
 #endif /* BTC_IMPL_INTERNAL_H */

@@ -18,30 +18,6 @@
  */
 
 BTC_EXTERN void
-btc_ripemd160(uint8_t *out, const uint8_t *data, size_t size);
-
-BTC_EXTERN void
-btc_sha1(uint8_t *out, const uint8_t *data, size_t size);
-
-BTC_EXTERN void
-btc_sha256(uint8_t *out, const uint8_t *data, size_t size);
-
-BTC_EXTERN void
-btc_hash160(uint8_t *out, const uint8_t *data, size_t size);
-
-BTC_EXTERN void
-btc_hash256(uint8_t *out, const uint8_t *data, size_t size);
-
-BTC_EXTERN void
-btc_getrandom(void *dst, size_t size);
-
-BTC_EXTERN uint32_t
-btc_random(void);
-
-BTC_EXTERN uint32_t
-btc_uniform(uint32_t max);
-
-BTC_EXTERN void
 btc_ecdsa_privkey_generate(uint8_t *out);
 
 BTC_EXTERN int

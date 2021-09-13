@@ -9,7 +9,7 @@
 #include <string.h>
 #include <satoshi/header.h>
 #include <satoshi/util.h>
-#include <torsion/hash.h>
+#include <satoshi/crypto/hash.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -96,9 +96,9 @@ btc_header_read(btc_header_t *z, const uint8_t **xp, size_t *xn) {
 
 void
 btc_header_hash(uint8_t *hash, const btc_header_t *hdr) {
-  hash256_t ctx;
+  btc_hash256_t ctx;
 
-  hash256_init(&ctx);
+  btc_hash256_init(&ctx);
 
   btc_uint32_update(&ctx, hdr->version);
   btc_raw_update(&ctx, hdr->prev_block, 32);
@@ -107,7 +107,7 @@ btc_header_hash(uint8_t *hash, const btc_header_t *hdr) {
   btc_uint32_update(&ctx, hdr->bits);
   btc_uint32_update(&ctx, hdr->nonce);
 
-  hash256_final(&ctx, hash);
+  btc_hash256_final(&ctx, hash);
 }
 
 int
@@ -130,7 +130,7 @@ btc_header_mine(btc_header_t *hdr,
                 uint32_t (*adjtime)(void *),
                 void *arg) {
   uint64_t attempt = 0;
-  hash256_t pre, ctx;
+  btc_hash256_t pre, ctx;
   uint8_t hash[32];
 
   memset(&pre, 0, sizeof(pre));
@@ -138,7 +138,7 @@ btc_header_mine(btc_header_t *hdr,
   for (;;) {
     hdr->time = adjtime(arg);
 
-    hash256_init(&pre);
+    btc_hash256_init(&pre);
 
     btc_uint32_update(&pre, hdr->version);
     btc_raw_update(&pre, hdr->prev_block, 32);
@@ -150,8 +150,7 @@ btc_header_mine(btc_header_t *hdr,
       ctx = pre;
 
       btc_uint32_update(&ctx, hdr->nonce);
-
-      hash256_final(&ctx, hash);
+      btc_hash256_final(&ctx, hash);
 
       if (btc_hash_compare(hash, target) <= 0)
         return 1;

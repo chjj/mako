@@ -50,6 +50,6 @@ BTC_EXTERN int
 btc_buffer_read(btc_buffer_t *z, const uint8_t **xp, size_t *xn);
 
 BTC_EXTERN void
-btc_buffer_update(btc_hash256_t *ctx, const btc_buffer_t *x);
+btc_buffer_update(btc__hash256_t *ctx, const btc_buffer_t *x);
 
 #endif /* BTC_BUFFER_H */

@@ -162,11 +162,10 @@ typedef struct btc_verify_error_s {
 } btc_verify_error_t;
 
 struct btc_view_s;
-typedef struct btc_view_s btc_view_t;
-
-struct sha256_s;
-typedef struct sha256_s btc_hash256_t;
-
+struct btc_sha256_s;
 struct btc_network_s;
+
+typedef struct btc_view_s btc_view_t;
+typedef struct btc_sha256_s btc__hash256_t;
 
 #endif /* BTC_TYPES_H */

@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <satoshi/buffer.h>
-#include <torsion/hash.h>
+#include <satoshi/crypto/hash.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -117,7 +117,7 @@ btc_buffer_read(btc_buffer_t *z, const uint8_t **xp, size_t *xn) {
 }
 
 void
-btc_buffer_update(hash256_t *ctx, const btc_buffer_t *x) {
+btc_buffer_update(btc_hash256_t *ctx, const btc_buffer_t *x) {
   btc_size_update(ctx, x->length);
   btc_raw_update(ctx, x->data, x->length);
 }

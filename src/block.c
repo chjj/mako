@@ -9,11 +9,11 @@
 #include <string.h>
 #include <satoshi/block.h>
 #include <satoshi/consensus.h>
-#include <satoshi/crypto.h>
+#include <satoshi/crypto.h> /* for merkle */
 #include <satoshi/header.h>
 #include <satoshi/script.h>
 #include <satoshi/tx.h>
-#include <torsion/hash.h>
+#include <satoshi/crypto/hash.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -121,7 +121,7 @@ int
 btc_block_create_commitment_hash(uint8_t *hash, const btc_block_t *blk) {
   const uint8_t *nonce = btc_block_witness_nonce(blk);
   uint8_t root[32];
-  hash256_t ctx;
+  btc_hash256_t ctx;
 
   if (nonce == NULL)
     return 0;
@@ -129,10 +129,10 @@ btc_block_create_commitment_hash(uint8_t *hash, const btc_block_t *blk) {
   if (!btc_block_witness_root(root, blk))
     return 0;
 
-  hash256_init(&ctx);
-  hash256_update(&ctx, root, 32);
-  hash256_update(&ctx, nonce, 32);
-  hash256_final(&ctx, hash);
+  btc_hash256_init(&ctx);
+  btc_hash256_update(&ctx, root, 32);
+  btc_hash256_update(&ctx, nonce, 32);
+  btc_hash256_final(&ctx, hash);
 
   return 1;
 }

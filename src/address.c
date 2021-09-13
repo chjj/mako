@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <satoshi/address.h>
-#include <satoshi/crypto.h>
+#include <satoshi/crypto/hash.h>
 #include <satoshi/encoding.h>
 #include <satoshi/network.h>
 #include <satoshi/script.h>

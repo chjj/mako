@@ -9,7 +9,7 @@
 #include <string.h>
 #include <satoshi/script.h>
 #include <satoshi/tx.h>
-#include <torsion/hash.h>
+#include <satoshi/crypto/hash.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -76,7 +76,7 @@ btc_input_read(btc_input_t *z, const uint8_t **xp, size_t *xn) {
 }
 
 void
-btc_input_update(hash256_t *ctx, const btc_input_t *x) {
+btc_input_update(btc_hash256_t *ctx, const btc_input_t *x) {
   btc_outpoint_update(ctx, &x->prevout);
   btc_script_update(ctx, &x->script);
   btc_uint32_update(ctx, x->sequence);

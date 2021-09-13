@@ -1,0 +1,30 @@
+/*!
+ * sys.h - system entropy source for libsatoshi
+ * Copyright (c) 2020, Christopher Jeffrey (MIT License).
+ * https://github.com/chjj/libsatoshi
+ */
+
+#ifndef BTC_SYS_H
+#define BTC_SYS_H
+
+#include <stddef.h>
+#include <stdint.h>
+
+/*
+ * Alias
+ */
+
+#define btc_getpid btc__getpid
+#define btc_sysrand btc__sysrand
+
+/*
+ * Entropy
+ */
+
+long
+btc_getpid(void);
+
+int
+btc_sysrand(void *dst, size_t size);
+
+#endif /* BTC_SYS_H */

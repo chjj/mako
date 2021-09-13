@@ -14,7 +14,16 @@ set(satoshi_libs)
 
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 
-list(APPEND satoshi_sources src/address.c
+list(APPEND satoshi_sources src/crypto/chacha20.c
+                            src/crypto/drbg.c
+                            src/crypto/hash160.c
+                            src/crypto/hash256.c
+                            src/crypto/rand.c
+                            src/crypto/ripemd160.c
+                            src/crypto/sha1.c
+                            src/crypto/sha256.c
+                            src/crypto/sys.c
+                            src/address.c
                             src/base58.c
                             src/bech32.c
                             src/block.c

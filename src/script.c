@@ -10,11 +10,11 @@
 #include <string.h>
 #include <satoshi/buffer.h>
 #include <satoshi/consensus.h>
-#include <satoshi/crypto.h>
+#include <satoshi/crypto.h> /* for ecc */
 #include <satoshi/policy.h>
 #include <satoshi/script.h>
 #include <satoshi/tx.h>
-#include <torsion/hash.h>
+#include <satoshi/crypto/hash.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -642,7 +642,7 @@ btc_script_read(btc_script_t *z, const uint8_t **xp, size_t *xn) {
 }
 
 void
-btc_script_update(hash256_t *ctx, const btc_script_t *x) {
+btc_script_update(btc_hash256_t *ctx, const btc_script_t *x) {
   btc_buffer_update(ctx, x);
 }
 

@@ -47,7 +47,7 @@ BTC_EXTERN int
 btc_outpoint_read(btc_outpoint_t *z, const uint8_t **xp, size_t *xn);
 
 BTC_EXTERN void
-btc_outpoint_update(btc_hash256_t *ctx, const btc_outpoint_t *x);
+btc_outpoint_update(btc__hash256_t *ctx, const btc_outpoint_t *x);
 
 /*
  * Input
@@ -74,7 +74,7 @@ BTC_EXTERN int
 btc_input_read(btc_input_t *z, const uint8_t **xp, size_t *xn);
 
 BTC_EXTERN void
-btc_input_update(btc_hash256_t *ctx, const btc_input_t *x);
+btc_input_update(btc__hash256_t *ctx, const btc_input_t *x);
 
 /*
  * Output
@@ -107,7 +107,7 @@ BTC_EXTERN int64_t
 btc_output_is_dust(const btc_output_t *x, int64_t rate);
 
 BTC_EXTERN void
-btc_output_update(btc_hash256_t *ctx, const btc_output_t *x);
+btc_output_update(btc__hash256_t *ctx, const btc_output_t *x);
 
 /*
  * Input Vector

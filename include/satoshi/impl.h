@@ -104,10 +104,10 @@ name ## _read(name ## _t *z, const uint8_t **xp, size_t *xn);
  * Serializable & Hashable Vector
  */
 
-#define BTC_DEFINE_HASHABLE_VECTOR(name, child, scope)    \
-BTC_DEFINE_SERIALIZABLE_VECTOR(name, child, scope)        \
-                                                          \
-scope void                                                \
-name ## _update(btc_hash256_t *ctx, const name ## _t *x);
+#define BTC_DEFINE_HASHABLE_VECTOR(name, child, scope)     \
+BTC_DEFINE_SERIALIZABLE_VECTOR(name, child, scope)         \
+                                                           \
+scope void                                                 \
+name ## _update(btc__hash256_t *ctx, const name ## _t *x);
 
 #endif /* BTC_IMPL_H */

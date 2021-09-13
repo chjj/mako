@@ -9,11 +9,11 @@
 #include <string.h>
 #include <satoshi/coins.h>
 #include <satoshi/consensus.h>
-#include <satoshi/crypto.h>
+#include <satoshi/crypto.h> /* for ecc */
 #include <satoshi/policy.h>
 #include <satoshi/script.h>
 #include <satoshi/tx.h>
-#include <torsion/hash.h>
+#include <satoshi/crypto/hash.h>
 #include "impl.h"
 #include "internal.h"
 #include "map.h"
@@ -68,13 +68,13 @@ btc_tx_has_witness(const btc_tx_t *tx) {
 
 static void
 btc_tx_digest(uint8_t *hash, const btc_tx_t *tx, int witness) {
-  hash256_t ctx;
+  btc_hash256_t ctx;
   size_t i;
 
   if (witness)
     witness = btc_tx_has_witness(tx);
 
-  hash256_init(&ctx);
+  btc_hash256_init(&ctx);
 
   btc_uint32_update(&ctx, tx->version);
 
@@ -93,7 +93,7 @@ btc_tx_digest(uint8_t *hash, const btc_tx_t *tx, int witness) {
 
   btc_uint32_update(&ctx, tx->locktime);
 
-  hash256_final(&ctx, hash);
+  btc_hash256_final(&ctx, hash);
 }
 
 void
@@ -115,7 +115,7 @@ btc_tx_sighash_v0(uint8_t *hash,
   const btc_input_t *input;
   const btc_output_t *output;
   btc_script_t prev;
-  hash256_t ctx;
+  btc_hash256_t ctx;
   size_t i;
 
   if ((type & 0x1f) == BTC_SIGHASH_SINGLE) {
@@ -133,7 +133,7 @@ btc_tx_sighash_v0(uint8_t *hash,
   btc_script_remove_separators(&prev, prev_);
 
   /* Start hashing. */
-  hash256_init(&ctx);
+  btc_hash256_init(&ctx);
 
   btc_uint32_update(&ctx, tx->version);
 
@@ -233,7 +233,7 @@ btc_tx_sighash_v0(uint8_t *hash,
   /* Append the hash type. */
   btc_uint32_update(&ctx, type);
 
-  hash256_final(&ctx, hash);
+  btc_hash256_final(&ctx, hash);
 }
 
 static void
@@ -248,7 +248,7 @@ btc_tx_sighash_v1(uint8_t *hash,
   uint8_t prevouts[32];
   uint8_t sequences[32];
   uint8_t outputs[32];
-  hash256_t ctx;
+  btc_hash256_t ctx;
   size_t i;
 
   memset(prevouts, 0, 32);
@@ -259,12 +259,12 @@ btc_tx_sighash_v1(uint8_t *hash,
     if (cache != NULL && cache->has_prevouts) {
       memcpy(prevouts, cache->prevouts, 32);
     } else {
-      hash256_init(&ctx);
+      btc_hash256_init(&ctx);
 
       for (i = 0; i < tx->inputs.length; i++)
         btc_outpoint_update(&ctx, &tx->inputs.items[i]->prevout);
 
-      hash256_final(&ctx, prevouts);
+      btc_hash256_final(&ctx, prevouts);
 
       if (cache != NULL) {
         memcpy(cache->prevouts, prevouts, 32);
@@ -279,12 +279,12 @@ btc_tx_sighash_v1(uint8_t *hash,
     if (cache != NULL && cache->has_sequences) {
       memcpy(sequences, cache->sequences, 32);
     } else {
-      hash256_init(&ctx);
+      btc_hash256_init(&ctx);
 
       for (i = 0; i < tx->inputs.length; i++)
         btc_uint32_update(&ctx, tx->inputs.items[i]->sequence);
 
-      hash256_final(&ctx, sequences);
+      btc_hash256_final(&ctx, sequences);
 
       if (cache != NULL) {
         memcpy(cache->sequences, sequences, 32);
@@ -298,12 +298,12 @@ btc_tx_sighash_v1(uint8_t *hash,
     if (cache != NULL && cache->has_outputs) {
       memcpy(outputs, cache->outputs, 32);
     } else {
-      hash256_init(&ctx);
+      btc_hash256_init(&ctx);
 
       for (i = 0; i < tx->outputs.length; i++)
         btc_output_update(&ctx, tx->outputs.items[i]);
 
-      hash256_final(&ctx, outputs);
+      btc_hash256_final(&ctx, outputs);
 
       if (cache != NULL) {
         memcpy(cache->outputs, outputs, 32);
@@ -312,13 +312,13 @@ btc_tx_sighash_v1(uint8_t *hash,
     }
   } else if ((type & 0x1f) == BTC_SIGHASH_SINGLE) {
     if (index < tx->outputs.length) {
-      hash256_init(&ctx);
+      btc_hash256_init(&ctx);
       btc_output_update(&ctx, tx->outputs.items[index]);
-      hash256_final(&ctx, outputs);
+      btc_hash256_final(&ctx, outputs);
     }
   }
 
-  hash256_init(&ctx);
+  btc_hash256_init(&ctx);
 
   btc_uint32_update(&ctx, tx->version);
   btc_raw_update(&ctx, prevouts, 32);
@@ -331,7 +331,7 @@ btc_tx_sighash_v1(uint8_t *hash,
   btc_uint32_update(&ctx, tx->locktime);
   btc_uint32_update(&ctx, type);
 
-  hash256_final(&ctx, hash);
+  btc_hash256_final(&ctx, hash);
 }
 
 void

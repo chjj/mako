@@ -370,7 +370,7 @@ BTC_EXTERN int
 btc_script_read(btc_script_t *z, const uint8_t **xp, size_t *xn);
 
 BTC_EXTERN void
-btc_script_update(btc_hash256_t *ctx, const btc_script_t *x);
+btc_script_update(btc__hash256_t *ctx, const btc_script_t *x);
 
 BTC_EXTERN void
 btc_script_hash160(uint8_t *hash, const btc_script_t *script);
