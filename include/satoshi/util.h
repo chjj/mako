@@ -10,15 +10,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "common.h"
-#include "impl.h"
-#include "types.h"
-
-/*
- * Misc
- */
-
-BTC_EXTERN int
-btc_hash_compare(const uint8_t *x, const uint8_t *y);
 
 /*
  * Compact
@@ -29,5 +20,59 @@ btc_compact_export(uint8_t *target, uint32_t bits);
 
 BTC_EXTERN uint32_t
 btc_compact_import(const uint8_t *target);
+
+/*
+ * Murmur3
+ */
+
+BTC_EXTERN uint32_t
+btc_murmur3_sum(const uint8_t *data, size_t len, uint32_t seed);
+
+BTC_EXTERN uint32_t
+btc_murmur3_tweak(const uint8_t *data, size_t len, uint32_t n, uint32_t tweak);
+
+/*
+ * Memory Zero
+ */
+
+BTC_EXTERN void
+btc_memzero(void *ptr, size_t len);
+
+/*
+ * Memory Compare
+ */
+
+BTC_EXTERN int
+btc_memcmp(const void *x, const void *y, size_t n);
+
+/*
+ * Memory Equal
+ */
+
+BTC_EXTERN int
+btc_memequal(const void *x, const void *y, size_t n);
+
+/*
+ * Memory XOR
+ */
+
+BTC_EXTERN void
+btc_memxor(void *z, const void *x, size_t n);
+
+BTC_EXTERN void
+btc_memxor3(void *z, const void *x, const void *y, size_t n);
+
+/*
+ * Hash
+ */
+
+BTC_EXTERN int
+btc_hash_compare(const uint8_t *x, const uint8_t *y);
+
+BTC_EXTERN int
+btc_hash_import(uint8_t *hash, const char *str);
+
+BTC_EXTERN void
+btc_hash_export(char *str, const char *hash);
 
 #endif /* BTC_UTIL_H */
