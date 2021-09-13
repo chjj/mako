@@ -542,9 +542,6 @@ int
 btc_tx_is_rbf(const btc_tx_t *tx) {
   size_t i;
 
-  if (tx->version == 2)
-    return 0;
-
   for (i = 0; i < tx->inputs.length; i++) {
     if (tx->inputs.items[i]->sequence < 0xfffffffe)
       return 1;

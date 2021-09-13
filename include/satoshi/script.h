@@ -13,14 +13,14 @@
 #include "impl.h"
 #include "types.h"
 
-enum {
+enum btc_sighash {
   BTC_SIGHASH_ALL = 1,
   BTC_SIGHASH_NONE = 2,
   BTC_SIGHASH_SINGLE = 3,
   BTC_SIGHASH_ANYONECANPAY = 0x80
 };
 
-enum {
+enum btc_script_flag {
   BTC_SCRIPT_VERIFY_NONE = 0,
   BTC_SCRIPT_VERIFY_P2SH = (1U << 0),
   BTC_SCRIPT_VERIFY_STRICTENC = (1U << 1),
@@ -41,7 +41,7 @@ enum {
   BTC_SCRIPT_VERIFY_CONST_SCRIPTCODE = (1U << 16),
 };
 
-enum {
+enum btc_script_error {
   BTC_SCRIPT_ERR_OK = 0,
   BTC_SCRIPT_ERR_UNKNOWN_ERROR,
   BTC_SCRIPT_ERR_EVAL_FALSE,
@@ -105,7 +105,7 @@ enum {
   BTC_SCRIPT_ERR_ERROR_COUNT
 };
 
-enum {
+enum btc_opcode {
   /* push value */
   BTC_OP_0 = 0x00,
   BTC_OP_FALSE = BTC_OP_0,
