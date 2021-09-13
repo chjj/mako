@@ -1236,7 +1236,7 @@ btc_script_get_subscript(btc_script_t *z, const btc_script_t *x, int index) {
     return;
   }
 
-  btc_reader_init(&reader, z);
+  btc_reader_init(&reader, x);
   btc_writer_init(&writer);
 
   while (btc_reader_next(&op, &reader)) {
