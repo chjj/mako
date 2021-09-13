@@ -1,20 +1,18 @@
 /*!
- * crypto.h - crypto for libsatoshi
+ * ecc.h - ecc for libsatoshi
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
  * https://github.com/chjj/libsatoshi
  */
 
-#ifndef BTC_CRYPTO_H
-#define BTC_CRYPTO_H
+#ifndef BTC_ECC_H
+#define BTC_ECC_H
 
 #include <stddef.h>
 #include <stdint.h>
-#include "common.h"
-#include "impl.h"
-#include "types.h"
+#include "../common.h"
 
 /*
- * Crypto
+ * ECC
  */
 
 BTC_EXTERN void
@@ -107,7 +105,4 @@ btc_bip340_sign(uint8_t *sig, const uint8_t *msg, const uint8_t *priv);
 BTC_EXTERN int
 btc_bip340_verify(const uint8_t *msg, const uint8_t *sig, const uint8_t *pub);
 
-BTC_EXTERN int
-btc_merkle_root(uint8_t *root, uint8_t *nodes, size_t size);
-
-#endif /* BTC_CRYPTO_H */
+#endif /* BTC_ECC_H */

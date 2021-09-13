@@ -9,11 +9,11 @@
 #include <string.h>
 #include <satoshi/block.h>
 #include <satoshi/consensus.h>
-#include <satoshi/crypto.h> /* for merkle */
+#include <satoshi/crypto/hash.h>
+#include <satoshi/crypto/merkle.h>
 #include <satoshi/header.h>
 #include <satoshi/script.h>
 #include <satoshi/tx.h>
-#include <satoshi/crypto/hash.h>
 #include "impl.h"
 #include "internal.h"
 

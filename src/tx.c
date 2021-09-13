@@ -9,11 +9,11 @@
 #include <string.h>
 #include <satoshi/coins.h>
 #include <satoshi/consensus.h>
-#include <satoshi/crypto.h> /* for ecc */
+#include <satoshi/crypto/ecc.h>
+#include <satoshi/crypto/hash.h>
 #include <satoshi/policy.h>
 #include <satoshi/script.h>
 #include <satoshi/tx.h>
-#include <satoshi/crypto/hash.h>
 #include "impl.h"
 #include "internal.h"
 #include "map.h"
