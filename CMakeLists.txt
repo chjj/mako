@@ -47,6 +47,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/tx.c
                             src/undo.c
                             src/util.c
+                            src/vector.c
                             src/view.c)
 
 list(APPEND satoshi_defines BTC_HAVE_ASM)

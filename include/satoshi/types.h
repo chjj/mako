@@ -22,6 +22,12 @@ typedef struct btc_buffer_s {
   size_t length;
 } btc_buffer_t;
 
+typedef struct btc_vector_s {
+  void **items;
+  size_t alloc;
+  size_t length;
+} btc_vector_t;
+
 typedef struct btc_stack_s {
   btc_buffer_t **items;
   size_t alloc;
