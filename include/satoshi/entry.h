@@ -7,6 +7,10 @@
 #ifndef BTC_ENTRY_H
 #define BTC_ENTRY_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include "common.h"
@@ -51,5 +55,9 @@ BTC_EXTERN void
 btc_entry_set_block(btc_entry_t *entry,
                     const btc_block_t *block,
                     const btc_entry_t *prev);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* BTC_ENTRY_H */

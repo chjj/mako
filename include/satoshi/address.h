@@ -7,6 +7,10 @@
 #ifndef BTC_ADDRESS_H
 #define BTC_ADDRESS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include "common.h"
@@ -56,5 +60,9 @@ btc_address_set_program(btc_address_t *addr, const btc_program_t *program);
 
 BTC_EXTERN void
 btc_address_get_program(btc_program_t *program, const btc_address_t *addr);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* BTC_ADDRESS_H */

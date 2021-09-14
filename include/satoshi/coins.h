@@ -7,6 +7,10 @@
 #ifndef BTC_COINS_H
 #define BTC_COINS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include "common.h"
@@ -80,5 +84,9 @@ btc_view_iterate(btc_view_t *view,
 
 BTC_EXTERN btc_undo_t *
 btc_view_undo(btc_view_t *view);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* BTC_COINS_H */

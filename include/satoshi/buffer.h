@@ -7,6 +7,10 @@
 #ifndef BTC_BUFFER_H
 #define BTC_BUFFER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include "common.h"
@@ -51,5 +55,9 @@ btc_buffer_read(btc_buffer_t *z, const uint8_t **xp, size_t *xn);
 
 BTC_EXTERN void
 btc_buffer_update(btc__hash256_t *ctx, const btc_buffer_t *x);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* BTC_BUFFER_H */

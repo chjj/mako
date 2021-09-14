@@ -7,6 +7,10 @@
 #ifndef BTC_SCRIPT_H
 #define BTC_SCRIPT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include "common.h"
@@ -534,5 +538,9 @@ btc_writer_push_data(btc_writer_t *z, const uint8_t *data, size_t length);
 
 BTC_EXTERN void
 btc_writer_compile(btc_script_t *z, const btc_writer_t *x);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* BTC_SCRIPT_H */

@@ -7,6 +7,10 @@
 #ifndef BTC_TX_H
 #define BTC_TX_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include "common.h"
@@ -256,5 +260,9 @@ btc_tx_coin(const btc_tx_t *tx, uint32_t index, uint32_t height);
  */
 
 BTC_DEFINE_SERIALIZABLE_VECTOR(btc_txvec, btc_tx, BTC_EXTERN)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* BTC_TX_H */

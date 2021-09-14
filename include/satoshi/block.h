@@ -7,6 +7,10 @@
 #ifndef BTC_BLOCK_H
 #define BTC_BLOCK_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include "common.h"
@@ -75,5 +79,9 @@ btc_block_write(uint8_t *zp, const btc_block_t *x);
 
 BTC_EXTERN int
 btc_block_read(btc_block_t *z, const uint8_t **xp, size_t *xn);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* BTC_BLOCK_H */

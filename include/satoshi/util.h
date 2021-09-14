@@ -7,6 +7,10 @@
 #ifndef BTC_UTIL_H
 #define BTC_UTIL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include "common.h"
@@ -74,5 +78,9 @@ btc_hash_import(uint8_t *hash, const char *str);
 
 BTC_EXTERN void
 btc_hash_export(char *str, const char *hash);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* BTC_UTIL_H */
