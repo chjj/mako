@@ -50,6 +50,10 @@ list(APPEND satoshi_sources src/crypto/asn1.c
                             src/util.c
                             src/view.c)
 
+list(APPEND satoshi_defines BTC_HAVE_ASM)
+list(APPEND satoshi_defines BTC_HAVE_INT128)
+list(APPEND satoshi_defines BTC_TLS=__thread)
+
 if(MSVC)
   list(APPEND satoshi_cflags /wd4244
                              /wd4267)
@@ -61,13 +65,7 @@ else()
                              -Wshadow)
 endif()
 
-list(APPEND satoshi_includes ${PROJECT_SOURCE_DIR}/include
-                             ${PROJECT_SOURCE_DIR}/deps/torsion/include)
-
-# list(APPEND satoshi_defines BTC_HAVE_INT128)
-
-add_subdirectory(deps/torsion)
-list(APPEND satoshi_libs torsion)
+list(APPEND satoshi_includes ${PROJECT_SOURCE_DIR}/include)
 
 add_library(satoshi_static STATIC ${satoshi_sources})
 target_compile_definitions(satoshi_static PUBLIC ${satoshi_defines})
