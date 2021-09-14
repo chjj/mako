@@ -66,44 +66,39 @@ btc_tx_has_witness(const btc_tx_t *tx) {
   return 0;
 }
 
-static void
-btc_tx_digest(uint8_t *hash, const btc_tx_t *tx, int witness) {
+void
+btc_tx_txid(uint8_t *hash, const btc_tx_t *tx) {
   btc_hash256_t ctx;
-  size_t i;
-
-  if (witness)
-    witness = btc_tx_has_witness(tx);
-
   btc_hash256_init(&ctx);
-
   btc_uint32_update(&ctx, tx->version);
-
-  if (witness) {
-    btc_uint8_update(&ctx, 0);
-    btc_uint8_update(&ctx, 1);
-  }
-
   btc_inpvec_update(&ctx, &tx->inputs);
   btc_outvec_update(&ctx, &tx->outputs);
-
-  if (witness) {
-    for (i = 0; i < tx->inputs.length; i++)
-      btc_stack_update(&ctx, &tx->inputs.items[i]->witness);
-  }
-
   btc_uint32_update(&ctx, tx->locktime);
-
   btc_hash256_final(&ctx, hash);
 }
 
 void
-btc_tx_txid(uint8_t *hash, const btc_tx_t *tx) {
-  btc_tx_digest(hash, tx, 0);
-}
-
-void
 btc_tx_wtxid(uint8_t *hash, const btc_tx_t *tx) {
-  btc_tx_digest(hash, tx, 1);
+  btc_hash256_t ctx;
+  size_t i;
+
+  if (!btc_tx_has_witness(tx)) {
+    btc_tx_txid(hash, tx);
+    return;
+  }
+
+  btc_hash256_init(&ctx);
+  btc_uint32_update(&ctx, tx->version);
+  btc_uint8_update(&ctx, 0);
+  btc_uint8_update(&ctx, 1);
+  btc_inpvec_update(&ctx, &tx->inputs);
+  btc_outvec_update(&ctx, &tx->outputs);
+
+  for (i = 0; i < tx->inputs.length; i++)
+    btc_stack_update(&ctx, &tx->inputs.items[i]->witness);
+
+  btc_uint32_update(&ctx, tx->locktime);
+  btc_hash256_final(&ctx, hash);
 }
 
 static void
@@ -402,8 +397,48 @@ btc_tx_verify_input(const btc_tx_t *tx,
 }
 
 int
+btc_tx_sign(btc_tx_t *tx,
+            btc_view_t *view,
+            uint32_t flags,
+            int (*derive)(uint8_t *priv,
+                          const btc_script_t *script,
+                          void *arg),
+            void *arg) {
+  const btc_input_t *input;
+  const btc_coin_t *coin;
+  btc_tx_cache_t cache;
+  uint8_t priv[32];
+  int total = 0;
+  size_t i;
+
+  memset(&cache, 0, sizeof(cache));
+
+  for (i = 0; i < tx->inputs.length; i++) {
+    input = tx->inputs.items[i];
+    coin = btc_view_get(view, &input->prevout);
+
+    if (coin == NULL)
+      continue;
+
+    if (!derive(priv, &coin->output.script, arg))
+      continue;
+
+    total += btc_tx_sign_input(tx,
+                               i,
+                               &coin->output,
+                               priv,
+                               BTC_SIGHASH_ALL,
+                               &cache);
+
+    btc_memzero(priv, 32);
+  }
+
+  return total;
+}
+
+int
 btc_tx_sign_input(btc_tx_t *tx,
-                  uint32_t index,
+                  size_t index,
                   const btc_output_t *coin,
                   const uint8_t *priv,
                   unsigned int type,

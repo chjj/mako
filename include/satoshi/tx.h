@@ -173,8 +173,17 @@ btc_tx_verify_input(const btc_tx_t *tx,
                     btc_tx_cache_t *cache);
 
 BTC_EXTERN int
+btc_tx_sign(btc_tx_t *tx,
+            btc_view_t *view,
+            uint32_t flags,
+            int (*derive)(uint8_t *priv,
+                          const btc_script_t *script,
+                          void *arg),
+            void *arg);
+
+BTC_EXTERN int
 btc_tx_sign_input(btc_tx_t *tx,
-                  uint32_t index,
+                  size_t index,
                   const btc_output_t *coin,
                   const uint8_t *priv,
                   unsigned int type,
