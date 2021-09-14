@@ -7,6 +7,10 @@
 #ifndef BTC_ECC_H
 #define BTC_ECC_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include "../common.h"
@@ -287,5 +291,9 @@ BTC_EXTERN int
 btc_bip340_derive(unsigned char *secret,
                   const unsigned char *pub,
                   const unsigned char *priv);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* BTC_ECC_H */
