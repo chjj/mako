@@ -17,6 +17,7 @@ set(CMAKE_C_VISIBILITY_PRESET hidden)
 list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/crypto/drbg.c
                             src/crypto/ecc.c
+                            src/crypto/ecc_wrap.c
                             src/crypto/hash160.c
                             src/crypto/hash256.c
                             src/crypto/merkle.c
