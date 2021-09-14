@@ -421,7 +421,8 @@ btc_tx_sign_input(btc_tx_t *tx,
   uint8_t msg[32];
   uint8_t hash[20];
   uint8_t pub[65];
-  uint8_t der[73];
+  uint8_t der[74];
+  uint8_t sig[64];
   size_t der_len;
   size_t len;
 
@@ -437,8 +438,12 @@ btc_tx_sign_input(btc_tx_t *tx,
       btc_tx_sighash(msg, tx, index, script,
                      value, type, 0, cache);
 
-      if (!btc_ecdsa_sign(der, &der_len, msg, priv))
+      if (!btc_ecdsa_sign(sig, NULL, msg, 32, priv))
         return 0;
+
+      CHECK(btc_ecdsa_sig_export(der, &der_len, sig));
+
+      der[der_len++] = type;
 
       btc_writer_init(&writer);
       btc_writer_push_data(&writer, der, der_len);
@@ -459,8 +464,12 @@ btc_tx_sign_input(btc_tx_t *tx,
       btc_tx_sighash(msg, tx, index, script,
                      value, type, 0, cache);
 
-      if (!btc_ecdsa_sign(der, &der_len, msg, priv))
+      if (!btc_ecdsa_sign(sig, NULL, msg, 32, priv))
         return 0;
+
+      CHECK(btc_ecdsa_sig_export(der, &der_len, sig));
+
+      der[der_len++] = type;
 
       btc_writer_init(&writer);
       btc_writer_push_data(&writer, der, der_len);
@@ -491,8 +500,12 @@ btc_tx_sign_input(btc_tx_t *tx,
 
     btc_script_clear(&redeem);
 
-    if (!btc_ecdsa_sign(der, &der_len, msg, priv))
+    if (!btc_ecdsa_sign(sig, NULL, msg, 32, priv))
       return 0;
+
+    CHECK(btc_ecdsa_sig_export(der, &der_len, sig));
+
+    der[der_len++] = type;
 
     btc_stack_reset(&input->witness);
     btc_stack_push_data(&input->witness, der, der_len);
@@ -525,8 +538,12 @@ btc_tx_sign_input(btc_tx_t *tx,
 
     btc_script_clear(&redeem);
 
-    if (!btc_ecdsa_sign(der, &der_len, msg, priv))
+    if (!btc_ecdsa_sign(sig, NULL, msg, 32, priv))
       return 0;
+
+    CHECK(btc_ecdsa_sig_export(der, &der_len, sig));
+
+    der[der_len++] = type;
 
     btc_stack_reset(&input->witness);
     btc_stack_push_data(&input->witness, der, der_len);

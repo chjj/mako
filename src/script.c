@@ -1542,7 +1542,12 @@ is_signature_encoding(const btc_buffer_t *sig) {
 
 static int
 is_low_der(const btc_buffer_t *sig) {
-  return btc_ecdsa_is_low_der(sig->data, sig->length);
+  uint8_t tmp[64];
+
+  if (!btc_ecdsa_sig_import(tmp, sig->data, sig->length))
+    return 0;
+
+  return btc_ecdsa_is_low_s(tmp);
 }
 
 static int
@@ -1634,11 +1639,18 @@ validate_key(const btc_buffer_t *key, unsigned int flags, int version) {
 
 static int
 checksig(const uint8_t *msg, const btc_buffer_t *sig, const btc_buffer_t *key) {
+  uint8_t tmp[64];
+
   if (sig->length == 0)
     return 0;
 
-  return btc_ecdsa_checksig(msg, sig->data, sig->length - 1,
-                                 key->data, key->length);
+  if (!btc_ecdsa_sig_import_lax(tmp, sig->data, sig->length - 1))
+    return 0;
+
+  if (!btc_ecdsa_sig_normalize(tmp, tmp))
+    return 0;
+
+  return btc_ecdsa_verify(msg, 32, tmp, key->data, key->length);
 }
 
 #define THROW(x) do { err = (x); goto done; } while (0)

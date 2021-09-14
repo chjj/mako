@@ -177,7 +177,7 @@ typedef struct wei_scratch_s {
   int **nafs;
   wge_t *points;
   sc_t *coeffs;
-} wei__scratch_t;
+} wei_scratch_t;
 
 /*
  * SECP256K1
@@ -1278,7 +1278,6 @@ wge_equal(const wge_t *p1, const wge_t *p2) {
 
 static int
 wge_is_zero(const wge_t *p) {
-  (void)ec;
   return p->inf;
 }
 
@@ -1687,7 +1686,6 @@ jge_set(jge_t *r, const jge_t *p) {
 
 static int
 jge_is_zero(const jge_t *p) {
-  (void)ec;
   return p->inf;
 }
 
@@ -2946,7 +2944,7 @@ wei_jmul_multi_var(jge_t *r,
                    const wge_t *points,
                    sc_t *coeffs,
                    size_t len,
-                   wei__scratch_t *scratch) {
+                   wei_scratch_t *scratch) {
   /* Multiple point multiplication, also known
    * as "Shamir's trick" (with interleaved NAFs).
    *
@@ -3022,7 +3020,7 @@ wei_mul_multi_var(wge_t *r,
                   const wge_t *points,
                   sc_t *coeffs,
                   size_t len,
-                  wei__scratch_t *scratch) {
+                  wei_scratch_t *scratch) {
   jge_t j;
 
   wei_jmul_multi_var(&j, k0, points, coeffs, len, scratch);
@@ -3335,13 +3333,13 @@ wei_point_to_hash(unsigned char *bytes,
 }
 
 /*
- * Short Weierstrass API
+ * Scratch API
  */
 
-wei__scratch_t *
-wei_scratch_create(size_t size) {
-  wei__scratch_t *scratch =
-    (wei__scratch_t *)checked_malloc(sizeof(wei__scratch_t));
+wei_scratch_t *
+btc_scratch_create(size_t size) {
+  wei_scratch_t *scratch =
+    (wei_scratch_t *)checked_malloc(sizeof(wei_scratch_t));
   size_t i;
 
   scratch->size = size;
@@ -3362,9 +3360,7 @@ wei_scratch_create(size_t size) {
 }
 
 void
-wei_scratch_destroy(wei__scratch_t *scratch) {
-  (void)ec;
-
+btc_scratch_destroy(wei_scratch_t *scratch) {
   free(scratch->wnd);
   free(scratch->wnds);
   free(scratch->naf);
@@ -3501,9 +3497,9 @@ btc_ecdsa_pubkey_create(unsigned char *pub,
 
 int
 btc_ecdsa_pubkey_convert(unsigned char *out,
-                     const unsigned char *pub,
-                     size_t pub_len,
-                     int compact) {
+                         const unsigned char *pub,
+                         size_t pub_len,
+                         int compact) {
   int ret = 1;
   wge_t A;
 
@@ -3773,10 +3769,6 @@ ecdsa_reduce(sc_t r, const unsigned char *msg, size_t msg_len) {
   /* Import and pad. */
   mpn_import(r, SCALAR_LIMBS, msg, msg_len, 1);
 
-  /* Shift by the remaining bits. */
-  if (msg_len * 8 > (size_t)256)
-    mpn_rshift(r, r, SCALAR_LIMBS, msg_len * 8 - 256);
-
   /* Reduce (r < 2^ceil(log2(n+1))). */
   return sc_reduce_weak(r, r, 0) ^ 1;
 }
@@ -3874,7 +3866,7 @@ btc_ecdsa_sign_internal(unsigned char *sig,
                         const unsigned char *msg,
                         size_t msg_len,
                         const unsigned char *priv,
-                        btc_ecdsa_redefine_f *redefine) {
+                        btc_redefine_f *redefine) {
   /* ECDSA Signing.
    *
    * [SEC1] Page 44, Section 4.1.3.
@@ -4674,7 +4666,7 @@ btc_bip340_verify_batch(const unsigned char *const *msgs,
                         const unsigned char *const *sigs,
                         const unsigned char *const *pubs,
                         size_t len,
-                        wei__scratch_t *scratch) {
+                        wei_scratch_t *scratch) {
   /* BIP340 Batch Verification.
    *
    * [BIP340] "Batch Verification".

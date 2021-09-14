@@ -18,7 +18,6 @@ list(APPEND satoshi_sources src/crypto/asn1.c
                             src/crypto/chacha20.c
                             src/crypto/drbg.c
                             src/crypto/ecc.c
-                            src/crypto/ecc_wrap.c
                             src/crypto/hash160.c
                             src/crypto/hash256.c
                             src/crypto/merkle.c
