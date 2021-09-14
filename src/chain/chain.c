@@ -1,4 +1,3 @@
-
 int
 btc_chain_add(btc_chain_t *chain, btc_block_t *block, int flags, int id) {
   btc_entry_t *prev, *entry;
@@ -93,7 +92,7 @@ btc_chain_connect(btc_chain_t *chain, btc_entry_t *prev, btc_block_t *block, int
   return entry;
 }
 
-static btc_entry_t *
+static int
 btc_chain_save_alternate(btc_chain_t *chain,
                          const btc_entry_t *entry,
                          btc_block_t *block,
@@ -102,10 +101,7 @@ btc_chain_save_alternate(btc_chain_t *chain,
   int ret = 0;
 
   if (chain->checkpoints_enabled) {
-    size_t index = chain->network->checkpoints.length - 1;
-    const btc_checkpoint_t *last = &chain->network->checkpoints.items[index];
-
-    if (prev->height + 1 < last->height) {
+    if (prev->height + 1 < chain->network->last_checkpoint) {
       chain->verify_error(chain->arg, entry->hash, "checkpoint",
                           "bad-fork-prior-to-checkpoint",
                           100);
@@ -129,14 +125,14 @@ fail:
   return ret;
 }
 
-static btc_entry_t *
+static int
 btc_chain_set_best_chain(btc_chain_t *chain,
                          const btc_entry_t *entry,
                          btc_block_t *block,
                          const btc_entry_t *prev,
                          int flags) {
+  const btc_entry_t *fork = NULL;
   btc_entry_t *tip = chain->tip;
-  btc_entry_t *fork = NULL;
   btc_deploy_state_t state;
   btc_view_t *view;
   int ret = 0;
@@ -191,7 +187,7 @@ fail:
   return ret;
 }
 
-static btc_entry_t *
+static const btc_entry_t *
 btc_chain_find_fork(btc_chain_t *chain,
                     const btc_entry_t *fork,
                     const btc_entry_t *longer) {
@@ -199,8 +195,7 @@ btc_chain_find_fork(btc_chain_t *chain,
     while (longer.height > fork.height) {
       longer = longer->prev;
 
-      if (longer == NULL)
-        return NULL;
+      CHECK(longer != NULL);
     }
 
     if (fork == longer)
@@ -208,57 +203,67 @@ btc_chain_find_fork(btc_chain_t *chain,
 
     fork = fork->prev;
 
-    if (fork == NULL)
-      return NULL;
+    CHECK(fork != NULL);
   }
 
   return fork;
 }
 
-static btc_entry_t *
+static const btc_entry_t *
 btc_chain_reorganize(btc_chain_t *chain, const btc_entry_t *competitor) {
-  btc_entry_t *tip = chain->tip;
-  btc_entry_t *fork = btc_chain_find_fork(chain, competitor);
-  btc_entryvec_t disconnect, connect;
-  btc_entry_t *entry;
+  const btc_entry_t *tip = chain->tip;
+  const btc_entry_t *fork = btc_chain_find_fork(chain, competitor);
+  btc_vector_t disconnect, connect;
+  const btc_entry_t *entry;
 
   CHECK(fork != NULL);
 
-  btc_entryvec_init(&disconnect);
-  btc_entryvec_init(&connect);
+  btc_vector_init(&disconnect);
+  btc_vector_init(&connect);
 
   /* Blocks to disconnect. */
   for (entry = tip; entry != fork; entry = entry->prev) {
-    btc_entryvec_push(&disconnect, entry);
+    btc_vector_push(&disconnect, entry);
     entry = entry->prev;
   }
 
   /* Blocks to connect. */
   for (entry = competitor; entry != fork; entry = entry->prev) {
-    btc_entryvec_push(&connect, entry);
+    btc_vector_push(&connect, entry);
     entry = entry->prev;
   }
 
-  for (i = 0; i < disconnect.length; i++)
-    CHECK(btc_chain_disconnect(chain, disconnect.items[i]));
+  for (i = 0; i < disconnect.length; i++) {
+    entry = (const btc_entry_t *)disconnect.items[i];
+
+    CHECK(btc_chain_disconnect(chain, entry));
+
+    if (entry->prev != NULL)
+      entry->prev->next = NULL;
+  }
 
   CHECK(connect.length > 0);
 
   for (i = connect.length - 1; i != 0; i--) {
-    if (!btc_chain_reconnect(chain, connect.items[i])) {
+    entry = (const btc_entry_t *)connect.items[i];
+
+    if (!btc_chain_reconnect(chain, entry)) {
       if (btc_hash_compare(chain->tip->chainwork, tip->chainwork) < 0)
         btc_chain_unreorganize(chain, fork, tip);
 
       fork = NULL;
       goto done;
     }
+
+    if (entry->prev != NULL)
+      entry->prev->next = entry;
   }
 
   chain->on_reorganize(arg, tip, competitor);
 
 done:
-  btc_entryvec_clear(&disconnect);
-  btc_entryvec_clear(&connect);
+  btc_vector_clear(&disconnect);
+  btc_vector_clear(&connect);
   return fork;
 }
 
@@ -266,33 +271,195 @@ static void
 btc_chain_unreorganize(btc_chain_t *chain,
                        const btc_entry_t *fork,
                        const btc_entry_t *last) {
-  btc_entry_t *tip = chain->tip;
-  btc_entryvec_t disconnect, connect;
-  btc_entry_t *entry;
+  const btc_entry_t *tip = chain->tip;
+  btc_vector_t disconnect, connect;
+  const btc_entry_t *entry;
 
-  btc_entryvec_init(&disconnect);
-  btc_entryvec_init(&connect);
+  btc_vector_init(&disconnect);
+  btc_vector_init(&connect);
 
   /* Blocks to disconnect. */
   for (entry = tip; entry != fork; entry = entry->prev) {
-    btc_entryvec_push(&disconnect, entry);
+    btc_vector_push(&disconnect, entry);
     entry = entry->prev;
   }
 
   /* Blocks to connect. */
   for (entry = last; entry != fork; entry = entry->prev) {
-    btc_entryvec_push(&connect, entry);
+    btc_vector_push(&connect, entry);
     entry = entry->prev;
   }
 
-  for (i = 0; i < disconnect.length; i++)
-    CHECK(btc_chain_disconnect(chain, disconnect.items[i]));
+  for (i = 0; i < disconnect.length; i++) {
+    entry = (const btc_entry_t *)disconnect.items[i];
 
-  for (i = connect.length - 1; i != (size_t)-1; i--)
-    CHECK(btc_chain_reconnect(chain, connect.items[i]));
+    CHECK(btc_chain_disconnect(chain, entry));
+  }
+
+  for (i = connect.length - 1; i != (size_t)-1; i--) {
+    entry = (const btc_entry_t *)connect.items[i];
+
+    CHECK(btc_chain_reconnect(chain, entry));
+  }
 
   chain->on_reorganize(arg, tip, last);
 
-  btc_entryvec_clear(&disconnect);
-  btc_entryvec_clear(&connect);
+  btc_vector_clear(&disconnect);
+  btc_vector_clear(&connect);
+}
+
+static int
+btc_chain_reconnect(btc_chain_t *chain, const btc_entry_t *entry) {
+  int flags = BTC_CHAIN_VERIFY_NONE;
+  btc_deploy_state_t state;
+  btc_entry_t *prev;
+  btc_block_t *block;
+  btc_view_t *view;
+  int ret = 0;
+
+  block = btc_chain_get_block(chain, entry->hash);
+
+  if (block == NULL) {
+    btc_chain_log(chain, "Block data not found: %h (%d).\n",
+                         entry->hash, entry->height);
+
+    return 0;
+  }
+
+  prev = entry->prev;
+
+  CHECK(prev != NULL);
+
+  view = btc_chain_verify_context(chain, &state, block, prev, flags);
+
+  if (view == NULL) {
+    btc_chain_log(chain, "Tried to connect invalid block: %h (%d).\n",
+                         entry->hash, entry->height);
+    goto fail;
+  }
+
+  CHECK(btc_chaindb_reconnect(chain->db, entry, block, view));
+
+  chain->tip = entry;
+  chain->height = entry->height;
+  chain->state = state;
+
+  chain->on_connect(chain->arg, entry, block, view);
+
+  btc_view_destroy(view);
+
+  ret = 1;
+fail:
+  btc_block_destroy(block);
+  return ret;
+}
+
+static int
+btc_chain_disconnect(btc_chain_t *chain, const btc_entry_t *entry) {
+  btc_entry_t *prev;
+  btc_block_t *block;
+  btc_view_t *view;
+
+  block = btc_chain_get_block(chain, entry->hash);
+
+  if (block == NULL) {
+    btc_chain_log(chain, "Block data not found: %h (%d).\n",
+                         entry->hash, entry->height);
+
+    return 0;
+  }
+
+  prev = entry->prev;
+
+  CHECK(prev != NULL);
+
+  view = btc_chaindb_disconnect(chain->db, entry, block);
+
+  CHECK(view != NULL);
+
+  chain->tip = entry;
+  chain->height = entry->height;
+
+  chain->on_disconnect(chain->arg, entry, block, view);
+
+  btc_view_destroy(view);
+  btc_block_destroy(block);
+
+  return 1;
+}
+
+uint32_t
+btc_chain_get_target(btc_chain_t *chain, uint32_t time, const btc_entry_t *prev) {
+  const btc_network_t *net = chain->network;
+  const btc_entry_t *first;
+  int height;
+
+  if (prev == NULL) {
+    CHECK(time == net->genesis.header.time);
+    return net->pow.bits;
+  }
+
+  /* Do not retarget. */
+  if ((prev->height + 1) % net->pow.retarget_interval != 0) {
+    if (net->pow.target_reset) {
+      /* Special behavior for testnet. */
+      if ((uint64_t)time > (uint64_t)prev->time + net->pow.target_spacing * 2)
+        return net->pow.bits;
+    }
+
+    while (prev->prev != NULL
+           && prev->height % net->pow.retarget_interval != 0
+           && prev->header.bits == net->pow.bits) {
+      prev = prev->prev;
+    }
+
+    return prev->bits;
+  }
+
+  /* Back 2 weeks. */
+  height = (int)prev->height - ((int)net->pow.retarget_interval - 1);
+  CHECK(height >= 0);
+
+  first = btc_chain_get_ancestor(chain, prev, height);
+  CHECK(first != NULL);
+
+  return btc_chain_retarget(chain, prev, first);
+}
+
+static uint32_t
+btc_chain_retarget(btc_chain_t *chain, const btc_entry_t *prev, const btc_entry_t *first) {
+  const btc_network_t *net = chain->network;
+  int64_t target_timespan = net->pow.target_timespan;
+  int64_t actual_timespan;
+  mpz_t limit, target;
+  uint32_t ret;
+
+  if (net->pow.no_retargeting)
+    return prev->header.bits;
+
+  mpz_init(limit);
+  mpz_import(limit, net->pow.limit, 32, -1);
+
+  mpz_init_set_compact(target, prev->header.bits);
+
+  actual_timespan = (int64_t)prev->header.time - (int64_t)first->header.time;
+
+  if (actual_timespan < target_timespan / 4)
+    actual_timespan = target_timespan / 4;
+
+  if (actual_timespan > target_timespan * 4)
+    actual_timespan = target_timespan * 4;
+
+  mpz_mul(target, target, actual_timespan);
+  mpz_quo(target, target, target_timespan);
+
+  if (mpz_cmp(target, limit) <= 0) {
+    ret = mpz_get_compact(target);
+  else
+    ret = net->pow.bits;
+
+  mpz_clear(limit);
+  mpz_clear(target);
+
+  return ret;
 }
