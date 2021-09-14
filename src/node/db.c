@@ -193,7 +193,8 @@ btc_db_write(struct btc_db_s *db, struct btc_batch_s *bat) {
 
 struct btc_batch_s *
 btc_batch_create(void) {
-  struct btc_batch_s *bat = (struct btc_batch_s *)malloc(sizeof(btc_batch_s));
+  struct btc_batch_s *bat =
+    (struct btc_batch_s *)malloc(sizeof(struct btc_batch_s));
 
   CHECK(bat != NULL);
 
@@ -231,7 +232,8 @@ btc_batch_clear(struct btc_batch_s *bat) {
 
 struct btc_iter_s *
 btc_iter_create(struct btc_db_s *db, int use_snapshot) {
-  struct btc_iter_s *iter = (struct btc_iter_s *)malloc(sizeof(btc_iter_s));
+  struct btc_iter_s *iter =
+    (struct btc_iter_s *)malloc(sizeof(struct btc_iter_s));
 
   CHECK(iter != NULL);
 
@@ -257,7 +259,7 @@ btc_iter_destroy(struct btc_iter_s *iter) {
   leveldb_iter_destroy(iter->it);
 
   if (iter->snapshot != NULL)
-    leveldb_release_snapshot(iter->db, iter->snapshot);
+    leveldb_release_snapshot(iter->level, iter->snapshot);
 
   leveldb_readoptions_destroy(iter->options);
 
