@@ -346,7 +346,11 @@ class FieldEncoder {
   }
 
   output(type, name, val) {
-    console.log(`static const ${type} field_${this.id}_${name} = %s;\n`, val);
+    // console.log(`static const ${type} field_${this.id}_${name} = %s;\n`, val);
+    if (this.id === 'secq256k1')
+      console.log(`static const ${type} scalar_${name} = %s;\n`, val);
+    else
+      console.log(`static const ${type} field_${name} = %s;\n`, val);
   }
 }
 
@@ -380,15 +384,12 @@ class CurveEncoder {
   }
 
   output(type, name, val) {
-    console.log(`static const ${type} ${this.id}_${name} = %s;\n`, val);
+    // console.log(`static const ${type} ${this.id}_${name} = %s;\n`, val);
+    console.log(`static const ${type} curve_${name} = %s;\n`, val);
   }
 }
 
-function encodePrimeField(field, width) {
-  const c = new FieldEncoder(field, width);
-
-  c.output('mp_limb_t', 'p[REDUCE_LIMBS]', c.scalar(c.m));
-  c.output('unsigned char', 'raw[FIELD_SIZE]', c.bytes(c.m));
+function encodeFieldConstants(c) {
   c.output('fe_t', 'zero', c.field(new BN(0)));
   c.output('fe_t', 'one', c.field(new BN(1)));
   c.output('fe_t', 'two', c.field(new BN(2)));
@@ -397,11 +398,28 @@ function encodePrimeField(field, width) {
   c.output('fe_t', 'mone', c.field(new BN(-1).mod(c.m)));
 }
 
-function encodePrimeField2(field) {
-  console.log('#if defined(BTC_HAVE_INT128)');
-  encodePrimeField(field, 64);
+function encodePrimeField(field) {
+  const c32 = new FieldEncoder(field, 32);
+  const c64 = new FieldEncoder(field, 64);
+
+  c32.output('unsigned char', 'raw[FIELD_SIZE]', c32.bytes(c32.m));
+
+  console.log('#if MP_LIMB_BITS == 64');
+  console.log('');
+  c64.output('sc_t', 'p', c64.scalar(c64.m));
   console.log('#else');
-  encodePrimeField(field, 32);
+  console.log('');
+  c32.output('sc_t', 'p', c32.scalar(c32.m));
+  console.log('#endif');
+
+  console.log('');
+
+  console.log('#if defined(BTC_HAVE_INT128)');
+  console.log('');
+  encodeFieldConstants(c64);
+  console.log('#else');
+  console.log('');
+  encodeFieldConstants(c32);
   console.log('#endif');
 }
 
@@ -426,7 +444,7 @@ function montify(q, width, limbs) {
   return [k, r];
 }
 
-function encodeScalarField(field, width) {
+function encodeScalarConstants(field, width) {
   const c = new FieldEncoder(field, width);
   const bits = c.m.bitLength();
   const limbs = Math.ceil(bits / width);
@@ -436,29 +454,48 @@ function encodeScalarField(field, width) {
   const nh = c.m.ushrn(1);
   const n = c.m;
 
-  c.output('mp_limb_t', 'n[SCALAR_LIMBS]', c.scalar(n));
-  c.output('mp_limb_t', 'nh[SCALAR_LIMBS]', c.scalar(nh));
+  c.output('sc_t', 'n', c.scalar(n));
+  c.output('sc_t', 'nh', c.scalar(nh));
   c.output('mp_limb_t', 'm[REDUCE_LIMBS - SCALAR_LIMBS + 1]', c.scalar(m));
   c.output('mp_limb_t', 'k', c.integer(k));
-  c.output('mp_limb_t', 'r2[SCALAR_LIMBS]', c.scalar(r2));
+  c.output('sc_t', 'r2', c.scalar(r2));
+  c.output('sc_t', 'one', c.scalar(new BN(1)));
 }
 
-function encodeScalarField2(field) {
+function encodeScalarField(field) {
   console.log('#if MP_LIMB_BITS == 64');
-  encodeScalarField(field, 64);
+  console.log('');
+  encodeScalarConstants(field, 64);
   console.log('#else');
-  encodeScalarField(field, 32);
+  console.log('');
+  encodeScalarConstants(field, 32);
   console.log('#endif');
 }
 
-function encodeShortCurve(curve, primeField, scalarField, width) {
-  const c = new CurveEncoder(curve, primeField, scalarField, width);
+function encodeShortCurveScalars(curve, c) {
+  c.output('sc_t', 'sc_p', c.scalar(curve.pmodn));
+
+  if (curve.endo) {
+    const lambda = curve.endo.lambda.neg().imod(curve.n);
+    const b1 = curve.endo.basis[0].b.neg().imod(curve.n);
+    const b2 = curve.endo.basis[1].b.neg().imod(curve.n);
+    const g1 = curve.endo.pre[1];
+    const g2 = curve.endo.pre[2].neg();
+
+    c.output('sc_t', 'lambda', c.scalar(lambda));
+    c.output('sc_t', 'b1', c.scalar(b1));
+    c.output('sc_t', 'b2', c.scalar(b2));
+    c.output('sc_t', 'g1', c.scalar(g1));
+    c.output('sc_t', 'g2', c.scalar(g2));
+  }
+}
+
+function encodeShortCurveFields(curve, c) {
   const fixed = curve.g._getWindows(4, curve.n.bitLength()).points;
   const naf = curve.g._getNAF(12).points;
 
-  c.output('mp_limb_t', 'sc_p[REDUCE_LIMBS]', c.scalar(curve.pmodn));
   c.output('fe_t', 'fe_n', c.field(curve.n.mod(curve.p)));
-  c.output('fe_t', 'a', c.field(curve.a));
+  // c.output('fe_t', 'a', c.field(curve.a));
   c.output('fe_t', 'b', c.field(curve.b));
   c.output('fe_t', 'c', c.field(curve.c));
   c.output('fe_t', 'z', c.field(curve.z));
@@ -469,98 +506,36 @@ function encodeShortCurve(curve, primeField, scalarField, width) {
   c.output('wge_t', 'g', c.point(curve.g));
   c.output('wge_t', 'wnd_fixed[FIXED_MAX_LENGTH]', c.points(fixed));
   c.output('wge_t', 'wnd_naf[NAF_SIZE_PRE]', c.points(naf));
-  c.output('wge_t', 'torsion[8]', c.points(curve.torsion));
+  // c.output('wge_t', 'torsion[8]', c.points(curve.torsion));
 
   if (curve.endo) {
     const beta = curve.endo.beta;
-    const lambda = curve.endo.lambda.neg().imod(curve.n);
-    const b1 = curve.endo.basis[0].b.neg().imod(curve.n);
-    const b2 = curve.endo.basis[1].b.neg().imod(curve.n);
-    const g1 = curve.endo.pre[1];
-    const g2 = curve.endo.pre[2].neg();
-    // const prec = curve.endo.pre[0];
     const wnd = naf.map(p => p._getBeta());
 
     c.output('fe_t', 'beta', c.field(beta));
-    c.output('sc_t', 'lambda', c.scalar(lambda));
-    c.output('sc_t', 'b1', c.scalar(b1));
-    c.output('sc_t', 'b2', c.scalar(b2));
-    c.output('sc_t', 'g1', c.scalar(g1));
-    c.output('sc_t', 'g2', c.scalar(g2));
     c.output('wge_t', 'wnd_endo[NAF_SIZE_PRE]', c.points(wnd));
-    // c.output('int', 'prec', prec);
   }
 }
 
-function encodeMontCurve(curve, primeField, scalarField, width) {
-  const c = new CurveEncoder(curve, primeField, scalarField, width);
-  const [iso, invert] = isomorphism[curve.id];
-  const c0 = curve._scale(iso, invert);
+function encodeCurve(curve, primeField, scalarField) {
+  const c32 = new CurveEncoder(curve, primeField, scalarField, 32);
+  const c64 = new CurveEncoder(curve, primeField, scalarField, 64);
 
-  c.output('fe_t', 'a', c.field(curve.a));
-  c.output('fe_t', 'b', c.field(curve.b));
-  c.output('fe_t', 'z', c.field(curve.z));
-  c.output('fe_t', 'c', c.field(c0));
-  c.output('fe_t', 'bi', c.field(curve.bi));
-  c.output('fe_t', 'i4', c.field(curve.i4));
-  c.output('fe_t', 'a24', c.field(curve.a24));
-  c.output('fe_t', 'a0', c.field(curve.a0));
-  c.output('fe_t', 'b0', c.field(curve.b0));
-  c.output('sc_t', 'i16', c.scalar(curve.scalar(16).invert(curve.n)));
-  c.output('mge_t', 'g', c.point(curve.g));
-  c.output('mge_t', 'torsion[8]', c.points(curve.torsion));
-}
-
-function encodeEdwardsCurve(curve, primeField, scalarField, width) {
-  const rist = new Ristretto(curve);
-  const c = new CurveEncoder(curve, primeField, scalarField, width);
-  const fixed = curve.g._getWindows(4, curve.n.bitLength()).points;
-  const naf = curve.g._getNAF(12).points;
-  const [iso, invert] = isomorphism[curve.id];
-  const c0 = curve._scale(iso, invert);
-
-  c.output('fe_t', 'a', c.field(curve.a));
-  c.output('fe_t', 'd', c.field(curve.d));
-  c.output('fe_t', 'k', c.field(curve.k));
-  c.output('fe_t', 'z', c.field(curve.z));
-  c.output('fe_t', 'c', c.field(c0));
-  c.output('fe_t', 'A', c.field(iso.a));
-  c.output('fe_t', 'B', c.field(iso.b));
-  c.output('fe_t', 'Bi', c.field(iso.bi));
-  c.output('fe_t', 'A0', c.field(iso.a0));
-  c.output('fe_t', 'B0', c.field(iso.b0));
-  c.output('xge_t', 'g', c.point(curve.g));
-  c.output('xge_t', 'wnd_fixed[FIXED_MAX_LENGTH]', c.points(fixed));
-  c.output('xge_t', 'wnd_naf[NAF_SIZE_PRE]', c.points(naf));
-  c.output('xge_t', 'torsion[8]', c.points(curve.torsion));
-
-  c.output('fe_t', 'qnr', c.field(rist.qnr));
-  c.output('fe_t', 'qnrds', c.field(rist.qnrds));
-  c.output('fe_t', 'adm1s', c.field(rist.adm1s));
-  c.output('fe_t', 'adm1si', c.field(rist.adm1si));
-  c.output('fe_t', 'dmaddpa', c.field(rist.dmaddpa));
-  c.output('fe_t', 'amdsi', c.field(rist.amdsi));
-  c.output('fe_t', 'dmasi', c.field(rist.dmasi));
-}
-
-function encodeCurve(curve, primeField, scalarField, width) {
-  if (curve.type === 'short')
-    return encodeShortCurve(curve, primeField, scalarField, width);
-
-  if (curve.type === 'mont')
-    return encodeMontCurve(curve, primeField, scalarField, width);
-
-  if (curve.type === 'edwards')
-    return encodeEdwardsCurve(curve, primeField, scalarField, width);
-
-  throw new Error();
-}
-
-function encodeCurve2(curve, primeField, scalarField) {
-  console.log('#if defined(BTC_HAVE_INT128)');
-  encodeCurve(curve, primeField, scalarField, 64);
+  console.log('#if MP_LIMB_BITS == 64');
+  console.log('');
+  encodeShortCurveScalars(curve, c64);
   console.log('#else');
-  encodeCurve(curve, primeField, scalarField, 32);
+  console.log('');
+  encodeShortCurveScalars(curve, c32);
+  console.log('#endif');
+  console.log('');
+
+  console.log('#if defined(BTC_HAVE_INT128)');
+  console.log('');
+  encodeShortCurveFields(curve, c64);
+  console.log('#else');
+  console.log('');
+  encodeShortCurveFields(curve, c32);
   console.log('#endif');
 }
 
@@ -579,27 +554,9 @@ const desc = {
 };
 
 {
-  switch (process.argv[2]) {
-    case 'scalar': {
-      encodeScalarField2(process.argv[3]);
-      break;
-    }
+  const [curve, primeField, scalarField] = desc[process.argv[2]];
 
-    case 'prime': {
-      encodePrimeField2(process.argv[3]);
-      break;
-    }
-
-    case 'curve': {
-      const [curve, primeField, scalarField] = desc[process.argv[3]];
-
-      encodeCurve2(curve, primeField, scalarField);
-
-      break;
-    }
-
-    default: {
-      throw new Error('Unknown argument.');
-    }
-  }
+  encodeScalarField(scalarField);
+  encodePrimeField(primeField);
+  encodeCurve(curve, primeField, scalarField);
 }

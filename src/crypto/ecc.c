@@ -183,7 +183,12 @@ typedef struct wei_scratch_s {
  * SECP256K1
  */
 
-#include "fields/secp256k1.h"
+#if FIELD_WORD_BITS == 64
+#  include "fields/secp256k1_64.h"
+#else
+#  include "fields/secp256k1_32.h"
+#endif
+
 #include "field.h"
 #include "scalar.h"
 #include "curve.h"
@@ -963,6 +968,16 @@ fe_sqr(fe_t z, const fe_t x) {
 }
 
 static BTC_INLINE void
+fe_sqrn(fe_t z, const fe_t x, int n) {
+  int i;
+
+  fiat_secp256k1_carry_square(z, x);
+
+  for (i = 1; i < n; i++)
+    fiat_secp256k1_carry_square(z, z);
+}
+
+static BTC_INLINE void
 fe_mul3(fe_t z, const fe_t x) {
   fiat_secp256k1_carry_scmul_3(z, x);
 }
@@ -992,53 +1007,186 @@ fe_invert_var(fe_t z, const fe_t x) {
   return ret;
 }
 
+static void
+fe_pow_core(fe_t z, const fe_t x1, const fe_t x2) {
+  /* Exponent: (p - 47) / 64 */
+  /* Bits: 223x1 1x0 22x1 4x0 */
+  fe_t t1, t2, t3, t4;
+
+  /* x3 = x2^(2^1) * x1 */
+  fe_sqr(t1, x2);
+  fe_mul(t1, t1, x1);
+
+  /* x6 = x3^(2^3) * x3 */
+  fe_sqrn(t2, t1, 3);
+  fe_mul(t2, t2, t1);
+
+  /* x9 = x6^(2^3) * x3 */
+  fe_sqrn(t3, t2, 3);
+  fe_mul(t3, t3, t1);
+
+  /* x11 = x9^(2^2) * x2 */
+  fe_sqrn(t2, t3, 2);
+  fe_mul(t2, t2, x2);
+
+  /* x22 = x11^(2^11) * x11 */
+  fe_sqrn(t3, t2, 11);
+  fe_mul(t3, t3, t2);
+
+  /* x44 = x22^(2^22) * x22 */
+  fe_sqrn(t2, t3, 22);
+  fe_mul(t2, t2, t3);
+
+  /* x88 = x44^(2^44) * x44 */
+  fe_sqrn(t4, t2, 44);
+  fe_mul(t4, t4, t2);
+
+  /* x176 = x88^(2^88) * x88 */
+  fe_sqrn(z, t4, 88);
+  fe_mul(z, z, t4);
+
+  /* x220 = x176^(2^44) * x44 */
+  fe_sqrn(z, z, 44);
+  fe_mul(z, z, t2);
+
+  /* x223 = x220^(2^3) * x3 */
+  fe_sqrn(z, z, 3);
+  fe_mul(z, z, t1);
+
+  /* z = x223^(2^1) */
+  fe_sqr(z, z);
+
+  /* z = z^(2^22) * x22 */
+  fe_sqrn(z, z, 22);
+  fe_mul(z, z, t3);
+
+  /* z = z^(2^4) */
+  fe_sqrn(z, z, 4);
+}
+
+static void
+fe_pow_pm3d4(fe_t z, const fe_t x) {
+  /* Exponent: (p - 3) / 4 */
+  /* Bits: 223x1 1x0 22x1 4x0 1x1 1x0 2x1 */
+  fe_t x1, x2;
+
+  /* x1 = x */
+  fe_set(x1, x);
+
+  /* x2 = x1^(2^1) * x1 */
+  fe_sqr(x2, x1);
+  fe_mul(x2, x2, x1);
+
+  /* z = x1^((p - 47) / 64) */
+  fe_pow_core(z, x1, x2);
+
+  /* z = z^(2^1) * x1 */
+  fe_sqr(z, z);
+  fe_mul(z, z, x1);
+
+  /* z = z^(2^1) */
+  fe_sqr(z, z);
+
+  /* z = z^(2^2) * x2 */
+  fe_sqrn(z, z, 2);
+  fe_mul(z, z, x2);
+}
+
 static int
 fe_invert(fe_t z, const fe_t x) {
-  secp256k1_fe_invert(z, x);
+  /* Exponent: p - 2 */
+  /* Bits: 223x1 1x0 22x1 4x0 1x1 1x0 2x1 1x0 1x1 */
+  fe_t x1, x2;
+
+  /* x1 = x */
+  fe_set(x1, x);
+
+  /* x2 = x1^(2^1) * x1 */
+  fe_sqr(x2, x1);
+  fe_mul(x2, x2, x1);
+
+  /* z = x1^((p - 47) / 64) */
+  fe_pow_core(z, x1, x2);
+
+  /* z = z^(2^1) * x1 */
+  fe_sqr(z, z);
+  fe_mul(z, z, x1);
+
+  /* z = z^(2^1) */
+  fe_sqr(z, z);
+
+  /* z = z^(2^2) * x2 */
+  fe_sqrn(z, z, 2);
+  fe_mul(z, z, x2);
+
+  /* z = z^(2^1) */
+  fe_sqr(z, z);
+
+  /* z = z^(2^1) * x1 */
+  fe_sqr(z, z);
+  fe_mul(z, z, x1);
+
   return fe_is_zero(z) ^ 1;
 }
 
 static int
 fe_sqrt(fe_t z, const fe_t x) {
-  return secp256k1_fe_sqrt(z, x);
+  /* Exponent: (p + 1) / 4 */
+  /* Bits: 223x1 1x0 22x1 4x0 2x1 2x0 */
+  fe_t x1, x2;
+
+  /* x1 = x */
+  fe_set(x1, x);
+
+  /* x2 = x1^(2^1) * x1 */
+  fe_sqr(x2, x1);
+  fe_mul(x2, x2, x1);
+
+  /* z = x1^((p - 47) / 64) */
+  fe_pow_core(z, x1, x2);
+
+  /* z = z^(2^2) * x2 */
+  fe_sqrn(z, z, 2);
+  fe_mul(z, z, x2);
+
+  /* z = z^(2^2) */
+  fe_sqrn(z, z, 2);
+
+  /* z^2 == x1 */
+  fe_sqr(x2, z);
+
+  return fe_equal(x2, x1);
 }
 
 static int
 fe_is_square(const fe_t x) {
   fe_t z;
-  return secp256k1_fe_sqrt(z, x);
+  return fe_sqrt(z, x);
 }
 
 static int
 fe_isqrt(fe_t z, const fe_t u, const fe_t v) {
-  int ret = 1;
+  fe_t t, x, c;
+  int ret;
 
-  /* Fast inverse square root chain.
-   *
-   * The inverse square root formulae notably
-   * do not fail when both the numerator and
-   * denominator are zero.
-   *
-   * We account for this below by explicitly
-   * checking for zero. `0 / 0` is extremely
-   * uncommon, and does not occur at all in
-   * Ristretto, for example. However, unlike
-   * SVDW and Elligator 2, the SSWU map can
-   * compute `0 / 0` when x = -b / a.
-   *
-   * Full list of cases for `0 / 0`:
-   *
-   *   - SSWU with x = -b / a.
-   *   - Elligator 2 with A = 0.
-   *   - Ristretto Elligator with a = d.
-   *   - Edwards point decoding on an
-   *     incomplete curve.
-   *
-   * Only the first is cause for concern,
-   * as the others are rather unrealistic.
-   */
-  ret &= fe_is_zero(v) ^ 1;
-  ret &= secp256k1_fe_isqrt(z, u, v);
+  /* x = u^3 * v * (u^5 * v^3)^((p - 3) / 4) mod p */
+  fe_sqr(t, u);       /* u^2 */
+  fe_mul(c, t, u);    /* u^3 */
+  fe_mul(t, t, c);    /* u^5 */
+  fe_sqr(x, v);       /* v^2 */
+  fe_mul(x, x, v);    /* v^3 */
+  fe_mul(x, x, t);    /* v^3 * u^5 */
+  fe_pow_pm3d4(x, x); /* (v^3 * u^5)^((p - 3) / 4) */
+  fe_mul(x, x, v);    /* (v^3 * u^5)^((p - 3) / 4) * v */
+  fe_mul(x, x, c);    /* (v^3 * u^5)^((p - 3) / 4) * v * u^3 */
+
+  /* x^2 * v == u */
+  fe_sqr(c, x);
+  fe_mul(c, c, v);
+
+  ret = fe_equal(c, u);
+
+  fe_set(z, x);
 
   return ret;
 }
