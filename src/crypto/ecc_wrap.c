@@ -7,10 +7,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <torsion/ecc.h>
 #include <satoshi/crypto/ecc.h>
 #include <satoshi/crypto/rand.h>
 #include <satoshi/util.h>
+#include "ecc.h"
 #include "../internal.h"
 
 static wei_curve_t *btc_secp256k1;
