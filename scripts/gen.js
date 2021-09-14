@@ -387,8 +387,8 @@ class CurveEncoder {
 function encodePrimeField(field, width) {
   const c = new FieldEncoder(field, width);
 
-  c.output('mp_limb_t', 'p[MAX_REDUCE_LIMBS]', c.scalar(c.m));
-  c.output('unsigned char', 'raw[MAX_FIELD_SIZE]', c.bytes(c.m));
+  c.output('mp_limb_t', 'p[REDUCE_LIMBS]', c.scalar(c.m));
+  c.output('unsigned char', 'raw[FIELD_SIZE]', c.bytes(c.m));
   c.output('fe_t', 'zero', c.field(new BN(0)));
   c.output('fe_t', 'one', c.field(new BN(1)));
   c.output('fe_t', 'two', c.field(new BN(2)));
@@ -398,7 +398,7 @@ function encodePrimeField(field, width) {
 }
 
 function encodePrimeField2(field) {
-  console.log('#if defined(TORSION_HAVE_INT128)');
+  console.log('#if defined(BTC_HAVE_INT128)');
   encodePrimeField(field, 64);
   console.log('#else');
   encodePrimeField(field, 32);
@@ -436,15 +436,15 @@ function encodeScalarField(field, width) {
   const nh = c.m.ushrn(1);
   const n = c.m;
 
-  c.output('mp_limb_t', 'n[MAX_REDUCE_LIMBS]', c.scalar(n));
-  c.output('mp_limb_t', 'nh[MAX_REDUCE_LIMBS]', c.scalar(nh));
-  c.output('mp_limb_t', 'm[MAX_REDUCE_LIMBS]', c.scalar(m));
+  c.output('mp_limb_t', 'n[SCALAR_LIMBS]', c.scalar(n));
+  c.output('mp_limb_t', 'nh[SCALAR_LIMBS]', c.scalar(nh));
+  c.output('mp_limb_t', 'm[REDUCE_LIMBS - SCALAR_LIMBS + 1]', c.scalar(m));
   c.output('mp_limb_t', 'k', c.integer(k));
-  c.output('mp_limb_t', 'r2[MAX_SCALAR_LIMBS * 2 + 1]', c.scalar(r2));
+  c.output('mp_limb_t', 'r2[SCALAR_LIMBS]', c.scalar(r2));
 }
 
 function encodeScalarField2(field) {
-  console.log('#if defined(TORSION_HAVE_INT128)');
+  console.log('#if MP_LIMB_BITS == 64');
   encodeScalarField(field, 64);
   console.log('#else');
   encodeScalarField(field, 32);
@@ -456,7 +456,7 @@ function encodeShortCurve(curve, primeField, scalarField, width) {
   const fixed = curve.g._getWindows(4, curve.n.bitLength()).points;
   const naf = curve.g._getNAF(12).points;
 
-  c.output('mp_limb_t', 'sc_p[MAX_REDUCE_LIMBS]', c.scalar(curve.pmodn));
+  c.output('mp_limb_t', 'sc_p[REDUCE_LIMBS]', c.scalar(curve.pmodn));
   c.output('fe_t', 'fe_n', c.field(curve.n.mod(curve.p)));
   c.output('fe_t', 'a', c.field(curve.a));
   c.output('fe_t', 'b', c.field(curve.b));
@@ -557,7 +557,7 @@ function encodeCurve(curve, primeField, scalarField, width) {
 }
 
 function encodeCurve2(curve, primeField, scalarField) {
-  console.log('#if defined(TORSION_HAVE_INT128)');
+  console.log('#if defined(BTC_HAVE_INT128)');
   encodeCurve(curve, primeField, scalarField, 64);
   console.log('#else');
   encodeCurve(curve, primeField, scalarField, 32);

@@ -15,8 +15,8 @@
 #include <stdint.h>
 typedef unsigned char fiat_secp256k1_uint1;
 typedef signed char fiat_secp256k1_int1;
-typedef torsion_int128_t fiat_secp256k1_int128;
-typedef torsion_uint128_t fiat_secp256k1_uint128;
+typedef btc_int128_t fiat_secp256k1_int128;
+typedef btc_uint128_t fiat_secp256k1_uint128;
 
 #if (-1 & 3) != 3
 #error "This code only works on a two's complement system"

@@ -100,5 +100,5 @@ secq256k1_sc_invert(const scalar_field_t *sc, sc_t z, const sc_t x) {
 
   sc_normal(sc, z, z);
 
-  sc_cleanse(sc, u1);
+  sc_cleanse(u1);
 }

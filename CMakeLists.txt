@@ -65,6 +65,8 @@ endif()
 list(APPEND satoshi_includes ${PROJECT_SOURCE_DIR}/include
                              ${PROJECT_SOURCE_DIR}/deps/torsion/include)
 
+list(APPEND satoshi_defines BTC_HAVE_INT128)
+
 add_subdirectory(deps/torsion)
 list(APPEND satoshi_libs torsion)
 
