@@ -401,8 +401,9 @@ function encodeFieldConstants(c) {
 function encodePrimeField(field) {
   const c32 = new FieldEncoder(field, 32);
   const c64 = new FieldEncoder(field, 64);
+  const size = c32.m.byteLength();
 
-  c32.output('unsigned char', 'raw[FIELD_SIZE]', c32.bytes(c32.m));
+  c32.output('unsigned char', `raw[${size}]`, c32.bytes(c32.m));
 
   console.log('#if MP_LIMB_BITS == 64');
   console.log('');
@@ -504,7 +505,7 @@ function encodeShortCurveFields(curve, c) {
   c.output('fe_t', 'i2', c.field(curve.i2));
   c.output('fe_t', 'i3', c.field(curve.i3));
   c.output('wge_t', 'g', c.point(curve.g));
-  c.output('wge_t', 'wnd_fixed[FIXED_MAX_LENGTH]', c.points(fixed));
+  c.output('wge_t', 'wnd_fixed[FIXED_LENGTH]', c.points(fixed));
   c.output('wge_t', 'wnd_naf[NAF_SIZE_PRE]', c.points(naf));
   // c.output('wge_t', 'torsion[8]', c.points(curve.torsion));
 

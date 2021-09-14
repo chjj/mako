@@ -108,17 +108,16 @@ BTC_BARRIER(fe_word_t, fe_word)
 
 #define SCALAR_LIMBS (256 / MP_LIMB_BITS)
 #define REDUCE_LIMBS (SCALAR_LIMBS * 2 + 2)
-#define ENDO_BITS ((256 + 1) / 2 + 1)
+#define ENDO_BITS 129
 
 #define FIXED_WIDTH 4
 #define FIXED_SIZE (1 << FIXED_WIDTH) /* 16 */
-#define FIXED_STEPS(bits) (((bits) + FIXED_WIDTH - 1) / FIXED_WIDTH) /* 64 */
-#define FIXED_LENGTH(bits) (FIXED_STEPS(bits) * FIXED_SIZE) /* 1024 */
-#define FIXED_MAX_LENGTH FIXED_LENGTH(256) /* 2096 */
+#define FIXED_STEPS ((256 + FIXED_WIDTH - 1) / FIXED_WIDTH) /* 64 */
+#define FIXED_LENGTH (FIXED_STEPS * FIXED_SIZE) /* 1024 */
 
 #define WND_WIDTH 4
 #define WND_SIZE (1 << WND_WIDTH) /* 16 */
-#define WND_STEPS(bits) (((bits) + WND_WIDTH - 1) / WND_WIDTH) /* 64 */
+#define WND_STEPS ((ENDO_BITS + WND_WIDTH - 1) / WND_WIDTH) /* 64 */
 
 #define NAF_WIDTH 5
 #define NAF_SIZE (1 << (NAF_WIDTH - 2)) /* 8 */
@@ -134,34 +133,19 @@ BTC_BARRIER(fe_word_t, fe_word)
 #define cleanse btc_memzero
 
 /*
- * Scalar Field
+ * Types
  */
 
-typedef mp_limb_t sc_t[SCALAR_LIMBS]; /* 72 bytes */
+typedef mp_limb_t sc_t[SCALAR_LIMBS];
+typedef fe_word_t fe_t[FIELD_WORDS];
 
-static const sc_t sc_one = {1, 0};
-
-/*
- * Prime Field
- */
-
-typedef fe_word_t fe_t[FIELD_WORDS]; /* 72 bytes */
-
-/*
- * Short Weierstrass
- */
-
-/* wge = weierstrass group element (affine) */
 typedef struct wge_s {
-  /* 152 bytes */
   fe_t x;
   fe_t y;
   int inf;
 } wge_t;
 
-/* jge = jacobian group element */
 typedef struct jge_s {
-  /* 216 bytes */
   fe_t x;
   fe_t y;
   fe_t z;
@@ -189,9 +173,7 @@ typedef struct wei_scratch_s {
 #  include "fields/secp256k1_32.h"
 #endif
 
-#include "field.h"
-#include "scalar.h"
-#include "curve.h"
+#include "secp256k1.h"
 
 /*
  * Helpers
@@ -203,10 +185,11 @@ bytes_lt(const unsigned char *xp, const unsigned char *yp, size_t n) {
   uint32_t eq = 1;
   uint32_t lt = 0;
   uint32_t a, b;
+  size_t i;
 
-  while (n--) {
-    a = xp[n];
-    b = yp[n];
+  for (i = 0; i < n; i++) {
+    a = xp[i];
+    b = yp[i];
     lt |= eq & ((a - b) >> 31);
     eq &= ((a ^ b) - 1) >> 31;
   }
@@ -290,28 +273,23 @@ sc_is_zero(const sc_t x) {
 }
 
 static int
-sc_equal(const sc_t x, const sc_t y) {
-  return mpn_sec_equal_p(x, y, SCALAR_LIMBS);
-}
-
-static int
 sc_cmp_var(const sc_t x, const sc_t y) {
   return mpn_cmp(x, y, SCALAR_LIMBS);
 }
 
 static int
 sc_is_canonical(const sc_t x) {
-  return mpn_sec_lt_p(x, field_secq256k1_n, SCALAR_LIMBS);
+  return mpn_sec_lt_p(x, scalar_n, SCALAR_LIMBS);
 }
 
 static int
 sc_is_high(const sc_t x) {
-  return mpn_sec_gt_p(x, field_secq256k1_nh, SCALAR_LIMBS);
+  return mpn_sec_gt_p(x, scalar_nh, SCALAR_LIMBS);
 }
 
 static int
 sc_is_high_var(const sc_t x) {
-  return mpn_cmp(x, field_secq256k1_nh, SCALAR_LIMBS) > 0;
+  return mpn_cmp(x, scalar_nh, SCALAR_LIMBS) > 0;
 }
 
 static mp_bits_t
@@ -333,7 +311,7 @@ static int
 sc_reduce_weak(sc_t z, const sc_t x, mp_limb_t hi) {
   mp_limb_t scratch[MPN_REDUCE_WEAK_ITCH(SCALAR_LIMBS)]; /* 144 bytes */
 
-  return mpn_reduce_weak(z, x, field_secq256k1_n, SCALAR_LIMBS, hi, scratch);
+  return mpn_reduce_weak(z, x, scalar_n, SCALAR_LIMBS, hi, scratch);
 }
 
 static void
@@ -347,7 +325,7 @@ static void
 sc_neg(sc_t z, const sc_t x) {
   int zero = sc_is_zero(x);
 
-  ASSERT(mpn_sub_n(z, field_secq256k1_n, x, SCALAR_LIMBS) == 0);
+  ASSERT(mpn_sub_n(z, scalar_n, x, SCALAR_LIMBS) == 0);
 
   sc_select_zero(z, z, zero);
 }
@@ -364,7 +342,7 @@ sc_reduce(sc_t z, const mp_limb_t *xp) {
   /* Barrett reduction (264 bytes). */
   mp_limb_t scratch[MPN_REDUCE_ITCH(SCALAR_LIMBS, REDUCE_LIMBS)];
 
-  mpn_reduce(z, xp, field_secq256k1_m, field_secq256k1_n, SCALAR_LIMBS, REDUCE_LIMBS, scratch);
+  mpn_reduce(z, xp, scalar_m, scalar_n, SCALAR_LIMBS, REDUCE_LIMBS, scratch);
 }
 
 static void
@@ -403,7 +381,7 @@ static void
 sc_montmul(sc_t z, const sc_t x, const sc_t y) {
   mp_limb_t scratch[MPN_MONTMUL_ITCH(SCALAR_LIMBS)]; /* 144 bytes */
 
-  mpn_sec_montmul(z, x, y, field_secq256k1_n, SCALAR_LIMBS, field_secq256k1_k, scratch);
+  mpn_sec_montmul(z, x, y, scalar_n, SCALAR_LIMBS, scalar_k, scratch);
 }
 
 static void
@@ -425,12 +403,12 @@ sc_montsqrn(sc_t z, const sc_t x, int n) {
 
 static void
 sc_mont(sc_t z, const sc_t x) {
-  sc_montmul(z, x, field_secq256k1_r2);
+  sc_montmul(z, x, scalar_r2);
 }
 
 static void
 sc_normal(sc_t z, const sc_t x) {
-  sc_montmul(z, x, sc_one);
+  sc_montmul(z, x, scalar_one);
 }
 
 static void
@@ -476,7 +454,7 @@ static int
 sc_invert_var(sc_t z, const sc_t x) {
   mp_limb_t scratch[MPN_INVERT_ITCH(SCALAR_LIMBS)]; /* 320 bytes */
 
-  return mpn_invert_n(z, x, field_secq256k1_n, SCALAR_LIMBS, scratch);
+  return mpn_invert_n(z, x, scalar_n, SCALAR_LIMBS, scratch);
 }
 
 static int
@@ -645,16 +623,7 @@ sc_naf_var0(int *naf, const sc_t k, int sign, mp_bits_t width, mp_bits_t max) {
 }
 
 static mp_bits_t
-sc_naf_var(int *naf, const sc_t k, mp_bits_t width) {
-  return sc_naf_var0(naf, k, 1, width, 256 + 1);
-}
-
-static mp_bits_t
-sc_naf_endo_var(int *naf1,
-                int *naf2,
-                const sc_t k1,
-                const sc_t k2,
-                mp_bits_t width) {
+sc_naf_var(int *naf1, int *naf2, const sc_t k1, const sc_t k2, mp_bits_t width) {
   mp_bits_t len1, len2;
   sc_t c1, c2;
   int s1, s2;
@@ -759,11 +728,6 @@ sc_jsf_var0(int *naf,
 
 static mp_bits_t
 sc_jsf_var(int *naf, const sc_t k1, const sc_t k2) {
-  return sc_jsf_var0(naf, k1, 1, k2, 1, 256 + 1);
-}
-
-static mp_bits_t
-sc_jsf_endo_var(int *naf, const sc_t k1, const sc_t k2) {
   sc_t c1, c2;
   int s1, s2;
 
@@ -811,7 +775,7 @@ fe_import(fe_t z, const unsigned char *xp) {
   int ret = 1;
 
   /* Ensure 0 <= x < p. */
-  ret &= (memcmp(xp, field_secp256k1_raw, 32) < 0); /* XXX */
+  ret &= bytes_lt(xp, field_raw, 32);
 
   /* Swap endianness if necessary. */
   reverse_copy(tmp, xp, 32);
@@ -1000,7 +964,7 @@ fe_invert_var(fe_t z, const fe_t x) {
 
   fe_get_limbs(zp, x);
 
-  ret &= mpn_invert_n(zp, zp, field_secp256k1_p, FIELD_LIMBS, scratch);
+  ret &= mpn_invert_n(zp, zp, field_p, FIELD_LIMBS, scratch);
 
   ASSERT(fe_set_limbs(z, zp));
 
@@ -1213,9 +1177,6 @@ fe_random(fe_t z, btc_drbg_t *rng) {
  */
 
 static void
-wei_mul_a(fe_t z, const fe_t x);
-
-static void
 wei_solve_y2(fe_t y2, const fe_t x);
 
 static int
@@ -1286,8 +1247,8 @@ wge_set_x(wge_t *r, const fe_t x, int sign) {
   if (sign != -1)
     fe_set_odd(y, y, sign);
 
-  fe_select(r->x, x, field_secp256k1_zero, ret ^ 1);
-  fe_select(r->y, y, field_secp256k1_zero, ret ^ 1);
+  fe_select(r->x, x, field_zero, ret ^ 1);
+  fe_select(r->y, y, field_zero, ret ^ 1);
 
   r->inf = ret ^ 1;
 
@@ -1298,8 +1259,8 @@ static int
 wge_set_xy(wge_t *r, const fe_t x, const fe_t y) {
   int ret = wei_validate_xy(x, y);
 
-  fe_select(r->x, x, field_secp256k1_zero, ret ^ 1);
-  fe_select(r->y, y, field_secp256k1_zero, ret ^ 1);
+  fe_select(r->x, x, field_zero, ret ^ 1);
+  fe_select(r->y, y, field_zero, ret ^ 1);
 
   r->inf = ret ^ 1;
 
@@ -1443,14 +1404,6 @@ static void
 wge_neg(wge_t *r, const wge_t *p) {
   fe_set(r->x, p->x);
   fe_neg(r->y, p->y);
-
-  r->inf = p->inf;
-}
-
-static void
-wge_neg_cond(wge_t *r, const wge_t *p, int flag) {
-  fe_set(r->x, p->x);
-  fe_neg_cond(r->y, p->y, flag);
 
   r->inf = p->inf;
 }
@@ -1616,8 +1569,8 @@ wge_dbl(wge_t *p3, const wge_t *p1) {
   fe_sub(y3, y3, p1->y);
 
   /* Ensure (0, 0) for infinity. */
-  fe_select(p3->x, x3, field_secp256k1_zero, inf);
-  fe_select(p3->y, y3, field_secp256k1_zero, inf);
+  fe_select(p3->x, x3, field_zero, inf);
+  fe_select(p3->y, y3, field_zero, inf);
 
   p3->inf = inf;
 }
@@ -1699,8 +1652,8 @@ wge_add(wge_t *p3, const wge_t *p1, const wge_t *p2) {
   fe_select(y3, y3, p1->y, p2->inf);
 
   /* Case 3 & 4: P + -P = O, O + O = O */
-  fe_select(x3, x3, field_secp256k1_zero, inf);
-  fe_select(y3, y3, field_secp256k1_zero, inf);
+  fe_select(x3, x3, field_zero, inf);
+  fe_select(y3, y3, field_zero, inf);
 
   fe_set(p3->x, x3);
   fe_set(p3->y, y3);
@@ -1777,7 +1730,7 @@ wge_set_jge_var(wge_t *r, const jge_t *p) {
 
 static void
 wge_endo_beta(wge_t *r, const wge_t *p) {
-  fe_mul(r->x, p->x, secp256k1_beta);
+  fe_mul(r->x, p->x, curve_beta);
   fe_set(r->y, p->y);
 
   r->inf = p->inf;
@@ -1789,19 +1742,9 @@ wge_endo_beta(wge_t *r, const wge_t *p) {
 
 static void
 jge_zero(jge_t *r) {
-  fe_set(r->x, field_secp256k1_one);
-  fe_set(r->y, field_secp256k1_one);
+  fe_set(r->x, field_one);
+  fe_set(r->y, field_one);
   fe_zero(r->z);
-
-  r->inf = 1;
-  r->aff = 0;
-}
-
-static void
-jge_cleanse(jge_t *r) {
-  fe_cleanse(r->x);
-  fe_cleanse(r->y);
-  fe_cleanse(r->z);
 
   r->inf = 1;
   r->aff = 0;
@@ -1902,10 +1845,10 @@ jge_equal_r_var(const jge_t *p, const sc_t x) {
   if (fe_equal(p->x, rx))
     return 1;
 
-  if (sc_cmp_var(x, secp256k1_sc_p) >= 0)
+  if (sc_cmp_var(x, curve_sc_p) >= 0)
     return 0;
 
-  fe_mul(rn, secp256k1_fe_n, zz);
+  fe_mul(rn, curve_fe_n, zz);
   fe_add(rx, rx, rn);
 
   return fe_equal(p->x, rx);
@@ -1918,7 +1861,7 @@ jge_neg(jge_t *r, const jge_t *p) {
   fe_set(r->z, p->z);
 
   /* Ensure (1, 1, 0) for infinity. */
-  fe_select(r->y, r->y, field_secp256k1_one, p->inf);
+  fe_select(r->y, r->y, field_one, p->inf);
 
   r->inf = p->inf;
   r->aff = p->aff;
@@ -1931,7 +1874,7 @@ jge_neg_cond(jge_t *r, const jge_t *p, int flag) {
   fe_set(r->z, p->z);
 
   /* Ensure (1, 1, 0) for infinity. */
-  fe_select(r->y, r->y, field_secp256k1_one, p->inf);
+  fe_select(r->y, r->y, field_one, p->inf);
 
   r->inf = p->inf;
   r->aff = p->aff;
@@ -2449,7 +2392,7 @@ jge_add(jge_t *p3, const jge_t *p1, const jge_t *p2) {
   fe_sqr(ll, l);
 
   /* LL = 0 (if degenerate) */
-  fe_select(ll, ll, field_secp256k1_zero, degenerate);
+  fe_select(ll, ll, field_zero, degenerate);
 
   /* X3 = 4 * W */
   fe_mul4(x3, w);
@@ -2478,9 +2421,9 @@ jge_add(jge_t *p3, const jge_t *p1, const jge_t *p2) {
   fe_select(z3, z3, p1->z, p2->inf);
 
   /* Case 3: P + -P = O */
-  fe_select(x3, x3, field_secp256k1_one, inf);
-  fe_select(y3, y3, field_secp256k1_one, inf);
-  fe_select(z3, z3, field_secp256k1_zero, inf);
+  fe_select(x3, x3, field_one, inf);
+  fe_select(y3, y3, field_one, inf);
+  fe_select(z3, z3, field_zero, inf);
 
   /* R = (X3, Y3, Z3) */
   fe_set(p3->x, x3);
@@ -2623,7 +2566,7 @@ jge_mixed_add(jge_t *p3, const jge_t *p1, const wge_t *p2) {
   fe_sqr(ll, l);
 
   /* LL = 0 (if degenerate) */
-  fe_select(ll, ll, field_secp256k1_zero, degenerate);
+  fe_select(ll, ll, field_zero, degenerate);
 
   /* X3 = 4 * W */
   fe_mul4(x3, w);
@@ -2644,7 +2587,7 @@ jge_mixed_add(jge_t *p3, const jge_t *p1, const wge_t *p2) {
   /* Case 1: O + P = P */
   fe_select(x3, x3, p2->x, p1->inf);
   fe_select(y3, y3, p2->y, p1->inf);
-  fe_select(z3, z3, field_secp256k1_one, p1->inf);
+  fe_select(z3, z3, field_one, p1->inf);
 
   /* Case 2: P + O = P */
   fe_select(x3, x3, p1->x, p2->inf);
@@ -2652,9 +2595,9 @@ jge_mixed_add(jge_t *p3, const jge_t *p1, const wge_t *p2) {
   fe_select(z3, z3, p1->z, p2->inf);
 
   /* Case 3: P + -P = O */
-  fe_select(x3, x3, field_secp256k1_one, inf);
-  fe_select(y3, y3, field_secp256k1_one, inf);
-  fe_select(z3, z3, field_secp256k1_zero, inf);
+  fe_select(x3, x3, field_one, inf);
+  fe_select(y3, y3, field_one, inf);
+  fe_select(z3, z3, field_zero, inf);
 
   /* R = (X3, Y3, Z3) */
   fe_set(p3->x, x3);
@@ -2689,9 +2632,9 @@ jge_mixed_sub(jge_t *p3, const jge_t *p1, const wge_t *p2) {
 
 static void
 jge_set_wge(jge_t *r, const wge_t *p) {
-  fe_select(r->x, p->x, field_secp256k1_one, p->inf);
-  fe_select(r->y, p->y, field_secp256k1_one, p->inf);
-  fe_select(r->z, field_secp256k1_one, field_secp256k1_zero, p->inf);
+  fe_select(r->x, p->x, field_one, p->inf);
+  fe_select(r->y, p->y, field_one, p->inf);
+  fe_select(r->z, field_one, field_zero, p->inf);
 
   r->inf = p->inf;
   r->aff = p->inf ^ 1;
@@ -2708,43 +2651,16 @@ jge_validate(const jge_t *p) {
   fe_sqr(z2, p->z);
   fe_sqr(z4, z2);
   fe_mul(z6, z4, z2);
-  fe_mul(z6, z6, secp256k1_b);
+  fe_mul(z6, z6, curve_b);
 
   fe_sqr(lhs, p->y);
-
-  wei_mul_a(rhs, p->x);
-  fe_mul(rhs, rhs, z4);
-  fe_add(rhs, rhs, x3);
-  fe_add(rhs, rhs, z6);
+  fe_add(rhs, x3, z6);
 
   return fe_equal(lhs, rhs);
 }
 
 static void
-jge_naf_points_var(jge_t *out, const wge_t *p, int width) {
-  int size = 1 << (width - 2);
-  jge_t dbl;
-  int i;
-
-  jge_set_wge(&out[0], p);
-  jge_dbl_var(&dbl, &out[0]);
-
-  for (i = 1; i < size; i++)
-    jge_add_var(&out[i], &out[i - 1], &dbl);
-}
-
-static void
-jge_jsf_points_var(jge_t *out,
-                   const wge_t *p1, const wge_t *p2) {
-  /* Create comb for JSF. */
-  jge_set_wge(&out[0], p1); /* 1 */
-  jge_mixed_add_var(&out[1], &out[0], p2); /* 3 */
-  jge_mixed_sub_var(&out[2], &out[0], p2); /* 5 */
-  jge_set_wge(&out[3], p2); /* 7 */
-}
-
-static void
-jge_jsf_points_endo_var(jge_t *out, const wge_t *p1) {
+jge_jsf_points_var(jge_t *out, const wge_t *p1) {
   wge_t p2, p3;
 
   /* Split point. */
@@ -2762,12 +2678,12 @@ jge_jsf_points_endo_var(jge_t *out, const wge_t *p1) {
 
 static void
 jge_endo_beta(jge_t *r, const jge_t *p) {
-  fe_mul(r->x, p->x, secp256k1_beta);
+  fe_mul(r->x, p->x, curve_beta);
   fe_set(r->y, p->y);
   fe_set(r->z, p->z);
 
   /* Ensure (1, 1, 0) for infinity. */
-  fe_select(r->x, r->x, field_secp256k1_one, p->inf);
+  fe_select(r->x, r->x, field_one, p->inf);
 
   r->inf = p->inf;
   r->aff = p->aff;
@@ -2778,11 +2694,6 @@ jge_endo_beta(jge_t *r, const jge_t *p) {
  */
 
 static void
-wei_mul_a(fe_t z, const fe_t x) {
-  fe_zero(z);
-}
-
-static void
 wei_solve_y2(fe_t y2, const fe_t x) {
   /* [GECC] Page 89, Section 3.2.2. */
   /* y^2 = x^3 + a * x + b */
@@ -2790,10 +2701,7 @@ wei_solve_y2(fe_t y2, const fe_t x) {
 
   fe_sqr(x3, x);
   fe_mul(x3, x3, x);
-
-  wei_mul_a(y2, x);
-  fe_add(y2, y2, x3);
-  fe_add(y2, y2, secp256k1_b);
+  fe_add(y2, x3, curve_b);
 }
 
 static int
@@ -2876,14 +2784,14 @@ wei_endo_split(sc_t k1, sc_t k2, const sc_t k) {
    */
   sc_t c1, c2;
 
-  sc_mulshift(c1, k, secp256k1_g1, 384);
-  sc_mulshift(c2, k, secp256k1_g2, 384); /* -g2 */
+  sc_mulshift(c1, k, curve_g1, 384);
+  sc_mulshift(c2, k, curve_g2, 384); /* -g2 */
 
-  sc_mul(c1, c1, secp256k1_b1); /* -b1 */
-  sc_mul(c2, c2, secp256k1_b2); /* -b2 */
+  sc_mul(c1, c1, curve_b1); /* -b1 */
+  sc_mul(c2, c2, curve_b2); /* -b2 */
 
   sc_add(k2, c1, c2);
-  sc_mul(k1, k2, secp256k1_lambda); /* -lambda */
+  sc_mul(k1, k2, curve_lambda); /* -lambda */
   sc_add(k1, k1, k);
 }
 
@@ -2898,8 +2806,7 @@ wei_jmul_g(jge_t *r, const sc_t k) {
    * doublings. This reduces a 256 bit multiplication
    * down to 64 additions with a window size of 4.
    */
-  const wge_t *wnds = secp256k1_wnd_fixed;
-  mp_bits_t steps = FIXED_STEPS(256);
+  const wge_t *wnds = curve_wnd_fixed;
   mp_bits_t i, j, b;
   wge_t t;
 
@@ -2907,7 +2814,7 @@ wei_jmul_g(jge_t *r, const sc_t k) {
   jge_zero(r);
   wge_zero(&t);
 
-  for (i = 0; i < steps; i++) {
+  for (i = 0; i < FIXED_STEPS; i++) {
     b = sc_get_bits(k, i * FIXED_WIDTH, FIXED_WIDTH);
 
     for (j = 0; j < FIXED_SIZE; j++)
@@ -2936,7 +2843,6 @@ wei_jmul(jge_t *r, const wge_t *p, const sc_t k) {
    * [ECPM] "Windowed method".
    * [GECC] Page 95, Section 3.3.
    */
-  mp_bits_t steps = WND_STEPS(ENDO_BITS);
   jge_t wnd1[WND_SIZE]; /* 3456 bytes */
   jge_t wnd2[WND_SIZE]; /* 3456 bytes */
   mp_bits_t i, j, b1, b2;
@@ -2977,7 +2883,7 @@ wei_jmul(jge_t *r, const wge_t *p, const sc_t k) {
   jge_zero(&t1);
   jge_zero(&t2);
 
-  for (i = steps - 1; i >= 0; i--) {
+  for (i = WND_STEPS - 1; i >= 0; i--) {
     b1 = sc_get_bits(k1, i * WND_WIDTH, WND_WIDTH);
     b2 = sc_get_bits(k2, i * WND_WIDTH, WND_WIDTH);
 
@@ -2986,7 +2892,7 @@ wei_jmul(jge_t *r, const wge_t *p, const sc_t k) {
       jge_select(&t2, &t2, &wnd2[j], j == b2);
     }
 
-    if (i == steps - 1) {
+    if (i == WND_STEPS - 1) {
       jge_add(r, &t1, &t2);
     } else {
       for (j = 0; j < WND_WIDTH; j++)
@@ -3025,8 +2931,8 @@ wei_jmul_double_var(jge_t *r,
    * [GECC] Algorithm 3.77, Page 129, Section 3.5.
    * [GLV] Page 193, Section 3 (Using Efficient Endomorphisms).
    */
-  const wge_t *wnd1 = secp256k1_wnd_naf;
-  const wge_t *wnd2 = secp256k1_wnd_endo;
+  const wge_t *wnd1 = curve_wnd_naf;
+  const wge_t *wnd2 = curve_wnd_endo;
   int naf1[ENDO_BITS + 1]; /* 1048 bytes */
   int naf2[ENDO_BITS + 1]; /* 1048 bytes */
   int naf3[ENDO_BITS + 1]; /* 1048 bytes */
@@ -3039,12 +2945,12 @@ wei_jmul_double_var(jge_t *r,
   wei_endo_split(c3, c4, k2);
 
   /* Compute NAFs. */
-  max1 = sc_naf_endo_var(naf1, naf2, c1, c2, NAF_WIDTH_PRE);
-  max2 = sc_jsf_endo_var(naf3, c3, c4);
+  max1 = sc_naf_var(naf1, naf2, c1, c2, NAF_WIDTH_PRE);
+  max2 = sc_jsf_var(naf3, c3, c4);
   max = ECC_MAX(max1, max2);
 
   /* Create comb for JSF. */
-  jge_jsf_points_endo_var(wnd3, p2);
+  jge_jsf_points_var(wnd3, p2);
 
   /* Multiply and add. */
   jge_zero(r);
@@ -3099,8 +3005,8 @@ wei_jmul_multi_var(jge_t *r,
    * [GECC] Algorithm 3.48, Page 109, Section 3.3.3.
    *        Algorithm 3.51, Page 112, Section 3.3.
    */
-  const wge_t *wnd0 = secp256k1_wnd_naf;
-  const wge_t *wnd1 = secp256k1_wnd_endo;
+  const wge_t *wnd0 = curve_wnd_naf;
+  const wge_t *wnd1 = curve_wnd_endo;
   int naf0[ENDO_BITS + 1]; /* 1048 bytes */
   int naf1[ENDO_BITS + 1]; /* 1048 bytes */
   jge_t **wnds = scratch->wnds;
@@ -3115,17 +3021,17 @@ wei_jmul_multi_var(jge_t *r,
   wei_endo_split(k1, k2, k0);
 
   /* Compute fixed NAFs. */
-  max = sc_naf_endo_var(naf0, naf1, k1, k2, NAF_WIDTH_PRE);
+  max = sc_naf_var(naf0, naf1, k1, k2, NAF_WIDTH_PRE);
 
   for (j = 0; j < len; j++) {
     /* Split scalar. */
     wei_endo_split(k1, k2, coeffs[j]);
 
     /* Compute JSF.*/
-    size = sc_jsf_endo_var(nafs[j], k1, k2);
+    size = sc_jsf_var(nafs[j], k1, k2);
 
     /* Create comb for JSF. */
-    jge_jsf_points_endo_var(wnds[j], &points[j]);
+    jge_jsf_points_var(wnds[j], &points[j]);
 
     /* Calculate max. */
     max = ECC_MAX(max, size);
@@ -3214,10 +3120,10 @@ wei_svdwf(fe_t x, fe_t y, const fe_t u) {
   fe_t x1, x2, x3, y1, y2, y3;
   int alpha, beta;
 
-  wei_solve_y2(gz, secp256k1_z);
+  wei_solve_y2(gz, curve_z);
 
-  fe_sqr(z3, secp256k1_zi);
-  fe_mul(z3, z3, secp256k1_i3);
+  fe_sqr(z3, curve_zi);
+  fe_mul(z3, z3, curve_i3);
 
   fe_sqr(u2, u);
   fe_sqr(u4, u2);
@@ -3228,22 +3134,22 @@ wei_svdwf(fe_t x, fe_t y, const fe_t u) {
   fe_invert(t2, t2);
 
   fe_mul(t3, u4, t2);
-  fe_mul(t3, t3, secp256k1_c);
+  fe_mul(t3, t3, curve_c);
 
   fe_sqr(t4, t1);
   fe_mul(t4, t4, t1);
 
-  fe_sub_nc(x1, secp256k1_c, secp256k1_z);
-  fe_mul(x1, x1, secp256k1_i2);
+  fe_sub_nc(x1, curve_c, curve_z);
+  fe_mul(x1, x1, curve_i2);
   fe_sub(x1, x1, t3);
 
-  fe_add_nc(y1, secp256k1_c, secp256k1_z);
-  fe_mul(y1, y1, secp256k1_i2);
+  fe_add_nc(y1, curve_c, curve_z);
+  fe_mul(y1, y1, curve_i2);
   fe_sub(x2, t3, y1);
 
   fe_mul(y1, t4, t2);
   fe_mul(y1, y1, z3);
-  fe_sub(x3, secp256k1_z, y1);
+  fe_sub(x3, curve_z, y1);
 
   wei_solve_y2(y1, x1);
   wei_solve_y2(y2, x2);
@@ -3330,10 +3236,10 @@ wei_svdwi(fe_t u, const wge_t *p, unsigned int hint) {
   uint32_t ret = 1;
   uint32_t sqr;
 
-  fe_sqr(z2, secp256k1_z);
-  fe_mul(z3, z2, secp256k1_z);
+  fe_sqr(z2, curve_z);
+  fe_mul(z3, z2, curve_z);
   fe_sqr(z4, z2);
-  fe_add(gz, z3, secp256k1_b);
+  fe_add(gz, z3, curve_b);
 
   fe_sqr(n0, p->x);
   fe_mul(n0, n0, z2);
@@ -3346,7 +3252,7 @@ wei_svdwi(fe_t u, const wge_t *p, unsigned int hint) {
   fe_mul3(n1, n1); /* x6 */
   fe_mul3(n1, n1); /* x18 */
 
-  fe_sub_nc(n2, p->x, secp256k1_z);
+  fe_sub_nc(n2, p->x, curve_z);
   fe_mul(n2, n2, gz);
   fe_mul3(n2, n2); /* x3 */
   fe_mul4(n2, n2); /* x12 */
@@ -3354,7 +3260,7 @@ wei_svdwi(fe_t u, const wge_t *p, unsigned int hint) {
   fe_sub(t4, n0, n1);
   fe_add(t4, t4, n2);
   sqr = fe_sqrt(t4, t4);
-  fe_mul(t4, t4, secp256k1_z);
+  fe_mul(t4, t4, curve_z);
 
   ret &= ((r - 2) >> 31) | sqr;
 
@@ -3365,16 +3271,16 @@ wei_svdwi(fe_t u, const wge_t *p, unsigned int hint) {
   fe_sub(t5, t5, n1);
 
   fe_add(n0, p->x, p->x);
-  fe_add(n0, n0, secp256k1_z);
+  fe_add(n0, n0, curve_z);
 
-  fe_sub(c0, secp256k1_c, n0);
-  fe_add(c1, secp256k1_c, n0);
+  fe_sub(c0, curve_c, n0);
+  fe_add(c1, curve_c, n0);
 
   fe_mul(n0, gz, c0);
   fe_mul(n1, gz, c1);
   fe_add(n2, t5, t4);
   fe_sub(n3, t5, t4);
-  fe_set(d0, field_secp256k1_two);
+  fe_set(d0, field_two);
 
   fe_select(n0, n0, n1, ((r ^ 1) - 1) >> 31); /* r = 1 */
   fe_select(n0, n0, n2, ((r ^ 2) - 1) >> 31); /* r = 2 */
@@ -4162,7 +4068,6 @@ btc_ecdsa_verify(const unsigned char *msg,
   sc_t m, r, s, u1, u2;
   wge_t A;
   jge_t R;
-  sc_t x;
 
   if (!sc_import(r, sig))
     return 0;
@@ -4251,10 +4156,10 @@ btc_ecdsa_recover(unsigned char *pub,
     goto fail;
 
   if (high) {
-    if (sc_cmp_var(r, secp256k1_sc_p) >= 0)
+    if (sc_cmp_var(r, curve_sc_p) >= 0)
       goto fail;
 
-    fe_add(x, x, secp256k1_fe_n);
+    fe_add(x, x, curve_fe_n);
   }
 
   if (!wge_set_x(&R, x, sign))
