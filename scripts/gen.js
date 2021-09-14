@@ -403,6 +403,11 @@ function encodePrimeField(field) {
   const c64 = new FieldEncoder(field, 64);
   const size = c32.m.byteLength();
 
+  console.log('/*');
+  console.log(' * Field');
+  console.log(' */');
+  console.log('');
+
   c32.output('unsigned char', `raw[${size}]`, c32.bytes(c32.m));
 
   console.log('#if MP_LIMB_BITS == 64');
@@ -422,6 +427,7 @@ function encodePrimeField(field) {
   console.log('');
   encodeFieldConstants(c32);
   console.log('#endif');
+  console.log('');
 }
 
 function montify(q, width, limbs) {
@@ -464,6 +470,10 @@ function encodeScalarConstants(field, width) {
 }
 
 function encodeScalarField(field) {
+  console.log('/*');
+  console.log(' * Scalar');
+  console.log(' */');
+  console.log('');
   console.log('#if MP_LIMB_BITS == 64');
   console.log('');
   encodeScalarConstants(field, 64);
@@ -471,6 +481,7 @@ function encodeScalarField(field) {
   console.log('');
   encodeScalarConstants(field, 32);
   console.log('#endif');
+  console.log('');
 }
 
 function encodeShortCurveScalars(curve, c) {
@@ -522,6 +533,11 @@ function encodeCurve(curve, primeField, scalarField) {
   const c32 = new CurveEncoder(curve, primeField, scalarField, 32);
   const c64 = new CurveEncoder(curve, primeField, scalarField, 64);
 
+  console.log('/*');
+  console.log(' * Curve');
+  console.log(' */');
+  console.log('');
+
   console.log('#if MP_LIMB_BITS == 64');
   console.log('');
   encodeShortCurveScalars(curve, c64);
@@ -554,6 +570,16 @@ const desc = {
   ED1174: [curves.ED1174, 'P251', 'Q251']
 };
 
+console.log('/*!');
+console.log(' * secp256k1.h - secp256k1 data for libsatoshi');
+console.log(' * Copyright (c) 2020, Christopher Jeffrey (MIT License).');
+console.log(' * https://github.com/chjj/libsatoshi');
+console.log(' */');
+console.log('');
+console.log('#ifndef BTC_SECP256K1_H');
+console.log('#define BTC_SECP256K1_H');
+console.log('');
+
 {
   const [curve, primeField, scalarField] = desc[process.argv[2]];
 
@@ -561,3 +587,5 @@ const desc = {
   encodePrimeField(primeField);
   encodeCurve(curve, primeField, scalarField);
 }
+
+console.log('#endif /* BTC_SECP256K1_H */');

@@ -1,3 +1,16 @@
+/*!
+ * secp256k1.h - secp256k1 data for libsatoshi
+ * Copyright (c) 2020, Christopher Jeffrey (MIT License).
+ * https://github.com/chjj/libsatoshi
+ */
+
+#ifndef BTC_SECP256K1_H
+#define BTC_SECP256K1_H
+
+/*
+ * Scalar
+ */
+
 #if MP_LIMB_BITS == 64
 
 static const sc_t scalar_n = {
@@ -54,6 +67,11 @@ static const sc_t scalar_r2 = {
 static const sc_t scalar_one = {0x00000001};
 
 #endif
+
+/*
+ * Field
+ */
+
 static const unsigned char field_raw[32] = {
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -154,6 +172,11 @@ static const fe_t field_mone = {
 };
 
 #endif
+
+/*
+ * Curve
+ */
+
 #if MP_LIMB_BITS == 64
 
 static const sc_t curve_sc_p = {
@@ -80249,3 +80272,4 @@ static const wge_t curve_wnd_endo[NAF_SIZE_PRE] = {
 };
 
 #endif
+#endif /* BTC_SECP256K1_H */
