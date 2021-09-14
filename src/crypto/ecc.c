@@ -166,11 +166,11 @@
 #if defined(BTC_HAVE_INT128)
 typedef uint64_t fe_word_t;
 #  define FIELD_WORD_BITS 64
-#  define MAX_FIELD_WORDS 9
+#  define MAX_FIELD_WORDS 6
 #else
 typedef uint32_t fe_word_t;
 #  define FIELD_WORD_BITS 32
-#  define MAX_FIELD_WORDS 19
+#  define MAX_FIELD_WORDS 12
 #endif
 
 typedef int fe_size_t;
@@ -178,12 +178,12 @@ typedef int fe_size_t;
 BTC_BARRIER(int, int)
 BTC_BARRIER(fe_word_t, fe_word)
 
-#define MAX_FIELD_BITS 521
-#define MAX_FIELD_SIZE 66
+#define MAX_FIELD_BITS 256
+#define MAX_FIELD_SIZE 32
 #define MAX_FIELD_LIMBS ((MAX_FIELD_BITS + MP_LIMB_BITS - 1) / MP_LIMB_BITS)
 
-#define MAX_SCALAR_BITS 521
-#define MAX_SCALAR_SIZE 66
+#define MAX_SCALAR_BITS 256
+#define MAX_SCALAR_SIZE 32
 #define MAX_SCALAR_LIMBS ((MAX_SCALAR_BITS + MP_LIMB_BITS - 1) / MP_LIMB_BITS)
 #define MAX_REDUCE_LIMBS (MAX_SCALAR_LIMBS * 2 + 2)
 #define MAX_ENDO_BITS ((MAX_SCALAR_BITS + 1) / 2 + 1)
@@ -232,7 +232,6 @@ typedef struct scalar_field_s {
   mp_size_t limbs;
   mp_size_t shift;
   size_t size;
-  unsigned int mask;
   mp_limb_t n[MAX_SCALAR_LIMBS];
   mp_limb_t nh[MAX_SCALAR_LIMBS];
   mp_limb_t m[MAX_REDUCE_LIMBS - MAX_SCALAR_LIMBS + 1];
@@ -377,8 +376,6 @@ typedef struct jge_s {
 } jge_t;
 
 typedef struct wei_s {
-  hash_id_t hash;
-  hash_id_t xof;
   prime_field_t fe;
   scalar_field_t sc;
   sc_t sc_p;
@@ -412,8 +409,6 @@ typedef struct wei_s {
 } wei_t;
 
 typedef struct wei_def_s {
-  hash_id_t hash;
-  hash_id_t xof;
   const prime_def_t *fe;
   const scalar_def_t *sc;
   int z;
@@ -1153,7 +1148,7 @@ sc_jsf_endo_var(const scalar_field_t *sc,
 }
 
 static void
-sc_random(const scalar_field_t *sc, sc_t z, drbg_t *rng) {
+sc_random(const scalar_field_t *sc, sc_t z, btc_drbg_t *rng) {
   mp_limb_t mask = MP_MASK(sc->bits % MP_LIMB_BITS);
   int ok;
 
@@ -1163,7 +1158,7 @@ sc_random(const scalar_field_t *sc, sc_t z, drbg_t *rng) {
   do {
     ok = 1;
 
-    mpn_random(z, sc->limbs, drbg_rng, rng);
+    mpn_random(z, sc->limbs, btc_drbg_rng, rng);
 
     z[sc->limbs - 1] &= mask;
 
@@ -1738,7 +1733,7 @@ fe_rsqrt(const prime_field_t *fe, fe_t z, const fe_t u, const fe_t v) {
 }
 
 BTC_UNUSED static void
-fe_random(const prime_field_t *fe, fe_t z, drbg_t *rng) {
+fe_random(const prime_field_t *fe, fe_t z, btc_drbg_t *rng) {
   size_t i = fe->endian < 0 ? fe->size - 1 : 0;
   unsigned char bytes[MAX_FIELD_SIZE];
   int ok;
@@ -1746,7 +1741,7 @@ fe_random(const prime_field_t *fe, fe_t z, drbg_t *rng) {
   do {
     ok = 1;
 
-    drbg_generate(rng, bytes, fe->size);
+    btc_drbg_generate(rng, bytes, fe->size);
 
     bytes[i] &= fe->mask;
 
@@ -1775,11 +1770,6 @@ scalar_field_init(scalar_field_t *sc, const scalar_def_t *def, int endian) {
   sc->limbs = (def->bits + MP_LIMB_BITS - 1) / MP_LIMB_BITS;
   sc->shift = sc->limbs * 2 + 2;
   sc->size = (def->bits + 7) / 8;
-  sc->mask = 0xff;
-
-  /* Mask to ignore high bits during hashing (schnorr). */
-  if ((sc->bits & 7) != 0)
-    sc->mask = (1 << (sc->bits & 7)) - 1;
 
   /* Deserialize order into limbs. */
   mpn_import(sc->n, sc->limbs, def->n, sc->size, 1);
@@ -2977,8 +2967,6 @@ jge_dbl3(const wei_t *ec, jge_t *p3, const jge_t *p1) {
 
 static void
 jge_dbl_var(const wei_t *ec, jge_t *p3, const jge_t *p1) {
-  const prime_field_t *fe = &ec->fe;
-
   /* P = O */
   if (p1->inf) {
     jge_zero(ec, p3);
@@ -3283,7 +3271,6 @@ jge_mixed_sub_var(const wei_t *ec, jge_t *p3,
 
 static void
 jge_dbl(const wei_t *ec, jge_t *p3, const jge_t *p1) {
-  const prime_field_t *fe = &ec->fe;
   int inf = p1->inf;
 
   if (ec->zero_a)
@@ -3819,9 +3806,6 @@ wei_init(wei_t *ec, const wei_def_t *def) {
   fe_t m3;
 
   memset(ec, 0, sizeof(*ec));
-
-  ec->hash = def->hash;
-  ec->xof = def->xof;
 
   prime_field_init(fe, def->fe, 1);
   scalar_field_init(sc, def->sc, 1);
@@ -4557,11 +4541,11 @@ wei_mul_multi_var(const wei_t *ec,
 static void
 wei_randomize(wei_t *ec, const unsigned char *entropy) {
   const scalar_field_t *sc = &ec->sc;
+  btc_drbg_t rng;
   jge_t unblind;
   sc_t blind;
-  drbg_t rng;
 
-  drbg_init(&rng, HASH_SHA256, entropy, ENTROPY_SIZE);
+  btc_drbg_init(&rng, entropy, 32);
 
   sc_random(sc, blind, &rng);
 
@@ -5031,19 +5015,19 @@ wei_point_to_hash(const wei_t *ec,
   unsigned char *u1 = bytes;
   unsigned char *u2 = bytes + fe->size;
   unsigned int hint = 0;
+  btc_drbg_t rng;
   wge_t p1, p2;
-  drbg_t rng;
 
-  drbg_init(&rng, HASH_SHA256, entropy, ENTROPY_SIZE);
+  btc_drbg_init(&rng, entropy, 32);
 
   do {
-    drbg_generate(&rng, u1, fe->size);
+    btc_drbg_generate(&rng, u1, fe->size);
 
     wei_point_from_uniform(ec, &p1, u1);
 
     wge_sub(ec, &p2, p, &p1);
 
-    drbg_generate(&rng, &hint, sizeof(hint));
+    btc_drbg_generate(&rng, &hint, sizeof(hint));
   } while (!wei_point_to_uniform(ec, u2, &p2, hint));
 
   cleanse(&rng, sizeof(rng));
@@ -5159,8 +5143,6 @@ static const endo_def_t endo_secp256k1 = {
  */
 
 static const wei_def_t curve_secp256k1 = {
-  HASH_SHA256,
-  HASH_SHA256,
   &field_secp256k1,
   &field_secq256k1,
   1,
@@ -5321,10 +5303,10 @@ ecdsa_privkey_generate(const wei_t *ec,
                        unsigned char *out,
                        const unsigned char *entropy) {
   const scalar_field_t *sc = &ec->sc;
-  drbg_t rng;
+  btc_drbg_t rng;
   sc_t a;
 
-  drbg_init(&rng, HASH_SHA256, entropy, ENTROPY_SIZE);
+  btc_drbg_init(&rng, entropy, 32);
 
   sc_random(sc, a, &rng);
   sc_export(sc, out, a);
@@ -6002,7 +5984,7 @@ ecdsa_sign_internal(const wei_t *ec,
   unsigned char bytes[MAX_SCALAR_SIZE * 2];
   unsigned int sign, high;
   sc_t a, m, k, r, s;
-  drbg_t rng;
+  btc_drbg_t rng;
   wge_t R;
   int ret = 1;
   int ok;
@@ -6015,10 +5997,10 @@ ecdsa_sign_internal(const wei_t *ec,
   sc_export(sc, bytes, a);
   sc_export(sc, bytes + sc->size, m);
 
-  drbg_init(&rng, ec->hash, bytes, sc->size * 2);
+  btc_drbg_init(&rng, bytes, sc->size * 2);
 
   do {
-    drbg_generate(&rng, bytes, sc->size);
+    btc_drbg_generate(&rng, bytes, sc->size);
 
     ok = ecdsa_reduce(ec, k, bytes, sc->size);
 
@@ -6653,69 +6635,28 @@ bip340_pubkey_combine(const wei_t *ec,
 }
 
 static void
-bip340_hash_init(hash_t *hash,
-                 hash_id_t type,
-                 const unsigned char *tag,
-                 size_t tag_len) {
-  /* [BIP340] "Tagged Hashes". */
-  size_t hash_size = hash_output_size(type);
-  size_t block_size = hash_block_size(type);
-  unsigned char bytes[HASH_MAX_BLOCK_SIZE / 2];
-
-  if (hash_size != block_size / 2) {
-    hash_init(hash, HASH_SHAKE256);
-    hash_size = block_size / 2;
-  } else {
-    hash_init(hash, type);
-  }
-
-  hash_update(hash, tag, tag_len);
-  hash_final(hash, bytes, hash_size);
-
-  hash_init(hash, type);
-  hash_update(hash, bytes, hash_size);
-  hash_update(hash, bytes, hash_size);
-}
-
-static void
 bip340_hash_aux(const wei_t *ec,
                 unsigned char *out,
                 const unsigned char *scalar,
                 const unsigned char *aux) {
   const scalar_field_t *sc = &ec->sc;
   unsigned char bytes[MAX_SCALAR_SIZE];
-  hash_t hash;
+  btc_sha256_t hash;
   size_t i;
 
-  STATIC_ASSERT(MAX_SCALAR_SIZE >= HASH_MAX_OUTPUT_SIZE);
+  /* "BIP0340/aux" */
+  hash.state[0] = 0x24dd3219;
+  hash.state[1] = 0x4eba7e70;
+  hash.state[2] = 0xca0fabb9;
+  hash.state[3] = 0x0fa3166d;
+  hash.state[4] = 0x3afbe4b1;
+  hash.state[5] = 0x4c44df97;
+  hash.state[6] = 0x4aac2739;
+  hash.state[7] = 0x249e850a;
+  hash.size = 64;
 
-  if (ec->xof == HASH_SHA256) {
-    sha256_t *sha = &hash.ctx.sha256;
-
-    sha->state[0] = 0x24dd3219;
-    sha->state[1] = 0x4eba7e70;
-    sha->state[2] = 0xca0fabb9;
-    sha->state[3] = 0x0fa3166d;
-    sha->state[4] = 0x3afbe4b1;
-    sha->state[5] = 0x4c44df97;
-    sha->state[6] = 0x4aac2739;
-    sha->state[7] = 0x249e850a;
-    sha->size = 64;
-
-    hash.type = HASH_SHA256;
-  } else {
-    static const unsigned char tag[11] = {
-      /* "BIP0340/aux" */
-      0x42, 0x49, 0x50, 0x30,
-      0x33, 0x34, 0x30, 0x2f,
-      0x61, 0x75, 0x78
-    };
-
-    bip340_hash_init(&hash, ec->xof, tag, sizeof(tag));
-  }
-
-  hash_update(&hash, aux, 32);
-  hash_final(&hash, bytes, sc->size);
+  btc_sha256_update(&hash, aux, 32);
+  btc_sha256_final(&hash, bytes);
 
   for (i = 0; i < sc->size; i++)
     out[i] = scalar[i] ^ bytes[i];
@@ -6735,47 +6676,28 @@ bip340_hash_nonce(const wei_t *ec, sc_t k,
   const scalar_field_t *sc = &ec->sc;
   unsigned char secret[MAX_SCALAR_SIZE];
   unsigned char bytes[MAX_SCALAR_SIZE];
-  hash_t hash;
-
-  STATIC_ASSERT(MAX_SCALAR_SIZE >= HASH_MAX_OUTPUT_SIZE);
+  btc_sha256_t hash;
 
   if (aux != NULL)
     bip340_hash_aux(ec, secret, scalar, aux);
   else
     memcpy(secret, scalar, sc->size);
 
-  if (ec->xof == HASH_SHA256) {
-    sha256_t *sha = &hash.ctx.sha256;
+  /* "BIP0340/nonce" */
+  hash.state[0] = 0x46615b35;
+  hash.state[1] = 0xf4bfbff7;
+  hash.state[2] = 0x9f8dc671;
+  hash.state[3] = 0x83627ab3;
+  hash.state[4] = 0x60217180;
+  hash.state[5] = 0x57358661;
+  hash.state[6] = 0x21a29e54;
+  hash.state[7] = 0x68b07b4c;
+  hash.size = 64;
 
-    sha->state[0] = 0x46615b35;
-    sha->state[1] = 0xf4bfbff7;
-    sha->state[2] = 0x9f8dc671;
-    sha->state[3] = 0x83627ab3;
-    sha->state[4] = 0x60217180;
-    sha->state[5] = 0x57358661;
-    sha->state[6] = 0x21a29e54;
-    sha->state[7] = 0x68b07b4c;
-    sha->size = 64;
-
-    hash.type = HASH_SHA256;
-  } else {
-    static const unsigned char tag[13] = {
-      /* "BIP0340/nonce" */
-      0x42, 0x49, 0x50, 0x30,
-      0x33, 0x34, 0x30, 0x2f,
-      0x6e, 0x6f, 0x6e, 0x63,
-      0x65
-    };
-
-    bip340_hash_init(&hash, ec->xof, tag, sizeof(tag));
-  }
-
-  hash_update(&hash, secret, sc->size);
-  hash_update(&hash, point, fe->size);
-  hash_update(&hash, msg, msg_len);
-  hash_final(&hash, bytes, sc->size);
-
-  bytes[0] &= sc->mask;
+  btc_sha256_update(&hash, secret, sc->size);
+  btc_sha256_update(&hash, point, fe->size);
+  btc_sha256_update(&hash, msg, msg_len);
+  btc_sha256_final(&hash, bytes);
 
   sc_import_weak(sc, k, bytes);
 
@@ -6793,43 +6715,23 @@ bip340_hash_challenge(const wei_t *ec, sc_t e,
   const prime_field_t *fe = &ec->fe;
   const scalar_field_t *sc = &ec->sc;
   unsigned char bytes[MAX_SCALAR_SIZE];
-  hash_t hash;
+  btc_sha256_t hash;
 
-  STATIC_ASSERT(MAX_SCALAR_SIZE >= HASH_MAX_OUTPUT_SIZE);
+  /* "BIP0340/challenge" */
+  hash.state[0] = 0x9cecba11;
+  hash.state[1] = 0x23925381;
+  hash.state[2] = 0x11679112;
+  hash.state[3] = 0xd1627e0f;
+  hash.state[4] = 0x97c87550;
+  hash.state[5] = 0x003cc765;
+  hash.state[6] = 0x90f61164;
+  hash.state[7] = 0x33e9b66a;
+  hash.size = 64;
 
-  if (ec->xof == HASH_SHA256) {
-    sha256_t *sha = &hash.ctx.sha256;
-
-    sha->state[0] = 0x9cecba11;
-    sha->state[1] = 0x23925381;
-    sha->state[2] = 0x11679112;
-    sha->state[3] = 0xd1627e0f;
-    sha->state[4] = 0x97c87550;
-    sha->state[5] = 0x003cc765;
-    sha->state[6] = 0x90f61164;
-    sha->state[7] = 0x33e9b66a;
-    sha->size = 64;
-
-    hash.type = HASH_SHA256;
-  } else {
-    static const unsigned char tag[17] = {
-      /* "BIP0340/challenge" */
-      0x42, 0x49, 0x50, 0x30,
-      0x33, 0x34, 0x30, 0x2f,
-      0x63, 0x68, 0x61, 0x6c,
-      0x6c, 0x65, 0x6e, 0x67,
-      0x65
-    };
-
-    bip340_hash_init(&hash, ec->xof, tag, sizeof(tag));
-  }
-
-  hash_update(&hash, R, fe->size);
-  hash_update(&hash, A, fe->size);
-  hash_update(&hash, msg, msg_len);
-  hash_final(&hash, bytes, sc->size);
-
-  bytes[0] &= sc->mask;
+  btc_sha256_update(&hash, R, fe->size);
+  btc_sha256_update(&hash, A, fe->size);
+  btc_sha256_update(&hash, msg, msg_len);
+  btc_sha256_final(&hash, bytes);
 
   sc_import_weak(sc, e, bytes);
 
@@ -7037,7 +6939,7 @@ bip340_verify_batch(const wei_t *ec,
   wge_t *points = scratch->points;
   sc_t *coeffs = scratch->coeffs;
   sc_t sum, s, e, a;
-  drbg_t rng;
+  btc_drbg_t rng;
   wge_t R, A;
   jge_t r;
   size_t j = 0;
@@ -7048,9 +6950,9 @@ bip340_verify_batch(const wei_t *ec,
   /* Seed RNG. */
   {
     unsigned char bytes[32];
-    sha256_t outer, inner;
+    btc_sha256_t outer, inner;
 
-    sha256_init(&outer);
+    btc_sha256_init(&outer);
 
     for (i = 0; i < len; i++) {
       const unsigned char *msg = msgs[i];
@@ -7058,18 +6960,18 @@ bip340_verify_batch(const wei_t *ec,
       const unsigned char *sig = sigs[i];
       const unsigned char *pub = pubs[i];
 
-      sha256_init(&inner);
-      sha256_update(&inner, msg, msg_len);
-      sha256_final(&inner, bytes);
+      btc_sha256_init(&inner);
+      btc_sha256_update(&inner, msg, msg_len);
+      btc_sha256_final(&inner, bytes);
 
-      sha256_update(&outer, bytes, 32);
-      sha256_update(&outer, sig, fe->size + sc->size);
-      sha256_update(&outer, pub, fe->size);
+      btc_sha256_update(&outer, bytes, 32);
+      btc_sha256_update(&outer, sig, fe->size + sc->size);
+      btc_sha256_update(&outer, pub, fe->size);
     }
 
-    sha256_final(&outer, bytes);
+    btc_sha256_final(&outer, bytes);
 
-    drbg_init(&rng, HASH_SHA256, bytes, 32);
+    btc_drbg_init(&rng, bytes, 32);
   }
 
   /* Intialize sum. */

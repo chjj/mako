@@ -255,7 +255,6 @@ ecdsa_pubkey_to_hash(const wei_curve_t *ec,
                      unsigned char *out,
                      const unsigned char *pub,
                      size_t pub_len,
-                     unsigned int subgroup,
                      const unsigned char *entropy);
 
 BTC_EXTERN int
@@ -472,7 +471,6 @@ BTC_EXTERN int
 bip340_pubkey_to_hash(const wei_curve_t *ec,
                       unsigned char *out,
                       const unsigned char *pub,
-                      unsigned int subgroup,
                       const unsigned char *entropy);
 
 BTC_EXTERN int
