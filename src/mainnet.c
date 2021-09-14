@@ -400,6 +400,7 @@ static const btc_network_t mainnet = {
     /* .items = */ mainnet_checkpoints,
     /* .length = */ lengthof(mainnet_checkpoints)
   },
+  /* .last_checkpoint */ mainnet_checkpoints[lengthof(mainnet_checkpoints) - 1].height,
   /* .halving_interval = */ 210000,
   /* .genesis = */ {
     /* .hash = */ {

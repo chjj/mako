@@ -7,6 +7,10 @@
 #ifndef BTC_NETWORK_H
 #define BTC_NETWORK_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include "common.h"
@@ -71,6 +75,11 @@ typedef struct btc_network_s {
     const btc_checkpoint_t *items;
     size_t length;
   } checkpoints;
+
+  /**
+   * Last checkpoint height.
+   */
+  uint32_t last_checkpoint;
 
   /**
    * Block subsidy halving interval.
@@ -267,6 +276,10 @@ typedef struct btc_network_s {
   int request_mempool;
 } btc_network_t;
 
-extern const btc_network_t *btc_main;
+BTC_EXTERN extern const btc_network_t *btc_main;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* BTC_NETWORK_H */
