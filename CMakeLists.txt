@@ -51,7 +51,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/vector.c
                             src/view.c)
 
-list(APPEND node_sources src/node/db.c)
+list(APPEND node_sources src/node/db_lmdb.c)
 
 list(APPEND satoshi_defines BTC_HAVE_ASM)
 list(APPEND satoshi_defines BTC_HAVE_INT128)
@@ -71,6 +71,7 @@ endif()
 list(APPEND satoshi_includes ${PROJECT_SOURCE_DIR}/include)
 
 # add_subdirectory(deps/leveldb)
+add_subdirectory(deps/lmdb)
 
 add_library(satoshi_static STATIC ${satoshi_sources})
 target_compile_definitions(satoshi_static PUBLIC ${satoshi_defines})
@@ -90,15 +91,16 @@ target_link_options(satoshi_shared PRIVATE -Wl,-z,now)
 target_link_libraries(satoshi_shared PRIVATE ${satoshi_libs})
 set_property(TARGET satoshi_shared PROPERTY OUTPUT_NAME satoshi)
 
-# add_library(satoshi_node STATIC ${node_sources})
-# target_compile_definitions(satoshi_node PUBLIC ${satoshi_defines})
-# target_compile_options(satoshi_node PUBLIC ${satoshi_cflags})
-# target_include_directories(satoshi_node PUBLIC ${satoshi_includes})
-# target_link_options(satoshi_node INTERFACE ${satoshi_ldflags})
+add_library(satoshi_node STATIC ${node_sources})
+target_compile_definitions(satoshi_node PUBLIC ${satoshi_defines})
+target_compile_options(satoshi_node PUBLIC ${satoshi_cflags})
+target_include_directories(satoshi_node PUBLIC ${satoshi_includes})
+target_link_options(satoshi_node INTERFACE ${satoshi_ldflags})
 # target_link_libraries(satoshi_node PRIVATE leveldb stdc++)
-# set_property(TARGET satoshi_node PROPERTY OUTPUT_NAME node)
+target_link_libraries(satoshi_node PRIVATE lmdb)
+set_property(TARGET satoshi_node PROPERTY OUTPUT_NAME node)
 
 add_executable(satoshi_test test/test.c)
 target_link_options(satoshi_test PRIVATE -Wl,-z,now)
-# target_link_libraries(satoshi_test PRIVATE satoshi_node satoshi_shared)
-target_link_libraries(satoshi_test PRIVATE satoshi_shared)
+target_link_libraries(satoshi_test PRIVATE satoshi_node satoshi_shared)
+# target_link_libraries(satoshi_test PRIVATE satoshi_shared)

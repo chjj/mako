@@ -7,6 +7,8 @@
 #ifndef BTC_INTERNAL_H
 #define BTC_INTERNAL_H
 
+#include <satoshi/common.h>
+
 /*
  * Language Standard
  */
@@ -271,10 +273,18 @@ prefix ## _barrier(type x) {      \
 
 #define btc_abort btc__abort
 
-BTC_NORETURN void
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+BTC_EXTERN BTC_NORETURN void
 btc__assert_fail(const char *file, int line, const char *expr);
 
-BTC_NORETURN void
+BTC_EXTERN BTC_NORETURN void
 btc__abort(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* BTC_INTERNAL_H */
