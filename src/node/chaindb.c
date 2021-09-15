@@ -3,7 +3,7 @@
 #include "../impl.h"
 #include "../internal.h"
 
-KHASH_SET_INIT_CONST_HASH(hashes)
+KHASH_MAP_INIT_CONST_HASH(hashes, btc_entry_t *)
 
 struct btc_chaindb_s {
   const btc_network_t *network;

@@ -18,6 +18,12 @@ extern "C" {
 #include "types.h"
 
 /*
+ * Constants
+ */
+
+#define BTC_ENTRY_SIZE 132
+
+/*
  * Chain Entry
  */
 

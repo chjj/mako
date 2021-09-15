@@ -25,6 +25,10 @@ btc_entry_init(btc_entry_t *z) {
   btc_header_init(&z->header);
   z->height = 0;
   memset(z->chainwork, 0, 32);
+  z->block_file = -1;
+  z->block_pos = -1;
+  z->undo_file = -1;
+  z->undo_pos = -1;
   z->prev = NULL;
   z->next = NULL;
 }
@@ -40,6 +44,12 @@ btc_entry_copy(btc_entry_t *z, const btc_entry_t *x) {
   btc_header_copy(&z->header, &x->header);
   z->height = x->height;
   memcpy(z->chainwork, x->chainwork, 32);
+  z->block_file = x->block_file;
+  z->block_pos = x->block_pos;
+  z->undo_file = x->undo_file;
+  z->undo_pos = x->undo_pos;
+  z->prev = NULL;
+  z->next = NULL;
 }
 
 size_t
@@ -49,6 +59,10 @@ btc_entry_size(const btc_entry_t *x) {
   size += btc_header_size(&x->header);
   size += 4;
   size += 32;
+  size += 4;
+  size += 4;
+  size += 4;
+  size += 4;
 
   return size;
 }
@@ -58,11 +72,17 @@ btc_entry_write(uint8_t *zp, const btc_entry_t *x) {
   zp = btc_header_write(zp, &x->header);
   zp = btc_uint32_write(zp, x->height);
   zp = btc_raw_write(zp, x->chainwork, 32);
+  zp = btc_int32_write(zp, x->block_file);
+  zp = btc_int32_write(zp, x->block_pos);
+  zp = btc_int32_write(zp, x->undo_file);
+  zp = btc_int32_write(zp, x->undo_pos);
   return zp;
 }
 
 int
 btc_entry_read(btc_entry_t *z, const uint8_t **xp, size_t *xn) {
+  btc_entry_init(z);
+
   if (!btc_header_read(&z->header, xp, xn))
     return 0;
 
@@ -72,10 +92,19 @@ btc_entry_read(btc_entry_t *z, const uint8_t **xp, size_t *xn) {
   if (!btc_raw_read(z->chainwork, 32, xp, xn))
     return 0;
 
-  btc_header_hash(z->hash, &z->header);
+  if (!btc_int32_read(&z->block_file, xp, xn))
+    return 0;
 
-  z->prev = NULL;
-  z->next = NULL;
+  if (!btc_int32_read(&z->block_pos, xp, xn))
+    return 0;
+
+  if (!btc_int32_read(&z->undo_file, xp, xn))
+    return 0;
+
+  if (!btc_int32_read(&z->undo_pos, xp, xn))
+    return 0;
+
+  btc_header_hash(z->hash, &z->header);
 
   return 1;
 }
@@ -120,14 +149,16 @@ void
 btc_entry_set_header(btc_entry_t *entry,
                      const btc_header_t *hdr,
                      const btc_entry_t *prev) {
-  btc_header_hash(entry->hash, hdr);
+  btc_entry_init(entry);
 
-  entry->header = *hdr;
+  btc_header_hash(entry->hash, hdr);
+  btc_header_copy(&entry->header, hdr);
+
   entry->height = prev != NULL ? prev->height + 1 : 0;
 
   btc_entry_get_chainwork(entry->chainwork, entry, prev);
 
-  entry->prev = prev;
+  entry->prev = (btc_entry_t *)prev;
 }
 
 void

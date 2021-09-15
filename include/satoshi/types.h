@@ -128,6 +128,10 @@ typedef struct btc_entry_s {
   btc_header_t header;
   uint32_t height;
   uint8_t chainwork[32];
+  int32_t block_file;
+  int32_t block_pos;
+  int32_t undo_file;
+  int32_t undo_pos;
   struct btc_entry_s *prev;
   struct btc_entry_s *next;
 } btc_entry_t;
