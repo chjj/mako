@@ -123,9 +123,11 @@ btc_entry_set_header(btc_entry_t *entry,
   btc_header_hash(entry->hash, hdr);
 
   entry->header = *hdr;
-  entry->height = prev->height + 1;
+  entry->height = prev != NULL ? prev->height + 1 : 0;
 
   btc_entry_get_chainwork(entry->chainwork, entry, prev);
+
+  entry->prev = prev;
 }
 
 void

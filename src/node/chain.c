@@ -453,7 +453,7 @@ btc_chain_retarget(btc_chain_t *chain, const btc_entry_t *prev, const btc_entry_
   mpz_mul(target, target, actual_timespan);
   mpz_quo(target, target, target_timespan);
 
-  if (mpz_cmp(target, limit) <= 0) {
+  if (mpz_cmp(target, limit) <= 0)
     ret = mpz_get_compact(target);
   else
     ret = net->pow.bits;

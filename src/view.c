@@ -219,6 +219,7 @@ btc_view_spend(btc__view_t *view,
 
     coin->spent = 1;
 
+    /* TODO: Maybe use a shallow vector for this? */
     btc_undo_push(&view->undo, btc_coin_clone(coin));
   }
 
