@@ -228,7 +228,7 @@ if(HAVE_CLANG_THREAD_SAFETY)
 endif(HAVE_CLANG_THREAD_SAFETY)
 
 add_subdirectory(deps/snappy)
-target_link_libraries(leveldb INTERFACE snappy)
+target_link_libraries(leveldb PRIVATE snappy)
 
 # Needed by port_stdcxx.h
 find_package(Threads REQUIRED)
