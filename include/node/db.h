@@ -30,7 +30,7 @@ BTC_EXTERN btc_db_t *
 btc_db_create(void);
 
 BTC_EXTERN int
-btc_db_open(btc_db_t *db, const char *path);
+btc_db_open(btc_db_t *db, const char *path, size_t map_size);
 
 BTC_EXTERN void
 btc_db_close(btc_db_t *db);
@@ -39,15 +39,15 @@ BTC_EXTERN void
 btc_db_destroy(btc_db_t *db);
 
 BTC_EXTERN int
-btc_db_get(btc_db_t *db, unsigned char **val, size_t *vallen,
-                         const unsigned char *key, size_t keylen);
+btc_db_get(btc_db_t *db, unsigned char **val, size_t *vlen,
+                         const unsigned char *key, size_t klen);
 
 BTC_EXTERN int
-btc_db_put(btc_db_t *db, const unsigned char *key, size_t keylen,
-                         const unsigned char *val, size_t vallen);
+btc_db_put(btc_db_t *db, const unsigned char *key, size_t klen,
+                         const unsigned char *val, size_t vlen);
 
 BTC_EXTERN int
-btc_db_del(btc_db_t *db, const unsigned char *key, size_t keylen);
+btc_db_del(btc_db_t *db, const unsigned char *key, size_t klen);
 
 BTC_EXTERN int
 btc_db_write(btc_db_t *db, btc_batch_t *bat);
@@ -57,7 +57,7 @@ btc_db_write(btc_db_t *db, btc_batch_t *bat);
  */
 
 BTC_EXTERN btc_batch_t *
-btc_batch_create(void);
+btc_batch_create(btc_db_t *db);
 
 BTC_EXTERN void
 btc_batch_destroy(btc_batch_t *bat);
@@ -68,9 +68,6 @@ btc_batch_put(btc_batch_t *bat, const unsigned char *key, size_t klen,
 
 BTC_EXTERN void
 btc_batch_del(btc_batch_t *bat, const unsigned char *key, size_t klen);
-
-BTC_EXTERN void
-btc_batch_clear(btc_batch_t *bat);
 
 /*
  * Iterator

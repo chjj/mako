@@ -73,8 +73,10 @@ btc_db_create(void) {
 }
 
 int
-btc_db_open(struct btc_db_s *db, const char *path) {
+btc_db_open(struct btc_db_s *db, const char *path, size_t map_size) {
   char *err = NULL;
+
+  (void)map_size;
 
   db->level = leveldb_open(db->options, path, &err);
 
@@ -112,15 +114,15 @@ btc_db_destroy(struct btc_db_s *db) {
 }
 
 int
-btc_db_get(struct btc_db_s *db, unsigned char **val, size_t *vallen,
-                                const unsigned char *key, size_t keylen) {
+btc_db_get(struct btc_db_s *db, unsigned char **val, size_t *vlen,
+                                const unsigned char *key, size_t klen) {
   char *err = NULL;
 
   *val = (unsigned char *)leveldb_get(db->level,
                                       db->read_options,
                                       (const char *)key,
-                                      keylen,
-                                      vallen,
+                                      klen,
+                                      vlen,
                                       &err);
 
   if (err != NULL) {
@@ -133,13 +135,13 @@ btc_db_get(struct btc_db_s *db, unsigned char **val, size_t *vallen,
 }
 
 int
-btc_db_put(struct btc_db_s *db, const unsigned char *key, size_t keylen,
-                                const unsigned char *val, size_t vallen) {
+btc_db_put(struct btc_db_s *db, const unsigned char *key, size_t klen,
+                                const unsigned char *val, size_t vlen) {
   char *err = NULL;
 
   leveldb_put(db->level, db->write_options,
-              (const char *)key, keylen,
-              (const char *)val, vallen,
+              (const char *)key, klen,
+              (const char *)val, vlen,
               &err);
 
   if (err != NULL) {
@@ -152,11 +154,11 @@ btc_db_put(struct btc_db_s *db, const unsigned char *key, size_t keylen,
 }
 
 int
-btc_db_del(struct btc_db_s *db, const unsigned char *key, size_t keylen) {
+btc_db_del(struct btc_db_s *db, const unsigned char *key, size_t klen) {
   char *err = NULL;
 
   leveldb_delete(db->level, db->write_options,
-                 (const char *)key, keylen,
+                 (const char *)key, klen,
                  &err);
 
   if (err != NULL) {
@@ -188,9 +190,11 @@ btc_db_write(struct btc_db_s *db, struct btc_batch_s *bat) {
  */
 
 struct btc_batch_s *
-btc_batch_create(void) {
+btc_batch_create(struct btc_db_s *db) {
   struct btc_batch_s *bat =
     (struct btc_batch_s *)malloc(sizeof(struct btc_batch_s));
+
+  (void)db;
 
   CHECK(bat != NULL);
 
@@ -215,11 +219,6 @@ btc_batch_put(struct btc_batch_s *bat, const unsigned char *key, size_t klen,
 void
 btc_batch_del(struct btc_batch_s *bat, const unsigned char *key, size_t klen) {
   leveldb_writebatch_delete(bat->wb, (const char *)key, klen);
-}
-
-void
-btc_batch_clear(struct btc_batch_s *bat) {
-  leveldb_writebatch_clear(bat->wb);
 }
 
 /*
