@@ -10,10 +10,6 @@
 #include <node/db.h>
 #include "../internal.h"
 
-typedef struct btc_db_s btc_db_t;
-typedef struct btc_batch_s btc_batch_t;
-typedef struct btc_iter_s btc_iter_t;
-
 /*
  * Types
  */
