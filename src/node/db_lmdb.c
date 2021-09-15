@@ -140,8 +140,11 @@ btc_db_get(struct btc_db_s *db, unsigned char **val, size_t *vlen,
   rc = mdb_get(txn, db->dbi, &mkey, &mval);
 
   if (rc != 0) {
-    fprintf(stderr, "mdb_get: %s\n", mdb_strerror(rc));
+    if (rc != MDB_NOTFOUND)
+      fprintf(stderr, "mdb_get: %s\n", mdb_strerror(rc));
+
     mdb_txn_abort(txn);
+
     return 0;
   }
 
@@ -223,9 +226,12 @@ btc_db_del(struct btc_db_s *db, const unsigned char *key, size_t klen) {
 
   rc = mdb_del(txn, db->dbi, &mkey, NULL);
 
-  if (rc != 0 && rc != MDB_NOTFOUND) {
-    fprintf(stderr, "mdb_del: %s\n", mdb_strerror(rc));
+  if (rc != 0) {
+    if (rc != MDB_NOTFOUND)
+      fprintf(stderr, "mdb_del: %s\n", mdb_strerror(rc));
+
     mdb_txn_abort(txn);
+
     return 0;
   }
 
