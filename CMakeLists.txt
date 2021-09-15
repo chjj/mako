@@ -5,6 +5,8 @@
 cmake_minimum_required(VERSION 3.4)
 project(satoshi LANGUAGES C)
 
+include(CTest)
+
 set(satoshi_sources)
 set(satoshi_defines)
 set(satoshi_cflags)
@@ -70,7 +72,6 @@ endif()
 
 list(APPEND satoshi_includes ${PROJECT_SOURCE_DIR}/include)
 
-# add_subdirectory(deps/leveldb)
 add_subdirectory(deps/liblmdb)
 
 add_library(satoshi_static STATIC ${satoshi_sources})
@@ -96,11 +97,21 @@ target_compile_definitions(satoshi_node PUBLIC ${satoshi_defines})
 target_compile_options(satoshi_node PUBLIC ${satoshi_cflags})
 target_include_directories(satoshi_node PUBLIC ${satoshi_includes})
 target_link_options(satoshi_node INTERFACE ${satoshi_ldflags})
-# target_link_libraries(satoshi_node PRIVATE leveldb stdc++)
 target_link_libraries(satoshi_node PRIVATE lmdb)
 set_property(TARGET satoshi_node PROPERTY OUTPUT_NAME node)
 
-add_executable(satoshi_test test/test.c)
-target_link_options(satoshi_test PRIVATE -Wl,-z,now)
-target_link_libraries(satoshi_test PRIVATE satoshi_node satoshi_shared)
-# target_link_libraries(satoshi_test PRIVATE satoshi_shared)
+add_library(satoshi_tests STATIC test/tests.c)
+target_compile_definitions(satoshi_tests PUBLIC ${satoshi_defines})
+target_compile_options(satoshi_tests PUBLIC ${satoshi_cflags})
+target_include_directories(satoshi_tests PUBLIC ${satoshi_includes})
+target_link_options(satoshi_tests INTERFACE ${satoshi_ldflags})
+set_property(TARGET satoshi_tests PROPERTY OUTPUT_NAME tests)
+
+foreach(name ecdsa bip340 sighash script tx db)
+  add_executable(t-${name} test/t-${name}.c)
+  target_link_options(t-${name} PRIVATE -Wl,-z,now)
+  target_link_libraries(t-${name} PRIVATE satoshi_tests
+                                          satoshi_node
+                                          satoshi_shared)
+  add_test(NAME ${name} COMMAND t-${name})
+endforeach()
