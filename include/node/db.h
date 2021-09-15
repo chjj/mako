@@ -39,6 +39,9 @@ BTC_EXTERN void
 btc_db_destroy(btc_db_t *db);
 
 BTC_EXTERN int
+btc_db_has(btc_db_t *db, const unsigned char *key, size_t klen);
+
+BTC_EXTERN int
 btc_db_get(btc_db_t *db, unsigned char **val, size_t *vlen,
                          const unsigned char *key, size_t klen);
 

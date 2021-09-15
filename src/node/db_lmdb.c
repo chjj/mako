@@ -121,6 +121,43 @@ btc_db_destroy(struct btc_db_s *db) {
 }
 
 int
+btc_db_has(struct btc_db_s *db, const unsigned char *key, size_t klen) {
+  MDB_val mkey, mval;
+  MDB_txn *txn;
+  int rc;
+
+  rc = mdb_txn_begin(db->env, NULL, MDB_RDONLY, &txn);
+
+  if (rc != 0) {
+    fprintf(stderr, "mdb_txn_begin: %s\n", mdb_strerror(rc));
+    return 0;
+  }
+
+  mkey.mv_data = (unsigned char *)key;
+  mkey.mv_size = klen;
+
+  rc = mdb_get(txn, db->dbi, &mkey, &mval);
+
+  if (rc != 0) {
+    if (rc != MDB_NOTFOUND)
+      fprintf(stderr, "mdb_get: %s\n", mdb_strerror(rc));
+
+    mdb_txn_abort(txn);
+
+    return 0;
+  }
+
+  rc = mdb_txn_commit(txn);
+
+  if (rc != 0) {
+    fprintf(stderr, "mdb_txn_commit: %s\n", mdb_strerror(rc));
+    return 0;
+  }
+
+  return 1;
+}
+
+int
 btc_db_get(struct btc_db_s *db, unsigned char **val, size_t *vlen,
                                 const unsigned char *key, size_t klen) {
   MDB_val mkey, mval;
@@ -355,7 +392,7 @@ btc_iter_create(struct btc_db_s *db, int use_snapshot) {
   iter->mkey.mv_size = 0;
   iter->mval.mv_data = NULL;
   iter->mval.mv_data = 0;
-  iter->rc = 0;
+  iter->rc = MDB_NOTFOUND;
 
   return iter;
 fail:

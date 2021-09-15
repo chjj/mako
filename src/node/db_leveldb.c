@@ -114,6 +114,19 @@ btc_db_destroy(struct btc_db_s *db) {
 }
 
 int
+btc_db_has(struct btc_db_s *db, const unsigned char *key, size_t klen) {
+  unsigned char *val;
+  size_t vlen;
+
+  if (!btc_db_get(db, &val, &vlen, key, klen))
+    return 0;
+
+  btc_db_free(val);
+
+  return 1;
+}
+
+int
 btc_db_get(struct btc_db_s *db, unsigned char **val, size_t *vlen,
                                 const unsigned char *key, size_t klen) {
   char *err = NULL;
