@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <lmdb.h>
 #include <node/db.h>
 #include "../internal.h"
@@ -20,6 +21,7 @@ struct btc_db_s {
 };
 
 struct btc_batch_s {
+  MDB_dbi dbi;
   MDB_txn *txn;
 };
 
@@ -125,14 +127,14 @@ btc_db_get(struct btc_db_s *db, unsigned char **val, size_t *vlen,
   MDB_txn *txn;
   int rc;
 
-  rc = mdb_txn_begin(env, NULL, MDB_RDONLY, &txn);
+  rc = mdb_txn_begin(db->env, NULL, MDB_RDONLY, &txn);
 
   if (rc != 0) {
     fprintf(stderr, "mdb_txn_begin: %s\n", mdb_strerror(rc));
     return 0;
   }
 
-  mkey.mv_data = key;
+  mkey.mv_data = (unsigned char *)key;
   mkey.mv_size = klen;
 
   rc = mdb_get(txn, db->dbi, &mkey, &mval);
@@ -179,11 +181,11 @@ btc_db_put(struct btc_db_s *db, const unsigned char *key, size_t klen,
     return 0;
   }
 
-  mkey.mv_data = key;
+  mkey.mv_data = (unsigned char *)key;
   mkey.mv_size = klen;
 
-  mval.mv_data = val;
-  mval.mv_data = vlen;
+  mval.mv_data = (unsigned char *)val;
+  mval.mv_size = vlen;
 
   rc = mdb_put(txn, db->dbi, &mkey, &mval, 0);
 
@@ -216,7 +218,7 @@ btc_db_del(struct btc_db_s *db, const unsigned char *key, size_t klen) {
     return 0;
   }
 
-  mkey.mv_data = key;
+  mkey.mv_data = (unsigned char *)key;
   mkey.mv_size = klen;
 
   rc = mdb_del(txn, db->dbi, &mkey, NULL);
@@ -240,6 +242,8 @@ btc_db_del(struct btc_db_s *db, const unsigned char *key, size_t klen) {
 int
 btc_db_write(struct btc_db_s *db, struct btc_batch_s *bat) {
   int rc = mdb_txn_commit(bat->txn);
+
+  (void)db;
 
   bat->txn = NULL;
 
@@ -270,6 +274,8 @@ btc_batch_create(struct btc_db_s *db) {
     goto fail;
   }
 
+  bat->dbi = db->dbi;
+
   return bat;
 fail:
   free(bat);
@@ -289,13 +295,13 @@ btc_batch_put(struct btc_batch_s *bat, const unsigned char *key, size_t klen,
                                        const unsigned char *val, size_t vlen) {
   MDB_val mkey, mval;
 
-  mkey.mv_data = key;
+  mkey.mv_data = (unsigned char *)key;
   mkey.mv_size = klen;
 
-  mval.mv_data = val;
-  mval.mv_data = vlen;
+  mval.mv_data = (unsigned char *)val;
+  mval.mv_size = vlen;
 
-  CHECK(mdb_put(bat->txn, db->dbi, &mkey, &mval, 0) == 0);
+  CHECK(mdb_put(bat->txn, bat->dbi, &mkey, &mval, 0) == 0);
 }
 
 void
@@ -303,10 +309,10 @@ btc_batch_del(struct btc_batch_s *bat, const unsigned char *key, size_t klen) {
   MDB_val mkey;
   int rc;
 
-  mkey.mv_data = key;
+  mkey.mv_data = (unsigned char *)key;
   mkey.mv_size = klen;
 
-  rc = mdb_del(bat->txn, db->dbi, &key, NULL);
+  rc = mdb_del(bat->txn, bat->dbi, &mkey, NULL);
 
   CHECK(rc == 0 || rc == MDB_NOTFOUND);
 }
@@ -320,6 +326,8 @@ btc_iter_create(struct btc_db_s *db, int use_snapshot) {
   struct btc_iter_s *iter =
     (struct btc_iter_s *)malloc(sizeof(struct btc_iter_s));
   int rc;
+
+  (void)use_snapshot;
 
   CHECK(iter != NULL);
 
@@ -373,7 +381,7 @@ btc_iter_seek_last(struct btc_iter_s *iter) {
 
 void
 btc_iter_seek(struct btc_iter_s *iter, const unsigned char *key, size_t klen) {
-  iter->mkey.mv_data = key;
+  iter->mkey.mv_data = (unsigned char *)key;
   iter->mkey.mv_size = klen;
   iter->rc = mdb_cursor_get(iter->cur, &iter->mkey, &iter->mval, MDB_SET_RANGE);
 }
