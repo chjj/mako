@@ -169,9 +169,9 @@ name ## _write(uint8_t *zp, const name ## _t *x);                \
 scope int                                                        \
 name ## _read(name ## _t *z, const uint8_t **xp, size_t *xn);    \
                                                                  \
-scope void                                                       \
+scope size_t                                                     \
 name ## _export(uint8_t *zp, const name ## _t *x) {              \
-  name ## _write(zp, x);                                         \
+  return name ## _write(zp, x) - zp;                             \
 }                                                                \
                                                                  \
 scope void                                                       \

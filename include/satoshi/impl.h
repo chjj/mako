@@ -63,7 +63,7 @@ name ## _copy(name ## _t *x, const name ## _t *y);
  */
 
 #define BTC_DEFINE_SERIALIZABLE(name, scope)                    \
-scope void                                                      \
+scope size_t                                                    \
 name ## _export(uint8_t *zp, const name ## _t *x);              \
                                                                 \
 scope void                                                      \
