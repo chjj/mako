@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include <lmdb.h>
 
@@ -92,6 +93,7 @@ btc_chainfile_copy(btc_chainfile_t *z, const btc_chainfile_t *x) {
 
 static size_t
 btc_chainfile_size(const btc_chainfile_t *x) {
+  (void)x;
   return 29;
 }
 
@@ -141,11 +143,11 @@ static void
 btc_chainfile_update(btc_chainfile_t *z, const btc_entry_t *entry) {
   z->items += 1;
 
-  if (z->min_time == -1 || entry->time < (uint32_t)z->min_time)
-    z->min_time = entry->time;
+  if (z->min_time == -1 || entry->header.time < (uint32_t)z->min_time)
+    z->min_time = entry->header.time;
 
-  if (z->max_time == -1 || entry->time > (uint32_t)z->max_time)
-    z->max_time = entry->time;
+  if (z->max_time == -1 || entry->header.time > (uint32_t)z->max_time)
+    z->max_time = entry->header.time;
 
   if (z->min_height == -1 || entry->height < (uint32_t)z->min_height)
     z->min_height = entry->height;
@@ -200,7 +202,7 @@ btc_chaindb_init(struct btc_chaindb_s *db, const btc_network_t *network) {
   btc_vector_init(&db->heights);
   btc_vector_init(&db->files);
 
-  CHECK(db->hash != NULL);
+  CHECK(db->hashes != NULL);
 
   db->slab = (uint8_t *)malloc(24 + BTC_MAX_RAW_BLOCK_SIZE);
 
@@ -377,6 +379,7 @@ btc_chaindb_load_files(struct btc_chaindb_s *db) {
   char path[BTC_PATH_MAX + 1];
   btc_chainfile_t *file;
   MDB_val mkey, mval;
+  MDB_cursor *cur;
   MDB_txn *txn;
   int rc;
 
@@ -460,7 +463,7 @@ btc_chaindb_unload_files(struct btc_chaindb_s *db) {
   btc_fs_close(db->undo.fd);
 
   while (db->files.length > 0) {
-    file = (btc_chainfile_t *)btc_vector_pop(&btc->files);
+    file = (btc_chainfile_t *)btc_vector_pop(&db->files);
     btc_chainfile_destroy(file);
   }
 }
@@ -472,8 +475,8 @@ btc_chaindb_init_index(struct btc_chaindb_s *db) {
   btc_block_t block;
 
   btc_block_init(&block);
-  btc_block_import(&block, db->network.genesis.data,
-                           db->network.genesis.length);
+  btc_block_import(&block, db->network->genesis.data,
+                           db->network->genesis.length);
 
   btc_entry_set_block(entry, &block, NULL);
 
@@ -594,7 +597,6 @@ btc_chaindb_load_index(struct btc_chaindb_s *db) {
 
 static void
 btc_chaindb_unload_index(struct btc_chaindb_s *db) {
-  btc_entry_t *entry;
   khiter_t it;
 
   for (it = kh_begin(db->hashes); it != kh_end(db->hashes); it++) {
@@ -605,8 +607,8 @@ btc_chaindb_unload_index(struct btc_chaindb_s *db) {
   kh_clear(hashes, db->hashes);
   btc_vector_clear(&db->heights);
 
-  db->gen = NULL;
-  db->tip = NULL;
+  db->head = NULL;
+  db->tail = NULL;
 }
 
 int
@@ -642,6 +644,7 @@ read_coin(void *ctx, void *arg, const btc_outpoint_t *prevout) {
   MDB_val mkey, mval;
   btc_coin_t *coin;
   uint8_t key[36];
+  int rc;
 
   btc_outpoint_write(key, prevout);
 
@@ -696,6 +699,7 @@ iterate_view(void *ctx,
   uint8_t *val = db->slab;
   MDB_val mkey, mval;
   uint8_t key[36];
+  int rc;
 
   btc_raw_write(key, hash, 32);
   btc_uint32_write(key + 32, index);
@@ -779,7 +783,7 @@ fail:
   return ret;
 }
 
-static btc_block_t *
+BTC_UNUSED static btc_block_t *
 btc_chaindb_read_block(struct btc_chaindb_s *db, btc_entry_t *entry) {
   btc_block_t *block;
   uint8_t *buf;
@@ -823,15 +827,17 @@ btc_chaindb_read_undo(struct btc_chaindb_s *db, btc_entry_t *entry) {
 
 static int
 btc_chaindb_should_sync(struct btc_chaindb_s *db, btc_entry_t *entry) {
-  time_t now = time(NULL):
+  time_t now = time(NULL);
+
+  (void)db;
 
   if (now == (time_t)-1)
     return 1;
 
-  if ((uint32_t)now < entry->time)
+  if ((uint32_t)now < entry->header.time)
     return 1;
 
-  if ((uint32_t)now - entry->time <= 24 * 60 * 60)
+  if ((uint32_t)now - entry->header.time <= 24 * 60 * 60)
     return 1;
 
   if ((entry->height % 1000) == 0)
@@ -905,7 +911,7 @@ btc_chaindb_write_block(struct btc_chaindb_s *db,
 
   /* Store in network format, in case we ever want
      to sendfile(2) blocks directly to a peer. */
-  btc_uint32_write(db->slab +  0, db->network.magic);
+  btc_uint32_write(db->slab +  0, db->network->magic);
   btc_uint32_write(db->slab +  4, 0x636f6c62);
   btc_uint32_write(db->slab +  8, 0x0000006b);
   btc_uint32_write(db->slab + 12, 0x00000000);
@@ -964,7 +970,7 @@ btc_chaindb_write_undo(struct btc_chaindb_s *db,
 
   btc_hash256(hash, buf + 24, len);
 
-  btc_uint32_write(buf +  0, db->network.magic);
+  btc_uint32_write(buf +  0, db->network->magic);
   btc_uint32_write(buf +  4, 0x00000000);
   btc_uint32_write(buf +  8, 0x00000000);
   btc_uint32_write(buf + 12, 0x00000000);
@@ -1012,8 +1018,8 @@ btc_chaindb_prune_files(struct btc_chaindb_s *db,
                         btc_entry_t *entry) {
   char path[BTC_PATH_MAX + 1];
   btc_chainfile_t *file;
-  MDB_val mkey, mval;
   uint8_t key[5];
+  MDB_val mkey;
   int target;
   size_t i;
 
@@ -1263,7 +1269,6 @@ btc_chaindb_reconnect(struct btc_chaindb_s *db,
                       const btc_block_t *block,
                       btc_view_t *view) {
   uint8_t raw[BTC_ENTRY_SIZE];
-  uint8_t *raw = db->slab;
   MDB_val mkey, mval;
   MDB_txn *txn;
 
