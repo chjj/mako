@@ -64,6 +64,7 @@ satoshi_test_static
 satoshi_bench.js
 satoshi_test.js
 satoshi.js
+tmp/
 vgcore.*
 wasm32-wasi/
 wasm64-wasi/
