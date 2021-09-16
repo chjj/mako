@@ -3,6 +3,78 @@
 #include "../impl.h"
 #include "../internal.h"
 
+/*
+ * Chain File
+ */
+
+struct btc_chainfile_s {
+  int fd;
+  int fileno;
+  int position;
+  int min_height;
+  int max_height;
+} btc_chainfile_t;
+
+DEFINE_SERIALIZABLE_OBJECT(btc_chainfile, SCOPE_EXTERN)
+
+void
+btc_chainfile_init(btc_chainfile_t *z) {
+  z->fd = -1;
+  z->fileno = 0;
+  z->position = 0;
+  z->min_height = -1;
+  z->max_height = -1;
+}
+
+void
+btc_chainfile_clear(btc_chainfile_t *z) {
+  btc_chainfile_init(z);
+}
+
+void
+btc_chainfile_copy(btc_chainfile_t *z, const btc_chainfile_t *x) {
+  z->fd = -1;
+  z->fileno = x->fileno;
+  z->position = x->position;
+  z->min_height = x->min_height;
+  z->max_height = x->max_height;
+}
+
+size_t
+btc_chainfile_size(const btc_chainfile_t *x) {
+  return 16;
+}
+
+uint8_t *
+btc_chainfile_write(uint8_t *zp, const btc_chainfile_t *x) {
+  zp = btc_int32_write(zp, x->fileno);
+  zp = btc_int32_write(zp, x->position);
+  zp = btc_int32_write(zp, x->min_height);
+  zp = btc_int32_write(zp, x->max_height);
+  return zp;
+}
+
+int
+btc_chainfile_read(btc_chainfile_t *z, const uint8_t **xp, size_t *xn) {
+  if (!btc_int32_read(&z->fileno, xp, xn))
+    return 0;
+
+  if (!btc_int32_read(&z->position, xp, xn))
+    return 0;
+
+  if (!btc_int32_read(&z->min_height, xp, xn))
+    return 0;
+
+  if (!btc_int32_read(&z->max_height, xp, xn))
+    return 0;
+
+  return 1;
+}
+
+/*
+ * Chain Database
+ */
+
 KHASH_MAP_INIT_CONST_HASH(hashes, btc_entry_t *)
 
 struct btc_chaindb_s {
@@ -13,15 +85,17 @@ struct btc_chaindb_s {
   MDB_dbi db_coin;
   MDB_dbi db_index;
   MDB_dbi db_tip;
+  MDB_dbi db_blockfile;
+  MDB_dbi db_undofile;
   khash_t(hashes) *hashes;
   btc_vector_t heights;
   btc_entry_t *head;
   btc_entry_t *tail;
+  btc_vector_t blockfiles;
+  btc_vector_t undofiles;
+  btc_chainfile_t block;
+  btc_chainfile_t undo;
   uint8_t *slab;
-  int fd;
-  int file;
-  int pos;
-  int len;
 };
 
 static void
@@ -32,6 +106,8 @@ btc_chaindb_init(struct btc_chaindb_s *db, const btc_network_t *network) {
   db->hashes = kh_init(hashes);
 
   btc_vector_init(&db->heights);
+  btc_vector_init(&db->blockfiles);
+  btc_vector_init(&db->undofiles);
 
   CHECK(db->hash != NULL);
 
@@ -44,6 +120,8 @@ static void
 btc_chaindb_clear(struct btc_chaindb_s *db) {
   kh_destroy(hashes, db->hashes);
   btc_vector_clear(&db->heights);
+  btc_vector_clear(&db->blockfiles);
+  btc_vector_clear(&db->undofiles);
   free(db->slab);
   memset(db, 0, sizeof(*db));
 }
@@ -164,6 +242,24 @@ btc_chaindb_open(struct btc_chaindb_s *db, const char *prefix, size_t map_size) 
     return 0;
   }
 
+  rc = mdb_dbi_open(txn, "blockfile", MDB_CREATE, &db->db_blockfile);
+
+  if (rc != 0) {
+    fprintf(stderr, "mdb_dbi_open: %s\n", mdb_strerror(rc));
+    mdb_txn_abort(txn);
+    mdb_env_close(db->env);
+    return 0;
+  }
+
+  rc = mdb_dbi_open(txn, "undofile", MDB_CREATE, &db->db_undofile);
+
+  if (rc != 0) {
+    fprintf(stderr, "mdb_dbi_open: %s\n", mdb_strerror(rc));
+    mdb_txn_abort(txn);
+    mdb_env_close(db->env);
+    return 0;
+  }
+
   rc = mdb_txn_commit(txn);
 
   if (rc != 0) {
@@ -174,39 +270,110 @@ btc_chaindb_open(struct btc_chaindb_s *db, const char *prefix, size_t map_size) 
 
   /* Read file info. */
   {
-    static const uint8_t info_key[1] = {'F'};
+    static const uint8_t blockfile_key[1] = {'B'};
+    static const uint8_t undofile_key[1] = {'U'};
+    int block_found = 0;
+    int undo_found = 0;
+    btc_chainfile_t *file;
     MDB_val mkey, mval;
-    btc_stat_t st;
 
     CHECK(mdb_txn_begin(db->env, NULL, MDB_RDONLY, &txn) == 0);
 
-    mkey.mv_data = (uint8_t *)info_key;
+    /* Read best block file. */
+    mkey.mv_data = (uint8_t *)blockfile_key;
     mkey.mv_size = 1;
 
     rc = mdb_get(txn, db->db_meta, &mkey, &mval);
 
     if (rc != MDB_NOTFOUND) {
       CHECK(rc == 0);
-      CHECK(mval.mv_size >= 8);
-
-      db->file = read32le(mval.mv_data + 0);
-      db->pos = read32le(mval.mv_data + 4);
-    } else {
-      db->file = 0;
-      db->pos = 0;
+      CHECK(btc_chainfile_import(&db->block, mval.mv_data, mval.mv_size));
+      block_found = 1;
     }
 
-    /* Open file for writing. */
-    sprintf(path, "%s/blocks/%d.dat", prefix, db->file);
+    /* Read best undo file. */
+    mkey.mv_data = (uint8_t *)undofile_key;
+    mkey.mv_size = 1;
 
-    db->fd = btc_fs_open(path, BTC_O_RDWR | BTC_O_CREAT | BTC_O_APPEND, 0664);
+    rc = mdb_get(txn, db->db_meta, &mkey, &mval);
 
-    CHECK(db->fd != -1);
+    if (rc != MDB_NOTFOUND) {
+      CHECK(rc == 0);
+      CHECK(btc_chainfile_import(&db->undo, mval.mv_data, mval.mv_size));
+      undo_found = 1;
+    }
+
+    /* Read block file index. */
+    btc_chainfile_init(&db->block);
+
+    CHECK(mdb_cursor_open(txn, db->db_blockfile, &cur) == 0);
+
+    rc = mdb_cursor_get(cur, &mkey, &mval, MDB_FIRST);
+
+    while (rc == 0) {
+      file = btc_chainfile_create();
+
+      CHECK(btc_chainfile_import(file, mval.mv_data, mval.mv_size));
+
+      btc_vector_push(&db->blockfiles, file);
+
+      rc = mdb_cursor_get(cur, &mkey, &mval, MDB_NEXT);
+    }
+
+    CHECK(rc == MDB_NOTFOUND);
+
+    mdb_cursor_close(cur);
+
+    /* Read undo file index. */
+    btc_chainfile_init(&db->undo);
+
+    CHECK(mdb_cursor_open(txn, db->db_undofile, &cur) == 0);
+
+    rc = mdb_cursor_get(cur, &mkey, &mval, MDB_FIRST);
+
+    while (rc == 0) {
+      file = btc_chainfile_create();
+
+      CHECK(btc_chainfile_import(file, mval.mv_data, mval.mv_size));
+
+      btc_vector_push(&db->undofiles, file);
+
+      rc = mdb_cursor_get(cur, &mkey, &mval, MDB_NEXT);
+    }
+
+    CHECK(rc == MDB_NOTFOUND);
+
+    mdb_cursor_close(cur);
 
     mdb_txn_abort(txn);
 
-    CHECK(btc_fs_fstat(db->fd, &st));
-    CHECK(st.st_size == (unsigned int)db->pos);
+    /* Open block file for writing. */
+    sprintf(path, "%s/blocks/blk%09d.dat", prefix, db->block.fileno);
+
+    if (block_found) {
+      db->block.fd = btc_fs_open(path, BTC_O_RDWR, 0664);
+
+      CHECK(db->block.fd != -1);
+    } else {
+      db->block.fd = btc_fs_open(path, BTC_O_RDWR | BTC_O_CREAT, 0664);
+
+      CHECK(db->block.fd != -1);
+      CHECK(btc_fs_ftruncate(db->block.fd, 128 << 20));
+    }
+
+    /* Open undo file for writing. */
+    sprintf(path, "%s/blocks/rev%09d.dat", prefix, db->undo.fileno);
+
+    if (undo_found) {
+      db->undo.fd = btc_fs_open(path, BTC_O_RDWR, 0664);
+
+      CHECK(db->undo.fd != -1);
+    } else {
+      db->undo.fd = btc_fs_open(path, BTC_O_RDWR | BTC_O_CREAT, 0664);
+
+      CHECK(db->undo.fd != -1);
+      CHECK(btc_fs_ftruncate(db->undo.fd, 128 << 20));
+    }
   }
 
   btc_chaindb_load(db);
@@ -216,12 +383,29 @@ btc_chaindb_open(struct btc_chaindb_s *db, const char *prefix, size_t map_size) 
 
 void
 btc_chaindb_close(struct btc_chaindb_s *db) {
+  btc_chainfile_t *file;
+
   btc_chaindb_unload(db);
+
+  btc_fs_close(db->block.fd);
+  btc_fs_close(db->undo.fd);
+
+  while (db->blockfiles.length > 0) {
+    file = (btc_chainfile_t *)btc_vector_pop(&btc->blockfiles);
+    btc_chainfile_destroy(file);
+  }
+
+  while (db->undofiles.length > 0) {
+    file = (btc_chainfile_t *)btc_vector_pop(&btc->undofiles);
+    btc_chainfile_destroy(file);
+  }
 
   mdb_dbi_close(db->env, db->db_meta);
   mdb_dbi_close(db->env, db->db_coin);
   mdb_dbi_close(db->env, db->db_index);
   mdb_dbi_close(db->env, db->db_tip);
+  mdb_dbi_close(db->env, db->db_blockfile);
+  mdb_dbi_close(db->env, db->db_undofile);
   mdb_env_close(db->env);
 }
 
@@ -245,7 +429,6 @@ btc_chaindb_new(struct btc_chaindb_s *db) {
 
 static void
 btc_chaindb_load(struct btc_chaindb_s *db) {
-  static const uint8_t info_key[1] = {'F'};
   static const uint8_t tip_key[1] = {'R'};
   btc_entry_t *entry, *tip;
   btc_entry_t *gen = NULL;
@@ -459,8 +642,9 @@ static int
 btc_chaindb_read(struct btc_chaindb_s *db,
                  uint8_t **raw,
                  size_t *len,
-                 int file,
-                 int pos) {
+                 const char *type,
+                 int fileno,
+                 int position) {
   uint8_t *buf = NULL;
   char path[1024];
   uint8_t tmp[4];
@@ -468,14 +652,14 @@ btc_chaindb_read(struct btc_chaindb_s *db,
   int ret = 0;
   int fd;
 
-  sprintf(path, "%s/blocks/%d.dat", db->prefix, file);
+  sprintf(path, "%s/blocks/%s%09d.dat", db->prefix, type, fileno);
 
   fd = btc_fs_open(path, O_RDONLY, 0);
 
   if (fd == -1)
     return 0;
 
-  if (!btc_fs_pread(fd, tmp, 4, pos))
+  if (!btc_fs_pread(fd, tmp, 4, position))
     goto fail;
 
   size = read32le(tmp);
@@ -484,7 +668,7 @@ btc_chaindb_read(struct btc_chaindb_s *db,
   if (buf == NULL)
     goto fail;
 
-  if (!btc_fs_pread(fd, buf, size, pos + 4))
+  if (!btc_fs_pread(fd, buf, size, position + 4))
     goto fail;
 
   *raw = buf;
@@ -511,8 +695,8 @@ btc_chaindb_read_block(struct btc_chaindb_s *db, btc_entry_t *entry) {
   if (entry->block_pos == -1)
     return NULL;
 
-  if (!btc_chaindb_read(db, &buf, &len, entry->block_file,
-                                        entry->block_pos)) {
+  if (!btc_chaindb_read(db, &buf, &len, "blk", entry->block_file,
+                                               entry->block_pos)) {
     return NULL;
   }
 
@@ -539,8 +723,8 @@ btc_chaindb_read_undo(struct btc_chaindb_s *db, btc_entry_t *entry) {
   if (entry->undo_pos == -1)
     return btc_undo_create();
 
-  if (!btc_chaindb_read(db, &buf, &len, entry->undo_file,
-                                        entry->undo_pos)) {
+  if (!btc_chaindb_read(db, &buf, &len, "rev", entry->undo_file,
+                                               entry->undo_pos)) {
     return NULL;
   }
 
@@ -577,24 +761,92 @@ btc_chaindb_should_sync(struct btc_chaindb_s *db, btc_entry_t *entry) {
 }
 
 static int
-btc_chaindb_alloc(struct btc_chaindb_s *db, size_t len) {
-  if (db->pos + len > (512 << 20)) {
+btc_chaindb_blockfile_alloc(struct btc_chaindb_s *db, MDB_txn *txn, size_t len) {
+  if (db->block.position + len > (128 << 20)) {
+    MDB_val mkey, mval;
     char path[1024];
+    uint8_t raw[16];
+    uint8_t key[4];
     int fd;
 
-    sprintf(path, "%s/blocks/%d.dat", db->prefix, db->file + 1);
+    write32be(key, db->block.fileno);
 
-    fd = btc_fs_open(path, BTC_O_RDWR | BTC_O_CREAT | BTC_O_APPEND, 0664);
+    mkey.mv_data = key;
+    mkey.mv_size = 4;
+    mval.mv_data = raw;
+    mval.mv_size = btc_chainfile_export(raw, &db->block);
+
+    if (mdb_put(txn, db->db_blockfile, &mkey, &mval, 0) != 0)
+      return 0;
+
+    sprintf(path, "%s/blocks/blk%09d.dat", db->prefix, db->block.fileno + 1);
+
+    fd = btc_fs_open(path, BTC_O_RDWR | BTC_O_CREAT, 0664);
 
     if (fd == -1)
       return 0;
 
-    btc_fs_fsync(db->fd);
-    btc_fs_close(db->fd);
+    if (!btc_fs_ftruncate(fd, 128 << 20)) {
+      btc_fs_close(fd);
+      return 0;
+    }
 
-    db->fd = fd;
-    db->file++;
-    db->pos = 0;
+    btc_fs_fsync(db->block.fd);
+    btc_fs_close(db->block.fd);
+
+    btc_vector_push(&db->blockfiles, btc_chainfile_clone(&db->block));
+
+    db->block.fd = fd;
+    db->block.fileno++;
+    db->block.position = 0;
+    db->block.min_height = -1;
+    db->block.max_height = -1;
+  }
+
+  return 1;
+}
+
+static int
+btc_chaindb_undofile_alloc(struct btc_chaindb_s *db, MDB_txn *txn, size_t len) {
+  if (db->undo.position + len > (128 << 20)) {
+    MDB_val mkey, mval;
+    char path[1024];
+    uint8_t raw[16];
+    uint8_t key[4];
+    int fd;
+
+    write32be(key, db->undo.fileno);
+
+    mkey.mv_data = key;
+    mkey.mv_size = 4;
+    mval.mv_data = raw;
+    mval.mv_size = btc_chainfile_export(raw, &db->undo);
+
+    if (mdb_put(txn, db->db_undofile, &mkey, &mval, 0) != 0)
+      return 0;
+
+    sprintf(path, "%s/blocks/rev%09d.dat", db->prefix, db->undo.fileno + 1);
+
+    fd = btc_fs_open(path, BTC_O_RDWR | BTC_O_CREAT, 0664);
+
+    if (fd == -1)
+      return 0;
+
+    if (!btc_fs_ftruncate(fd, 128 << 20)) {
+      btc_fs_close(fd);
+      return 0;
+    }
+
+    btc_fs_fsync(db->undo.fd);
+    btc_fs_close(db->undo.fd);
+
+    btc_vector_push(&db->undofiles, btc_chainfile_clone(&db->undo));
+
+    db->undo.fd = fd;
+    db->undo.fileno++;
+    db->undo.position = 0;
+    db->undo.min_height = -1;
+    db->undo.max_height = -1;
   }
 
   return 1;
@@ -602,35 +854,58 @@ btc_chaindb_alloc(struct btc_chaindb_s *db, size_t len) {
 
 static int
 btc_chaindb_write_block(struct btc_chaindb_s *db,
+                        MDB_txn *txn,
                         btc_entry_t *entry,
                         const btc_block_t *block) {
+  static const uint8_t blockfile_key[1] = {'B'};
   size_t len = btc_block_export(db->slab + 4, block);
 
   btc_uint32_write(db->slab, len);
 
   len += 4;
 
-  if (!btc_chaindb_alloc(db, len))
+  if (!btc_chaindb_blockfile_alloc(db, txn, len))
     return 0;
 
-  if (!btc_fs_write(db->fd, db->slab, len))
+  if (!btc_fs_pwrite(db->block.fd, db->slab, len, db->block.position))
     return 0;
 
   if (btc_chaindb_should_sync(db, entry))
-    btc_fs_fsync(db->fd);
+    btc_fs_fsync(db->block.fd);
 
-  entry->block_file = db->file;
-  entry->block_pos = db->pos;
+  entry->block_file = db->block.fileno;
+  entry->block_pos = db->block.position;
 
-  db->pos += len;
+  db->block.position += len;
+
+  if (db->block.min_height == -1 || entry.height < db->block.min_height)
+    db->block.min_height = entry.height;
+
+  if (db->block.max_height == -1 || entry.height > db->block.max_height)
+    db->block.max_height = entry.height;
+
+  {
+    MDB_val mkey, mval;
+    uint8_t raw[16];
+
+    mkey.mv_data = (uint8_t *)blockfile_key;
+    mkey.mv_size = 1;
+    mval.mv_data = raw;
+    mval.mv_size = btc_chainfile_export(raw, &db->block);
+
+    if (mdb_put(txn, db->db_blockfile, &mkey, &mval, 0) != 0)
+      return 0;
+  }
 
   return 1;
 }
 
 static int
 btc_chaindb_write_undo(struct btc_chaindb_s *db,
+                       MDB_txn *txn,
                        btc_entry_t *entry,
                        btc_undo_t *undo) {
+  static const uint8_t undofile_key[1] = {'U'};
   size_t len = btc_undo_size(undo);
   uint8_t *buf = db->slab;
   int ret = 0;
@@ -646,19 +921,38 @@ btc_chaindb_write_undo(struct btc_chaindb_s *db,
 
   len += 4;
 
-  if (!btc_chaindb_alloc(db, len))
+  if (!btc_chaindb_undofile_alloc(db, txn, len))
     goto fail;
 
-  if (!btc_fs_write(db->fd, buf, len))
+  if (!btc_fs_pwrite(db->undo.fd, buf, len, db->undo.position))
     goto fail;
 
   if (btc_chaindb_should_sync(db, entry))
-    btc_fs_fsync(db->fd);
+    btc_fs_fsync(db->undo.fd);
 
-  entry->undo_file = db->file;
-  entry->undo_pos = db->pos;
+  entry->undo_file = db->undo.fileno;
+  entry->undo_pos = db->undo.position;
 
-  db->pos += len;
+  db->undo.position += len;
+
+  if (db->undo.min_height == -1 || entry.height < db->undo.min_height)
+    db->undo.min_height = entry.height;
+
+  if (db->undo.max_height == -1 || entry.height > db->undo.max_height)
+    db->undo.max_height = entry.height;
+
+  {
+    MDB_val mkey, mval;
+    uint8_t raw[16];
+
+    mkey.mv_data = (uint8_t *)undofile_key;
+    mkey.mv_size = 1;
+    mval.mv_data = raw;
+    mval.mv_size = btc_chainfile_export(raw, &db->undo);
+
+    if (mdb_put(txn, db->db_undofile, &mkey, &mval, 0) != 0)
+      goto fail;
+  }
 
   ret = 1;
 fail:
@@ -669,12 +963,74 @@ fail:
 }
 
 static int
-btc_chaindb_prune_block(struct btc_chaindb_s *db, btc_entry_t *entry) {
+btc_chaindb_prune_files(struct btc_chaindb_s *db, btc_entry_t *entry) {
+  int keep = db->network->block.keep_blocks;
+  btc_chainfile_t *file;
+  MDB_val mkey, mval;
+  char path[1024];
+  uint8_t key[4];
+  int target;
+  size_t i;
+
   if (entry->height < db->network->block.keep_blocks)
     return 1;
 
-  if (entry->height <= db->network->block.prune_after_height)
+  target = entry->height - keep;
+
+  if (target <= (int)db->network->block.prune_after_height)
     return 1;
+
+  for (i = 0; i < db->blockfiles.length; i++) {
+    file = (btc_chainfile_t *)db->blockfiles.items[i];
+
+    if (file->max_height >= target)
+      continue;
+
+    sprintf(path, "%s/blocks/blk%09d.dat", db->prefix, file->fileno);
+
+    btc_fs_unlink(path);
+
+    write32be(key, file->fileno);
+
+    mkey.mv_data = key;
+    mkey.mv_size = 4;
+
+    if (mdb_del(txn, db->db_blockfile, &mkey, NULL) != 0)
+      return 0;
+
+    if (i != db->blockfiles.length - 1)
+      db->blockfiles.items[i--] = db->blockfiles.items[db->blockfiles.length - 1];
+
+    db->blockfiles.length--;
+
+    btc_chainfile_destroy(file);
+  }
+
+  for (i = 0; i < db->undofiles.length; i++) {
+    file = (btc_chainfile_t *)db->undofiles.items[i];
+
+    if (file->max_height >= target)
+      continue;
+
+    sprintf(path, "%s/blocks/rev%09d.dat", db->prefix, file->fileno);
+
+    btc_fs_unlink(path);
+
+    write32be(key, file->fileno);
+
+    mkey.mv_data = key;
+    mkey.mv_size = 4;
+
+    if (mdb_del(txn, db->db_undofile, &mkey, NULL) != 0)
+      return 0;
+
+    if (i != db->undofiles.length - 1)
+      db->undofiles.items[i--] = db->undofiles.items[db->undofiles.length - 1];
+
+    db->undofiles.length--;
+
+    btc_chainfile_destroy(file);
+  }
 
   return 1;
 }
@@ -702,7 +1058,7 @@ btc_chaindb_connect_block(struct btc_chaindb_s *db,
 
   if (undo->length != 0) {
     if (entry->undo_pos == -1) {
-      if (!btc_chaindb_write_undo(db, entry, undo))
+      if (!btc_chaindb_write_undo(db, txn, entry, undo))
         return 0;
     }
 
@@ -710,7 +1066,7 @@ btc_chaindb_connect_block(struct btc_chaindb_s *db,
   }
 
   /* Prune height-288 if pruning is enabled. */
-  return btc_chaindb_prune_block(db, entry);
+  return btc_chaindb_prune_files(db, entry);
 }
 
 static btc_view_t *
@@ -763,7 +1119,7 @@ btc_chaindb_save_block(struct btc_chaindb_s *db,
                        btc_view_t *view) {
   /* Write actual block data. */
   if (entry->block_pos == -1) {
-    if (!btc_chaindb_write_block(db, entry, block))
+    if (!btc_chaindb_write_block(db, txn, entry, block))
       return 0;
   }
 
@@ -792,18 +1148,6 @@ btc_chaindb_save(struct btc_chaindb_s *db,
 
   /* Connect block and save data. */
   if (!btc_chaindb_save_block(db, txn, entry, block, view))
-    goto fail;
-
-  /* Write file info. */
-  btc_int32_write(raw + 0, db->file);
-  btc_int32_write(raw + 4, db->pos);
-
-  mkey.mv_data = (uint8_t *)info_key;
-  mkey.mv_size = 1;
-  mval.mv_data = raw;
-  mval.mv_size = 8;
-
-  if (mdb_put(txn, db->db_meta, &mkey, &mval, 0) != 0)
     goto fail;
 
   /* Write entry data. */
@@ -896,18 +1240,6 @@ btc_chaindb_reconnect(struct btc_chaindb_s *db,
 
   /* Connect inputs. */
   if (!btc_chaindb_connect_block(db, txn, entry, block, view))
-    goto fail;
-
-  /* Write file info. */
-  btc_int32_write(raw + 0, db->file);
-  btc_int32_write(raw + 4, db->pos);
-
-  mkey.mv_data = (uint8_t *)info_key;
-  mkey.mv_size = 1;
-  mval.mv_data = raw;
-  mval.mv_size = 8;
-
-  if (mdb_put(txn, db->db_meta, &mkey, &mval, 0) != 0)
     goto fail;
 
   /* Write state. */
