@@ -107,7 +107,7 @@ target_include_directories(satoshi_tests PUBLIC ${satoshi_includes})
 target_link_options(satoshi_tests INTERFACE ${satoshi_ldflags})
 set_property(TARGET satoshi_tests PROPERTY OUTPUT_NAME tests)
 
-foreach(name ecdsa bip340 sighash script tx db)
+foreach(name ecdsa bip340 sighash script tx db chaindb)
   add_executable(t-${name} test/t-${name}.c)
   target_link_options(t-${name} PRIVATE -Wl,-z,now)
   target_link_libraries(t-${name} PRIVATE satoshi_tests

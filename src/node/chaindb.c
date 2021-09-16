@@ -624,7 +624,7 @@ btc_chaindb_open(struct btc_chaindb_s *db,
   if (!btc_chaindb_load_files(db))
     return 0;
 
-  if (btc_chaindb_load_index(db))
+  if (!btc_chaindb_load_index(db))
     return 0;
 
   return 1;

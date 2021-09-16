@@ -276,7 +276,7 @@ typedef struct btc_network_s {
   int request_mempool;
 } btc_network_t;
 
-BTC_EXTERN extern const btc_network_t *btc_main;
+BTC_EXTERN extern const btc_network_t *btc_mainnet;
 
 #ifdef __cplusplus
 }
