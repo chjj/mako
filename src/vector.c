@@ -64,6 +64,12 @@ btc_vector_pop(btc_vector_t *z) {
   return z->items[--z->length];
 }
 
+void *
+btc_vector_top(const btc_vector_t *z) {
+  CHECK(z->length > 0);
+  return (void *)z->items[z->length - 1];
+}
+
 void
 btc_vector_resize(btc_vector_t *z, size_t zn) {
   if (z->length < zn)

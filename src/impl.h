@@ -16,7 +16,7 @@ struct btc_sha256_s;
 void
 btc_hash256_update(struct btc_sha256_s *ctx, const void *data, size_t len);
 
-#define SCOPE_STATIC static
+#define SCOPE_STATIC BTC_UNUSED static
 #define SCOPE_EXTERN
 
 /*
@@ -121,6 +121,12 @@ scope child ## _t *                                                  \
 name ## _pop(name ## _t *z) {                                        \
   CHECK(z->length > 0);                                              \
   return z->items[--z->length];                                      \
+}                                                                    \
+                                                                     \
+scope child ## _t *                                                  \
+name ## _top(const name ## _t *z) {                                  \
+  CHECK(z->length > 0);                                              \
+  return (child ## _t *)z->items[z->length - 1];                     \
 }                                                                    \
                                                                      \
 scope void                                                           \

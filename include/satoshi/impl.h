@@ -49,6 +49,9 @@ name ## _push(name ## _t *z, child ## _t *x);      \
 scope child ## _t *                                \
 name ## _pop(name ## _t *z);                       \
                                                    \
+scope child ## _t *                                \
+name ## _top(const name ## _t *z);                 \
+                                                   \
 scope void                                         \
 name ## _drop(name ## _t *z);                      \
                                                    \
