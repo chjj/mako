@@ -72,7 +72,7 @@ endif()
 
 list(APPEND satoshi_includes ${PROJECT_SOURCE_DIR}/include)
 
-add_subdirectory(deps/liblmdb)
+add_subdirectory(deps/lmdb)
 
 add_library(satoshi_static STATIC ${satoshi_sources})
 target_compile_definitions(satoshi_static PUBLIC ${satoshi_defines})
