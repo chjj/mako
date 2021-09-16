@@ -53,7 +53,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/vector.c
                             src/view.c)
 
-list(APPEND node_sources src/node/chaindb.c src/node/db_lmdb.c src/node/io.c)
+list(APPEND node_sources src/node/chaindb.c src/node/io.c)
 
 list(APPEND satoshi_defines BTC_HAVE_ASM)
 list(APPEND satoshi_defines BTC_HAVE_INT128)
@@ -107,7 +107,7 @@ target_include_directories(satoshi_tests PUBLIC ${satoshi_includes})
 target_link_options(satoshi_tests INTERFACE ${satoshi_ldflags})
 set_property(TARGET satoshi_tests PROPERTY OUTPUT_NAME tests)
 
-foreach(name ecdsa bip340 sighash script tx db chaindb)
+foreach(name ecdsa bip340 sighash script tx chaindb)
   add_executable(t-${name} test/t-${name}.c)
   target_link_options(t-${name} PRIVATE -Wl,-z,now)
   target_link_libraries(t-${name} PRIVATE satoshi_tests
