@@ -68,24 +68,24 @@ btc_view_put(btc_view_t *view,
 BTC_EXTERN int
 btc_view_spend(btc_view_t *view,
                const btc_tx_t *tx,
-               btc_coin_t *(*read_coin)(void *,
-                                        void *,
-                                        const btc_outpoint_t *),
-               void *ctx,
-               void *arg);
+               btc_coin_t *(*read_coin)(const btc_outpoint_t *prevout,
+                                        void *arg1,
+                                        void *arg2),
+               void *arg1,
+               void *arg2);
 
 BTC_EXTERN void
 btc_view_add(btc_view_t *view, const btc_tx_t *tx, uint32_t height, int spent);
 
 BTC_EXTERN int
 btc_view_iterate(btc_view_t *view,
-                 int (*cb)(void *,
-                           void *,
-                           const uint8_t *,
-                           uint32_t,
-                           const btc_coin_t *),
-                 void *ctx,
-                 void *arg);
+                 int (*cb)(const uint8_t *hash,
+                           uint32_t index,
+                           const btc_coin_t *coin,
+                           void *arg1,
+                           void *arg2),
+                 void *arg1,
+                 void *arg2);
 
 BTC_EXTERN btc_undo_t *
 btc_view_undo(btc_view_t *view);

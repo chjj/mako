@@ -638,9 +638,9 @@ btc_chaindb_close(struct btc_chaindb_s *db) {
 }
 
 static btc_coin_t *
-read_coin(void *ctx, void *arg, const btc_outpoint_t *prevout) {
-  struct btc_chaindb_s *db = (struct btc_chaindb_s *)ctx;
-  MDB_txn *txn = (MDB_txn *)arg;
+read_coin(const btc_outpoint_t *prevout, void *arg1, void *arg2) {
+  struct btc_chaindb_s *db = (struct btc_chaindb_s *)arg1;
+  MDB_txn *txn = (MDB_txn *)arg2;
   MDB_val mkey, mval;
   btc_coin_t *coin;
   uint8_t key[36];
@@ -689,13 +689,13 @@ btc_chaindb_spend(struct btc_chaindb_s *db,
 }
 
 static int
-iterate_view(void *ctx,
-             void *arg,
-             const uint8_t *hash,
+iterate_view(const uint8_t *hash,
              uint32_t index,
-             const btc_coin_t *coin) {
-  struct btc_chaindb_s *db = (struct btc_chaindb_s *)ctx;
-  MDB_txn *txn = (MDB_txn *)arg;
+             const btc_coin_t *coin,
+             void *arg1,
+             void *arg2) {
+  struct btc_chaindb_s *db = (struct btc_chaindb_s *)arg1;
+  MDB_txn *txn = (MDB_txn *)arg2;
   uint8_t *val = db->slab;
   MDB_val mkey, mval;
   uint8_t key[36];

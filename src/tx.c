@@ -402,8 +402,10 @@ btc_tx_sign(btc_tx_t *tx,
             uint32_t flags,
             int (*derive)(uint8_t *priv,
                           const btc_script_t *script,
-                          void *arg),
-            void *arg) {
+                          void *arg1,
+                          void *arg2),
+            void *arg1,
+            void *arg2) {
   const btc_input_t *input;
   const btc_coin_t *coin;
   btc_tx_cache_t cache;
@@ -420,7 +422,7 @@ btc_tx_sign(btc_tx_t *tx,
     if (coin == NULL)
       continue;
 
-    if (!derive(priv, &coin->output.script, arg))
+    if (!derive(priv, &coin->output.script, arg1, arg2))
       continue;
 
     total += btc_tx_sign_input(tx,

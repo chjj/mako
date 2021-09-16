@@ -178,8 +178,10 @@ btc_tx_sign(btc_tx_t *tx,
             uint32_t flags,
             int (*derive)(uint8_t *priv,
                           const btc_script_t *script,
-                          void *arg),
-            void *arg);
+                          void *arg1,
+                          void *arg2),
+            void *arg1,
+            void *arg2);
 
 BTC_EXTERN int
 btc_tx_sign_input(btc_tx_t *tx,
