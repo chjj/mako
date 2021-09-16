@@ -1,4 +1,27 @@
+/*!
+ * chaindb.c - chaindb for libsatoshi
+ * Copyright (c) 2021, Christopher Jeffrey (MIT License).
+ * https://github.com/chjj/libsatoshi
+ */
+
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
 #include <lmdb.h>
+
+#include <satoshi/block.h>
+#include <satoshi/coins.h>
+#include <satoshi/consensus.h>
+#include <satoshi/crypto/hash.h>
+#include <satoshi/entry.h>
+#include <satoshi/network.h>
+#include <satoshi/node/chaindb.h>
+#include <satoshi/tx.h>
+#include <satoshi/util.h>
+#include <satoshi/vector.h>
+
 #include "../bio.h"
 #include "../map.h"
 #include "../impl.h"
