@@ -7,7 +7,12 @@
 #ifndef BTC_CONSENSUS_H
 #define BTC_CONSENSUS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
+#include "common.h"
 
 /**
  * One bitcoin in satoshis.
@@ -163,5 +168,19 @@
  */
 
 #define BTC_BIP16_TIME INT64_C(1333238400)
+
+/*
+ * Helpers
+ */
+
+BTC_EXTERN int
+btc_has_versionbit(uint32_t version, int bit);
+
+BTC_EXTERN int64_t
+btc_get_reward(int32_t height, int32_t interval);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* BTC_CONSENSUS_H */

@@ -8,9 +8,10 @@
 #include <stdint.h>
 #include <string.h>
 #include <satoshi/consensus.h>
+#include <satoshi/crypto/hash.h>
+#include <satoshi/policy.h>
 #include <satoshi/script.h>
 #include <satoshi/tx.h>
-#include <satoshi/crypto/hash.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -69,9 +70,6 @@ btc_output_update(btc_hash256_t *ctx, const btc_output_t *x) {
   btc_int64_update(ctx, x->value);
   btc_script_update(ctx, &x->script);
 }
-
-/* XXX */
-#define btc_get_min_fee(x, y) (y)
 
 int64_t
 btc_output_dust_threshold(const btc_output_t *x, int64_t rate) {

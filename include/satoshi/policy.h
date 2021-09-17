@@ -7,7 +7,13 @@
 #ifndef BTC_POLICY_H
 #define BTC_POLICY_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <stddef.h>
 #include <stdint.h>
+#include "common.h"
 #include "consensus.h"
 
 /**
@@ -143,7 +149,7 @@
  * Maximum block weight to be mined.
  */
 
-#define BTC_MAX_BLOCK_WEIGHT_ (1000000 * BTC_WITNESS_SCALE_FACTOR)
+#define BTC_MAX_POLICY_BLOCK_WEIGHT (1000000 * BTC_WITNESS_SCALE_FACTOR)
 
 /**
  * How much of the block should be dedicated to
@@ -159,5 +165,22 @@
  */
 
 #define BTC_BLOCK_PRIORITY_THRESHOLD BTC_FREE_THRESHOLD
+
+/*
+ * Helpers
+ */
+
+BTC_EXTERN int64_t
+btc_get_min_fee(size_t size, int64_t rate);
+
+BTC_EXTERN int64_t
+btc_get_round_fee(size_t size, int64_t rate);
+
+BTC_EXTERN int64_t
+btc_get_rate(size_t size, int64_t fee);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* BTC_POLICY_H */

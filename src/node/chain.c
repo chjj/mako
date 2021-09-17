@@ -39,74 +39,6 @@ btc_dstate_init(btc_dstate_t *state) {
   state->bip148 = 0;
 }
 
-static int
-btc_consensus_has_bit(uint32_t version, int bit) {
-  if ((version & BTC_VERSION_TOP_MASK) != BTC_VERSION_TOP_BITS)
-    return 0;
-
-  return (version >> bit) & 1;
-}
-
-static int64_t
-btc_consensus_get_reward(int32_t height, int32_t interval) {
-  int64_t subsidy = BTC_BASE_REWARD;
-  int32_t halvings = height / interval;
-
-  if (halvings >= 64)
-    return 0;
-
-  return subsidy >> halvings;
-}
-
-static const btc_deployment_t *
-btc_network_deployment(const btc_network_t *network, const char *name) {
-  const btc_deployment_t *deploy;
-  size_t i;
-
-  for (i = 0; i < network->deployments.length; i++) {
-    deploy = network->deployments.items[i];
-
-    if (strcmp(deploy->name, name) == 0)
-      return deploy;
-  }
-
-  return NULL;
-}
-
-static const btc_checkpoint_t *
-btc_network_checkpoint(const btc_network_t *network, int32_t height) {
-  const btc_checkpoint_t *chk;
-  size_t i;
-
-  if (height > network->last_checkpoint)
-    return NULL;
-
-  for (i = 0; i < network->checkpoints.length; i++) {
-    chk = network->checkpoints.items[i];
-
-    if (chk->height == height)
-      return chk;
-  }
-
-  return NULL;
-}
-
-static const btc_checkpoint_t *
-btc_network_bip30(const btc_network_t *network, int32_t height) {
-  const btc_checkpoint_t *chk;
-  size_t i;
-
-  for (i = 0; i < network->softforks.bip30.length; i++) {
-    chk = network->softforks.bip30.items[i];
-
-    if (chk->height == height)
-      return chk;
-  }
-
-  return NULL;
-}
-
-
 
 
 
@@ -241,7 +173,7 @@ btc_chain_get_state(btc_chain_t *chain,
         count = 0;
 
         for (i = 0; i < window; i++) {
-          if (btc_consensus_has_bit(block->header.version, bit))
+          if (btc_has_versionbit(block->header.version, bit))
             count++;
 
           if (count >= threshold) {
@@ -529,7 +461,7 @@ btc_chain_verify(btc_chain_t *chain,
   if (state->bip91 || state->bip148) {
     const btc_deployment_t *segwit = btc_network_deployment(network, "segwit");
 
-    if (!btc_consensus_has_bit(block->header.version, segwit->bit))
+    if (!btc_has_versionbit(block->header.version, segwit->bit))
       return btc_chain_throw(chain, hdr, "invalid", "bad-no-segwit", 0, 0);
   }
 
@@ -845,7 +777,7 @@ btc_chain_verify_inputs(btc_chain_t *chain,
   }
 
   /* Make sure the miner isn't trying to conjure more coins. */
-  reward += btc_consensus_get_reward(height, interval);
+  reward += btc_get_reward(height, interval);
 
   if (btc_block_claimed(block) > reward) {
     return btc_chain_throw(chain, hdr,

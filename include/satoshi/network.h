@@ -16,12 +16,20 @@ extern "C" {
 #include "common.h"
 #include "types.h"
 
+/*
+ * Constants
+ */
+
 enum btc_network {
   BTC_NETWORK_MAINNET,
   BTC_NETWORK_TESTNET,
   BTC_NETWORK_REGTEST,
   BTC_NETWORK_SIMNET
 };
+
+/*
+ * Types
+ */
 
 typedef struct btc_checkpoint_s {
   int32_t height;
@@ -275,6 +283,23 @@ typedef struct btc_network_s {
    */
   int request_mempool;
 } btc_network_t;
+
+/*
+ * Helpers
+ */
+
+BTC_EXTERN const btc_checkpoint_t *
+btc_network_checkpoint(const btc_network_t *network, int32_t height);
+
+BTC_EXTERN const btc_checkpoint_t *
+btc_network_bip30(const btc_network_t *network, int32_t height);
+
+BTC_EXTERN const btc_deployment_t *
+btc_network_deployment(const btc_network_t *network, const char *name);
+
+/*
+ * Networks
+ */
 
 BTC_EXTERN extern const btc_network_t *btc_mainnet;
 

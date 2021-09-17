@@ -35,6 +35,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/buffer.c
                             src/coin.c
                             src/compact.c
+                            src/consensus.c
                             src/entry.c
                             src/header.c
                             src/input.c
@@ -43,9 +44,11 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/mainnet.c
                             src/mpi.c
                             src/murmur3.c
+                            src/network.c
                             src/outpoint.c
                             src/output.c
                             src/outvec.c
+                            src/policy.c
                             src/script.c
                             src/tx.c
                             src/undo.c

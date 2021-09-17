@@ -74,6 +74,9 @@ BTC_EXTERN int
 btc_hash_compare(const uint8_t *x, const uint8_t *y);
 
 BTC_EXTERN int
+btc_hash_equal(const uint8_t *x, const uint8_t *y);
+
+BTC_EXTERN int
 btc_hash_import(uint8_t *hash, const char *str);
 
 BTC_EXTERN void
