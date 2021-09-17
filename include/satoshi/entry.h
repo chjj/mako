@@ -62,6 +62,12 @@ btc_entry_set_block(btc_entry_t *entry,
                     const btc_block_t *block,
                     const btc_entry_t *prev);
 
+BTC_EXTERN uint32_t
+btc_entry_median_time(const btc_entry_t *entry);
+
+BTC_EXTERN uint32_t
+btc_entry_bip148_time(const btc_entry_t *prev, uint32_t ts);
+
 #ifdef __cplusplus
 }
 #endif

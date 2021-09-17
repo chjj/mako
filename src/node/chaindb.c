@@ -783,8 +783,8 @@ fail:
   return ret;
 }
 
-BTC_UNUSED static btc_block_t *
-btc_chaindb_read_block(struct btc_chaindb_s *db, btc_entry_t *entry) {
+static btc_block_t *
+btc_chaindb_read_block(struct btc_chaindb_s *db, const btc_entry_t *entry) {
   btc_block_t *block;
   uint8_t *buf;
   size_t len;
@@ -805,7 +805,7 @@ btc_chaindb_read_block(struct btc_chaindb_s *db, btc_entry_t *entry) {
 }
 
 static btc_undo_t *
-btc_chaindb_read_undo(struct btc_chaindb_s *db, btc_entry_t *entry) {
+btc_chaindb_read_undo(struct btc_chaindb_s *db, const btc_entry_t *entry) {
   btc_undo_t *undo;
   uint8_t *buf;
   size_t len;
@@ -826,7 +826,7 @@ btc_chaindb_read_undo(struct btc_chaindb_s *db, btc_entry_t *entry) {
 }
 
 static int
-btc_chaindb_should_sync(struct btc_chaindb_s *db, btc_entry_t *entry) {
+btc_chaindb_should_sync(struct btc_chaindb_s *db, const btc_entry_t *entry) {
   time_t now = time(NULL);
 
   (void)db;
@@ -1057,13 +1057,10 @@ btc_chaindb_prune_files(struct btc_chaindb_s *db,
 
     btc_fs_unlink(path);
 
-    if (i == db->files.length - 1) {
+    if (i != db->files.length - 1)
+      db->files.items[i--] = btc_vector_pop(&db->files);
+    else
       btc_vector_pop(&db->files);
-    } else {
-      db->files.items[i] = btc_vector_top(&db->files);
-      db->files.length--;
-      i--;
-    }
 
     btc_chainfile_destroy(file);
   }
@@ -1375,4 +1372,96 @@ fail:
     mdb_txn_abort(txn);
 
   return NULL;
+}
+
+btc_entry_t *
+btc_chaindb_head(struct btc_chaindb_s *db) {
+  return db->head;
+}
+
+btc_entry_t *
+btc_chaindb_tail(struct btc_chaindb_s *db) {
+  return db->tail;
+}
+
+uint32_t
+btc_chaindb_height(struct btc_chaindb_s *db) {
+  return db->tail->height;
+}
+
+btc_entry_t *
+btc_chaindb_by_hash(struct btc_chaindb_s *db, uint8_t *hash) {
+  khiter_t iter = kh_get(hashes, db->hashes, hash);
+
+  if (iter == kh_end(db->hashes))
+    return NULL;
+
+  return kh_value(db->hashes, iter);
+}
+
+btc_entry_t *
+btc_chaindb_by_height(struct btc_chaindb_s *db, uint32_t height) {
+  if (height >= db->heights.length)
+    return NULL;
+
+  return db->heights.items[height];
+}
+
+int
+btc_chaindb_is_main(btc_chaindb_t *db, const btc_entry_t *entry) {
+  if (entry->height >= db->heights.length)
+    return 0;
+
+  return db->heights.items[entry->height] == entry;
+}
+
+int
+btc_chaindb_has_coins(btc_chaindb_t *db, const btc_tx_t *tx) {
+  MDB_val mkey, mval;
+  uint8_t key[36];
+  MDB_txn *txn;
+  size_t i;
+  int rc;
+
+  CHECK(mdb_txn_begin(db->env, NULL, MDB_RDONLY, &txn) == 0);
+
+  btc_tx_txid(key, tx);
+
+  for (i = 0; i < tx->outputs.length; i++) {
+    btc_uint32_write(key + 32, i);
+
+    mkey.mv_data = key;
+    mkey.mv_size = sizeof(key);
+
+    rc = mdb_get(txn, db->db_coin, &mkey, &mval);
+
+    if (rc == 0) {
+      mdb_txn_abort(txn);
+      return 1;
+    }
+
+    CHECK(rc == MDB_NOTFOUND);
+  }
+
+  mdb_txn_abort(txn);
+
+  return 0;
+}
+
+btc_block_t *
+btc_chaindb_get_block(struct btc_chaindb_s *db, const btc_entry_t *entry) {
+  return btc_chaindb_read_block(db, entry);
+}
+
+int
+btc_chaindb_get_raw_block(struct btc_chaindb_s *db,
+                          uint8_t **data,
+                          size_t *length,
+                          const btc_entry_t *entry) {
+  if (entry->block_pos == -1)
+    return 0;
+
+  return btc_chaindb_read(db, data, length, &db->block, entry->block_file,
+                                                        entry->block_pos);
+
 }

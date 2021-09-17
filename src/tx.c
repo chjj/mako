@@ -832,12 +832,15 @@ btc_tx_has_duplicate_inputs(const btc_tx_t *tx) {
   return 0;
 }
 
-#define THROW(m, s) do { \
-  if (err != NULL) {     \
-    err->msg = (m);      \
-    err->score = (s);    \
-  }                      \
-  return 0;              \
+#define THROW(r, s) do {      \
+  if (err != NULL) {          \
+    memset(err->hash, 0, 32); \
+    err->code = "invalid";    \
+    err->reason = (r);        \
+    err->score = (s);         \
+    err->malleated = 0;       \
+  }                           \
+  return 0;                   \
 } while (0)
 
 int

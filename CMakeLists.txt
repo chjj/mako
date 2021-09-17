@@ -59,6 +59,13 @@ list(APPEND satoshi_defines BTC_HAVE_ASM)
 list(APPEND satoshi_defines BTC_HAVE_INT128)
 list(APPEND satoshi_defines BTC_TLS=__thread)
 
+if(WIN32)
+  string(REPLACE "/" "\\" srcdir "${PROJECT_SOURCE_DIR}")
+  list(APPEND satoshi_defines BTC_PREFIX="${srcdir}\\tmp")
+else()
+  list(APPEND satoshi_defines BTC_PREFIX="${PROJECT_SOURCE_DIR}/tmp")
+endif()
+
 if(MSVC)
   list(APPEND satoshi_cflags /wd4244
                              /wd4267)

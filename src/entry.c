@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <satoshi/consensus.h>
 #include <satoshi/entry.h>
 #include <satoshi/header.h>
 #include <satoshi/mpi.h>
@@ -166,4 +167,43 @@ btc_entry_set_block(btc_entry_t *entry,
                     const btc_block_t *block,
                     const btc_entry_t *prev) {
   btc_entry_set_header(entry, &block->header, prev);
+}
+
+static int
+cmptime(const void *x, const void *y) {
+  return *((int64_t *)x) - *((int64_t *)y);
+}
+
+uint32_t
+btc_entry_median_time(const btc_entry_t *entry) {
+  int64_t tvec[BTC_MEDIAN_TIMESPAN];
+  int len = 0;
+  int i;
+
+  for (i = 0; i < BTC_MEDIAN_TIMESPAN && entry != NULL; i++) {
+    tvec[len++] = entry->header.time;
+    entry = entry->prev;
+  }
+
+  qsort(tvec, len, sizeof(int64_t), cmptime);
+
+  return tvec[len >> 1];
+}
+
+uint32_t
+btc_entry_bip148_time(const btc_entry_t *prev, uint32_t ts) {
+  int64_t tvec[BTC_MEDIAN_TIMESPAN];
+  int len = 0;
+  int i;
+
+  tvec[len++] = ts;
+
+  for (i = 1; i < BTC_MEDIAN_TIMESPAN && prev != NULL; i++) {
+    tvec[len++] = prev->header.time;
+    prev = prev->prev;
+  }
+
+  qsort(tvec, len, sizeof(int64_t), cmptime);
+
+  return tvec[len >> 1];
 }
