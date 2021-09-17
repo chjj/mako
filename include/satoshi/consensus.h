@@ -162,6 +162,6 @@
  * The date bip16 (p2sh) was activated (consensus).
  */
 
-#define BTC_BIP16_TIME UINT32_C(1333238400)
+#define BTC_BIP16_TIME INT64_C(1333238400)
 
 #endif /* BTC_CONSENSUS_H */

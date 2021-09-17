@@ -221,24 +221,22 @@ btc_block_check_body(btc_verify_error_t *err, const btc_block_t *blk) {
 
 #undef THROW
 
-int
-btc_block_coinbase_height(uint32_t *height, const btc_block_t *blk) {
+int32_t
+btc_block_coinbase_height(const btc_block_t *blk) {
   const btc_tx_t *tx;
 
-  *height = (uint32_t)-1;
-
   if (blk->header.version < 2)
-    return 0;
+    return -1;
 
   if (blk->txs.length == 0)
-    return 0;
+    return -1;
 
   tx = blk->txs.items[0];
 
   if (tx->inputs.length == 0)
-    return 0;
+    return -1;
 
-  return btc_script_get_height(height, &tx->inputs.items[0]->script);
+  return btc_script_get_height(&tx->inputs.items[0]->script);
 }
 
 int64_t

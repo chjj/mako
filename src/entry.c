@@ -71,7 +71,7 @@ btc_entry_size(const btc_entry_t *x) {
 uint8_t *
 btc_entry_write(uint8_t *zp, const btc_entry_t *x) {
   zp = btc_header_write(zp, &x->header);
-  zp = btc_uint32_write(zp, x->height);
+  zp = btc_int32_write(zp, x->height);
   zp = btc_raw_write(zp, x->chainwork, 32);
   zp = btc_int32_write(zp, x->block_file);
   zp = btc_int32_write(zp, x->block_pos);
@@ -87,7 +87,7 @@ btc_entry_read(btc_entry_t *z, const uint8_t **xp, size_t *xn) {
   if (!btc_header_read(&z->header, xp, xn))
     return 0;
 
-  if (!btc_uint32_read(&z->height, xp, xn))
+  if (!btc_int32_read(&z->height, xp, xn))
     return 0;
 
   if (!btc_raw_read(z->chainwork, 32, xp, xn))
@@ -174,7 +174,7 @@ cmptime(const void *x, const void *y) {
   return *((int64_t *)x) - *((int64_t *)y);
 }
 
-uint32_t
+int64_t
 btc_entry_median_time(const btc_entry_t *entry) {
   int64_t tvec[BTC_MEDIAN_TIMESPAN];
   int len = 0;
@@ -190,8 +190,8 @@ btc_entry_median_time(const btc_entry_t *entry) {
   return tvec[len >> 1];
 }
 
-uint32_t
-btc_entry_bip148_time(const btc_entry_t *prev, uint32_t ts) {
+int64_t
+btc_entry_bip148_time(const btc_entry_t *prev, int64_t ts) {
   int64_t tvec[BTC_MEDIAN_TIMESPAN];
   int len = 0;
   int i;

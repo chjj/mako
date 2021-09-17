@@ -21,7 +21,7 @@ DEFINE_SERIALIZABLE_OBJECT(btc_coin, SCOPE_EXTERN)
 void
 btc_coin_init(btc_coin_t *z) {
   z->version = 1;
-  z->height = (uint32_t)-1;
+  z->height = -1;
   z->coinbase = 0;
   z->spent = 0;
   btc_output_init(&z->output);
@@ -56,7 +56,7 @@ btc_coin_size(const btc_coin_t *x) {
 uint8_t *
 btc_coin_write(uint8_t *zp, const btc_coin_t *x) {
   zp = btc_varint_write(zp, x->version);
-  zp = btc_uint32_write(zp, x->height);
+  zp = btc_int32_write(zp, x->height);
   zp = btc_uint8_write(zp, x->coinbase);
   zp = btc_output_write(zp, &x->output);
   return zp;
@@ -72,7 +72,7 @@ btc_coin_read(btc_coin_t *z, const uint8_t **xp, size_t *xn) {
 
   z->version = (uint32_t)version;
 
-  if (!btc_uint32_read(&z->height, xp, xn))
+  if (!btc_int32_read(&z->height, xp, xn))
     return 0;
 
   if (!btc_uint8_read(&flags, xp, xn))

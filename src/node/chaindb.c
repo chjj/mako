@@ -52,8 +52,8 @@ typedef struct btc_chainfile_s {
   int32_t id;
   int32_t pos;
   int32_t items;
-  int32_t min_time;
-  int32_t max_time;
+  int64_t min_time;
+  int64_t max_time;
   int32_t min_height;
   int32_t max_height;
 } btc_chainfile_t;
@@ -103,8 +103,8 @@ btc_chainfile_write(uint8_t *zp, const btc_chainfile_t *x) {
   zp = btc_int32_write(zp, x->id);
   zp = btc_int32_write(zp, x->pos);
   zp = btc_int32_write(zp, x->items);
-  zp = btc_int32_write(zp, x->min_time);
-  zp = btc_int32_write(zp, x->max_time);
+  zp = btc_time_write(zp, x->min_time);
+  zp = btc_time_write(zp, x->max_time);
   zp = btc_int32_write(zp, x->min_height);
   zp = btc_int32_write(zp, x->max_height);
   return zp;
@@ -124,10 +124,10 @@ btc_chainfile_read(btc_chainfile_t *z, const uint8_t **xp, size_t *xn) {
   if (!btc_int32_read(&z->items, xp, xn))
     return 0;
 
-  if (!btc_int32_read(&z->min_time, xp, xn))
+  if (!btc_time_read(&z->min_time, xp, xn))
     return 0;
 
-  if (!btc_int32_read(&z->max_time, xp, xn))
+  if (!btc_time_read(&z->max_time, xp, xn))
     return 0;
 
   if (!btc_int32_read(&z->min_height, xp, xn))
@@ -143,16 +143,16 @@ static void
 btc_chainfile_update(btc_chainfile_t *z, const btc_entry_t *entry) {
   z->items += 1;
 
-  if (z->min_time == -1 || entry->header.time < (uint32_t)z->min_time)
+  if (z->min_time == -1 || entry->header.time < z->min_time)
     z->min_time = entry->header.time;
 
-  if (z->max_time == -1 || entry->header.time > (uint32_t)z->max_time)
+  if (z->max_time == -1 || entry->header.time > z->max_time)
     z->max_time = entry->header.time;
 
-  if (z->min_height == -1 || entry->height < (uint32_t)z->min_height)
+  if (z->min_height == -1 || entry->height < z->min_height)
     z->min_height = entry->height;
 
-  if (z->max_height == -1 || entry->height > (uint32_t)z->max_height)
+  if (z->max_height == -1 || entry->height > z->max_height)
     z->max_height = entry->height;
 }
 
@@ -262,7 +262,7 @@ btc_chaindb_load_prefix(struct btc_chaindb_s *db, const char *prefix) {
 
 static int
 btc_chaindb_load_database(struct btc_chaindb_s *db, size_t map_size) {
-  int flags = MDB_NOTLS | MDB_NOLOCK | MDB_NOSYNC;
+  unsigned int flags = MDB_NOTLS | MDB_NOLOCK | MDB_NOSYNC;
   char path[BTC_PATH_MAX + 1];
   MDB_txn *txn;
   int rc;
@@ -579,7 +579,7 @@ btc_chaindb_load_index(struct btc_chaindb_s *db) {
   entry = tip;
 
   do {
-    CHECK(entry->height < db->heights.length);
+    CHECK((size_t)entry->height < db->heights.length);
 
     db->heights.items[entry->height] = entry;
 
@@ -834,10 +834,7 @@ btc_chaindb_should_sync(struct btc_chaindb_s *db, const btc_entry_t *entry) {
   if (now == (time_t)-1)
     return 1;
 
-  if ((uint32_t)now < entry->header.time)
-    return 1;
-
-  if ((uint32_t)now - entry->header.time <= 24 * 60 * 60)
+  if ((int64_t)now - entry->header.time <= 24 * 60 * 60)
     return 1;
 
   if ((entry->height % 1000) == 0)
@@ -1244,7 +1241,7 @@ btc_chaindb_save(struct btc_chaindb_s *db,
       entry->prev->next = entry;
 
     /* Update heights. */
-    CHECK(db->heights.length == entry->height);
+    CHECK(db->heights.length == (size_t)entry->height);
     btc_vector_push(&db->heights, entry);
 
     /* Update tip. */
@@ -1306,7 +1303,7 @@ btc_chaindb_reconnect(struct btc_chaindb_s *db,
   entry->prev->next = entry;
 
   /* Update heights. */
-  CHECK(db->heights.length == entry->height);
+  CHECK(db->heights.length == (size_t)entry->height);
   btc_vector_push(&db->heights, entry);
 
   /* Update tip. */
@@ -1384,7 +1381,7 @@ btc_chaindb_tail(struct btc_chaindb_s *db) {
   return db->tail;
 }
 
-uint32_t
+int32_t
 btc_chaindb_height(struct btc_chaindb_s *db) {
   return db->tail->height;
 }
@@ -1400,8 +1397,8 @@ btc_chaindb_by_hash(struct btc_chaindb_s *db, uint8_t *hash) {
 }
 
 btc_entry_t *
-btc_chaindb_by_height(struct btc_chaindb_s *db, uint32_t height) {
-  if (height >= db->heights.length)
+btc_chaindb_by_height(struct btc_chaindb_s *db, int32_t height) {
+  if ((size_t)height >= db->heights.length)
     return NULL;
 
   return db->heights.items[height];
@@ -1409,7 +1406,7 @@ btc_chaindb_by_height(struct btc_chaindb_s *db, uint32_t height) {
 
 int
 btc_chaindb_is_main(btc_chaindb_t *db, const btc_entry_t *entry) {
-  if (entry->height >= db->heights.length)
+  if ((size_t)entry->height >= db->heights.length)
     return 0;
 
   return db->heights.items[entry->height] == entry;

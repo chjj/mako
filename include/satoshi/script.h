@@ -490,8 +490,8 @@ btc_script_is_unspendable(const btc_script_t *script);
 BTC_EXTERN int
 btc_script_is_push_only(const btc_script_t *script);
 
-BTC_EXTERN int
-btc_script_get_height(uint32_t *height, const btc_script_t *script);
+BTC_EXTERN int32_t
+btc_script_get_height(const btc_script_t *script);
 
 BTC_EXTERN int
 btc_script_sigops(const btc_script_t *script, int accurate);

@@ -113,7 +113,7 @@ typedef struct btc_header_s {
   uint32_t version;
   uint8_t prev_block[32];
   uint8_t merkle_root[32];
-  uint32_t time;
+  int64_t time;
   uint32_t bits;
   uint32_t nonce;
 } btc_header_t;
@@ -126,7 +126,7 @@ typedef struct btc_block_s {
 typedef struct btc_entry_s {
   uint8_t hash[32];
   btc_header_t header;
-  uint32_t height;
+  int32_t height;
   uint8_t chainwork[32];
   int32_t block_file;
   int32_t block_pos;
@@ -138,7 +138,7 @@ typedef struct btc_entry_s {
 
 typedef struct btc_coin_s {
   uint32_t version;
-  uint32_t height;
+  int32_t height;
   int coinbase;
   int spent;
   btc_output_t output;

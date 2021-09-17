@@ -227,7 +227,7 @@ btc_view_spend(btc__view_t *view,
 }
 
 void
-btc_view_add(btc__view_t *view, const btc_tx_t *tx, uint32_t height, int spent) {
+btc_view_add(btc__view_t *view, const btc_tx_t *tx, int32_t height, int spent) {
   uint8_t hash[32];
   btc_coins_t *coins;
   btc_coin_t *coin;

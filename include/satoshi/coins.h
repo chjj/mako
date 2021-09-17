@@ -75,7 +75,7 @@ btc_view_spend(btc_view_t *view,
                void *arg2);
 
 BTC_EXTERN void
-btc_view_add(btc_view_t *view, const btc_tx_t *tx, uint32_t height, int spent);
+btc_view_add(btc_view_t *view, const btc_tx_t *tx, int32_t height, int spent);
 
 BTC_EXTERN int
 btc_view_iterate(btc_view_t *view,

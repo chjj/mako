@@ -106,7 +106,7 @@ btc_tx_sighash_v0(uint8_t *hash,
                   const btc_tx_t *tx,
                   size_t index,
                   const btc_script_t *prev_,
-                  unsigned int type) {
+                  int type) {
   const btc_input_t *input;
   const btc_output_t *output;
   btc_script_t prev;
@@ -226,7 +226,7 @@ btc_tx_sighash_v0(uint8_t *hash,
   btc_uint32_update(&ctx, tx->locktime);
 
   /* Append the hash type. */
-  btc_uint32_update(&ctx, type);
+  btc_int32_update(&ctx, type);
 
   btc_hash256_final(&ctx, hash);
 }
@@ -237,7 +237,7 @@ btc_tx_sighash_v1(uint8_t *hash,
                   size_t index,
                   const btc_script_t *prev,
                   int64_t value,
-                  unsigned int type,
+                  int type,
                   btc_tx_cache_t *cache) {
   const btc_input_t *input = tx->inputs.items[index];
   uint8_t prevouts[32];
@@ -324,7 +324,7 @@ btc_tx_sighash_v1(uint8_t *hash,
   btc_uint32_update(&ctx, input->sequence);
   btc_raw_update(&ctx, outputs, 32);
   btc_uint32_update(&ctx, tx->locktime);
-  btc_uint32_update(&ctx, type);
+  btc_int32_update(&ctx, type);
 
   btc_hash256_final(&ctx, hash);
 }
@@ -335,7 +335,7 @@ btc_tx_sighash(uint8_t *hash,
                size_t index,
                const btc_script_t *prev,
                int64_t value,
-               unsigned int type,
+               int type,
                int version,
                btc_tx_cache_t *cache) {
   /* Traditional sighashing. */
@@ -354,7 +354,7 @@ btc_tx_sighash(uint8_t *hash,
 }
 
 int
-btc_tx_verify(const btc_tx_t *tx, btc_view_t *view, uint32_t flags) {
+btc_tx_verify(const btc_tx_t *tx, btc_view_t *view, unsigned int flags) {
   const btc_input_t *input;
   const btc_coin_t *coin;
   btc_tx_cache_t cache;
@@ -380,7 +380,7 @@ int
 btc_tx_verify_input(const btc_tx_t *tx,
                     size_t index,
                     const btc_output_t *coin,
-                    uint32_t flags,
+                    unsigned int flags,
                     btc_tx_cache_t *cache) {
   const btc_input_t *input = tx->inputs.items[index];
 
@@ -399,7 +399,6 @@ btc_tx_verify_input(const btc_tx_t *tx,
 int
 btc_tx_sign(btc_tx_t *tx,
             btc_view_t *view,
-            uint32_t flags,
             int (*derive)(uint8_t *priv,
                           const btc_script_t *script,
                           void *arg1,
@@ -443,7 +442,7 @@ btc_tx_sign_input(btc_tx_t *tx,
                   size_t index,
                   const btc_output_t *coin,
                   const uint8_t *priv,
-                  unsigned int type,
+                  int type,
                   btc_tx_cache_t *cache) {
   const btc_script_t *script = &coin->script;
   btc_input_t *input = tx->inputs.items[index];
@@ -605,13 +604,14 @@ btc_tx_is_rbf(const btc_tx_t *tx) {
 }
 
 int
-btc_tx_is_final(const btc_tx_t *tx, uint32_t height, uint32_t time) {
+btc_tx_is_final(const btc_tx_t *tx, int32_t height, int64_t time) {
+  static unsigned int threshold = BTC_LOCKTIME_THRESHOLD;
   size_t i;
 
   if (tx->locktime == 0)
     return 1;
 
-  if (tx->locktime < (tx->locktime < BTC_LOCKTIME_THRESHOLD ? height : time))
+  if ((int64_t)tx->locktime < (tx->locktime < threshold ? height : time))
     return 1;
 
   for (i = 0; i < tx->inputs.length; i++) {
@@ -623,15 +623,15 @@ btc_tx_is_final(const btc_tx_t *tx, uint32_t height, uint32_t time) {
 }
 
 int
-btc_tx_verify_locktime(const btc_tx_t *tx, size_t index, uint32_t predicate) {
-  static const uint32_t threshold = BTC_LOCKTIME_THRESHOLD;
+btc_tx_verify_locktime(const btc_tx_t *tx, size_t index, int64_t predicate) {
+  static unsigned int threshold = BTC_LOCKTIME_THRESHOLD;
   const btc_input_t *input = tx->inputs.items[index];
 
   /* Locktimes must be of the same type (blocks or seconds). */
-  if ((tx->locktime < threshold) != (predicate < threshold))
+  if ((tx->locktime < threshold) != (predicate < (int64_t)threshold))
     return 0;
 
-  if (predicate > tx->locktime)
+  if (predicate > (int64_t)tx->locktime)
     return 0;
 
   if (input->sequence == 0xffffffff)
@@ -641,11 +641,12 @@ btc_tx_verify_locktime(const btc_tx_t *tx, size_t index, uint32_t predicate) {
 }
 
 int
-btc_tx_verify_sequence(const btc_tx_t *tx, size_t index, uint32_t predicate) {
+btc_tx_verify_sequence(const btc_tx_t *tx, size_t index, int64_t predicate) {
   static const uint32_t disable_flag = BTC_SEQUENCE_DISABLE_FLAG;
   static const uint32_t type_flag = BTC_SEQUENCE_TYPE_FLAG;
   static const uint32_t mask = BTC_SEQUENCE_MASK;
   const btc_input_t *input = tx->inputs.items[index];
+  int64_t sequence = (int64_t)input->sequence;
 
   /* For future softfork capability. */
   if (predicate & disable_flag)
@@ -658,14 +659,14 @@ btc_tx_verify_sequence(const btc_tx_t *tx, size_t index, uint32_t predicate) {
   /* Cannot use the disable flag without
      the predicate also having the disable
      flag (for future softfork capability). */
-  if (input->sequence & disable_flag)
+  if (sequence & disable_flag)
     return 0;
 
   /* Locktimes must be of the same type (blocks or seconds). */
-  if ((input->sequence & type_flag) != (predicate & type_flag))
+  if ((sequence & type_flag) != (predicate & type_flag))
     return 0;
 
-  if ((predicate & mask) > (input->sequence & mask))
+  if ((predicate & mask) > (sequence & mask))
     return 0;
 
   return 1;
@@ -898,7 +899,7 @@ int
 btc_check_inputs(btc_verify_error_t *err,
                  const btc_tx_t *tx,
                  btc_view_t *view,
-                 uint32_t height) {
+                 int32_t height) {
   const btc_input_t *input;
   const btc_coin_t *coin;
   int64_t value, fee;
@@ -913,8 +914,6 @@ btc_check_inputs(btc_verify_error_t *err,
       THROW("bad-txns-inputs-missingorspent", 0);
 
     if (coin->coinbase) {
-      CHECK(height >= coin->height);
-
       if (height - coin->height < BTC_COINBASE_MATURITY)
         THROW("bad-txns-premature-spend-of-coinbase", 0);
     }
@@ -1031,7 +1030,7 @@ btc_tx_write(uint8_t *zp, const btc_tx_t *tx) {
 
 int
 btc_tx_read(btc_tx_t *z, const uint8_t **xp, size_t *xn) {
-  uint8_t flags = 0;
+  unsigned int flags = 0;
   size_t i;
 
   if (!btc_uint32_read(&z->version, xp, xn))
@@ -1074,7 +1073,7 @@ btc_tx_read(btc_tx_t *z, const uint8_t **xp, size_t *xn) {
 }
 
 btc_coin_t *
-btc_tx_coin(const btc_tx_t *tx, uint32_t index, uint32_t height) {
+btc_tx_coin(const btc_tx_t *tx, size_t index, int32_t height) {
   btc_coin_t *coin = btc_coin_create();
 
   coin->version = tx->version;

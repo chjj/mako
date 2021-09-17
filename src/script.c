@@ -1182,47 +1182,39 @@ btc_script_is_push_only(const btc_script_t *script) {
   return 1;
 }
 
-int
-btc_script_get_height(uint32_t *height, const btc_script_t *script) {
+int32_t
+btc_script_get_height(const btc_script_t *script) {
   btc_opcode_t op;
   uint8_t tmp[9];
   int64_t num;
 
-  *height = (uint32_t)-1;
-
   if (!btc_opcode_import(&op, script->data, script->length))
+    return -1;
+
+  if (op.value == BTC_OP_0)
     return 0;
 
-  if (op.value == BTC_OP_0) {
-    *height = 0;
-    return 1;
-  }
-
-  if (op.value >= BTC_OP_1 && op.value <= BTC_OP_16) {
-    *height = op.value - 0x50;
-    return 1;
-  }
+  if (op.value >= BTC_OP_1 && op.value <= BTC_OP_16)
+    return op.value - 0x50;
 
   if (op.value > 6)
-    return 0;
+    return -1;
 
   num = btc_scriptnum_import(op.data, op.length);
 
   if (num < 16)
-    return 0;
+    return -1;
 
   if (num > INT32_MAX)
-    return 0;
+    return -1;
 
   if (btc_scriptnum_export(tmp, num) != op.length)
-    return 0;
+    return -1;
 
   if (memcmp(op.data, tmp, op.length) != 0)
-    return 0;
+    return -1;
 
-  *height = num;
-
-  return 1;
+  return num;
 }
 
 static int
@@ -2365,9 +2357,8 @@ btc_script_execute(const btc_script_t *script,
       case BTC_OP_CHECKSIG:
       case BTC_OP_CHECKSIGVERIFY: {
         const btc_buffer_t *sig, *key;
-        unsigned int type;
         uint8_t hash[32];
-        int res;
+        int res, type;
 
         if (tx == NULL)
           THROW(BTC_SCRIPT_ERR_UNKNOWN_ERROR);
@@ -2421,10 +2412,10 @@ btc_script_execute(const btc_script_t *script,
       }
       case BTC_OP_CHECKMULTISIG:
       case BTC_OP_CHECKMULTISIGVERIFY: {
-        int i, j, m, n, okey, ikey, isig, res;
+        int i, j, m, n, okey, ikey, isig;
         const btc_buffer_t *sig, *key;
-        unsigned int type;
         uint8_t hash[32];
+        int res, type;
 
         if (tx == NULL)
           THROW(BTC_SCRIPT_ERR_UNKNOWN_ERROR);

@@ -22,8 +22,8 @@ enum btc_threshold_state {
 };
 
 typedef struct btc_dstate_s {
-  int flags;
-  int lock_flags;
+  unsigned int flags;
+  unsigned int lock_flags;
   int bip34;
   int bip91;
   int bip148;
@@ -48,9 +48,9 @@ btc_consensus_has_bit(uint32_t version, int bit) {
 }
 
 static int64_t
-btc_consensus_get_reward(int height, int interval) {
+btc_consensus_get_reward(int32_t height, int32_t interval) {
   int64_t subsidy = BTC_BASE_REWARD;
-  int halvings = height / interval;
+  int32_t halvings = height / interval;
 
   if (halvings >= 64)
     return 0;
@@ -74,7 +74,7 @@ btc_network_deployment(const btc_network_t *network, const char *name) {
 }
 
 static const btc_checkpoint_t *
-btc_network_checkpoint(const btc_network_t *network, uint32_t height) {
+btc_network_checkpoint(const btc_network_t *network, int32_t height) {
   const btc_checkpoint_t *chk;
   size_t i;
 
@@ -92,7 +92,7 @@ btc_network_checkpoint(const btc_network_t *network, uint32_t height) {
 }
 
 static const btc_checkpoint_t *
-btc_network_bip30(const btc_network_t *network, uint32_t height) {
+btc_network_bip30(const btc_network_t *network, int32_t height) {
   const btc_checkpoint_t *chk;
   size_t i;
 
@@ -139,7 +139,7 @@ btc_chain_error(btc_chain_t *chain) {
 
 
 static btc_entry_t *
-btc_chain_get_ancestor(btc_chain_t *chain, btc_entry_t *entry, uint32_t height) {
+btc_chain_get_ancestor(btc_chain_t *chain, btc_entry_t *entry, int32_t height) {
   CHECK(height >= 0);
   CHECK(height <= entry->height);
 
@@ -163,13 +163,14 @@ static int
 btc_chain_get_state(btc_chain_t *chain,
                     btc_entry_t *prev,
                     const btc_deployment_t *deployment) {
-  int bit = deployment->bit;
-  int window = chain->network->miner_window;
-  int threshold = chain->network->activation_threshold;
+  int32_t window = chain->network->miner_window;
+  int32_t threshold = chain->network->activation_threshold;
   btc_entry_t *entry, *block;
+  int bit = deployment->bit;
   btc_vector_t compute;
-  uint32_t time, height;
-  int i, state, count;
+  int32_t height, count;
+  int64_t time;
+  int i, state;
 
   if (deployment->threshold != -1)
     threshold = deployment->threshold;
@@ -281,10 +282,10 @@ btc_chain_get_state(btc_chain_t *chain,
 static void
 btc_chain_get_deployments(btc_chain_t *chain,
                           btc_dstate_t *state,
-                          uint32_t time,
+                          int64_t time,
                           btc_entry_t *prev) {
   const btc_network_t *network = chain->network;
-  uint32_t height = prev.height + 1;
+  int32_t height = prev.height + 1;
   const btc_deployment_t *deploy;
   int witness;
 
@@ -356,7 +357,7 @@ btc_chain_get_deployments(btc_chain_t *chain,
          assumption that deployment checks should
          only ever examine the values of the
          previous block (necessary for mining). */
-      uint32_t mtp = btc_entry_bip148_time(prev, time);
+      int64_t mtp = btc_entry_bip148_time(prev, time);
 
       if (mtp >= 1501545600 && mtp <= 1510704000)
         state->bip148 = 1;
@@ -381,7 +382,7 @@ btc_chain_verify_checkpoint(btc_chain_t *chain,
                             const btc_entry_t *prev,
                             const uint8_t *hash) {
   const btc_network_t *network = chain->network;
-  uint32_t height = prev->height + 1;
+  int32_t height = prev->height + 1;
   const btc_checkpoint_t *chk;
   size_t i;
 
@@ -419,15 +420,15 @@ btc_chain_verify(btc_chain_t *chain,
                  btc_dstate_t *state,
                  const btc_block_t *block,
                  const btc_entry_t *prev,
-                 int flags) {
+                 unsigned int flags) {
   const btc_header_t *hdr = &block->header;
   const btc_network_t *network = chain->network;
   uint8_t hash[32];
   uint8_t root[32];
-  uint32_t bits, mtp;
-  uint32_t height;
-  uint32_t time;
+  int64_t time, mtp;
+  int32_t height;
   int has_commit;
+  uint32_t bits;
   size_t i;
 
   btc_dstate_init(state);
@@ -550,12 +551,7 @@ btc_chain_verify(btc_chain_t *chain,
   /* Make sure the height contained
      in the coinbase is correct. */
   if (state->bip34) {
-    uint32_t cbheight;
-
-    if (!btc_block_coinbase_height(&cbheight, block))
-      return btc_chain_throw(chain, hdr, "invalid", "bad-cb-height", 100, 0);
-
-    if (cbheight != height)
+    if (btc_block_coinbase_height(block) != height)
       return btc_chain_throw(chain, hdr, "invalid", "bad-cb-height", 100, 0);
   }
 
@@ -666,7 +662,7 @@ btc_chain_update_inputs(btc_chain_t *chain,
                         btc_entry_t *prev) {
   const btc_tx_t *cb = block->txs.items[0];
   btc_view_t *view = btc_view_create();
-  uint32_t height = prev->height + 1;
+  int32_t height = prev->height + 1;
   size_t i;
 
   btc_view_add(view, cb, height, 0);
@@ -686,15 +682,15 @@ static int
 btc_chain_verify_final(btc_chain_t *chain,
                        const btc_entry_t *prev,
                        const btc_tx_t *tx,
-                       int flags) {
-  uint32_t height = prev->height + 1;
+                       unsigned int flags) {
+  int32_t height = prev->height + 1;
 
   /* We can skip MTP if the locktime is height. */
   if (tx->locktime < BTC_LOCKTIME_THRESHOLD)
     return btc_tx_is_final(tx, height, 0);
 
   if (flags & BTC_CHAIN_MEDIAN_TIME_PAST) {
-    uint32_t ts = btc_entry_median_time(prev);
+    int64_t ts = btc_entry_median_time(prev);
     return btc_tx_is_final(tx, height, ts);
   }
 
@@ -706,7 +702,7 @@ btc_chain_verify_locks(btc_chain_t *chain,
                        const btc_entry_t *prev,
                        const btc_tx_t *tx,
                        btc_view_t *view,
-                       int flags) {
+                       unsigned int flags) {
   int32_t min_height = -1;
   int64_t min_time = -1;
   size_t i;
@@ -777,9 +773,9 @@ btc_chain_verify_inputs(btc_chain_t *chain,
                         btc_entry_t *prev,
                         const btc_dstate_t *state) {
   const btc_header_t *hdr = &block->header;
-  uint32_t interval = chain->network->halving_interval;
+  int32_t interval = chain->network->halving_interval;
   btc_view_t *view = btc_view_create();
-  uint32_t height = prev->height + 1;
+  int32_t height = prev->height + 1;
   btc_verify_error_t err;
   int64_t reward = 0;
   int sigops = 0;
@@ -880,7 +876,7 @@ btc_chain_verify_context(btc_chain_t *chain,
                          btc_dstate_t *state,
                          const btc_block_t *block,
                          btc_entry_t *prev,
-                         int flags) {
+                         unsigned int flags) {
   /* Initial non-contextual verification. */
   if (!btc_chain_verify(chain, state, block, prev, flags))
     return NULL;
@@ -902,7 +898,7 @@ btc_chain_verify_context(btc_chain_t *chain,
 }
 
 int
-btc_chain_add(btc_chain_t *chain, btc_block_t *block, int flags, int id) {
+btc_chain_add(btc_chain_t *chain, btc_block_t *block, unsigned int flags, int id) {
   const btc_header_t *hdr = &block->header;
   btc_entry_t *prev, *entry;
   uint8_t hash[32];
@@ -967,7 +963,7 @@ static btc_entry_t *
 btc_chain_connect(btc_chain_t *chain,
                   const btc_entry_t *prev,
                   btc_block_t *block,
-                  int flags) {
+                  unsigned int flags) {
   btc_entry_t *entry = btc_entry_create();
 
   btc_entry_set_block(entry, block, prev);
@@ -991,7 +987,7 @@ static int
 btc_chain_save_alternate(btc_chain_t *chain,
                          btc_entry_t *entry,
                          btc_block_t *block,
-                         int flags) {
+                         unsigned int flags) {
   const btc_header_t *hdr = &block->header;
   btc_dstate_t state;
   int ret = 0;
@@ -1027,7 +1023,7 @@ static int
 btc_chain_set_best_chain(btc_chain_t *chain,
                          btc_entry_t *entry,
                          btc_block_t *block,
-                         int flags) {
+                         unsigned int flags) {
   const btc_entry_t *fork = NULL;
   btc_entry_t *tip = chain->tip;
   btc_dstate_t state;
@@ -1201,7 +1197,7 @@ btc_chain_unreorganize(btc_chain_t *chain,
 
 static int
 btc_chain_reconnect(btc_chain_t *chain, const btc_entry_t *entry) {
-  int flags = BTC_CHAIN_VERIFY_NONE;
+  unsigned int flags = BTC_CHAIN_VERIFY_NONE;
   btc_dstate_t state;
   btc_entry_t *prev;
   btc_block_t *block;
@@ -1281,11 +1277,11 @@ btc_chain_disconnect(btc_chain_t *chain, const btc_entry_t *entry) {
 
 uint32_t
 btc_chain_get_target(btc_chain_t *chain,
-                     uint32_t time,
+                     int64_t time,
                      const btc_entry_t *prev) {
   const btc_network_t *net = chain->network;
   const btc_entry_t *first;
-  int height;
+  int32_t height;
 
   if (prev == NULL) {
     CHECK(time == net->genesis.header.time);
@@ -1296,7 +1292,7 @@ btc_chain_get_target(btc_chain_t *chain,
   if ((prev->height + 1) % net->pow.retarget_interval != 0) {
     if (net->pow.target_reset) {
       /* Special behavior for testnet. */
-      if ((uint64_t)time > (uint64_t)prev->time + net->pow.target_spacing * 2)
+      if (time > prev->time + net->pow.target_spacing * 2)
         return net->pow.bits;
 
       while (prev->prev != NULL
@@ -1310,7 +1306,7 @@ btc_chain_get_target(btc_chain_t *chain,
   }
 
   /* Back 2 weeks. */
-  height = (int)prev->height - ((int)net->pow.retarget_interval - 1);
+  height = prev->height - (net->pow.retarget_interval - 1);
 
   CHECK(height >= 0);
 
@@ -1339,7 +1335,7 @@ btc_chain_retarget(btc_chain_t *chain,
 
   mpz_init_set_compact(target, prev->header.bits);
 
-  actual_timespan = (int64_t)prev->header.time - (int64_t)first->header.time;
+  actual_timespan = prev->header.time - first->header.time;
 
   if (actual_timespan < target_timespan / 4)
     actual_timespan = target_timespan / 4;

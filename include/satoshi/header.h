@@ -47,7 +47,7 @@ BTC_EXTERN int
 btc_header_mine(btc_header_t *hdr,
                 const uint8_t *target,
                 uint64_t limit,
-                uint32_t (*adjtime)(void *),
+                int64_t (*adjtime)(void *),
                 void *arg);
 
 #endif /* BTC_HEADER_H */

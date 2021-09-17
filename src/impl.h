@@ -600,6 +600,34 @@ btc_size_update(struct btc_sha256_s *ctx, size_t x) {
   return btc_varint_update(ctx, x);
 }
 
+BTC_UNUSED static size_t
+btc_time_size(int64_t x) {
+  (void)x;
+  return 4;
+}
+
+BTC_UNUSED static uint8_t *
+btc_time_write(uint8_t *zp, int64_t x) {
+  return btc_uint32_write(zp, (uint32_t)x);
+}
+
+BTC_UNUSED static int
+btc_time_read(int64_t *zp, const uint8_t **xp, size_t *xn) {
+  uint32_t z;
+
+  if (!btc_uint32_read(&z, xp, xn))
+    return 0;
+
+  *zp = (int64_t)z;
+
+  return 1;
+}
+
+BTC_UNUSED static void
+btc_time_update(struct btc_sha256_s *ctx, int64_t x) {
+  return btc_uint32_update(ctx, (uint32_t)x);
+}
+
 BTC_UNUSED static uint8_t *
 btc_raw_write(uint8_t *zp, const uint8_t *xp, size_t xn) {
   if (xn > 0)

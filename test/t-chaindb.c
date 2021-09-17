@@ -16,5 +16,5 @@ int main(void) {
   btc_chaindb_close(db);
   btc_chaindb_destroy(db);
 
-  return 1;
+  return 0;
 }

@@ -53,8 +53,8 @@ btc_block_get_commitment_hash(uint8_t *hash, const btc_block_t *blk);
 BTC_EXTERN int
 btc_block_check_body(btc_verify_error_t *err, const btc_block_t *blk);
 
-BTC_EXTERN int
-btc_block_coinbase_height(uint32_t *height, const btc_block_t *blk);
+BTC_EXTERN int32_t
+btc_block_coinbase_height(const btc_block_t *blk);
 
 BTC_EXTERN int64_t
 btc_block_claimed(const btc_block_t *blk);

@@ -65,7 +65,7 @@ btc_header_write(uint8_t *zp, const btc_header_t *x) {
   zp = btc_uint32_write(zp, x->version);
   zp = btc_raw_write(zp, x->prev_block, 32);
   zp = btc_raw_write(zp, x->merkle_root, 32);
-  zp = btc_uint32_write(zp, x->time);
+  zp = btc_time_write(zp, x->time);
   zp = btc_uint32_write(zp, x->bits);
   zp = btc_uint32_write(zp, x->nonce);
   return zp;
@@ -82,7 +82,7 @@ btc_header_read(btc_header_t *z, const uint8_t **xp, size_t *xn) {
   if (!btc_raw_read(z->merkle_root, 32, xp, xn))
     return 0;
 
-  if (!btc_uint32_read(&z->time, xp, xn))
+  if (!btc_time_read(&z->time, xp, xn))
     return 0;
 
   if (!btc_uint32_read(&z->bits, xp, xn))
@@ -103,7 +103,7 @@ btc_header_hash(uint8_t *hash, const btc_header_t *hdr) {
   btc_uint32_update(&ctx, hdr->version);
   btc_raw_update(&ctx, hdr->prev_block, 32);
   btc_raw_update(&ctx, hdr->merkle_root, 32);
-  btc_uint32_update(&ctx, hdr->time);
+  btc_time_update(&ctx, hdr->time);
   btc_uint32_update(&ctx, hdr->bits);
   btc_uint32_update(&ctx, hdr->nonce);
 
@@ -127,7 +127,7 @@ int
 btc_header_mine(btc_header_t *hdr,
                 const uint8_t *target,
                 uint64_t limit,
-                uint32_t (*adjtime)(void *),
+                int64_t (*adjtime)(void *),
                 void *arg) {
   uint64_t attempt = 0;
   btc_hash256_t pre, ctx;
@@ -143,7 +143,7 @@ btc_header_mine(btc_header_t *hdr,
     btc_uint32_update(&pre, hdr->version);
     btc_raw_update(&pre, hdr->prev_block, 32);
     btc_raw_update(&pre, hdr->merkle_root, 32);
-    btc_uint32_update(&pre, hdr->time);
+    btc_time_update(&pre, hdr->time);
     btc_uint32_update(&pre, hdr->bits);
 
     do {

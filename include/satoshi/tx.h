@@ -158,24 +158,23 @@ btc_tx_sighash(uint8_t *hash,
                size_t index,
                const btc_script_t *prev,
                int64_t value,
-               unsigned int type,
+               int type,
                int version,
                btc_tx_cache_t *cache);
 
 BTC_EXTERN int
-btc_tx_verify(const btc_tx_t *tx, btc_view_t *view, uint32_t flags);
+btc_tx_verify(const btc_tx_t *tx, btc_view_t *view, unsigned int flags);
 
 BTC_EXTERN int
 btc_tx_verify_input(const btc_tx_t *tx,
                     size_t index,
                     const btc_output_t *coin,
-                    uint32_t flags,
+                    unsigned int flags,
                     btc_tx_cache_t *cache);
 
 BTC_EXTERN int
 btc_tx_sign(btc_tx_t *tx,
             btc_view_t *view,
-            uint32_t flags,
             int (*derive)(uint8_t *priv,
                           const btc_script_t *script,
                           void *arg1,
@@ -188,20 +187,20 @@ btc_tx_sign_input(btc_tx_t *tx,
                   size_t index,
                   const btc_output_t *coin,
                   const uint8_t *priv,
-                  unsigned int type,
+                  int type,
                   btc_tx_cache_t *cache);
 
 BTC_EXTERN int
 btc_tx_is_rbf(const btc_tx_t *tx);
 
 BTC_EXTERN int
-btc_tx_is_final(const btc_tx_t *tx, uint32_t height, uint32_t time);
+btc_tx_is_final(const btc_tx_t *tx, int32_t height, int64_t time);
 
 BTC_EXTERN int
-btc_tx_verify_locktime(const btc_tx_t *tx, size_t index, uint32_t predicate);
+btc_tx_verify_locktime(const btc_tx_t *tx, size_t index, int64_t predicate);
 
 BTC_EXTERN int
-btc_tx_verify_sequence(const btc_tx_t *tx, size_t index, uint32_t predicate);
+btc_tx_verify_sequence(const btc_tx_t *tx, size_t index, int64_t predicate);
 
 BTC_EXTERN int64_t
 btc_tx_input_value(const btc_tx_t *tx, btc_view_t *view);
@@ -237,7 +236,7 @@ BTC_EXTERN int
 btc_check_inputs(btc_verify_error_t *err,
                  const btc_tx_t *tx,
                  btc_view_t *view,
-                 uint32_t height);
+                 int32_t height);
 
 BTC_EXTERN size_t
 btc_tx_base_size(const btc_tx_t *tx);
@@ -264,7 +263,7 @@ BTC_EXTERN int
 btc_tx_read(btc_tx_t *z, const uint8_t **xp, size_t *xn);
 
 BTC_EXTERN btc_coin_t *
-btc_tx_coin(const btc_tx_t *tx, uint32_t index, uint32_t height);
+btc_tx_coin(const btc_tx_t *tx, size_t index, int32_t height);
 
 /*
  * Transaction Vector

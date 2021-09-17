@@ -71,7 +71,7 @@ btc_output_update(btc_hash256_t *ctx, const btc_output_t *x) {
 }
 
 /* XXX */
-#define btc_get_min_fee(x, y) 1
+#define btc_get_min_fee(x, y) (y)
 
 int64_t
 btc_output_dust_threshold(const btc_output_t *x, int64_t rate) {

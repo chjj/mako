@@ -24,17 +24,17 @@ enum btc_network {
 };
 
 typedef struct btc_checkpoint_s {
-  uint32_t height;
+  int32_t height;
   uint8_t hash[32];
 } btc_checkpoint_t;
 
 typedef struct btc_deployment_s {
   const char *name;
   int bit;
-  uint32_t start_time;
-  uint32_t timeout;
-  int threshold;
-  int window;
+  int64_t start_time;
+  int64_t timeout;
+  int32_t threshold;
+  int32_t window;
   int required;
   int force;
 } btc_deployment_t;
@@ -79,12 +79,12 @@ typedef struct btc_network_s {
   /**
    * Last checkpoint height.
    */
-  uint32_t last_checkpoint;
+  int32_t last_checkpoint;
 
   /**
    * Block subsidy halving interval.
    */
-  uint32_t halving_interval;
+  int32_t halving_interval;
 
   /**
    * Genesis block.
@@ -118,17 +118,17 @@ typedef struct btc_network_s {
     /**
      * Desired retarget period in seconds.
      */
-    uint32_t target_timespan;
+    int64_t target_timespan;
 
     /**
      * Average block time.
      */
-    uint32_t target_spacing;
+    int64_t target_spacing;
 
     /**
      * Retarget interval in blocks.
      */
-    uint32_t retarget_interval;
+    int32_t retarget_interval;
 
     /**
      * Whether to reset target if a block
@@ -149,25 +149,25 @@ typedef struct btc_network_s {
     /**
      * Safe height to start pruning.
      */
-    uint32_t prune_after_height;
+    int32_t prune_after_height;
 
     /**
      * Safe number of blocks to keep.
      */
-    uint32_t keep_blocks;
+    int32_t keep_blocks;
 
     /**
      * Age used for the time delta to
      * determine whether the chain is synced.
      */
-    uint32_t max_tip_age;
+    int64_t max_tip_age;
 
     /**
      * Height at which block processing is
      * slow enough that we can output
      * logs without spamming.
      */
-    uint32_t slow_height;
+    int32_t slow_height;
   } block;
 
   /**
@@ -203,12 +203,12 @@ typedef struct btc_network_s {
   /**
    * Version bits activation threshold.
    */
-  uint32_t activation_threshold;
+  int32_t activation_threshold;
 
   /**
    * Confirmation window for versionbits.
    */
-  uint32_t miner_window;
+  int32_t miner_window;
 
   /**
    * Deployments for versionbits.
