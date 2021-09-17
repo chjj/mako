@@ -165,6 +165,7 @@ KHASH_MAP_INIT_CONST_HASH(hashes, btc_entry_t *)
 struct btc_chaindb_s {
   const btc_network_t *network;
   char prefix[BTC_PATH_MAX + 1];
+  int pruning_enabled;
   MDB_env *env;
   MDB_dbi db_meta;
   MDB_dbi db_coin;
@@ -197,6 +198,9 @@ btc_chaindb_init(struct btc_chaindb_s *db, const btc_network_t *network) {
   memset(db, 0, sizeof(*db));
 
   db->network = network;
+  db->prefix[0] = '/';
+  db->pruning_enabled = 0;
+
   db->hashes = kh_init(hashes);
 
   btc_vector_init(&db->heights);
@@ -1019,6 +1023,9 @@ btc_chaindb_prune_files(struct btc_chaindb_s *db,
   MDB_val mkey;
   int target;
   size_t i;
+
+  if (!db->pruning_enabled)
+    return 1;
 
   if (entry->height < db->network->block.keep_blocks)
     return 1;

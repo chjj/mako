@@ -39,10 +39,125 @@ btc_dstate_init(btc_dstate_t *state) {
   state->bip148 = 0;
 }
 
+typedef void btc_connect_cb(const btc_entry_t *entry,
+                            const btc_block_t *block,
+                            btc_view_t *view,
+                            void *arg);
+
+typedef void btc_reorganize_cb(const btc_entry_t *old,
+                               const btc_entry_t *new,
+                               void *arg);
+
+typedef struct btc_chain_s {
+  const btc_network_t *network;
+  btc_chaindb_t *db;
+  const btc_timedata_t *time;
+  btc_entry_t *tip;
+  int32_t height;
+  btc_dstate_t state;
+  btc_verify_error_t error;
+  int synced;
+  btc_connect_cb *on_connect;
+  btc_connect_cb *on_disconnect;
+  btc_reorganize_cb *on_reorganize;
+  void *arg;
+  int checkpoints_enabled;
+  int bip91_enabled;
+  int bip148_enabled;
+} btc_chain_t;
+
+static void
+btc_chain_init(btc_chain_t *chain, const btc_network_t *network) {
+  memset(chain, 0, sizeof(*chain));
+
+  chain->network = network;
+  chain->db = btc_chaindb_create(network);
+  chain->time = NULL;
+  chain->tip = NULL;
+  chain->height = -1;
+
+  btc_dstate_init(&chain->state);
+}
+
+static void
+btc_chain_clear(btc_chain_t *chain) {
+  btc_chaindb_destroy(chain->db);
+  chain->db = NULL;
+}
+
+btc_chain_t *
+btc_chain_create(const btc_network_t *network) {
+  btc_chain_t *chain = (btc_chain_t *)malloc(sizeof(btc_chain_t));
+
+  CHECK(chain != NULL);
+
+  btc_chain_init(chain, network);
+
+  return chain;
+}
+
+void
+btc_chain_destroy(btc_chain_t *chain) {
+  btc_chain_clear(chain);
+  free(chain);
+}
+
+void
+btc_chain_set_timedata(btc_chain_t *chain, const btc_timedata_t *td) {
+  chain->timedata = td;
+}
+
+void
+btc_chain_on_connect(btc_chain_t *chain, btc_connect_cb *handler) {
+  chain->on_connect = handler;
+}
+
+void
+btc_chain_on_disconnect(btc_chain_t *chain, btc_connect_cb *handler) {
+  chain->on_disconnect = handler;
+}
+
+void
+btc_chain_on_reorganize(btc_chain_t *chain, btc_reorganize_cb *handler) {
+  chain->on_reorganize = handler;
+}
+
+void
+btc_chain_set_context(btc_chain_t *chain, void *arg) {
+  chain->arg = arg;
+}
+
+void
+btc_chain_set_checkpoints(btc_chain_t *chain, int value) {
+  chain->checkpoints_enabled = value;
+}
+
+int
+btc_chain_open(btc_chain_t *chain, const char *prefix, size_t map_size) {
+  if (!btc_chaindb_open(chain->db, prefix, map_size))
+    return 0;
+
+  chain->tip = btc_chaindb_tail(chain->db);
+  chain->height = chain->tip->height;
+
+  return 1;
+}
+
+    const state = await this.getDeploymentState();
+
+    this.setDeploymentState(state);
+
+    this.logger.memory();
+
+    this.emit('tip', tip);
+
+    this.maybeSync();
 
 
-
-
+void
+btc_chain_close(btc_chain_t *chain) {
+  btc_chaindb_close(chain->db);
+}
 
 static int
 btc_chain_throw(btc_chain_t *chain,
@@ -1002,7 +1117,7 @@ btc_chain_set_best_chain(btc_chain_t *chain,
   chain->height = entry->height;
   chain->state = state;
 
-  chain->on_connect(chain->arg, entry, block, view);
+  chain->on_connect(entry, block, view, chain->arg);
 
   btc_view_destroy(view);
 
@@ -1078,7 +1193,7 @@ btc_chain_reorganize(btc_chain_t *chain, const btc_entry_t *competitor) {
     }
   }
 
-  chain->on_reorganize(chain->arg, tip, competitor);
+  chain->on_reorganize(tip, competitor, chain->arg);
 
 done:
   btc_vector_clear(&disconnect);
@@ -1121,7 +1236,7 @@ btc_chain_unreorganize(btc_chain_t *chain,
     CHECK(btc_chain_reconnect(chain, entry));
   }
 
-  chain->on_reorganize(chain->arg, tip, last);
+  chain->on_reorganize(tip, last, chain->arg);
 
   btc_vector_clear(&disconnect);
   btc_vector_clear(&connect);
@@ -1163,7 +1278,7 @@ btc_chain_reconnect(btc_chain_t *chain, const btc_entry_t *entry) {
   chain->height = entry->height;
   chain->state = state;
 
-  chain->on_connect(chain->arg, entry, block, view);
+  chain->on_connect(entry, block, view, chain->arg);
 
   btc_view_destroy(view);
 
@@ -1199,7 +1314,7 @@ btc_chain_disconnect(btc_chain_t *chain, const btc_entry_t *entry) {
   chain->tip = entry;
   chain->height = entry->height;
 
-  chain->on_disconnect(chain->arg, entry, block, view);
+  chain->on_disconnect(entry, block, view, chain->arg);
 
   btc_view_destroy(view);
   btc_block_destroy(block);
