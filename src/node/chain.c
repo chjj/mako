@@ -39,6 +39,17 @@ btc_dstate_init(btc_dstate_t *state) {
   state->bip148 = 0;
 }
 
+typedef struct btc_orphan_s {
+  uint8_t hash[32];
+  btc_block_t *block;
+  unsigned int flags;
+  int id;
+  int64_t time;
+} btc_orphan_t;
+
+KHASH_SET_INIT_HASH(invalid)
+KHASH_MAP_INIT_HASH(orphans, btc_orphan_t *)
+
 typedef void btc_connect_cb(const btc_entry_t *entry,
                             const btc_block_t *block,
                             btc_view_t *view,
@@ -48,10 +59,15 @@ typedef void btc_reorganize_cb(const btc_entry_t *old,
                                const btc_entry_t *new,
                                void *arg);
 
+typedef void btc_badorphan_cb(btc_verify_error *err, int id, void *arg);
+
 typedef struct btc_chain_s {
   const btc_network_t *network;
   btc_chaindb_t *db;
   const btc_timedata_t *time;
+  khash_t(invalid) *invalid;
+  khash_t(orphans) *orphan_map;
+  khash_t(orphans) *orphan_prev;
   btc_entry_t *tip;
   int32_t height;
   btc_dstate_t state;
@@ -60,30 +76,12 @@ typedef struct btc_chain_s {
   btc_connect_cb *on_connect;
   btc_connect_cb *on_disconnect;
   btc_reorganize_cb *on_reorganize;
+  btc_badorphan_cb *on_badorphan;
   void *arg;
   int checkpoints_enabled;
   int bip91_enabled;
   int bip148_enabled;
 } btc_chain_t;
-
-static void
-btc_chain_init(btc_chain_t *chain, const btc_network_t *network) {
-  memset(chain, 0, sizeof(*chain));
-
-  chain->network = network;
-  chain->db = btc_chaindb_create(network);
-  chain->time = NULL;
-  chain->tip = NULL;
-  chain->height = -1;
-
-  btc_dstate_init(&chain->state);
-}
-
-static void
-btc_chain_clear(btc_chain_t *chain) {
-  btc_chaindb_destroy(chain->db);
-  chain->db = NULL;
-}
 
 btc_chain_t *
 btc_chain_create(const btc_network_t *network) {
@@ -91,14 +89,48 @@ btc_chain_create(const btc_network_t *network) {
 
   CHECK(chain != NULL);
 
-  btc_chain_init(chain, network);
+  memset(chain, 0, sizeof(*chain));
+
+  chain->network = network;
+  chain->db = btc_chaindb_create(network);
+  chain->time = NULL;
+  chain->invalid = kh_init(invalid);
+  chain->orphan_map = kh_init(orphans);
+  chain->orphan_prev = kh_init(orphans);
+  chain->tip = NULL;
+  chain->height = -1;
+
+  CHECK(chain->invalid != NULL);
+  CHECK(chain->orphan_map != NULL);
+  CHECK(chain->orphan_prev != NULL);
+
+  btc_dstate_init(&chain->state);
 
   return chain;
 }
 
 void
 btc_chain_destroy(btc_chain_t *chain) {
-  btc_chain_clear(chain);
+  khiter_t it = kh_begin(chain->invalid);
+
+  for (; it != kh_end(chain->invalid); it++) {
+    if (kh_exist(chain->invalid, it))
+      free(kh_value(chain->invalid, it));
+  }
+
+  it = kh_begin(chain->orphan_map);
+
+  for (; it != kh_end(chain->orphan_map); it++) {
+    if (kh_exist(chain->orphan_map, it))
+      btc_orphan_destroy(kh_value(chain->orphan_map, it));
+  }
+
+  kh_destroy(coins, chain->invalid);
+  kh_destroy(coins, chain->orphan_map);
+  kh_destroy(orphans, chain->orphan_prev);
+
+  btc_chaindb_destroy(chain->db);
+
   free(chain);
 }
 
@@ -123,6 +155,11 @@ btc_chain_on_reorganize(btc_chain_t *chain, btc_reorganize_cb *handler) {
 }
 
 void
+btc_chain_on_badorphan(btc_chain_t *chain, btc_badorphan_cb *handler) {
+  chain->on_badorphan = handler;
+}
+
+void
 btc_chain_set_context(btc_chain_t *chain, void *arg) {
   chain->arg = arg;
 }
@@ -140,19 +177,10 @@ btc_chain_open(btc_chain_t *chain, const char *prefix, size_t map_size) {
   chain->tip = btc_chaindb_tail(chain->db);
   chain->height = chain->tip->height;
 
+  btc_chain_get_deployment_state(chain, state);
+
   return 1;
 }
-
-    const state = await this.getDeploymentState();
-
-    this.setDeploymentState(state);
-
-    this.logger.memory();
-
-    this.emit('tip', tip);
-
-    this.maybeSync();
-
 
 void
 btc_chain_close(btc_chain_t *chain) {
@@ -410,8 +438,19 @@ btc_chain_get_deployments(btc_chain_t *chain,
         state->bip148 = 1;
     }
   }
+}
 
-  return state;
+static void
+btc_chain_get_deployment_state(btc_chain_t *chain, btc_dstate_t *state) {
+  btc_entry_t *prev = chain->tip;
+
+  if (prev->prev == NULL) {
+    CHECK(prev->height == 0);
+    btc_dstate_init(state);
+    return
+  }
+
+  btc_chain_get_deployments(chain, state, chain->tip.header.time, prev);
 }
 
 static int
@@ -1323,6 +1362,11 @@ btc_chain_disconnect(btc_chain_t *chain, const btc_entry_t *entry) {
 }
 
 uint32_t
+btc_chain_get_current_target(btc_chain_t *chain) {
+  return btc_chain_get_target(chain, btc_timedata_now(chain->time), chain->tip);
+}
+
+uint32_t
 btc_chain_get_target(btc_chain_t *chain,
                      int64_t time,
                      const btc_entry_t *prev) {
@@ -1402,4 +1446,378 @@ btc_chain_retarget(btc_chain_t *chain,
   mpz_clear(target);
 
   return ret;
+}
+
+static void
+btc_chain_handle_orphans(btc_chain_t *chain, btc_entry_t *entry) {
+  btc_orphan_t *orphan = btc_chain_resolve_orphan(chain, entry->hash);
+
+  while (orphan != NULL) {
+    entry = btc_chain_connect(chain, entry, orphan->block, orphan->flags);
+
+    btc_orphan_destroy(orphan);
+
+    if (entry == NULL) {
+      btc_chain_log(chain,
+        "Could not resolve orphan block %h: %s.",
+        orphan->hash, chain->error.reason);
+
+      chain->on_badorphan(&chain->error, orphan->id, chain->arg);
+
+      break;
+    }
+
+    btc_chain_log(chain,
+      "Orphan block was resolved: %h (%d).",
+      entry->hash, entry->height);
+
+    orphan = btc_chain_resolve_orphan(chain, entry->hash);
+  }
+}
+
+static void
+btc_chain_store_orphan(btc_chain_t *chain,
+                       btc_block_t *block,
+                       unsigned int flags,
+                       int id) {
+  int32_t height = btc_block_coinbase_height(block);
+  khiter_t it = kh_get(orphans, chain->orphan_prev, block->header.prev_block);
+  btc_orphan_t *orphan;
+
+  /* The orphan chain forked. */
+  if (it != kh_end(map->h)) {
+    orphan = kh_value(chain->orphan_prev, it);
+
+    btc_chain_log(chain,
+      "Removing forked orphan block: %h (%d).",
+      orphan->hash, height);
+
+    btc_chain_remove_orphan(orphan);
+    btc_orphan_destroy(orphan);
+
+    return;
+  }
+
+  orphan = btc_orphan_create();
+  orphan->block = block;
+  orphan->flags = flags;
+  orphan->id = id;
+  orphan->time = time(NULL);
+
+  btc_header_hash(orphan->hash, &block->header);
+
+  btc_chain_limit_orphans(chain);
+  btc_chain_add_orphan(chain, orphan);
+
+  btc_chain_log(chain,
+    "Storing orphan block: %h (%d).",
+    orphan->hash, height);
+}
+
+static void
+btc_chain_add_orphan(btc_chain_t *chain, btc_orphan_t *orphan) {
+  btc_header_t *hdr = &orphan->block->header;
+  int ret = -1;
+  khiter_t it;
+
+  it = kh_put(orphans, chain->orphan_map, orphan->hash, &ret);
+
+  CHECK(ret > 0);
+
+  kh_value(chain->orphan_map, it) = orphan;
+
+  it = kh_put(orphans, chain->orphan_prev, hdr->prev_block, &ret);
+
+  CHECK(ret > 0);
+
+  kh_value(chain->orphan_prev, it) = orphan;
+}
+
+static void
+btc_chain_remove_orphan(btc_chain_t *chain, btc_orphan_t *orphan) {
+  btc_header_t *hdr = &orphan->block->header;
+  khiter_t it;
+
+  it = kh_get(orphans, chain->orphan_map, orphan->hash);
+
+  CHECK(it != kh_end(chain->orphan_map));
+
+  kh_del(orphans, chain->orphan_map, it);
+
+  it = kh_get(orphans, chain->orphan_prev, hdr->prev_block);
+
+  CHECK(it != kh_end(chain->orphan_prev));
+
+  kh_del(orphans, chain->orphan_prev, it);
+}
+
+static int
+btc_chain_has_next_orphan(btc_chain_t *chain, const uint8_t *hash) {
+  khiter_t it = kh_get(orphans, chain->orphan_prev, hash);
+  return it != kh_end(chain->orphan_prev);
+}
+
+static btc_orphan_t *
+btc_chain_has_resolve_orphan(btc_chain_t *chain, const uint8_t *hash) {
+  khiter_t it = kh_get(orphans, chain->orphan_prev, hash);
+  btc_orphan_t *orphan;
+
+  if (it == kh_end(chain->orphan_prev))
+    return NULL;
+
+  orphan = kh_value(chain->orphan_prev, it);
+
+  btc_chain_remove_orphan(chain, orphan);
+
+  return orphan;
+}
+
+static void
+btc_chain_purge_orphans(btc_chain_t *chain) {
+  size_t count = kh_size(chain->orphan_map);
+  khiter_t it;
+
+  if (count == 0)
+    return;
+
+  it = kh_begin(chain->orphan_map);
+
+  for (; it != kh_end(chain->orphan_map); it++) {
+    if (kh_exist(chain->orphan_map, it))
+      btc_orphan_destroy(kh_value(chain->orphan_map, it));
+  }
+
+  kh_clear(orphans, chain->orphan_map);
+  kh_clear(orphans, chain->orphan_prev);
+
+  btc_chain_log(chain, "Purged %d orphans.", count);
+}
+
+static void
+btc_chain_limit_orphans(btc_chain_t *chain) {
+  btc_orphan_t *oldest = NULL;
+  int64_t now = time(NULL);
+  btc_orphan_t *orphan;
+  btc_vector_t orphans;
+  khiter_t it;
+  size_t i;
+
+  if (kh_size(chain->orphan_map) <= 20)
+    return;
+
+  btc_vector_init(&orphans);
+
+  it = kh_begin(chain->orphan_map);
+
+  for (; it != kh_end(chain->orphan_map); it++) {
+    if (kh_exist(chain->orphan_map, it)) {
+      orphan = kh_value(chain->orphan_map, it)
+
+      if (now < orphan->time + 60 * 60) {
+        if (oldest == NULL || orphan->time < oldest->time)
+          oldest = orphan;
+        continue;
+      }
+
+      btc_vector_push(&orphans, orphan);
+    }
+  }
+
+  for (i = 0; i < orphans.length; i++) {
+    orphan = (btc_orphan_t *)orphans.items[i];
+
+    btc_chain_remove_orphan(chain, orphan);
+    btc_orphan_destroy(orphan);
+  }
+
+  btc_vector_clear(&orphans);
+
+  if (kh_size(chain->orphan_map) <= 20)
+    return;
+
+  btc_vector_init(&orphans);
+
+  it = kh_begin(chain->orphan_map);
+
+  for (; it != kh_end(chain->orphan_map); it++) {
+    if (kh_exist(chain->orphan_map, it)) {
+      orphan = kh_value(chain->orphan_map, it)
+
+      if (orphan == oldest)
+        continue;
+
+      btc_vector_push(&orphans, orphan);
+    }
+  }
+
+  for (i = 0; i < orphans.length; i++) {
+    orphan = (btc_orphan_t *)orphans.items[i];
+
+    btc_chain_remove_orphan(chain, orphan);
+    btc_orphan_destroy(orphan);
+  }
+
+  btc_vector_clear(&orphans);
+}
+
+static int
+btc_chain_is_invalid(btc_chain_t *chain, const btc_block_t *block) {
+  uint8_t hash[32];
+  khiter_t it;
+
+  btc_header_hash(hash, &block->header);
+
+  it = kh_get(invalid, chain->invalid, hash);
+
+  if (it != kh_end(chain->orphan_prev))
+    return 1;
+
+  it = kh_get(invalid, chain->invalid, block->header.prev_block);
+
+  if (it != kh_end(chain->orphan_prev)) {
+    btc_chain_set_invalid(chain, block->header.prev_block);
+    return 1;
+  }
+
+  return 0;
+}
+
+static int
+btc_chain_has_invalid(btc_chain_t *chain, const uint8_t *hash) {
+  uint8_t hash[32];
+  khiter_t it;
+
+  btc_header_hash(hash, &block->header);
+
+  it = kh_get(invalid, chain->invalid, hash);
+
+  if (it != kh_end(chain->orphan_prev))
+    return 1;
+
+  it = kh_get(invalid, chain->invalid, block->header.prev_block);
+
+  if (it != kh_end(chain->orphan_prev)) {
+    btc_chain_set_invalid(chain, block->header.prev_block);
+    return 1;
+  }
+
+  return 0;
+}
+
+static void
+btc_chain_set_invalid(btc_chain_t *chain, const uint8_t *hash) {
+  int ret = -1;
+  uint8_t *buf;
+  khiter_t it;
+
+  it = kh_put(invalid, chain->invalid, hash, &ret);
+
+  CHECK(ret != -1);
+
+  if (ret == 0)
+    return;
+
+  buf = (uint8_t *)malloc(32);
+
+  CHECK(buf != NULL);
+
+  memcpy(buf, hash, 32);
+
+  kh_key(chain->invalid, it) = buf;
+}
+
+static void
+btc_chain_remove_invalid(btc_chain_t *chain, const uint8_t *hash) {
+  khiter_t it = kh_get(invalid, chain->invalid, hash);
+
+  if (it == kh_end(chain->invalid))
+    return;
+
+  free(kh_key(chain->invalid, it));
+
+  kh_del(invalid, chain->invalid, it);
+}
+
+static void
+btc_chain_has(btc_chain_t *chain, const uint8_t *hash) {
+  if (btc_chain_has_orphan(chain, hash))
+    return 1;
+
+  if (btc_chain_has_invalid(chain, hash))
+    return 1;
+
+  return btc_chaindb_by_hash(chain->db, hash) != NULL;
+}
+
+static void
+btc_chain_get_locator(btc_chain_t *chain,
+                      btc_vector_t *hashes,
+                      const uint8_t *start) {
+  btc_entry_t *entry = chain->tip;
+  int32_t step = 1;
+  int32_t height;
+
+  CHECK(hashes->length == 0);
+
+  if (start != NULL) {
+    entry = btc_chaindb_by_hash(chain->db, start);
+
+    CHECK(entry != NULL);
+  }
+
+  btc_vector_push(hashes, entry->hash);
+
+  height = entry->height;
+
+  while (height > 0) {
+    height -= step;
+
+    if (height < 0)
+      height = 0;
+
+    if (hashes->length > 10)
+      step *= 2;
+
+    entry = btc_chain_get_ancestor(chain, entry, height);
+
+    btc_vector_push(hashes, entry->hash);
+  }
+}
+
+static const uint8_t *
+btc_chain_get_orphan_root(btc_chain_t *chain, const uint8_t *hash) {
+  const uint8_t *root = NULL;
+  btc_orphan_t *orphan;
+  khiter_t it;
+
+  CHECK(hash != NULL);
+
+  for (;;) {
+    it = kh_get(orphans, chain->orphan_map, hash);
+
+    if (it == kh_end(chain->orphan_map))
+      break;
+
+    orphan = kh_value(chain->orphan_map, it);
+
+    root = hash;
+    hash = orphan->block->header.prev_block;
+  }
+
+  return root;
+}
+
+static const uint8_t *
+btc_chain_find_locator(btc_chain_t *chain, const btc_vector_t *locator) {
+  size_t i;
+
+  for (i = 0; i < locator->length; i++) {
+    const uint8_t *hash = (const uint8_t *)locator->items[i];
+    btc_entry_t *entry = btc_chaindb_by_hash(chain->db, hash);
+
+    if (entry != NULL && btc_chaindb_is_main(chain->db, entry))
+      return entry->hash;
+  }
+
+  return btc_chaindb_head(chain->db)->hash;
 }
