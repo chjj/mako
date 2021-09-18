@@ -80,7 +80,14 @@ BTC_EXTERN int
 btc_hash_import(uint8_t *hash, const char *str);
 
 BTC_EXTERN void
-btc_hash_export(char *str, const char *hash);
+btc_hash_export(char *str, const uint8_t *hash);
+
+/*
+ * Time
+ */
+
+BTC_EXTERN int64_t
+btc_now(void);
 
 #ifdef __cplusplus
 }

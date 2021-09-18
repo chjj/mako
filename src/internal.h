@@ -218,6 +218,12 @@
 #  define BTC_UNUSED
 #endif
 
+#if BTC_GNUC_PREREQ(3, 0)
+#  define BTC_MALLOC __attribute__((__malloc__))
+#else
+#  define BTC_MALLOC
+#endif
+
 #if defined(__GNUC__) && __GNUC__ >= 2
 #  define BTC_EXTENSION __extension__
 #else
@@ -264,24 +270,36 @@ prefix ## _barrier(type x) {      \
  * Macros
  */
 
-#define ENTROPY_SIZE 32
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+#define lengthof(x) (sizeof(x) / sizeof((x)[0]))
 
 /*
  * Helpers
  */
 
+#define btc_assert_fail btc__assert_fail
 #define btc_abort btc__abort
+#define btc_malloc btc__malloc
+#define btc_realloc btc__realloc
+#define btc_free btc__free
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 BTC_EXTERN BTC_NORETURN void
-btc__assert_fail(const char *file, int line, const char *expr);
+btc_assert_fail(const char *file, int line, const char *expr);
 
 BTC_EXTERN BTC_NORETURN void
-btc__abort(void);
+btc_abort(void);
+
+BTC_EXTERN BTC_MALLOC void *
+btc_malloc(size_t size);
+
+BTC_EXTERN BTC_MALLOC void *
+btc_realloc(void *ptr, size_t size);
+
+BTC_EXTERN void
+btc_free(void *ptr);
 
 #ifdef __cplusplus
 }

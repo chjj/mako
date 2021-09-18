@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 #ifdef _WIN32
 #  include <windows.h> /* SecureZeroMemory */
 #endif
@@ -178,7 +179,7 @@ btc_hash_import(uint8_t *hash, const char *str) {
 }
 
 void
-btc_hash_export(char *str, const char *hash) {
+btc_hash_export(char *str, const uint8_t *hash) {
   int j = 0;
   int i;
 
@@ -188,4 +189,17 @@ btc_hash_export(char *str, const char *hash) {
   }
 
   str[j] = '\0';
+}
+
+/*
+ * Time
+ */
+
+int64_t
+btc_now(void) {
+  time_t now = time(NULL);
+
+  CHECK(now != (time_t)-1);
+
+  return (int64_t)now;
 }

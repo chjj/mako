@@ -28,6 +28,8 @@ test_bip340_vectors(void) {
     int result = bip340_vectors[i].result;
     const char *comment = bip340_vectors[i].comment;
 
+    (void)comment;
+
     hex_decode(priv, &priv_len, bip340_vectors[i].priv);
     hex_decode(pub, &pub_len, bip340_vectors[i].pub);
     hex_decode(aux, &aux_len, bip340_vectors[i].aux);

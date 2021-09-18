@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
 
 #include <lmdb.h>
 
@@ -831,14 +830,9 @@ btc_chaindb_read_undo(struct btc_chaindb_s *db, const btc_entry_t *entry) {
 
 static int
 btc_chaindb_should_sync(struct btc_chaindb_s *db, const btc_entry_t *entry) {
-  time_t now = time(NULL);
-
   (void)db;
 
-  if (now == (time_t)-1)
-    return 1;
-
-  if ((int64_t)now - entry->header.time <= 24 * 60 * 60)
+  if (btc_now() - entry->header.time <= 24 * 60 * 60)
     return 1;
 
   if ((entry->height % 1000) == 0)

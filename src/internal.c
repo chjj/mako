@@ -16,7 +16,7 @@
  */
 
 BTC_NORETURN void
-btc__assert_fail(const char *file, int line, const char *expr) {
+btc_assert_fail(const char *file, int line, const char *expr) {
   /* LCOV_EXCL_START */
 #if defined(BTC_DEBUG)
   fprintf(stderr, "%s:%d: Assertion `%s' failed.\n", file, line, expr);
@@ -31,6 +31,36 @@ btc__assert_fail(const char *file, int line, const char *expr) {
 }
 
 BTC_NORETURN void
-btc__abort(void) {
+btc_abort(void) {
   abort(); /* LCOV_EXCL_LINE */
+}
+
+BTC_MALLOC void *
+btc_malloc(size_t size) {
+  void *ptr = malloc(size);
+
+  if (ptr == NULL)
+    abort(); /* LCOV_EXCL_LINE */
+
+  return ptr;
+}
+
+BTC_MALLOC void *
+btc_realloc(void *ptr, size_t size) {
+  ptr = realloc(ptr, size);
+
+  if (ptr == NULL)
+    abort(); /* LCOV_EXCL_LINE */
+
+  return ptr;
+}
+
+void
+btc_free(void *ptr) {
+  if (ptr == NULL) {
+    abort(); /* LCOV_EXCL_LINE */
+    return;
+  }
+
+  free(ptr);
 }

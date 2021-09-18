@@ -9,8 +9,6 @@
 #include <satoshi/network.h>
 #include "internal.h"
 
-#define lengthof(x) (sizeof(x) / sizeof((x)[0]))
-
 static const char *mainnet_seeds[] = {
   "seed.bitcoin.sipa.be", /* Pieter Wuille */
   "dnsseed.bluematt.me", /* Matt Corallo */

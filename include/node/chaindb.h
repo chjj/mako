@@ -12,8 +12,8 @@ extern "C" {
 #endif
 
 #include <stddef.h>
-#include "satoshi/common.h"
-#include "satoshi/types.h"
+#include "../satoshi/common.h"
+#include "../satoshi/types.h"
 
 /*
  * Types

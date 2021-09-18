@@ -896,10 +896,10 @@ btc_tx_check_sanity(btc_verify_error_t *err, const btc_tx_t *tx) {
 }
 
 int
-btc_check_inputs(btc_verify_error_t *err,
-                 const btc_tx_t *tx,
-                 btc_view_t *view,
-                 int32_t height) {
+btc_tx_check_inputs(btc_verify_error_t *err,
+                    const btc_tx_t *tx,
+                    btc_view_t *view,
+                    int32_t height) {
   const btc_input_t *input;
   const btc_coin_t *coin;
   int64_t value, fee;
