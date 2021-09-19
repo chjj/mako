@@ -153,6 +153,11 @@ btc_hash_equal(const uint8_t *x, const uint8_t *y) {
   return btc_hash_compare(x, y) == 0;
 }
 
+uint8_t *
+btc_hash_clone(const uint8_t *hash) {
+  return (uint8_t *)memcpy(btc_malloc(32), hash, 32);
+}
+
 int
 btc_hash_import(uint8_t *hash, const char *str) {
   int i, hi, lo;

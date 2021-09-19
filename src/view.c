@@ -39,18 +39,13 @@ btc_coins_create(void) {
 
 static void
 btc_coins_destroy(btc_coins_t *coins) {
-  khiter_t iter = kh_begin(coins->map);
-  btc_coin_t *val;
+  khiter_t it = kh_begin(coins->map);
 
-  for (; iter != kh_end(coins->map); iter++) {
-    if (kh_exist(coins->map, iter)) {
-      val = kh_value(coins->map, iter);
+  for (; it != kh_end(coins->map); it++) {
+    if (!kh_exist(coins->map, it))
+      continue;
 
-      if (val != NULL)
-        btc_coin_destroy(val);
-
-      kh_value(coins->map, iter) = NULL;
-    }
+    btc_coin_destroy(kh_value(coins->map, it));
   }
 
   kh_destroy(coins, coins->map);
@@ -60,30 +55,32 @@ btc_coins_destroy(btc_coins_t *coins) {
 
 static btc_coin_t *
 btc_coins_get(btc_coins_t *coins, uint32_t index) {
-  khiter_t iter = kh_get(coins, coins->map, index);
+  khiter_t it = kh_get(coins, coins->map, index);
 
-  if (iter == kh_end(coins->map))
+  if (it == kh_end(coins->map))
     return 0;
 
-  return kh_value(coins->map, iter);
+  return kh_value(coins->map, it);
 }
 
 static void
 btc_coins_put(btc_coins_t *coins, uint32_t index, btc_coin_t *coin) {
   int ret = -1;
-  khiter_t iter = kh_put(coins, coins->map, index, &ret);
-  btc_coin_t *val;
+  khiter_t it = kh_put(coins, coins->map, index, &ret);
 
   CHECK(ret != -1);
 
-  if (ret == 0) {
-    val = kh_value(coins->map, iter);
+  /* It might be better to free `coin` in this
+     situation. This call could break things if
+     the coin in the bucket is present in the
+     undo vector. Emphasis on "could": the code
+     is currently structured in such a way that
+     this should be impossible (short of a txid
+     collision). */
+  if (ret == 0)
+    btc_coin_destroy(kh_value(coins->map, it));
 
-    if (val != NULL)
-      btc_coin_destroy(val);
-  }
-
-  kh_value(coins->map, iter) = coin;
+  kh_value(coins->map, it) = coin;
 }
 
 /*
@@ -114,21 +111,18 @@ btc_view_create(void) {
 
 void
 btc_view_destroy(btc__view_t *view) {
-  khiter_t iter = kh_begin(view->map);
-  btc_coins_t *val;
+  khiter_t it = kh_begin(view->map);
 
-  for (; iter != kh_end(view->map); iter++) {
-    if (kh_exist(view->map, iter)) {
-      val = kh_value(view->map, iter);
+  for (; it != kh_end(view->map); it++) {
+    if (!kh_exist(view->map, it))
+      continue;
 
-      if (val != NULL)
-        btc_coins_destroy(val);
-
-      kh_value(view->map, iter) = NULL;
-    }
+    btc_coins_destroy(kh_value(view->map, it));
   }
 
   kh_destroy(view, view->map);
+
+  view->undo.length = 0; /* Do not double-free coins. */
 
   btc_undo_clear(&view->undo);
 
@@ -137,33 +131,31 @@ btc_view_destroy(btc__view_t *view) {
 
 static btc_coins_t *
 btc_view_coins(btc__view_t *view, const uint8_t *hash) {
-  khiter_t iter = kh_get(view, view->map, hash);
+  khiter_t it = kh_get(view, view->map, hash);
 
-  if (iter == kh_end(view->map))
+  if (it == kh_end(view->map))
     return NULL;
 
-  return kh_value(view->map, iter);
+  return kh_value(view->map, it);
 }
 
 static btc_coins_t *
 btc_view_ensure(btc__view_t *view, const uint8_t *hash) {
   int ret = -1;
-  khiter_t iter = kh_put(view, view->map, hash, &ret);
+  khiter_t it = kh_put(view, view->map, hash, &ret);
   btc_coins_t *coins;
 
   CHECK(ret != -1);
 
-  if (ret) {
+  if (ret == 0) {
+    coins = kh_value(view->map, it);
+  } else {
     coins = btc_coins_create();
 
     memcpy(coins->hash, hash, 32);
 
-    kh_key(view->map, iter) = coins->hash;
-    kh_value(view->map, iter) = coins;
-  } else {
-    coins = kh_value(view->map, iter);
-
-    CHECK(coins != NULL);
+    kh_key(view->map, it) = coins->hash;
+    kh_value(view->map, it) = coins;
   }
 
   return coins;
@@ -224,8 +216,7 @@ btc_view_spend(btc__view_t *view,
 
     coin->spent = 1;
 
-    /* TODO: Maybe use a shallow vector for this? */
-    btc_undo_push(&view->undo, btc_coin_clone(coin));
+    btc_undo_push(&view->undo, coin);
   }
 
   return 1;
@@ -293,24 +284,22 @@ btc_view_iterate(btc__view_t *view,
                            void *arg2),
                  void *arg1,
                  void *arg2) {
-  khiter_t view_iter = kh_begin(view->map);
-  khiter_t coins_iter;
   btc_coins_t *coins;
+  khiter_t itv, itc;
   int rc;
 
-  for (; view_iter != kh_end(view->map); view_iter++) {
-    if (!kh_exist(view->map, view_iter))
+  for (itv = kh_begin(view->map); itv != kh_end(view->map); itv++) {
+    if (!kh_exist(view->map, itv))
       continue;
 
-    coins = kh_value(view->map, view_iter);
-    coins_iter = kh_begin(coins->map);
+    coins = kh_value(view->map, itv);
 
-    for (; coins_iter != kh_end(coins->map); coins_iter++) {
-      if (!kh_exist(coins->map, coins_iter))
+    for (itc = kh_begin(coins->map); itc != kh_end(coins->map); itc++) {
+      if (!kh_exist(coins->map, itc))
         continue;
 
-      rc = cb(coins->hash, kh_key(coins->map, coins_iter),
-                           kh_value(coins->map, coins_iter),
+      rc = cb(coins->hash, kh_key(coins->map, itc),
+                           kh_value(coins->map, itc),
                            arg1,
                            arg2);
 

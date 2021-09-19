@@ -1106,13 +1106,9 @@ btc_chaindb_connect_block(struct btc_chaindb_s *db,
   /* Write undo coins (if there are any). */
   undo = btc_view_undo(view);
 
-  if (undo->length != 0) {
-    if (entry->undo_pos == -1) {
-      if (!btc_chaindb_write_undo(db, txn, entry, undo))
-        return 0;
-    }
-
-    btc_undo_reset(undo);
+  if (undo->length != 0 && entry->undo_pos == -1) {
+    if (!btc_chaindb_write_undo(db, txn, entry, undo))
+      return 0;
   }
 
   /* Prune height-288 if pruning is enabled. */

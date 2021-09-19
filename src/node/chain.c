@@ -418,7 +418,6 @@ btc_chain_has_next_orphan(struct btc_chain_s *chain, const uint8_t *hash) {
 static void
 btc_chain_set_invalid(struct btc_chain_s *chain, const uint8_t *hash) {
   int ret = -1;
-  uint8_t *key;
   khiter_t it;
 
   it = kh_put(invalid, chain->invalid, (uint8_t *)hash, &ret);
@@ -428,11 +427,7 @@ btc_chain_set_invalid(struct btc_chain_s *chain, const uint8_t *hash) {
   if (ret == 0)
     return;
 
-  key = (uint8_t *)btc_malloc(32);
-
-  memcpy(key, hash, 32);
-
-  kh_key(chain->invalid, it) = key;
+  kh_key(chain->invalid, it) = btc_hash_clone(hash);
 }
 
 BTC_UNUSED static void
