@@ -71,7 +71,7 @@ BTC_EXTERN int32_t
 btc_chaindb_height(btc_chaindb_t *db);
 
 BTC_EXTERN btc_entry_t *
-btc_chaindb_by_hash(btc_chaindb_t *db, uint8_t *hash);
+btc_chaindb_by_hash(btc_chaindb_t *db, const uint8_t *hash);
 
 BTC_EXTERN btc_entry_t *
 btc_chaindb_by_height(btc_chaindb_t *db, int32_t height);

@@ -1013,7 +1013,7 @@ btc_chaindb_prune_files(struct btc_chaindb_s *db,
                         btc_entry_t *entry) {
   char path[BTC_PATH_MAX + 1];
   btc_chainfile_t *file;
-  int64_t target;
+  int32_t target;
   uint8_t key[5];
   MDB_val mkey;
   size_t i;
@@ -1388,7 +1388,7 @@ btc_chaindb_height(struct btc_chaindb_s *db) {
 }
 
 btc_entry_t *
-btc_chaindb_by_hash(struct btc_chaindb_s *db, uint8_t *hash) {
+btc_chaindb_by_hash(struct btc_chaindb_s *db, const uint8_t *hash) {
   khiter_t iter = kh_get(hashes, db->hashes, hash);
 
   if (iter == kh_end(db->hashes))

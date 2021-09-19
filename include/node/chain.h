@@ -136,7 +136,7 @@ btc_chain_get_target(btc_chain_t *chain,
 BTC_EXTERN const uint8_t *
 btc_chain_get_orphan_root(btc_chain_t *chain, const uint8_t *hash);
 
-BTC_EXTERN btc_entry_t *
+BTC_EXTERN const btc_entry_t *
 btc_chain_find_locator(btc_chain_t *chain, const btc_vector_t *locator);
 
 #ifdef __cplusplus
