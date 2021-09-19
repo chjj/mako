@@ -1013,9 +1013,9 @@ btc_chaindb_prune_files(struct btc_chaindb_s *db,
                         btc_entry_t *entry) {
   char path[BTC_PATH_MAX + 1];
   btc_chainfile_t *file;
+  int64_t target;
   uint8_t key[5];
   MDB_val mkey;
-  int target;
   size_t i;
 
   if (!db->pruning_enabled)
@@ -1026,7 +1026,7 @@ btc_chaindb_prune_files(struct btc_chaindb_s *db,
 
   target = entry->height - db->network->block.keep_blocks;
 
-  if (target <= (int)db->network->block.prune_after_height)
+  if (target <= db->network->block.prune_after_height)
     return 1;
 
   for (i = 0; i < db->files.length; i++) {
@@ -1402,7 +1402,7 @@ btc_chaindb_by_height(struct btc_chaindb_s *db, int32_t height) {
   if ((size_t)height >= db->heights.length)
     return NULL;
 
-  return db->heights.items[height];
+  return (btc_entry_t *)db->heights.items[height];
 }
 
 int
@@ -1410,7 +1410,7 @@ btc_chaindb_is_main(btc_chaindb_t *db, const btc_entry_t *entry) {
   if ((size_t)entry->height >= db->heights.length)
     return 0;
 
-  return db->heights.items[entry->height] == entry;
+  return (btc_entry_t *)db->heights.items[entry->height] == entry;
 }
 
 int

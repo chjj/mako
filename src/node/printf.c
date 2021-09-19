@@ -159,9 +159,10 @@ btc_value(char *z, int64_t x) {
 
   z += btc_unsigned(z, hi);
 
-  *z++ = '.';
-
-  z += btc_unsigned(z, lo);
+  if (lo != 0) {
+    *z++ = '.';
+    z += btc_unsigned(z, lo);
+  }
 
   return z - s;
 }
@@ -266,6 +267,12 @@ btc_vfprintf(FILE *stream, const char *fmt, va_list ap) {
       }
       case 1: {
         switch (ch) {
+          case '%': {
+            NEED(1);
+            *ptr++ = '%';
+            state = 0;
+            break;
+          }
           case 'd':
           case 'i': {
             NEED(11);
@@ -329,12 +336,6 @@ btc_vfprintf(FILE *stream, const char *fmt, va_list ap) {
             *(va_arg(ap, int *)) = total + (ptr - buf);
             break;
           }
-          case '%': {
-            NEED(1);
-            *ptr++ = '%';
-            state = 0;
-            break;
-          }
           case 'z': {
             if (*str == '\0') {
               state = 0;
@@ -395,7 +396,7 @@ btc_vfprintf(FILE *stream, const char *fmt, va_list ap) {
           case 'H': {
             /* 256-bit hash (little endian) */
             NEED(64);
-            ptr += btc_hash(ptr, va_arg(ap, const unsigned char *));
+            ptr += btc_hash(ptr, va_arg(ap, unsigned char *));
             state = 0;
             break;
           }

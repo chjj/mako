@@ -138,7 +138,7 @@ btc_block_create_commitment_hash(uint8_t *hash, const btc_block_t *blk) {
 }
 
 int
-btc_block_get_commitment_hash(uint8_t *hash /* maybe do zero copy */, const btc_block_t *blk) {
+btc_block_get_commitment_hash(uint8_t *hash, const btc_block_t *blk) {
   const btc_output_t *output;
   const btc_tx_t *tx;
   size_t i;
