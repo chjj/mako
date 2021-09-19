@@ -738,7 +738,7 @@ static int
 btc_chaindb_read(struct btc_chaindb_s *db,
                  uint8_t **raw,
                  size_t *len,
-                 btc_chainfile_t *file,
+                 const btc_chainfile_t *file,
                  int id,
                  int pos) {
   char path[BTC_PATH_MAX + 1];
@@ -829,9 +829,7 @@ btc_chaindb_read_undo(struct btc_chaindb_s *db, const btc_entry_t *entry) {
 }
 
 static int
-btc_chaindb_should_sync(struct btc_chaindb_s *db, const btc_entry_t *entry) {
-  (void)db;
-
+should_sync(const btc_entry_t *entry) {
   if (btc_now() - entry->header.time <= 24 * 60 * 60)
     return 1;
 
@@ -922,7 +920,7 @@ btc_chaindb_write_block(struct btc_chaindb_s *db,
   if (!btc_fs_write(db->block.fd, db->slab, len))
     return 0;
 
-  if (btc_chaindb_should_sync(db, entry))
+  if (should_sync(entry))
     btc_fs_fsync(db->block.fd);
 
   entry->block_file = db->block.id;
@@ -981,7 +979,7 @@ btc_chaindb_write_undo(struct btc_chaindb_s *db,
   if (!btc_fs_write(db->undo.fd, buf, len))
     goto fail;
 
-  if (btc_chaindb_should_sync(db, entry))
+  if (should_sync(entry))
     btc_fs_fsync(db->undo.fd);
 
   entry->undo_file = db->undo.id;
@@ -1010,7 +1008,7 @@ fail:
 static int
 btc_chaindb_prune_files(struct btc_chaindb_s *db,
                         MDB_txn *txn,
-                        btc_entry_t *entry) {
+                        const btc_entry_t *entry) {
   char path[BTC_PATH_MAX + 1];
   btc_chainfile_t *file;
   int32_t target;
@@ -1103,7 +1101,7 @@ btc_chaindb_connect_block(struct btc_chaindb_s *db,
 static btc_view_t *
 btc_chaindb_disconnect_block(struct btc_chaindb_s *db,
                              MDB_txn *txn,
-                             btc_entry_t *entry,
+                             const btc_entry_t *entry,
                              const btc_block_t *block) {
   btc_view_t *view = btc_view_create();
   btc_undo_t *undo = btc_chaindb_read_undo(db, entry);
@@ -1372,12 +1370,12 @@ fail:
   return NULL;
 }
 
-btc_entry_t *
+const btc_entry_t *
 btc_chaindb_head(struct btc_chaindb_s *db) {
   return db->head;
 }
 
-btc_entry_t *
+const btc_entry_t *
 btc_chaindb_tail(struct btc_chaindb_s *db) {
   return db->tail;
 }
@@ -1387,7 +1385,7 @@ btc_chaindb_height(struct btc_chaindb_s *db) {
   return db->tail->height;
 }
 
-btc_entry_t *
+const btc_entry_t *
 btc_chaindb_by_hash(struct btc_chaindb_s *db, const uint8_t *hash) {
   khiter_t iter = kh_get(hashes, db->hashes, hash);
 
@@ -1397,7 +1395,7 @@ btc_chaindb_by_hash(struct btc_chaindb_s *db, const uint8_t *hash) {
   return kh_value(db->hashes, iter);
 }
 
-btc_entry_t *
+const btc_entry_t *
 btc_chaindb_by_height(struct btc_chaindb_s *db, int32_t height) {
   if ((size_t)height >= db->heights.length)
     return NULL;

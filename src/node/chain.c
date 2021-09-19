@@ -229,7 +229,7 @@ btc_chain_open(struct btc_chain_s *chain, const char *prefix, size_t map_size) {
   if (!btc_chaindb_open(chain->db, prefix, map_size))
     return 0;
 
-  chain->tip = btc_chaindb_tail(chain->db);
+  chain->tip = (btc_entry_t *)btc_chaindb_tail(chain->db);
   chain->height = chain->tip->height;
 
   btc_chain_get_deployment_state(chain, &chain->state);
@@ -1941,8 +1941,8 @@ btc_chain_get_orphan_root(struct btc_chain_s *chain, const uint8_t *hash) {
 
 const btc_entry_t *
 btc_chain_find_locator(struct btc_chain_s *chain, const btc_vector_t *locator) {
+  const btc_entry_t *entry;
   const uint8_t *hash;
-  btc_entry_t *entry;
   size_t i;
 
   for (i = 0; i < locator->length; i++) {

@@ -61,19 +61,19 @@ btc_chaindb_disconnect(btc_chaindb_t *db,
                        btc_entry_t *entry,
                        const btc_block_t *block);
 
-BTC_EXTERN btc_entry_t *
+BTC_EXTERN const btc_entry_t *
 btc_chaindb_head(btc_chaindb_t *db);
 
-BTC_EXTERN btc_entry_t *
+BTC_EXTERN const btc_entry_t *
 btc_chaindb_tail(btc_chaindb_t *db);
 
 BTC_EXTERN int32_t
 btc_chaindb_height(btc_chaindb_t *db);
 
-BTC_EXTERN btc_entry_t *
+BTC_EXTERN const btc_entry_t *
 btc_chaindb_by_hash(btc_chaindb_t *db, const uint8_t *hash);
 
-BTC_EXTERN btc_entry_t *
+BTC_EXTERN const btc_entry_t *
 btc_chaindb_by_height(btc_chaindb_t *db, int32_t height);
 
 BTC_EXTERN int
