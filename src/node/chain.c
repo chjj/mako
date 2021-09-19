@@ -11,6 +11,7 @@
 
 #include <lmdb.h>
 
+#include <node/chain.h>
 #include <node/chaindb.h>
 #include <node/timedata.h>
 
@@ -31,43 +32,8 @@
 #include "printf.h"
 
 /*
- * Constants
- */
-
-enum btc_chain_flags {
-  BTC_CHAIN_VERIFY_NONE = 0,
-  BTC_CHAIN_VERIFY_POW  = 1 << 0,
-  BTC_CHAIN_VERIFY_BODY = 1 << 1,
-  BTC_CHAIN_DEFAULT_FLAGS = BTC_CHAIN_VERIFY_POW | BTC_CHAIN_VERIFY_BODY
-};
-
-enum btc_lock_flags {
-  BTC_CHAIN_VERIFY_SEQUENCE  = 1 << 0,
-  BTC_CHAIN_MEDIAN_TIME_PAST = 1 << 1,
-  BTC_CHAIN_MANDATORY_LOCKTIME_FLAGS = 0,
-  BTC_CHAIN_STANDARD_LOCKTIME_FLAGS = BTC_CHAIN_VERIFY_SEQUENCE
-                                    | BTC_CHAIN_MEDIAN_TIME_PAST
-};
-
-enum btc_threshold_state {
-  BTC_CHAIN_DEFINED,
-  BTC_CHAIN_STARTED,
-  BTC_CHAIN_LOCKED_IN,
-  BTC_CHAIN_ACTIVE,
-  BTC_CHAIN_FAILED
-};
-
-/*
  * Deployment State
  */
-
-typedef struct btc_deployment_state_s {
-  unsigned int flags;
-  unsigned int lock_flags;
-  int bip34;
-  int bip91;
-  int bip148;
-} btc_deployment_state_t;
 
 static void
 btc_deployment_state_init(btc_deployment_state_t *state) {
@@ -120,19 +86,6 @@ btc_orphan_copy(btc_orphan_t *z, const btc_orphan_t *x) {
 KHASH_SET_INIT_HASH(invalid)
 KHASH_MAP_INIT_HASH(orphans, btc_orphan_t *)
 
-typedef void btc_connect_cb(const btc_entry_t *entry,
-                            const btc_block_t *block,
-                            btc_view_t *view,
-                            void *arg);
-
-typedef void btc_reorganize_cb(const btc_entry_t *old,
-                               const btc_entry_t *new,
-                               void *arg);
-
-typedef void btc_badorphan_cb(const btc_verify_error *err, int id, void *arg);
-
-typedef struct btc_chain_s btc_chain_t;
-
 struct btc_chain_s {
   const btc_network_t *network;
   FILE *logfile;
@@ -158,7 +111,8 @@ struct btc_chain_s {
 
 struct btc_chain_s *
 btc_chain_create(const btc_network_t *network) {
-  struct btc_chain_s *chain = (struct btc_chain_s *)btc_malloc(sizeof(struct btc_chain_s));
+  struct btc_chain_s *chain =
+    (struct btc_chain_s *)btc_malloc(sizeof(struct btc_chain_s));
 
   memset(chain, 0, sizeof(*chain));
 
@@ -207,8 +161,8 @@ btc_chain_destroy(struct btc_chain_s *chain) {
 }
 
 void
-btc_chain_set_logfile(struct btc_chain_s *chain, FILE *file) {
-  chain->logfile = file;
+btc_chain_set_logfile(struct btc_chain_s *chain, FILE *stream) {
+  chain->logfile = stream;
 }
 
 void
@@ -318,7 +272,6 @@ const btc_verify_error_t *
 btc_chain_error(struct btc_chain_s *chain) {
   return &chain->error;
 }
-
 
 static btc_entry_t *
 btc_chain_get_ancestor(struct btc_chain_s *chain, btc_entry_t *entry, int32_t height) {
@@ -1929,7 +1882,7 @@ btc_chain_get_locator(struct btc_chain_s *chain,
   }
 }
 
-static const uint8_t *
+const uint8_t *
 btc_chain_get_orphan_root(struct btc_chain_s *chain, const uint8_t *hash) {
   const uint8_t *root = NULL;
   btc_orphan_t *orphan;
