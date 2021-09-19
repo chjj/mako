@@ -9,11 +9,12 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <satoshi/util.h>
 #include "printf.h"
 
 /*
- * Helpers
+ * Serialization
  */
 
 static int
@@ -168,6 +169,362 @@ btc_value(char *z, int64_t x) {
 }
 
 /*
+ * State Management
+ */
+
+typedef struct state_s {
+  FILE *stream;
+  char *str;
+  size_t size;
+  char buf[1024];
+  char *ptr;
+  int state;
+  size_t total;
+  int overflow;
+  void (*write)(struct state_s *, const char *, size_t);
+} state_t;
+
+static void
+state_fprintf(state_t *st, const char *xp, size_t xn) {
+  fwrite(xp, 1, xn, st->stream);
+  st->total += xn;
+}
+
+static void
+state_sprintf(state_t *st, const char *xp, size_t xn) {
+  if (st->str != NULL) {
+    memcpy(st->str, xp, xn);
+    st->str += xn;
+    *st->str = '\0';
+  }
+
+  st->total += xn;
+}
+
+static void
+state_snprintf(state_t *st, const char *xp, size_t xn) {
+  st->total += xn;
+
+  if (!st->overflow) {
+    if (xn > st->size - 1) {
+      xn = st->size - 1;
+      st->overflow = 1;
+    }
+
+    memcpy(st->str, xp, xn);
+
+    st->str += xn;
+    st->size -= xn;
+
+    *st->str = '\0';
+  }
+}
+
+static void
+state_puts(state_t *st, const char *s) {
+  if (s == NULL)
+    s = "(null)";
+
+  st->write(st, s, strlen(s));
+}
+
+static void
+state_flush(state_t *st) {
+  if (st->ptr != st->buf) {
+    st->write(st, st->buf, st->ptr - st->buf);
+    st->ptr = st->buf;
+  }
+}
+
+static void
+state_need(state_t *st, size_t n) {
+  if ((size_t)(st->ptr - st->buf) + n > sizeof(st->buf) - 1)
+    state_flush(st);
+}
+
+/*
+ * Print
+ */
+
+static int
+printf_core(state_t *st, const char *fmt, va_list ap) {
+  while (*fmt) {
+    int ch = *fmt++;
+
+    switch (st->state) {
+      case 0: {
+        switch (ch) {
+          case '%': {
+            st->state = 1;
+            break;
+          }
+          default: {
+            state_need(st, 1);
+            *st->ptr++ = ch;
+            if (ch == '\n' && st->stream != NULL)
+              state_flush(st);
+            break;
+          }
+        }
+        break;
+      }
+      case 1: {
+        switch (ch) {
+          case '%': {
+            state_need(st, 1);
+            *st->ptr++ = '%';
+            st->state = 0;
+            break;
+          }
+          case 'd':
+          case 'i': {
+            state_need(st, 11);
+            st->ptr += btc_signed(st->ptr, va_arg(ap, int));
+            st->state = 0;
+            break;
+          }
+          case 'o': {
+            state_need(st, 11);
+            st->ptr += btc_octal(st->ptr, va_arg(ap, unsigned int));
+            st->state = 0;
+            break;
+          }
+          case 'u': {
+            state_need(st, 10);
+            st->ptr += btc_unsigned(st->ptr, va_arg(ap, unsigned int));
+            st->state = 0;
+            break;
+          }
+          case 'x': {
+            state_need(st, 8);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned int), 'a');
+            st->state = 0;
+            break;
+          }
+          case 'X': {
+            state_need(st, 8);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned int), 'A');
+            st->state = 0;
+            break;
+          }
+          case 'f': {
+            state_need(st, 32);
+            st->ptr += btc_float(st->ptr, va_arg(ap, double));
+            st->state = 0;
+            break;
+          }
+          case 'c': {
+            state_need(st, 1);
+            *st->ptr++ = va_arg(ap, int);
+            st->state = 0;
+            break;
+          }
+          case 's': {
+            state_flush(st);
+            state_puts(st, va_arg(ap, char *));
+            st->state = 0;
+            break;
+          }
+          case 'p': {
+#if defined(UINTPTR_MAX)
+            state_need(st, 18);
+            st->ptr += btc_ptr(st->ptr, va_arg(ap, void *));
+#else
+            abort();
+#endif
+            st->state = 0;
+            break;
+          }
+          case 'n': {
+            *(va_arg(ap, int *)) = st->total + (st->ptr - st->buf);
+            break;
+          }
+          case 'z': {
+            if (*fmt == '\0') {
+              st->state = 0;
+              break;
+            }
+
+            ch = *fmt++;
+
+            switch (ch) {
+              case 'd':
+              case 'i': {
+#if defined(SIZE_MAX) && defined(INT64_MAX)
+#  if SIZE_MAX >> 31 >> 31 >> 1 == 1
+                state_need(st, 21);
+                st->ptr += btc_signed(st->ptr, va_arg(ap, int64_t));
+#  else
+                state_need(st, 11);
+                st->ptr += btc_signed(st->ptr, va_arg(ap, int32_t));
+#  endif
+#else
+                abort();
+#endif
+                st->state = 0;
+                break;
+              }
+              case 'o': {
+                state_need(st, 22);
+                st->ptr += btc_octal(st->ptr, va_arg(ap, size_t));
+                st->state = 0;
+                break;
+              }
+              case 'u': {
+                state_need(st, 20);
+                st->ptr += btc_unsigned(st->ptr, va_arg(ap, size_t));
+                st->state = 0;
+                break;
+              }
+              case 'x': {
+                state_need(st, 16);
+                st->ptr += btc_hex(st->ptr, va_arg(ap, size_t), 'a');
+                st->state = 0;
+                break;
+              }
+              case 'X': {
+                state_need(st, 16);
+                st->ptr += btc_hex(st->ptr, va_arg(ap, size_t), 'A');
+                st->state = 0;
+                break;
+              }
+              default: {
+                st->state = 0;
+                break;
+              }
+            }
+
+            break;
+          }
+          case 'H': {
+            /* 256-bit hash (little endian) */
+            state_need(st, 64);
+            st->ptr += btc_hash(st->ptr, va_arg(ap, unsigned char *));
+            st->state = 0;
+            break;
+          }
+          case 'T': {
+            /* time value */
+            state_need(st, 21);
+            st->ptr += btc_signed(st->ptr, va_arg(ap, int64_t));
+            st->state = 0;
+            break;
+          }
+          case 'v': {
+            /* bitcoin amount */
+            state_need(st, 22);
+            st->ptr += btc_value(st->ptr, va_arg(ap, int64_t));
+            st->state = 0;
+            break;
+          }
+          case 'q': {
+            st->state = 3;
+            break;
+          }
+          case 'l': {
+            st->state = 2;
+            break;
+          }
+          default: {
+            st->state = 0;
+            break;
+          }
+        }
+        break;
+      }
+      case 2: {
+        switch (ch) {
+          case 'd':
+          case 'i': {
+            state_need(st, 21);
+            st->ptr += btc_signed(st->ptr, va_arg(ap, long));
+            st->state = 0;
+            break;
+          }
+          case 'o': {
+            state_need(st, 22);
+            st->ptr += btc_octal(st->ptr, va_arg(ap, unsigned long));
+            st->state = 0;
+            break;
+          }
+          case 'u': {
+            state_need(st, 20);
+            st->ptr += btc_unsigned(st->ptr, va_arg(ap, unsigned long));
+            st->state = 0;
+            break;
+          }
+          case 'x': {
+            state_need(st, 16);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned long), 'a');
+            st->state = 0;
+            break;
+          }
+          case 'X': {
+            state_need(st, 16);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned long), 'A');
+            st->state = 0;
+            break;
+          }
+          case 'l': {
+            st->state = 3;
+            break;
+          }
+          default: {
+            st->state = 0;
+            break;
+          }
+        }
+        break;
+      }
+      case 3: {
+        switch (ch) {
+          case 'd':
+          case 'i': {
+            state_need(st, 21);
+            st->ptr += btc_signed(st->ptr, va_arg(ap, long long));
+            st->state = 0;
+            break;
+          }
+          case 'o': {
+            state_need(st, 22);
+            st->ptr += btc_octal(st->ptr, va_arg(ap, unsigned long long));
+            st->state = 0;
+            break;
+          }
+          case 'u': {
+            state_need(st, 20);
+            st->ptr += btc_unsigned(st->ptr, va_arg(ap, unsigned long long));
+            st->state = 0;
+            break;
+          }
+          case 'x': {
+            state_need(st, 16);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned long long), 'a');
+            st->state = 0;
+            break;
+          }
+          case 'X': {
+            state_need(st, 16);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned long long), 'A');
+            st->state = 0;
+            break;
+          }
+          default: {
+            st->state = 0;
+            break;
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  state_flush(st);
+
+  return st->total;
+}
+
+/*
  * STDIO
  */
 
@@ -206,6 +563,11 @@ btc_printf(const char *fmt, ...) {
 }
 
 int
+btc_vprintf(const char *fmt, va_list ap) {
+  return btc_vfprintf(stdout, fmt, ap);
+}
+
+int
 btc_fprintf(FILE *stream, const char *fmt, ...) {
   va_list ap;
   int ret;
@@ -220,306 +582,77 @@ btc_fprintf(FILE *stream, const char *fmt, ...) {
 }
 
 int
-btc_vprintf(const char *fmt, va_list ap) {
-  return btc_vfprintf(stdout, fmt, ap);
+btc_vfprintf(FILE *stream, const char *fmt, va_list ap) {
+  state_t st;
+
+  st.stream = stream;
+  st.str = NULL;
+  st.size = 0;
+  st.ptr = st.buf;
+  st.state = 0;
+  st.total = 0;
+  st.overflow = 1;
+  st.write = state_fprintf;
+
+  return printf_core(&st, fmt, ap);
 }
 
 int
-btc_vfprintf(FILE *stream, const char *fmt, va_list ap) {
-  const char *str = fmt;
-  char buf[1024];
-  char *ptr = buf;
-  int state = 0;
-  int total = 0;
+btc_sprintf(char *str, const char *fmt, ...) {
+  va_list ap;
+  int ret;
 
-#define FLUSH do {        \
-  if (ptr != buf) {       \
-    *ptr = '\0';          \
-    fputs(buf, stream);   \
-    total += (ptr - buf); \
-    ptr = buf;            \
-  }                       \
-} while (0)
+  va_start(ap, fmt);
 
-#define NEED(n) do {                               \
-  if ((size_t)(ptr - buf) + (n) > sizeof(buf) - 1) \
-    FLUSH;                                         \
-} while (0)
+  ret = btc_vsprintf(str, fmt, ap);
 
-  while (*str) {
-    int ch = *str++;
+  va_end(ap);
 
-    switch (state) {
-      case 0: {
-        switch (ch) {
-          case '%': {
-            state = 1;
-            break;
-          }
-          default: {
-            NEED(1);
-            *ptr++ = ch;
-            if (ch == '\n') FLUSH;
-            break;
-          }
-        }
-        break;
-      }
-      case 1: {
-        switch (ch) {
-          case '%': {
-            NEED(1);
-            *ptr++ = '%';
-            state = 0;
-            break;
-          }
-          case 'd':
-          case 'i': {
-            NEED(11);
-            ptr += btc_signed(ptr, va_arg(ap, int));
-            state = 0;
-            break;
-          }
-          case 'o': {
-            NEED(11);
-            ptr += btc_octal(ptr, va_arg(ap, unsigned int));
-            state = 0;
-            break;
-          }
-          case 'u': {
-            NEED(10);
-            ptr += btc_unsigned(ptr, va_arg(ap, unsigned int));
-            state = 0;
-            break;
-          }
-          case 'x': {
-            NEED(8);
-            ptr += btc_hex(ptr, va_arg(ap, unsigned int), 'a');
-            state = 0;
-            break;
-          }
-          case 'X': {
-            NEED(8);
-            ptr += btc_hex(ptr, va_arg(ap, unsigned int), 'A');
-            state = 0;
-            break;
-          }
-          case 'f': {
-            NEED(32);
-            ptr += btc_float(ptr, va_arg(ap, double));
-            state = 0;
-            break;
-          }
-          case 'c': {
-            NEED(1);
-            *ptr++ = va_arg(ap, int);
-            state = 0;
-            break;
-          }
-          case 's': {
-            FLUSH;
-            fputs(va_arg(ap, char *), stream);
-            state = 0;
-            break;
-          }
-          case 'p': {
-#if defined(UINTPTR_MAX)
-            NEED(18);
-            ptr += btc_ptr(ptr, va_arg(ap, void *));
-#else
-            abort();
-#endif
-            state = 0;
-            break;
-          }
-          case 'n': {
-            *(va_arg(ap, int *)) = total + (ptr - buf);
-            break;
-          }
-          case 'z': {
-            if (*str == '\0') {
-              state = 0;
-              break;
-            }
+  return ret;
+}
 
-            ch = *str++;
+int
+btc_vsprintf(char *str, const char *fmt, va_list ap) {
+  state_t st;
 
-            switch (ch) {
-              case 'd':
-              case 'i': {
-#if defined(SIZE_MAX) && defined(INT64_MAX)
-#  if SIZE_MAX >> 31 >> 31 >> 1 == 1
-                NEED(21);
-                ptr += btc_signed(ptr, va_arg(ap, int64_t));
-#  else
-                NEED(11);
-                ptr += btc_signed(ptr, va_arg(ap, int32_t));
-#  endif
-#else
-                abort();
-#endif
-                state = 0;
-                break;
-              }
-              case 'o': {
-                NEED(22);
-                ptr += btc_octal(ptr, va_arg(ap, size_t));
-                state = 0;
-                break;
-              }
-              case 'u': {
-                NEED(20);
-                ptr += btc_unsigned(ptr, va_arg(ap, size_t));
-                state = 0;
-                break;
-              }
-              case 'x': {
-                NEED(16);
-                ptr += btc_hex(ptr, va_arg(ap, size_t), 'a');
-                state = 0;
-                break;
-              }
-              case 'X': {
-                NEED(16);
-                ptr += btc_hex(ptr, va_arg(ap, size_t), 'A');
-                state = 0;
-                break;
-              }
-              default: {
-                state = 0;
-                break;
-              }
-            }
+  st.stream = NULL;
+  st.str = str;
+  st.size = 0;
+  st.ptr = st.buf;
+  st.state = 0;
+  st.total = 0;
+  st.overflow = (str == NULL);
+  st.write = state_sprintf;
 
-            break;
-          }
-          case 'H': {
-            /* 256-bit hash (little endian) */
-            NEED(64);
-            ptr += btc_hash(ptr, va_arg(ap, unsigned char *));
-            state = 0;
-            break;
-          }
-          case 'T': {
-            /* time value */
-            NEED(21);
-            ptr += btc_signed(ptr, va_arg(ap, int64_t));
-            state = 0;
-            break;
-          }
-          case 'v': {
-            /* bitcoin amount */
-            NEED(22);
-            ptr += btc_value(ptr, va_arg(ap, int64_t));
-            state = 0;
-            break;
-          }
-          case 'q': {
-            state = 3;
-            break;
-          }
-          case 'l': {
-            state = 2;
-            break;
-          }
-          default: {
-            state = 0;
-            break;
-          }
-        }
-        break;
-      }
-      case 2: {
-        switch (ch) {
-          case 'd':
-          case 'i': {
-            NEED(21);
-            ptr += btc_signed(ptr, va_arg(ap, long));
-            state = 0;
-            break;
-          }
-          case 'o': {
-            NEED(22);
-            ptr += btc_octal(ptr, va_arg(ap, unsigned long));
-            state = 0;
-            break;
-          }
-          case 'u': {
-            NEED(20);
-            ptr += btc_unsigned(ptr, va_arg(ap, unsigned long));
-            state = 0;
-            break;
-          }
-          case 'x': {
-            NEED(16);
-            ptr += btc_hex(ptr, va_arg(ap, unsigned long), 'a');
-            state = 0;
-            break;
-          }
-          case 'X': {
-            NEED(16);
-            ptr += btc_hex(ptr, va_arg(ap, unsigned long), 'A');
-            state = 0;
-            break;
-          }
-          case 'l': {
-            state = 3;
-            break;
-          }
-          default: {
-            state = 0;
-            break;
-          }
-        }
-        break;
-      }
-      case 3: {
-        switch (ch) {
-          case 'd':
-          case 'i': {
-            NEED(21);
-            ptr += btc_signed(ptr, va_arg(ap, long long));
-            state = 0;
-            break;
-          }
-          case 'o': {
-            NEED(22);
-            ptr += btc_octal(ptr, va_arg(ap, unsigned long long));
-            state = 0;
-            break;
-          }
-          case 'u': {
-            NEED(20);
-            ptr += btc_unsigned(ptr, va_arg(ap, unsigned long long));
-            state = 0;
-            break;
-          }
-          case 'x': {
-            NEED(16);
-            ptr += btc_hex(ptr, va_arg(ap, unsigned long long), 'a');
-            state = 0;
-            break;
-          }
-          case 'X': {
-            NEED(16);
-            ptr += btc_hex(ptr, va_arg(ap, unsigned long long), 'A');
-            state = 0;
-            break;
-          }
-          default: {
-            state = 0;
-            break;
-          }
-        }
-        break;
-      }
-    }
-  }
+  return printf_core(&st, fmt, ap);
+}
 
-  FLUSH;
+int
+btc_snprintf(char *str, size_t size, const char *fmt, ...) {
+  va_list ap;
+  int ret;
 
-#undef FLUSH
-#undef NEED
+  va_start(ap, fmt);
 
-  return total;
+  ret = btc_vsnprintf(str, size, fmt, ap);
+
+  va_end(ap);
+
+  return ret;
+}
+
+int
+btc_vsnprintf(char *str, size_t size, const char *fmt, va_list ap) {
+  state_t st;
+
+  st.stream = NULL;
+  st.str = str;
+  st.size = size;
+  st.ptr = st.buf;
+  st.state = 0;
+  st.total = 0;
+  st.overflow = (str == NULL || size == 0);
+  st.write = state_snprintf;
+
+  return printf_core(&st, fmt, ap);
 }

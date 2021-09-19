@@ -59,6 +59,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
 list(APPEND node_sources src/node/chain.c
                          src/node/chaindb.c
                          src/node/io.c
+                         src/node/logger.c
                          src/node/printf.c
                          src/node/timedata.c)
 

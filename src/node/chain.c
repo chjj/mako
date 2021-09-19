@@ -13,6 +13,7 @@
 
 #include <node/chain.h>
 #include <node/chaindb.h>
+#include <node/logger.h>
 #include <node/timedata.h>
 
 #include <satoshi/block.h>
@@ -32,7 +33,6 @@
 #include "../impl.h"
 #include "../internal.h"
 #include "io.h"
-#include "printf.h"
 
 /*
  * Deployment State
@@ -91,7 +91,7 @@ KHASH_MAP_INIT_CONST_HASH(orphans, btc_orphan_t *)
 
 struct btc_chain_s {
   const btc_network_t *network;
-  FILE *logfile;
+  btc_logger_t *log;
   btc_chaindb_t *db;
   const btc_timedata_t *timedata;
   khash_t(invalid) *invalid;
@@ -120,7 +120,7 @@ btc_chain_create(const btc_network_t *network) {
   memset(chain, 0, sizeof(*chain));
 
   chain->network = network;
-  chain->logfile = stdout;
+  chain->log = NULL;
   chain->db = btc_chaindb_create(network);
   chain->timedata = NULL;
   chain->invalid = kh_init(invalid);
@@ -164,8 +164,8 @@ btc_chain_destroy(struct btc_chain_s *chain) {
 }
 
 void
-btc_chain_set_logfile(struct btc_chain_s *chain, FILE *stream) {
-  chain->logfile = stream;
+btc_chain_set_logger(struct btc_chain_s *chain, btc_logger_t *log) {
+  chain->log = log;
 }
 
 void
@@ -205,13 +205,9 @@ btc_chain_set_checkpoints(struct btc_chain_s *chain, int value) {
 
 static void
 btc_chain_log(struct btc_chain_s *chain, const char *fmt, ...) {
-  FILE *stream = chain->logfile;
   va_list ap;
-
   va_start(ap, fmt);
-  btc_fputs(stream, "[chain] ");
-  btc_vfprintf(stream, fmt, ap);
-  btc_fputc(stream, '\n');
+  btc_logger_write(chain->log, "chain", fmt, ap);
   va_end(ap);
 }
 

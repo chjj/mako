@@ -12,8 +12,8 @@ extern "C" {
 #endif
 
 #include <stddef.h>
-#include <stdio.h>
-#include "timedata.h"
+#include "logger.h" /* XXX */
+#include "timedata.h" /* XXX */
 #include "../satoshi/common.h"
 #include "../satoshi/types.h"
 
@@ -80,7 +80,7 @@ BTC_EXTERN void
 btc_chain_destroy(btc_chain_t *chain);
 
 BTC_EXTERN void
-btc_chain_set_logfile(btc_chain_t *chain, FILE *stream);
+btc_chain_set_logger(btc_chain_t *chain, btc_logger_t *log);
 
 BTC_EXTERN void
 btc_chain_set_timedata(btc_chain_t *chain, const btc_timedata_t *td);
