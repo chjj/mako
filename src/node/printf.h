@@ -11,20 +11,8 @@
 #include <stdio.h>
 
 /*
- * STDIO
+ * Print
  */
-
-void
-btc_putc(int ch);
-
-void
-btc_fputc(FILE *stream, int ch);
-
-void
-btc_puts(const char *str);
-
-void
-btc_fputs(FILE *stream, const char *str);
 
 int
 btc_printf(const char *fmt, ...);

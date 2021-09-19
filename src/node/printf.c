@@ -243,7 +243,7 @@ state_need(state_t *st, size_t n) {
 }
 
 /*
- * Print
+ * Core
  */
 
 static int
@@ -525,28 +525,8 @@ printf_core(state_t *st, const char *fmt, va_list ap) {
 }
 
 /*
- * STDIO
+ * Print
  */
-
-void
-btc_putc(int ch) {
-  fputc(ch, stdout);
-}
-
-void
-btc_fputc(FILE *stream, int ch) {
-  fputc(ch, stream);
-}
-
-void
-btc_puts(const char *str) {
-  fputs(str, stdout);
-}
-
-void
-btc_fputs(FILE *stream, const char *str) {
-  fputs(str, stream);
-}
 
 int
 btc_printf(const char *fmt, ...) {
