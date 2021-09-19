@@ -57,6 +57,9 @@ btc_view_create(void);
 BTC_EXTERN void
 btc_view_destroy(btc_view_t *view);
 
+BTC_EXTERN int
+btc_view_has(btc_view_t *view, const btc_outpoint_t *outpoint);
+
 BTC_EXTERN const btc_coin_t *
 btc_view_get(btc_view_t *view, const btc_outpoint_t *outpoint);
 
@@ -73,6 +76,15 @@ btc_view_spend(btc_view_t *view,
                                         void *arg2),
                void *arg1,
                void *arg2);
+
+BTC_EXTERN int
+btc_view_fill(btc_view_t *view,
+              const btc_tx_t *tx,
+              btc_coin_t *(*read_coin)(const btc_outpoint_t *prevout,
+                                       void *arg1,
+                                       void *arg2),
+              void *arg1,
+              void *arg2);
 
 BTC_EXTERN void
 btc_view_add(btc_view_t *view, const btc_tx_t *tx, int32_t height, int spent);

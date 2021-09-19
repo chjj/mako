@@ -45,6 +45,11 @@ btc_chaindb_spend(btc_chaindb_t *db,
                   const btc_tx_t *tx);
 
 BTC_EXTERN int
+btc_chaindb_fill(btc_chaindb_t *db,
+                 btc_view_t *view,
+                 const btc_tx_t *tx);
+
+BTC_EXTERN int
 btc_chaindb_save(btc_chaindb_t *db,
                  btc_entry_t *entry,
                  const btc_block_t *block,

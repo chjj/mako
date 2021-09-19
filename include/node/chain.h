@@ -80,7 +80,7 @@ BTC_EXTERN void
 btc_chain_destroy(btc_chain_t *chain);
 
 BTC_EXTERN void
-btc_chain_set_logger(btc_chain_t *chain, btc_logger_t *log);
+btc_chain_set_logger(btc_chain_t *chain, btc_logger_t *logger);
 
 BTC_EXTERN void
 btc_chain_set_timedata(btc_chain_t *chain, const btc_timedata_t *td);
@@ -109,8 +109,22 @@ btc_chain_open(btc_chain_t *chain, const char *prefix, size_t map_size);
 BTC_EXTERN void
 btc_chain_close(btc_chain_t *chain);
 
-BTC_EXTERN const btc_verify_error_t *
-btc_chain_error(btc_chain_t *chain);
+BTC_EXTERN int
+btc_chain_has_orphan(btc_chain_t *chain, const uint8_t *hash);
+
+BTC_EXTERN uint32_t
+btc_chain_get_target(btc_chain_t *chain,
+                     int64_t time,
+                     const btc_entry_t *prev);
+
+BTC_EXTERN uint32_t
+btc_chain_get_current_target(btc_chain_t *chain);
+
+BTC_EXTERN int
+btc_chain_verify_final(btc_chain_t *chain,
+                       const btc_entry_t *prev,
+                       const btc_tx_t *tx,
+                       unsigned int flags);
 
 BTC_EXTERN int
 btc_chain_verify_locks(btc_chain_t *chain,
@@ -125,16 +139,57 @@ btc_chain_add(btc_chain_t *chain,
               unsigned int flags,
               int id);
 
-BTC_EXTERN uint32_t
-btc_chain_get_current_target(btc_chain_t *chain);
+BTC_EXTERN const btc_entry_t *
+btc_chain_tip(btc_chain_t *chain);
 
-BTC_EXTERN uint32_t
-btc_chain_get_target(btc_chain_t *chain,
-                     int64_t time,
-                     const btc_entry_t *prev);
+BTC_EXTERN int32_t
+btc_chain_height(btc_chain_t *chain);
+
+BTC_EXTERN const btc_deployment_state_t *
+btc_chain_state(btc_chain_t *chain);
+
+BTC_EXTERN const btc_verify_error_t *
+btc_chain_error(btc_chain_t *chain);
+
+BTC_EXTERN int
+btc_chain_synced(btc_chain_t *chain);
+
+BTC_EXTERN const btc_entry_t *
+btc_chain_by_hash(btc_chain_t *chain, const uint8_t *hash);
+
+BTC_EXTERN const btc_entry_t *
+btc_chain_by_height(btc_chain_t *chain, int32_t height);
+
+BTC_EXTERN int
+btc_chain_is_main(btc_chain_t *chain, const btc_entry_t *entry);
+
+BTC_EXTERN int
+btc_chain_has_coins(btc_chain_t *chain, const btc_tx_t *tx);
+
+BTC_EXTERN int
+btc_chain_get_coins(btc_chain_t *chain,
+                    btc_view_t *view,
+                    const btc_tx_t *tx);
+
+BTC_EXTERN btc_block_t *
+btc_chain_get_block(btc_chain_t *chain, const btc_entry_t *entry);
+
+BTC_EXTERN int
+btc_chain_get_raw_block(btc_chain_t *chain,
+                        uint8_t **data,
+                        size_t *length,
+                        const btc_entry_t *entry);
+
+BTC_EXTERN int
+btc_chain_has(btc_chain_t *chain, const uint8_t *hash);
 
 BTC_EXTERN const uint8_t *
 btc_chain_get_orphan_root(btc_chain_t *chain, const uint8_t *hash);
+
+BTC_EXTERN void
+btc_chain_get_locator(btc_chain_t *chain,
+                      btc_vector_t *hashes,
+                      const uint8_t *start);
 
 BTC_EXTERN const btc_entry_t *
 btc_chain_find_locator(btc_chain_t *chain, const btc_vector_t *locator);

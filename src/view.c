@@ -169,6 +169,11 @@ btc_view_ensure(btc__view_t *view, const uint8_t *hash) {
   return coins;
 }
 
+int
+btc_view_has(btc__view_t *view, const btc_outpoint_t *outpoint) {
+  return btc_view_get(view, outpoint) != NULL;
+}
+
 const btc_coin_t *
 btc_view_get(btc__view_t *view, const btc_outpoint_t *outpoint) {
   btc_coins_t *coins = btc_view_coins(view, outpoint->hash);
@@ -224,6 +229,40 @@ btc_view_spend(btc__view_t *view,
   }
 
   return 1;
+}
+
+int
+btc_view_fill(btc__view_t *view,
+              const btc_tx_t *tx,
+              btc_coin_t *(*read_coin)(const btc_outpoint_t *prevout,
+                                       void *arg1,
+                                       void *arg2),
+              void *arg1,
+              void *arg2) {
+  const btc_outpoint_t *prevout;
+  btc_coins_t *coins;
+  btc_coin_t *coin;
+  int ret = 1;
+  size_t i;
+
+  for (i = 0; i < tx->inputs.length; i++) {
+    prevout = &tx->inputs.items[i]->prevout;
+    coins = btc_view_ensure(view, prevout->hash);
+    coin = btc_coins_get(coins, prevout->index);
+
+    if (coin == NULL) {
+      coin = read_coin(prevout, arg1, arg2);
+
+      if (coin == NULL) {
+        ret = 0;
+        continue;
+      }
+
+      btc_coins_put(coins, prevout->index, coin);
+    }
+  }
+
+  return ret;
 }
 
 void

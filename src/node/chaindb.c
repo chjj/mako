@@ -691,6 +691,27 @@ btc_chaindb_spend(struct btc_chaindb_s *db,
   return rc;
 }
 
+int
+btc_chaindb_fill(struct btc_chaindb_s *db,
+                 btc_view_t *view,
+                 const btc_tx_t *tx) {
+  MDB_txn *txn;
+  int rc;
+
+  rc = mdb_txn_begin(db->env, NULL, MDB_RDONLY, &txn);
+
+  if (rc != 0) {
+    fprintf(stderr, "mdb_txn_begin: %s\n", mdb_strerror(rc));
+    return 0;
+  }
+
+  rc = btc_view_fill(view, tx, read_coin, db, txn);
+
+  mdb_txn_abort(txn);
+
+  return rc;
+}
+
 static int
 iterate_view(const uint8_t *hash,
              uint32_t index,
@@ -1404,7 +1425,7 @@ btc_chaindb_by_height(struct btc_chaindb_s *db, int32_t height) {
 }
 
 int
-btc_chaindb_is_main(btc_chaindb_t *db, const btc_entry_t *entry) {
+btc_chaindb_is_main(struct btc_chaindb_s *db, const btc_entry_t *entry) {
   if ((size_t)entry->height >= db->heights.length)
     return 0;
 
@@ -1412,7 +1433,7 @@ btc_chaindb_is_main(btc_chaindb_t *db, const btc_entry_t *entry) {
 }
 
 int
-btc_chaindb_has_coins(btc_chaindb_t *db, const btc_tx_t *tx) {
+btc_chaindb_has_coins(struct btc_chaindb_s *db, const btc_tx_t *tx) {
   MDB_val mkey, mval;
   uint8_t key[36];
   MDB_txn *txn;
