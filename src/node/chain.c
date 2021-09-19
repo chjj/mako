@@ -91,7 +91,7 @@ KHASH_MAP_INIT_CONST_HASH(orphans, btc_orphan_t *)
 
 struct btc_chain_s {
   const btc_network_t *network;
-  btc_logger_t *log;
+  btc_logger_t *logger;
   btc_chaindb_t *db;
   const btc_timedata_t *timedata;
   khash_t(invalid) *invalid;
@@ -120,7 +120,7 @@ btc_chain_create(const btc_network_t *network) {
   memset(chain, 0, sizeof(*chain));
 
   chain->network = network;
-  chain->log = NULL;
+  chain->logger = NULL;
   chain->db = btc_chaindb_create(network);
   chain->timedata = NULL;
   chain->invalid = kh_init(invalid);
@@ -164,8 +164,8 @@ btc_chain_destroy(struct btc_chain_s *chain) {
 }
 
 void
-btc_chain_set_logger(struct btc_chain_s *chain, btc_logger_t *log) {
-  chain->log = log;
+btc_chain_set_logger(struct btc_chain_s *chain, btc_logger_t *logger) {
+  chain->logger = logger;
 }
 
 void
@@ -207,7 +207,7 @@ static void
 btc_chain_log(struct btc_chain_s *chain, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
-  btc_logger_write(chain->log, "chain", fmt, ap);
+  btc_logger_write(chain->logger, "chain", fmt, ap);
   va_end(ap);
 }
 

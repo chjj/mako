@@ -26,52 +26,52 @@ struct btc_logger_s {
 
 struct btc_logger_s *
 btc_logger_create(void) {
-  struct btc_logger_s *log =
+  struct btc_logger_s *logger =
     (struct btc_logger_s *)btc_malloc(sizeof(struct btc_logger_s));
 
-  log->stream = NULL;
-  log->silent = 0;
+  logger->stream = NULL;
+  logger->silent = 0;
 
-  return log;
+  return logger;
 }
 
 void
-btc_logger_destroy(struct btc_logger_s *log) {
-  btc_free(log);
+btc_logger_destroy(struct btc_logger_s *logger) {
+  btc_free(logger);
 }
 
 void
-btc_logger_set_silent(struct btc_logger_s *log, int silent) {
-  log->silent = silent;
+btc_logger_set_silent(struct btc_logger_s *logger, int silent) {
+  logger->silent = silent;
 }
 
 int
-btc_logger_open(struct btc_logger_s *log, const char *file) {
+btc_logger_open(struct btc_logger_s *logger, const char *file) {
   FILE *stream = fopen(file, "a");
 
   if (stream == NULL)
     return 0;
 
-  log->stream = stream;
+  logger->stream = stream;
 
   return 1;
 }
 
 void
-btc_logger_close(struct btc_logger_s *log) {
-  fclose(log->stream);
-  log->stream = NULL;
+btc_logger_close(struct btc_logger_s *logger) {
+  fclose(logger->stream);
+  logger->stream = NULL;
 }
 
 void
-btc_logger_write(struct btc_logger_s *log,
+btc_logger_write(struct btc_logger_s *logger,
                  const char *pre,
                  const char *fmt,
                  va_list ap) {
   char tmp[1024];
   int len = 0;
 
-  if (log == NULL || log->silent == 0 || log->stream != NULL) {
+  if (logger == NULL || logger->silent == 0 || logger->stream != NULL) {
     int rem = sizeof(tmp) - 1;
     char *ptr = tmp;
 
@@ -99,9 +99,9 @@ btc_logger_write(struct btc_logger_s *log,
     len = (ptr - tmp) - 1;
   }
 
-  if (log == NULL || log->silent == 0)
+  if (logger == NULL || logger->silent == 0)
     fwrite(tmp, 1, len, stdout);
 
-  if (log != NULL && log->stream != NULL)
-    fwrite(tmp, 1, len, log->stream);
+  if (logger != NULL && logger->stream != NULL)
+    fwrite(tmp, 1, len, logger->stream);
 }

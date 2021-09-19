@@ -29,19 +29,19 @@ BTC_EXTERN btc_logger_t *
 btc_logger_create(void);
 
 BTC_EXTERN void
-btc_logger_destroy(btc_logger_t *log);
+btc_logger_destroy(btc_logger_t *logger);
 
 BTC_EXTERN void
-btc_logger_set_silent(btc_logger_t *log, int silent);
+btc_logger_set_silent(btc_logger_t *logger, int silent);
 
 BTC_EXTERN int
-btc_logger_open(btc_logger_t *log, const char *file);
+btc_logger_open(btc_logger_t *logger, const char *file);
 
 BTC_EXTERN void
-btc_logger_close(btc_logger_t *log);
+btc_logger_close(btc_logger_t *logger);
 
 BTC_EXTERN void
-btc_logger_write(btc_logger_t *log,
+btc_logger_write(btc_logger_t *logger,
                  const char *pre,
                  const char *fmt,
                  va_list ap);
