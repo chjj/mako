@@ -732,6 +732,7 @@ printf_core(state_t *st, const char *fmt, va_list ap) {
           }
           case 'n': {
             *(va_arg(ap, char *)) = (st->total + (st->ptr - st->buf)) & 0x7f;
+            st->state = PRINTF_STATE_NONE;
             break;
           }
           default: {
@@ -776,6 +777,7 @@ printf_core(state_t *st, const char *fmt, va_list ap) {
           }
           case 'n': {
             *(va_arg(ap, short *)) = (st->total + (st->ptr - st->buf)) & 0x7fff;
+            st->state = PRINTF_STATE_NONE;
             break;
           }
           case 'h': {
@@ -824,6 +826,7 @@ printf_core(state_t *st, const char *fmt, va_list ap) {
           }
           case 'n': {
             *(va_arg(ap, int *)) = st->total + (st->ptr - st->buf);
+            st->state = PRINTF_STATE_NONE;
             break;
           }
           default: {
@@ -868,6 +871,7 @@ printf_core(state_t *st, const char *fmt, va_list ap) {
           }
           case 'n': {
             *(va_arg(ap, long *)) = st->total + (st->ptr - st->buf);
+            st->state = PRINTF_STATE_NONE;
             break;
           }
           case 'l': {
@@ -916,6 +920,7 @@ printf_core(state_t *st, const char *fmt, va_list ap) {
           }
           case 'n': {
             *(va_arg(ap, long long *)) = st->total + (st->ptr - st->buf);
+            st->state = PRINTF_STATE_NONE;
             break;
           }
           default: {
@@ -969,6 +974,7 @@ printf_core(state_t *st, const char *fmt, va_list ap) {
           }
           case 'n': {
             *(va_arg(ap, size_t *)) = st->total + (st->ptr - st->buf);
+            st->state = PRINTF_STATE_NONE;
             break;
           }
           default: {
