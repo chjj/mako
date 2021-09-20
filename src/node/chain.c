@@ -870,7 +870,7 @@ btc_chain_throw(struct btc_chain_s *chain,
   chain->error.malleated = malleated;
 
   btc_chain_log(chain, "Verification error: %s "
-                       "(code=%s reason=%s score=%d hash=%H)",
+                       "(code=%s score=%d hash=%H)",
                 reason, code, score, hash);
 
   return 0;
@@ -1052,7 +1052,7 @@ btc_chain_verify(struct btc_chain_s *chain,
   /* Blocks that do not commit to
      witness data cannot contain it. */
   if (!has_commit) {
-    if (!btc_block_has_witness(block)) {
+    if (btc_block_has_witness(block)) {
       return btc_chain_throw(chain, hdr,
                              "invalid",
                              "unexpected-witness",
