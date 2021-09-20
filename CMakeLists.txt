@@ -60,6 +60,7 @@ list(APPEND node_sources src/node/chain.c
                          src/node/chaindb.c
                          src/node/io.c
                          src/node/logger.c
+                         src/node/loop.c
                          src/node/printf.c
                          src/node/timedata.c)
 

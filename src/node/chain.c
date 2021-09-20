@@ -9,8 +9,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <lmdb.h>
-
 #include <node/chain.h>
 #include <node/chaindb.h>
 #include <node/logger.h>
