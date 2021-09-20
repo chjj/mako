@@ -570,7 +570,7 @@ btc_chain_retarget(struct btc_chain_s *chain,
   else
     ret = net->pow.bits;
 
-  btc_chain_log(chain, "Retargeting to: 0x%x.", ret);
+  btc_chain_log(chain, "Retargeting to: %#.8x.", ret);
 
   mpz_clear(limit);
   mpz_clear(target);
