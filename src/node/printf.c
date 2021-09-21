@@ -4,12 +4,14 @@
  * https://github.com/chjj/libsatoshi
  */
 
+#include <errno.h>
 #include <limits.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <satoshi/netaddr.h>
 #include <satoshi/util.h>
 #include "printf.h"
 
@@ -466,6 +468,21 @@ btc_value(char *z, int64_t x) {
   return z - s;
 }
 
+static int
+btc_sockaddr(char *z, const struct sockaddr *x) {
+  btc_netaddr_t addr;
+
+  if (!btc_netaddr_set_sockaddr(&addr, x))
+    return 0;
+
+  return btc_netaddr_get_str(z, &addr);
+}
+
+static int
+btc_netaddr(char *z, const btc_netaddr_t *x) {
+  return btc_netaddr_get_str(z, x);
+}
+
 /*
  * Helpers
  */
@@ -642,6 +659,12 @@ printf_core(state_t *st, const char *fmt, va_list ap) {
             st->state = PRINTF_STATE_NONE;
             break;
           }
+          case 'm': {
+            state_flush(st);
+            state_puts(st, strerror(errno));
+            st->state = PRINTF_STATE_NONE;
+            break;
+          }
           case 'R': {
             /* raw data */
             unsigned char *raw = va_arg(ap, unsigned char *);
@@ -686,6 +709,20 @@ printf_core(state_t *st, const char *fmt, va_list ap) {
             /* bitcoin amount */
             state_grow(st, 22);
             st->ptr += btc_value(st->ptr, va_arg(ap, int64_t));
+            st->state = PRINTF_STATE_NONE;
+            break;
+          }
+          case 'S': {
+            /* socket address */
+            state_grow(st, BTC_ADDRSTRLEN);
+            st->ptr += btc_sockaddr(st->ptr, va_arg(ap, struct sockaddr *));
+            st->state = PRINTF_STATE_NONE;
+            break;
+          }
+          case 'N': {
+            /* network address */
+            state_grow(st, BTC_ADDRSTRLEN);
+            st->ptr += btc_netaddr(st->ptr, va_arg(ap, btc_netaddr_t *));
             st->state = PRINTF_STATE_NONE;
             break;
           }

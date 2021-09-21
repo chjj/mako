@@ -622,7 +622,7 @@ btc_netaddr_set_str(btc_netaddr_t *z, const char *xp) {
   return btc_netaddr_set_sockaddr(z, sa);
 }
 
-void
+size_t
 btc_netaddr_get_str(char *zp, const btc_netaddr_t *x) {
   struct sockaddr_storage storage;
   struct sockaddr *sa = (struct sockaddr *)&storage;
@@ -652,4 +652,6 @@ btc_netaddr_get_str(char *zp, const btc_netaddr_t *x) {
     else
       strcpy(zp, str);
   }
+
+  return strlen(zp);
 }

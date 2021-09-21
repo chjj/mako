@@ -152,7 +152,7 @@ btc_netaddr_get_sockaddr(struct sockaddr *z, const btc_netaddr_t *x);
 BTC_EXTERN int
 btc_netaddr_set_str(btc_netaddr_t *z, const char *xp);
 
-BTC_EXTERN void
+BTC_EXTERN size_t
 btc_netaddr_get_str(char *zp, const btc_netaddr_t *x);
 
 #ifdef __cplusplus
