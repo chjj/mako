@@ -22,12 +22,17 @@ typedef void btc_error_cb(btc_socket_t *, int);
 typedef void btc_data_cb(btc_socket_t *, const unsigned char *, size_t);
 typedef void btc_drain_cb(btc_socket_t *);
 
+struct btc_netaddr_s;
+
 /*
  * Socket
  */
 
 btc_loop_t *
 btc_socket_loop(btc_socket_t *socket);
+
+void
+btc_socket_address(struct btc_netaddr_s *addr, btc_socket_t *socket);
 
 void
 btc_socket_on_socket(btc_socket_t *socket, btc_connect_cb *handler);
@@ -85,10 +90,10 @@ void *
 btc_loop_get_data(btc_loop_t *loop, int name);
 
 btc_socket_t *
-btc_loop_listen(btc_loop_t *loop, const char *ip, int port, int max);
+btc_loop_listen(btc_loop_t *loop, const struct btc_netaddr_s *addr, int max);
 
 btc_socket_t *
-btc_loop_connect(btc_loop_t *loop, const char *ip, int port);
+btc_loop_connect(btc_loop_t *loop, const struct btc_netaddr_s *addr);
 
 void
 btc_loop_start(btc_loop_t *loop);

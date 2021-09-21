@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <unistd.h>
+#include <satoshi/netaddr.h>
 #include "loop.h"
 #include "../internal.h"
 
@@ -112,11 +113,16 @@ try_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
 
 static int
 safe_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
+  socklen_t len;
   int fd;
 
   do {
-    fd = try_accept(sockfd, addr, addrlen);
+    len = *addrlen;
+    fd = try_accept(sockfd, addr, &len);
   } while (fd == -1 && errno == EINTR);
+
+  if (fd != -1)
+    *addrlen = len;
 
   return fd;
 }
@@ -221,6 +227,11 @@ btc_socket_loop(btc__socket_t *socket) {
 }
 
 void
+btc_socket_address(btc_netaddr_t *addr, btc__socket_t *socket) {
+  CHECK(btc_netaddr_set_sockaddr(addr, socket->addr));
+}
+
+void
 btc_socket_on_socket(btc__socket_t *socket, btc_connect_cb *handler) {
   socket->on_socket = handler;
 }
@@ -266,23 +277,16 @@ btc_socket_buffered(btc__socket_t *socket) {
 }
 
 static int
-btc_socket_setaddr(btc__socket_t *socket, const char *ip, int port) {
-  struct sockaddr_in *in4 = (struct sockaddr_in *)socket->addr;
-  struct sockaddr_in6 *in6 = (struct sockaddr_in6 *)socket->addr;
+btc_socket_setaddr(btc__socket_t *socket, const btc_netaddr_t *addr) {
+  btc_netaddr_get_sockaddr(socket->addr, addr);
 
-  memset(&socket->storage, 0, sizeof(socket->storage));
-
-  if (inet_pton(AF_INET, ip, &in4->sin_addr) == 1) {
-    in4->sin_family = PF_INET;
-    in4->sin_port = port;
-    socket->addrlen = sizeof(*in4);
+  if (socket->addr->sa_family == PF_INET) {
+    socket->addrlen = sizeof(struct sockaddr_in);
     return 1;
   }
 
-  if (inet_pton(AF_INET6, ip, &in6->sin6_addr) == 1) {
-    in6->sin6_family = PF_INET6;
-    in6->sin6_port = port;
-    socket->addrlen = sizeof(*in6);
+  if (socket->addr->sa_family == PF_INET6) {
+    socket->addrlen = sizeof(struct sockaddr_in6);
     return 1;
   }
 
@@ -290,11 +294,11 @@ btc_socket_setaddr(btc__socket_t *socket, const char *ip, int port) {
 }
 
 static int
-btc_socket_listen(btc__socket_t *server, const char *ip, int port, int max) {
+btc_socket_listen(btc__socket_t *server, const btc_netaddr_t *addr, int max) {
   int option = 1;
   int fd;
 
-  if (!btc_socket_setaddr(server, ip, port))
+  if (!btc_socket_setaddr(server, addr))
     return 0;
 
   fd = safe_socket(server->addr->sa_family, SOCK_STREAM, 0);
@@ -326,6 +330,8 @@ btc_socket_accept(btc__socket_t *socket, btc__socket_t *server) {
 
   memset(&socket->storage, 0, sizeof(socket->storage));
 
+  socket->addrlen = sizeof(socket->storage);
+
   fd = safe_accept(server->fd, socket->addr, &socket->addrlen);
 
   if (fd == -1)
@@ -338,10 +344,10 @@ btc_socket_accept(btc__socket_t *socket, btc__socket_t *server) {
 }
 
 static int
-btc_socket_connect(btc__socket_t *socket, const char *ip, int port) {
+btc_socket_connect(btc__socket_t *socket, const btc_netaddr_t *addr) {
   int fd;
 
-  if (!btc_socket_setaddr(socket, ip, port))
+  if (!btc_socket_setaddr(socket, addr))
     return 0;
 
   fd = safe_socket(socket->addr->sa_family, SOCK_STREAM, 0);
@@ -410,6 +416,8 @@ btc_socket_flush(btc__socket_t *socket) {
 
     socket->head = next;
   }
+
+  CHECK(socket->total == 0);
 
   socket->head = NULL;
   socket->tail = NULL;
@@ -553,10 +561,10 @@ btc_loop_unregister(btc__loop_t *loop, btc__socket_t *socket) {
 }
 
 btc__socket_t *
-btc_loop_listen(btc__loop_t *loop, const char *ip, int port, int max) {
+btc_loop_listen(btc__loop_t *loop, const btc_netaddr_t *addr, int max) {
   btc__socket_t *socket = btc_socket_create(loop);
 
-  if (!btc_socket_listen(socket, ip, port, max)) {
+  if (!btc_socket_listen(socket, addr, max)) {
     btc_socket_destroy(socket);
     return NULL;
   }
@@ -567,10 +575,10 @@ btc_loop_listen(btc__loop_t *loop, const char *ip, int port, int max) {
 }
 
 btc__socket_t *
-btc_loop_connect(btc__loop_t *loop, const char *ip, int port) {
+btc_loop_connect(btc__loop_t *loop, const btc_netaddr_t *addr) {
   btc__socket_t *socket = btc_socket_create(loop);
 
-  if (!btc_socket_connect(socket, ip, port)) {
+  if (!btc_socket_connect(socket, addr)) {
     btc_socket_destroy(socket);
     return NULL;
   }
