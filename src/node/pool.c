@@ -11,7 +11,6 @@
 
 #include <node/addrman.h>
 #include <node/chain.h>
-#include <node/chaindb.h>
 #include <node/logger.h>
 #include <node/pool.h>
 #include <node/timedata.h>
