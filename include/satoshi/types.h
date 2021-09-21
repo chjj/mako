@@ -9,8 +9,6 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include "common.h"
-#include "impl.h"
 
 /*
  * Types
@@ -180,5 +178,12 @@ struct btc_network_s;
 
 typedef struct btc_view_s btc_view_t;
 typedef struct btc_sha256_s btc__hash256_t;
+
+typedef struct btc_netaddr_s {
+  int64_t time;
+  uint64_t services;
+  uint8_t raw[16];
+  int port;
+} btc_netaddr_t;
 
 #endif /* BTC_TYPES_H */

@@ -625,7 +625,7 @@ btc_time_read(int64_t *zp, const uint8_t **xp, size_t *xn) {
 
 BTC_UNUSED static void
 btc_time_update(struct btc_sha256_s *ctx, int64_t x) {
-  return btc_uint32_update(ctx, (uint32_t)x);
+  btc_uint32_update(ctx, (uint32_t)x);
 }
 
 BTC_UNUSED static uint8_t *
@@ -654,6 +654,63 @@ btc_raw_read(uint8_t *zp, size_t zn,
 BTC_UNUSED static void
 btc_raw_update(struct btc_sha256_s *ctx, const uint8_t *xp, size_t xn) {
   btc_hash256_update(ctx, xp, xn);
+}
+
+BTC_UNUSED static size_t
+btc_string_size(const char *xp) {
+  size_t len = strlen(xp);
+  return btc_size_size(len) + len;
+}
+
+BTC_UNUSED static uint8_t *
+btc_string_write(uint8_t *zp, const char *xp) {
+  size_t len = strlen(xp);
+
+  zp = btc_size_write(zp, len);
+
+  if (len > 0)
+    memcpy(zp, xp, len);
+
+  return zp + len;
+}
+
+BTC_UNUSED static int
+btc_string_read(char *zp, const uint8_t **xp, size_t *xn, size_t max) {
+  size_t i, zn;
+
+  if (!btc_size_read(&zn, xp, xn))
+    return 0;
+
+  if (zn + 1 > max)
+    return 0;
+
+  if (*xn < zn)
+    return 0;
+
+  for (i = 0; i < zn; i++) {
+    int ch = (*xp)[i];
+
+    if (ch < 32 || ch > 126)
+      return 0;
+  }
+
+  if (zn > 0)
+    memcpy(zp, xp, zn);
+
+  zp[zn] = '\0';
+
+  *xp += zn;
+  *xn -= zn;
+
+  return 1;
+}
+
+BTC_UNUSED static void
+btc_string_update(struct btc_sha256_s *ctx, const char *xp) {
+  size_t len = strlen(xp);
+
+  btc_size_update(ctx, len);
+  btc_hash256_update(ctx, xp, len);
 }
 
 #endif /* BTC_IMPL_INTERNAL_H */

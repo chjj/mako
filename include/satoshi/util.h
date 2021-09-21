@@ -70,20 +70,29 @@ btc_memxor3(void *z, const void *x, const void *y, size_t n);
  * Hash
  */
 
-BTC_EXTERN int
-btc_hash_compare(const uint8_t *x, const uint8_t *y);
-
-BTC_EXTERN int
-btc_hash_equal(const uint8_t *x, const uint8_t *y);
-
-BTC_EXTERN uint8_t *
-btc_hash_clone(const uint8_t *hash);
-
-BTC_EXTERN int
-btc_hash_import(uint8_t *hash, const char *str);
+BTC_EXTERN void
+btc_hash_init(uint8_t *zp);
 
 BTC_EXTERN void
-btc_hash_export(char *str, const uint8_t *hash);
+btc_hash_copy(uint8_t *zp, const uint8_t *xp);
+
+BTC_EXTERN uint8_t *
+btc_hash_clone(const uint8_t *xp);
+
+BTC_EXTERN int
+btc_hash_compare(const uint8_t *xp, const uint8_t *yp);
+
+BTC_EXTERN int
+btc_hash_equal(const uint8_t *xp, const uint8_t *yp);
+
+BTC_EXTERN int
+btc_hash_is_null(const uint8_t *xp);
+
+BTC_EXTERN int
+btc_hash_import(uint8_t *zp, const char *xp);
+
+BTC_EXTERN void
+btc_hash_export(char *zp, const uint8_t *xp);
 
 /*
  * Time

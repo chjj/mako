@@ -44,6 +44,8 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/mainnet.c
                             src/mpi.c
                             src/murmur3.c
+                            src/netaddr.c
+                            src/netmsg.c
                             src/network.c
                             src/outpoint.c
                             src/output.c

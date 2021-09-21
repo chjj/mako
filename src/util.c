@@ -136,64 +136,80 @@ nib2char(int ch) {
  * Hash
  */
 
+void
+btc_hash_init(uint8_t *zp) {
+  memset(zp, 0, 32);
+}
+
+void
+btc_hash_copy(uint8_t *zp, const uint8_t *xp) {
+  memcpy(zp, xp, 32);
+}
+
+uint8_t *
+btc_hash_clone(const uint8_t *xp) {
+  return (uint8_t *)memcpy(btc_malloc(32), xp, 32);
+}
+
 int
-btc_hash_compare(const uint8_t *x, const uint8_t *y) {
+btc_hash_compare(const uint8_t *xp, const uint8_t *yp) {
   int i;
 
   for (i = 32 - 1; i >= 0; i--) {
-    if (x[i] != y[i])
-      return (int)x[i] - (int)y[i];
+    if (xp[i] != yp[i])
+      return (int)xp[i] - (int)yp[i];
   }
 
   return 0;
 }
 
 int
-btc_hash_equal(const uint8_t *x, const uint8_t *y) {
-  return btc_hash_compare(x, y) == 0;
-}
-
-uint8_t *
-btc_hash_clone(const uint8_t *hash) {
-  return (uint8_t *)memcpy(btc_malloc(32), hash, 32);
+btc_hash_equal(const uint8_t *xp, const uint8_t *yp) {
+  return btc_hash_compare(xp, yp) == 0;
 }
 
 int
-btc_hash_import(uint8_t *hash, const char *str) {
+btc_hash_is_null(const uint8_t *xp) {
+  static const uint8_t yp[32] = {0};
+  return btc_hash_equal(xp, yp);
+}
+
+int
+btc_hash_import(uint8_t *zp, const char *xp) {
   int i, hi, lo;
   int j = 32;
 
   for (i = 0; i < 64; i += 2) {
-    hi = char2nib(str[i + 0]);
+    hi = char2nib(xp[i + 0]);
 
     if (hi >= 16)
       return 0;
 
-    lo = char2nib(str[i + 1]);
+    lo = char2nib(xp[i + 1]);
 
     if (lo >= 16)
       return 0;
 
-    hash[--j] = (hi << 4) | lo;
+    zp[--j] = (hi << 4) | lo;
   }
 
-  if (str[64] != '\0')
+  if (xp[64] != '\0')
     return 0;
 
   return 1;
 }
 
 void
-btc_hash_export(char *str, const uint8_t *hash) {
+btc_hash_export(char *zp, const uint8_t *yp) {
   int j = 0;
   int i;
 
   for (i = 31; i >= 0; i--) {
-    str[j++] = nib2char(hash[i] >> 4);
-    str[j++] = nib2char(hash[i] & 15);
+    zp[j++] = nib2char(yp[i] >> 4);
+    zp[j++] = nib2char(yp[i] & 15);
   }
 
-  str[j] = '\0';
+  zp[j] = '\0';
 }
 
 /*
