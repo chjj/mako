@@ -58,12 +58,14 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/vector.c
                             src/view.c)
 
-list(APPEND node_sources src/node/chain.c
+list(APPEND node_sources src/node/addrman.c
+                         src/node/chain.c
                          src/node/chaindb.c
                          src/node/io.c
                          src/node/logger.c
                          src/node/loop.c
                          src/node/printf.c
+                         src/node/resolve.c
                          src/node/timedata.c)
 
 list(APPEND satoshi_defines BTC_HAVE_ASM)
