@@ -469,16 +469,6 @@ btc_value(char *z, int64_t x) {
 }
 
 static int
-btc_sockaddr(char *z, const struct sockaddr *x) {
-  btc_netaddr_t addr;
-
-  if (!btc_netaddr_set_sockaddr(&addr, x))
-    return 0;
-
-  return btc_netaddr_get_str(z, &addr);
-}
-
-static int
 btc_netaddr(char *z, const btc_netaddr_t *x) {
   return btc_netaddr_get_str(z, x);
 }
@@ -709,13 +699,6 @@ printf_core(state_t *st, const char *fmt, va_list ap) {
             /* bitcoin amount */
             state_grow(st, 22);
             st->ptr += btc_value(st->ptr, va_arg(ap, int64_t));
-            st->state = PRINTF_STATE_NONE;
-            break;
-          }
-          case 'S': {
-            /* socket address */
-            state_grow(st, BTC_ADDRSTRLEN);
-            st->ptr += btc_sockaddr(st->ptr, va_arg(ap, struct sockaddr *));
             st->state = PRINTF_STATE_NONE;
             break;
           }

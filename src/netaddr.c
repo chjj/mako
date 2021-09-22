@@ -78,6 +78,22 @@ static const uint8_t btc_tor_onion[6] = {
 };
 
 /*
+ * Helpers
+ */
+
+static int
+inet_pton4(const char *src, unsigned char *dst);
+
+static int
+inet_pton6(const char *src, unsigned char *dst);
+
+static int
+inet_ntop4(const unsigned char *src, char *dst, size_t size);
+
+static int
+inet_ntop6(const unsigned char *src, char *dst, size_t size);
+
+/*
  * Net Address
  */
 
@@ -533,125 +549,437 @@ btc_netaddr_get_sockaddr(struct sockaddr *z, const btc_netaddr_t *x) {
 
 int
 btc_netaddr_set_str(btc_netaddr_t *z, const char *xp) {
-  struct sockaddr_storage storage;
-  struct sockaddr *sa = (struct sockaddr *)&storage;
-  char str[INET6_ADDRSTRLEN + 1];
-  const char *pstr = NULL;
-  size_t len = strlen(xp);
-  int family = PF_INET;
+  char tmp[BTC_ADDRSTRLEN + 1];
+  const char *p = NULL;
+  char *t = tmp;
   int port = 0;
+  int len = 0;
+  int sq = -1;
+  int co = -1;
+  int col = 0;
+  int family;
 
-  if (len > INET6_ADDRSTRLEN)
-    return 0;
+  btc_netaddr_init(z);
 
-  if (strchr(xp, '.') != NULL) {
-    const char *ch = strchr(xp, ':');
+  while (*t) {
+    int ch = *t++;
 
-    if (ch != NULL) {
-      pstr = ch + 1;
+    if (ch == ']')
+      sq = len;
 
-      memcpy(str, xp, ch - xp);
-
-      str[ch - xp] = '\0';
-    } else {
-      memcpy(str, xp, len + 1);
+    if (ch == ':') {
+      co = len;
+      col += 1;
     }
 
-    family = PF_INET;
-  } else if (xp[0] == '[') {
-    const char *ch = strchr(xp, ']');
+    if (++len > BTC_ADDRSTRLEN)
+      return 0;
+  }
 
-    if (ch == NULL)
+  if (xp[0] == '[') {
+    if (sq == -1)
+      return 0;
+
+    if (col < 2)
       return 0;
 
     xp++;
+    sq--;
 
-    memcpy(str, xp, ch - xp);
+    memcpy(tmp, xp, sq);
 
-    str[ch - xp] = '\0';
+    tmp[sq] = '\0';
 
-    if (ch[1] != '\0') {
-      if (ch[1] != ':')
+    if (xp[sq + 1] != '\0') {
+      if (xp[sq + 1] != ':')
         return 0;
 
-      pstr = ch + 2;
+      p = xp + sq + 2;
     }
 
-    family = PF_INET6;
-  } else {
-    memcpy(str, xp, len + 1);
+    family = 6;
+  } else if (col > 1) {
+    memcpy(tmp, xp, len + 1);
 
-    family = PF_INET6;
+    family = 6;
+  } else if (co != -1) {
+    p = xp + co + 1;
+
+    memcpy(tmp, xp, co);
+
+    tmp[co] = '\0';
+
+    family = 4;
+  } else {
+    memcpy(tmp, xp, len + 1);
+
+    family = 4;
   }
 
-  if (pstr != NULL) {
-    while (*pstr) {
-      int ch = *pstr++;
+  if (p != NULL) {
+    len = 0;
+
+    while (*p) {
+      int ch = *p++;
 
       if (ch < '0' || ch > '9')
+        return 0;
+
+      if (len > 0 && port == 0)
         return 0;
 
       port *= 10;
       port += (ch - '0');
 
-      if (port > 0xffff)
+      len += 1;
+
+      if (len > 5 || port > 0xffff)
         return 0;
     }
+
+    if (len == 0)
+      return 0;
   }
 
-  memset(sa, 0, sizeof(storage));
+  if (family == 4) {
+    memset(z->raw +  0, 0x00, 10);
+    memset(z->raw + 10, 0xff, 2);
 
-  if (family == PF_INET) {
-    struct sockaddr_in *sai = (struct sockaddr_in *)sa;
-
-    if (inet_pton(AF_INET, str, &sai->sin_addr) != 1)
+    if (inet_pton4(tmp, z->raw + 12) != 0)
       return 0;
-
-    sai->sin_family = PF_INET;
-    sai->sin_port = htons(port);
   } else {
-    struct sockaddr_in6 *sai = (struct sockaddr_in6 *)sa;
-
-    if (inet_pton(AF_INET6, str, &sai->sin6_addr) != 1)
+    if (inet_pton6(tmp, z->raw) != 0)
       return 0;
-
-    sai->sin6_family = PF_INET6;
-    sai->sin6_port = htons(port);
   }
 
-  return btc_netaddr_set_sockaddr(z, sa);
+  z->port = port;
+
+  return 1;
 }
 
 size_t
 btc_netaddr_get_str(char *zp, const btc_netaddr_t *x) {
-  struct sockaddr_storage storage;
-  struct sockaddr *sa = (struct sockaddr *)&storage;
+  char tmp[BTC_ADDRSTRLEN + 1];
+  int c;
 
-  btc_netaddr_get_sockaddr(sa, x);
+  if (btc_netaddr_is_mapped(x)) {
+    CHECK(inet_ntop4(x->raw, tmp, sizeof(tmp) - 6) == 0);
 
-  if (sa->sa_family == PF_INET) {
-    struct sockaddr_in *sai = (struct sockaddr_in *)sa;
-    size_t size = sizeof(struct in_addr);
-    char str[INET_ADDRSTRLEN + 1];
-
-    CHECK(inet_ntop(AF_INET, &sai->sin_addr, str, size) != NULL);
-
-    if (x->port != 0)
-      sprintf(zp, "%s:%d", str, x->port);
-    else
-      strcpy(zp, str);
+    if (x->port != 0) {
+      c = sprintf(zp, "%s:%d", tmp, x->port);
+    } else {
+      c = strlen(tmp);
+      memcpy(zp, tmp, c + 1);
+    }
   } else {
-    struct sockaddr_in6 *sai = (struct sockaddr_in6 *)sa;
-    size_t size = sizeof(struct in6_addr);
-    char str[INET6_ADDRSTRLEN + 1];
+    CHECK(inet_ntop6(x->raw, tmp, sizeof(tmp) - 8) == 0);
 
-    CHECK(inet_ntop(AF_INET6, &sai->sin6_addr, str, size) != NULL);
-
-    if (x->port != 0)
-      sprintf(zp, "[%s]:%d", str, x->port);
-    else
-      strcpy(zp, str);
+    if (x->port != 0) {
+      c = sprintf(zp, "[%s]:%d", tmp, x->port);
+    } else {
+      c = strlen(tmp);
+      memcpy(zp, tmp, c + 1);
+    }
   }
 
-  return strlen(zp);
+  CHECK(c >= 0);
+
+  return c;
+}
+
+/**
+ * Portable inet_{pton,ntop}.
+ *
+ * Code from libuv[1]. According to c-ares[2][3], this code was
+ * written in 1996 by Paul Vixie and is under the ISC license.
+ *
+ * See LICENSE for more information.
+ *
+ * [1] https://github.com/libuv/libuv/blob/385b796/src/inet.c
+ * [2] https://github.com/c-ares/c-ares/blob/c2f3235/src/lib/inet_ntop.c
+ * [3] https://github.com/c-ares/c-ares/blob/c2f3235/src/lib/inet_net_pton.c
+ */
+
+static int
+inet_pton4(const char *src, unsigned char *dst) {
+  static const char digits[] = "0123456789";
+  int saw_digit, octets, ch;
+  unsigned char tmp[4], *tp;
+
+  saw_digit = 0;
+  octets = 0;
+
+  *(tp = tmp) = 0;
+
+  while ((ch = *src++) != '\0') {
+    const char *pch;
+
+    if ((pch = strchr(digits, ch)) != NULL) {
+      unsigned int nw = *tp * 10 + (pch - digits);
+
+      if (saw_digit && *tp == 0)
+        return -1;
+
+      if (nw > 255)
+        return -1;
+
+      *tp = nw;
+
+      if (!saw_digit) {
+        if (++octets > 4)
+          return -1;
+
+        saw_digit = 1;
+      }
+    } else if (ch == '.' && saw_digit) {
+      if (octets == 4)
+        return -1;
+
+      *++tp = 0;
+      saw_digit = 0;
+    } else {
+      return -1;
+    }
+  }
+
+  if (octets < 4)
+    return -1;
+
+  memcpy(dst, tmp, 4);
+
+  return 0;
+}
+
+static int
+inet_pton6(const char *src, unsigned char *dst) {
+  static const char xdigits_l[] = "0123456789abcdef",
+                    xdigits_u[] = "0123456789ABCDEF";
+  unsigned char tmp[16], *tp, *endp, *colonp;
+  const char *xdigits, *curtok;
+  int ch, seen_xdigits;
+  unsigned int val;
+
+  memset((tp = tmp), 0, sizeof(tmp));
+
+  endp = tp + sizeof(tmp);
+  colonp = NULL;
+
+  /* Leading :: requires some special handling. */
+  if (*src == ':') {
+    if (*++src != ':')
+      return -1;
+  }
+
+  curtok = src;
+  seen_xdigits = 0;
+  val = 0;
+
+  while ((ch = *src++) != '\0') {
+    const char *pch;
+
+    if ((pch = strchr((xdigits = xdigits_l), ch)) == NULL)
+      pch = strchr((xdigits = xdigits_u), ch);
+
+    if (pch != NULL) {
+      val <<= 4;
+      val |= (pch - xdigits);
+
+      if (++seen_xdigits > 4)
+        return -1;
+
+      continue;
+    }
+
+    if (ch == ':') {
+      curtok = src;
+
+      if (!seen_xdigits) {
+        if (colonp)
+          return -1;
+
+        colonp = tp;
+
+        continue;
+      } else if (*src == '\0') {
+        return -1;
+      }
+
+      if (tp + 2 > endp)
+        return -1;
+
+      *tp++ = (unsigned char)(val >> 8) & 0xff;
+      *tp++ = (unsigned char)val & 0xff;
+
+      seen_xdigits = 0;
+      val = 0;
+
+      continue;
+    }
+
+    if (ch == '.' && ((tp + 4) <= endp)) {
+      int err = inet_pton4(curtok, tp);
+
+      if (err == 0) {
+        tp += 4;
+        seen_xdigits = 0;
+        break;  /*%< '\\0' was seen by inet_pton4(). */
+      }
+    }
+
+    return -1;
+  }
+
+  if (seen_xdigits) {
+    if (tp + 2 > endp)
+      return -1;
+
+    *tp++ = (unsigned char)(val >> 8) & 0xff;
+    *tp++ = (unsigned char)val & 0xff;
+  }
+
+  if (colonp != NULL) {
+    /*
+     * Since some memmove()'s erroneously fail to handle
+     * overlapping regions, we'll do the shift by hand.
+     */
+    int n = tp - colonp;
+    int i;
+
+    if (tp == endp)
+      return -1;
+
+    for (i = 1; i <= n; i++) {
+      endp[-i] = colonp[n - i];
+      colonp[n - i] = 0;
+    }
+
+    tp = endp;
+  }
+
+  if (tp != endp)
+    return -1;
+
+  memcpy(dst, tmp, sizeof(tmp));
+
+  return 0;
+}
+
+static int
+inet_ntop4(const unsigned char *src, char *dst, size_t size) {
+  static const char fmt[] = "%u.%u.%u.%u";
+  char tmp[4 * 10 + 3 + 1];
+  int c;
+
+  c = sprintf(tmp, fmt, src[0], src[1], src[2], src[3]);
+
+  if (c <= 0 || (size_t)c + 1 > size)
+    return -1;
+
+  memcpy(dst, tmp, c + 1);
+
+  return 0;
+}
+
+static int
+inet_ntop6(const unsigned char *src, char *dst, size_t size) {
+  /*
+   * Note that int32_t and int16_t need only be "at least" large enough
+   * to contain a value of the specified size.  On some systems, like
+   * Crays, there is no such thing as an integer variable with 16 bits.
+   * Keep this in mind if you think this function should have been coded
+   * to use pointer overlays.  All the world's not a VAX.
+   */
+  struct { int base, len; } best, cur;
+  char tmp[BTC_ADDRSTRLEN + 1], *tp;
+  unsigned int words[16 / 2];
+  int i;
+
+  /*
+   * Preprocess:
+   *  Copy the input (bytewise) array into a wordwise array.
+   *  Find the longest run of 0x00's in src[] for :: shorthanding.
+   */
+  memset(words, 0, sizeof(words));
+
+  for (i = 0; i < 16; i++)
+    words[i / 2] |= (src[i] << ((1 - (i % 2)) << 3));
+
+  best.base = -1;
+  best.len = 0;
+  cur.base = -1;
+  cur.len = 0;
+
+  for (i = 0; i < (int)lengthof(words); i++) {
+    if (words[i] == 0) {
+      if (cur.base == -1) {
+        cur.base = i;
+        cur.len = 1;
+      } else {
+        cur.len++;
+      }
+    } else {
+      if (cur.base != -1) {
+        if (best.base == -1 || cur.len > best.len)
+          best = cur;
+
+        cur.base = -1;
+      }
+    }
+  }
+
+  if (cur.base != -1) {
+    if (best.base == -1 || cur.len > best.len)
+      best = cur;
+  }
+
+  if (best.base != -1 && best.len < 2)
+    best.base = -1;
+
+  /*
+   * Format the result.
+   */
+  tp = tmp;
+
+  for (i = 0; i < (int)lengthof(words); i++) {
+    /* Are we inside the best run of 0x00's? */
+    if (best.base != -1 && i >= best.base && i < (best.base + best.len)) {
+      if (i == best.base)
+        *tp++ = ':';
+
+      continue;
+    }
+
+    /* Are we following an initial run of 0x00s or any real hex? */
+    if (i != 0)
+      *tp++ = ':';
+
+    /* Is this address an encapsulated IPv4? */
+    if (i == 6 && best.base == 0 && (best.len == 6
+        || (best.len == 7 && words[7] != 0x0001)
+        || (best.len == 5 && words[5] == 0xffff))) {
+      int err = inet_ntop4(src + 12, tp, sizeof(tmp) - (tp - tmp));
+
+      if (err)
+        return err;
+
+      tp += strlen(tp);
+
+      break;
+    }
+
+    tp += sprintf(tp, "%x", words[i]);
+  }
+
+  /* Was it a trailing run of 0x00's? */
+  if (best.base != -1 && (best.base + best.len) == lengthof(words))
+    *tp++ = ':';
+
+  *tp++ = '\0';
+
+  if ((size_t)(tp - tmp) > size)
+    return -1;
+
+  memcpy(dst, tmp, tp - tmp);
+
+  return 0;
 }
