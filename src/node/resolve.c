@@ -7,17 +7,26 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <satoshi/net.h>
 #include <satoshi/netaddr.h>
 #include <satoshi/network.h>
 #include <satoshi/util.h>
 #include <satoshi/vector.h>
 #include "../internal.h"
+
+#if defined(_WIN32)
+#  include <winsock2.h>
+#  include <ws2tcpip.h>
+#  ifndef __MINGW32__
+#    pragma comment(lib, "ws2_32.lib")
+#  endif
+#else
+#  include <sys/types.h>
+#  include <sys/socket.h>
+#  include <netdb.h>
+#  include <arpa/inet.h>
+#  include <netinet/in.h>
+#endif
 
 /*
  * Resolve
