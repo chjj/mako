@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <io/core.h>
 #include <node/addrman.h>
 #include <node/logger.h>
 #include <node/timedata.h>
@@ -18,7 +19,6 @@
 #include <satoshi/util.h>
 #include <satoshi/vector.h>
 #include "../internal.h"
-#include "resolve.h"
 
 /*
  * Address Manager
@@ -74,6 +74,9 @@ btc_addrman_log(struct btc_addrman_s *man, const char *fmt, ...) {
 int
 btc_addrman_open(struct btc_addrman_s *man) {
   const btc_network_t *network = man->network;
+  int64_t now = btc_now();
+  btc_sockaddr_t *res, *p;
+  btc_netaddr_t addr;
   int ret = 0;
   size_t i;
 
@@ -82,7 +85,19 @@ btc_addrman_open(struct btc_addrman_s *man) {
 
     btc_addrman_log(man, "Resolving %s...", seed);
 
-    ret |= btc_dns_resolve(&man->addrs, seed, network);
+    if (btc_getaddrinfo(&res, seed)) {
+      for (p = res; p != NULL; p = p->next) {
+        btc_netaddr_set_sockaddr(&addr, p);
+
+        addr.time = now;
+        addr.services = BTC_NET_LOCAL_SERVICES;
+        addr.port = network->port;
+
+        btc_vector_push(&man->addrs, btc_netaddr_clone(&addr));
+      }
+
+      btc_freeaddrinfo(res);
+    }
   }
 
   btc_addrman_log(man, "Resolved %zu seeds.", man->addrs.length);

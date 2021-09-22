@@ -11,8 +11,8 @@
 
 #include <lmdb.h>
 
+#include <io/core.h>
 #include <node/chaindb.h>
-
 #include <satoshi/block.h>
 #include <satoshi/coins.h>
 #include <satoshi/consensus.h>
@@ -27,7 +27,6 @@
 #include "../map.h"
 #include "../impl.h"
 #include "../internal.h"
-#include "io.h"
 
 /*
  * Constants

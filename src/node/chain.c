@@ -31,7 +31,6 @@
 #include "../map.h"
 #include "../impl.h"
 #include "../internal.h"
-#include "io.h"
 
 /*
  * Deployment State

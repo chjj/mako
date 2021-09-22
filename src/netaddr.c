@@ -78,6 +78,17 @@ static const uint8_t btc_tor_onion[6] = {
 };
 
 /*
+ * Types
+ */
+
+typedef struct btc_sockaddr_s {
+  int family;
+  uint8_t raw[16];
+  int port;
+  struct btc_sockaddr_s *next;
+} btc_sockaddr_t;
+
+/*
  * Helpers
  */
 
@@ -497,54 +508,26 @@ btc_netaddr_is_routable(const btc_netaddr_t *addr) {
   return 1;
 }
 
-int
-btc_netaddr_set_sockaddr(btc_netaddr_t *z, const struct sockaddr *x) {
+void
+btc_netaddr_set_sockaddr(btc_netaddr_t *z, const btc_sockaddr_t *x) {
   btc_netaddr_init(z);
-
-  if (x->sa_family == PF_INET) {
-    const struct sockaddr_in *sai = (const struct sockaddr_in *)x;
-
-    btc_netaddr_set(z, 4, (const uint8_t *)&sai->sin_addr, 0);
-
-    z->port = ntohs(sai->sin_port);
-
-    return 1;
-  }
-
-  if (x->sa_family == PF_INET6) {
-    const struct sockaddr_in6 *sai = (const struct sockaddr_in6 *)x;
-
-    btc_netaddr_set(z, 6, (const uint8_t *)&sai->sin6_addr, 0);
-
-    z->port = ntohs(sai->sin6_port);
-
-    return 1;
-  }
-
-  return 0;
+  btc_netaddr_set(z, x->family, x->raw, x->port);
 }
 
 void
-btc_netaddr_get_sockaddr(struct sockaddr *z, const btc_netaddr_t *x) {
-  memset(z, 0, sizeof(struct sockaddr_storage));
+btc_netaddr_get_sockaddr(btc_sockaddr_t *z, const btc_netaddr_t *x) {
+  memset(z, 0, sizeof(*z));
 
   if (btc_netaddr_is_mapped(x)) {
-    struct sockaddr_in *sai = (struct sockaddr_in *)z;
-
-    sai->sin_family = PF_INET;
-
-    memcpy(&sai->sin_addr, x->raw + 12, 4);
-
-    sai->sin_port = htons(x->port);
+    z->family = 4;
+    memcpy(z->raw, x->raw + 12, 4);
   } else {
-    struct sockaddr_in6 *sai = (struct sockaddr_in6 *)z;
-
-    sai->sin6_family = PF_INET6;
-
-    memcpy(&sai->sin6_addr, x->raw, 16);
-
-    sai->sin6_port = htons(x->port);
+    z->family = 6;
+    memcpy(z->raw, x->raw, 16);
   }
+
+  z->port = x->port;
+  z->next = NULL;
 }
 
 int

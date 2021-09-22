@@ -45,7 +45,6 @@ config.status
 configure
 i686-w64-mingw32/
 libtool
-libsatoshi
 libsatoshi.pc
 libsatoshi-*.asc
 libsatoshi-*.tar.gz
@@ -56,14 +55,11 @@ m4/ltoptions.m4
 m4/ltsugar.m4
 m4/ltversion.m4
 sha256sums.txt
-satoshi
 satoshi_bench
 satoshi_ctgrind
-satoshi_test
-satoshi_test_static
 satoshi_bench.js
-satoshi_test.js
-satoshi.js
+satoshid
+satoshid.js
 tmp/
 vgcore.*
 wasm32-wasi/

@@ -27,7 +27,7 @@ extern "C" {
  * Types
  */
 
-struct sockaddr;
+struct btc_sockaddr_s;
 
 /*
  * Net Address
@@ -143,11 +143,11 @@ btc_netaddr_is_valid(const btc_netaddr_t *addr);
 BTC_EXTERN int
 btc_netaddr_is_routable(const btc_netaddr_t *addr);
 
-BTC_EXTERN int
-btc_netaddr_set_sockaddr(btc_netaddr_t *z, const struct sockaddr *x);
+BTC_EXTERN void
+btc_netaddr_set_sockaddr(btc_netaddr_t *z, const struct btc_sockaddr_s *x);
 
 BTC_EXTERN void
-btc_netaddr_get_sockaddr(struct sockaddr *z, const btc_netaddr_t *x);
+btc_netaddr_get_sockaddr(struct btc_sockaddr_s *z, const btc_netaddr_t *x);
 
 BTC_EXTERN int
 btc_netaddr_set_str(btc_netaddr_t *z, const char *xp);

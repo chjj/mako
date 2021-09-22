@@ -13,6 +13,7 @@ set(satoshi_cflags)
 set(satoshi_includes)
 set(satoshi_ldflags)
 set(satoshi_libs)
+set(io_sources)
 set(node_sources)
 
 set(CMAKE_C_VISIBILITY_PRESET hidden)
@@ -51,26 +52,47 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/output.c
                             src/outvec.c
                             src/policy.c
+                            src/printf.c
+                            src/printf_core.c
                             src/script.c
+                            src/sprintf.c
                             src/tx.c
                             src/undo.c
                             src/util.c
                             src/vector.c
                             src/view.c)
 
+list(APPEND io_sources src/io/addrinfo.c
+                       src/io/core.c
+                       src/io/sockaddr.c)
+
+if(WIN32)
+  list(APPEND io_sources src/io/win/fs.c
+                         src/io/win/loop.c
+                         src/io/win/thread.c
+                         src/io/win/time.c)
+else()
+  list(APPEND io_sources src/io/unix/fs.c
+                         src/io/unix/loop.c
+                         src/io/unix/thread.c
+                         src/io/unix/time.c)
+endif()
+
 list(APPEND node_sources src/node/addrman.c
                          src/node/chain.c
                          src/node/chaindb.c
-                         src/node/io.c
                          src/node/logger.c
-                         src/node/loop.c
-                         src/node/printf.c
-                         src/node/resolve.c
                          src/node/timedata.c)
 
-list(APPEND satoshi_defines BTC_HAVE_ASM)
-list(APPEND satoshi_defines BTC_HAVE_INT128)
-list(APPEND satoshi_defines BTC_TLS=__thread)
+if(WIN32 AND NOT MINGW)
+  list(APPEND satoshi_defines "BTC_TLS=__declspec(thread)")
+else()
+  list(APPEND satoshi_defines BTC_HAVE_ASM)
+  list(APPEND satoshi_defines BTC_HAVE_INT128)
+  if(NOT MINGW)
+    list(APPEND satoshi_defines BTC_TLS=__thread)
+  endif()
+endif()
 
 if(WIN32)
   string(REPLACE "/" "\\" srcdir "${PROJECT_SOURCE_DIR}")
@@ -112,6 +134,14 @@ target_link_options(satoshi_shared PRIVATE -Wl,-z,now)
 target_link_libraries(satoshi_shared PRIVATE ${satoshi_libs})
 set_property(TARGET satoshi_shared PROPERTY OUTPUT_NAME satoshi)
 
+add_library(satoshi_io STATIC ${io_sources})
+target_compile_definitions(satoshi_io PUBLIC ${satoshi_defines})
+target_compile_options(satoshi_io PUBLIC ${satoshi_cflags})
+target_include_directories(satoshi_io PUBLIC ${satoshi_includes})
+target_link_options(satoshi_io INTERFACE ${satoshi_ldflags})
+target_link_libraries(satoshi_io PRIVATE pthread)
+set_property(TARGET satoshi_io PROPERTY OUTPUT_NAME io)
+
 add_library(satoshi_node STATIC ${node_sources})
 target_compile_definitions(satoshi_node PUBLIC ${satoshi_defines})
 target_compile_options(satoshi_node PUBLIC ${satoshi_cflags})
@@ -132,6 +162,7 @@ foreach(name ecdsa bip340 sighash script tx chaindb chain)
   target_link_options(t-${name} PRIVATE -Wl,-z,now)
   target_link_libraries(t-${name} PRIVATE satoshi_tests
                                           satoshi_node
+                                          satoshi_io
                                           satoshi_shared)
   add_test(NAME ${name} COMMAND t-${name})
 endforeach()
