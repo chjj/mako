@@ -12,8 +12,7 @@ extern "C" {
 #endif
 
 #include <stddef.h>
-#include "logger.h" /* XXX */
-#include "timedata.h" /* XXX */
+#include "types.h"
 #include "../satoshi/common.h"
 #include "../satoshi/types.h"
 
@@ -47,16 +46,6 @@ enum btc_threshold_state {
 /*
  * Types
  */
-
-typedef struct btc_deployment_state_s {
-  unsigned int flags;
-  unsigned int lock_flags;
-  int bip34;
-  int bip91;
-  int bip148;
-} btc_deployment_state_t;
-
-typedef struct btc_chain_s btc_chain_t;
 
 typedef void btc_connect_cb(const btc_entry_t *entry,
                             const btc_block_t *block,

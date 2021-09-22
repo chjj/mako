@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <node/addrman.h>
 #include <node/chain.h>
 #include <node/logger.h>
 #include <node/mempool.h>

@@ -13,18 +13,6 @@
 #include "impl.h"
 #include "internal.h"
 
-#if defined(_WIN32)
-#  include <winsock2.h>
-#  include <ws2tcpip.h>
-#  ifndef __MINGW32__
-#    pragma comment(lib, "ws2_32.lib")
-#  endif
-#else
-#  include <sys/types.h>
-#  include <sys/socket.h>
-#  include <arpa/inet.h>
-#endif
-
 /*
  * Constants
  */

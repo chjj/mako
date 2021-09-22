@@ -13,19 +13,9 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdint.h>
+#include "types.h"
 #include "../satoshi/common.h"
 #include "../satoshi/impl.h"
-
-/*
- * Types
- */
-
-typedef struct btc_timedata_s {
-  int64_t samples[200];
-  size_t length;
-  int64_t offset;
-  int checked;
-} btc_timedata_t;
 
 /*
  * Time Data

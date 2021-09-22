@@ -9,6 +9,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <io/loop.h>
+
 #include <node/addrman.h>
 #include <node/chain.h>
 #include <node/logger.h>
@@ -30,7 +32,6 @@
 #include <satoshi/util.h>
 #include <satoshi/vector.h>
 
-#include "loop.h"
 #include "../map.h"
 #include "../internal.h"
 
@@ -45,10 +46,14 @@ struct btc_pool_s {
   const btc_timedata_t *timedata;
   btc_addrman_t *addrman;
   btc_chain_t *chain;
+  btc_mempool_t *mempool;
 };
 
 struct btc_pool_s *
-btc_pool_create(const btc_network_t *network, btc_loop_t *loop) {
+btc_pool_create(const btc_network_t *network,
+                btc_loop_t *loop,
+                btc_chain_t *chain,
+                btc_mempool_t *mempool) {
   struct btc_pool_s *pool =
     (struct btc_pool_s *)btc_malloc(sizeof(struct btc_pool_s));
 
@@ -59,7 +64,8 @@ btc_pool_create(const btc_network_t *network, btc_loop_t *loop) {
   pool->logger = NULL;
   pool->timedata = NULL;
   pool->addrman = btc_addrman_create(network);
-  pool->chain = NULL;
+  pool->chain = chain;
+  pool->mempool = mempool;
 
   return pool;
 }
@@ -78,11 +84,6 @@ btc_pool_set_logger(struct btc_pool_s *pool, btc_logger_t *logger) {
 void
 btc_pool_set_timedata(struct btc_pool_s *pool, const btc_timedata_t *td) {
   pool->timedata = td;
-}
-
-void
-btc_pool_set_chain(struct btc_pool_s *pool, btc_chain_t *chain) {
-  pool->chain = chain;
 }
 
 static void

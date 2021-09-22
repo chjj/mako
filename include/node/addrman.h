@@ -12,8 +12,7 @@ extern "C" {
 #endif
 
 #include <stddef.h>
-#include "logger.h" /* XXX */
-#include "timedata.h" /* XXX */
+#include "types.h"
 #include "../satoshi/common.h"
 #include "../satoshi/types.h"
 
@@ -77,12 +76,6 @@ enum btc_score {
   BTC_SCORE_MANUAL,
   BTC_SCORE_MAX
 };
-
-/*
- * Types
- */
-
-typedef struct btc_addrman_s btc_addrman_t;
 
 /*
  * Address Manager

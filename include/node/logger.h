@@ -13,13 +13,8 @@ extern "C" {
 
 #include <stdarg.h>
 #include <stddef.h>
+#include "types.h"
 #include "../satoshi/common.h"
-
-/*
- * Types
- */
-
-typedef struct btc_logger_s btc_logger_t;
 
 /*
  * Logger
