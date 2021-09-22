@@ -47,16 +47,18 @@ enum btc_threshold_state {
  * Types
  */
 
-typedef void btc_connect_cb(const btc_entry_t *entry,
-                            const btc_block_t *block,
-                            btc_view_t *view,
-                            void *arg);
+typedef void btc_chain_connect_cb(const btc_entry_t *entry,
+                                  const btc_block_t *block,
+                                  btc_view_t *view,
+                                  void *arg);
 
-typedef void btc_reorganize_cb(const btc_entry_t *old,
-                               const btc_entry_t *new_,
-                               void *arg);
+typedef void btc_chain_reorganize_cb(const btc_entry_t *old,
+                                     const btc_entry_t *new_,
+                                     void *arg);
 
-typedef void btc_badorphan_cb(const btc_verify_error_t *err, int id, void *arg);
+typedef void btc_chain_badorphan_cb(const btc_verify_error_t *err,
+                                    int id,
+                                    void *arg);
 
 /*
  * Chain
@@ -75,16 +77,16 @@ BTC_EXTERN void
 btc_chain_set_timedata(btc_chain_t *chain, const btc_timedata_t *td);
 
 BTC_EXTERN void
-btc_chain_on_connect(btc_chain_t *chain, btc_connect_cb *handler);
+btc_chain_on_connect(btc_chain_t *chain, btc_chain_connect_cb *handler);
 
 BTC_EXTERN void
-btc_chain_on_disconnect(btc_chain_t *chain, btc_connect_cb *handler);
+btc_chain_on_disconnect(btc_chain_t *chain, btc_chain_connect_cb *handler);
 
 BTC_EXTERN void
-btc_chain_on_reorganize(btc_chain_t *chain, btc_reorganize_cb *handler);
+btc_chain_on_reorganize(btc_chain_t *chain, btc_chain_reorganize_cb *handler);
 
 BTC_EXTERN void
-btc_chain_on_badorphan(btc_chain_t *chain, btc_badorphan_cb *handler);
+btc_chain_on_badorphan(btc_chain_t *chain, btc_chain_badorphan_cb *handler);
 
 BTC_EXTERN void
 btc_chain_set_context(btc_chain_t *chain, void *arg);

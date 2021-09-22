@@ -21,11 +21,11 @@ extern "C" {
 typedef struct btc_loop_s btc_loop_t;
 typedef struct btc_socket_s btc_socket_t;
 
-typedef void btc_tick_f(btc_loop_t *);
-typedef void btc_connect_f(btc_socket_t *);
-typedef void btc_error_f(btc_socket_t *, int);
-typedef void btc_data_f(btc_socket_t *, const unsigned char *, size_t);
-typedef void btc_drain_f(btc_socket_t *);
+typedef void btc_loop_tick_cb(btc_loop_t *);
+typedef void btc_socket_connect_cb(btc_socket_t *);
+typedef void btc_socket_error_cb(btc_socket_t *, int);
+typedef void btc_socket_data_cb(btc_socket_t *, const unsigned char *, size_t);
+typedef void btc_socket_drain_cb(btc_socket_t *);
 
 struct btc_sockaddr_s;
 
@@ -40,22 +40,22 @@ BTC_EXTERN void
 btc_socket_address(struct btc_sockaddr_s *addr, btc_socket_t *socket);
 
 BTC_EXTERN void
-btc_socket_on_socket(btc_socket_t *socket, btc_connect_f *handler);
+btc_socket_on_socket(btc_socket_t *socket, btc_socket_connect_cb *handler);
 
 BTC_EXTERN void
-btc_socket_on_connect(btc_socket_t *socket, btc_connect_f *handler);
+btc_socket_on_connect(btc_socket_t *socket, btc_socket_connect_cb *handler);
 
 BTC_EXTERN void
-btc_socket_on_disconnect(btc_socket_t *socket, btc_connect_f *handler);
+btc_socket_on_disconnect(btc_socket_t *socket, btc_socket_connect_cb *handler);
 
 BTC_EXTERN void
-btc_socket_on_error(btc_socket_t *socket, btc_error_f *handler);
+btc_socket_on_error(btc_socket_t *socket, btc_socket_error_cb *handler);
 
 BTC_EXTERN void
-btc_socket_on_data(btc_socket_t *socket, btc_data_f *handler);
+btc_socket_on_data(btc_socket_t *socket, btc_socket_data_cb *handler);
 
 BTC_EXTERN void
-btc_socket_on_drain(btc_socket_t *socket, btc_drain_f *handler);
+btc_socket_on_drain(btc_socket_t *socket, btc_socket_drain_cb *handler);
 
 BTC_EXTERN void
 btc_socket_set_data(btc_socket_t *socket, void *data);
@@ -86,7 +86,7 @@ BTC_EXTERN void
 btc_loop_destroy(btc_loop_t *loop);
 
 BTC_EXTERN void
-btc_loop_on_tick(btc_loop_t *loop, btc_tick_f *handler);
+btc_loop_on_tick(btc_loop_t *loop, btc_loop_tick_cb *handler);
 
 BTC_EXTERN void
 btc_loop_set_data(btc_loop_t *loop, int name, void *data);

@@ -101,11 +101,3 @@ void
 btc_miner_close(struct btc_miner_s *miner) {
   (void)miner;
 }
-
-BTC_UNUSED static int64_t
-btc_miner_now(struct btc_miner_s *miner) {
-  if (miner->timedata == NULL)
-    return btc_now();
-
-  return btc_timedata_now(miner->timedata);
-}

@@ -108,11 +108,3 @@ void
 btc_pool_close(struct btc_pool_s *pool) {
   btc_addrman_close(pool->addrman);
 }
-
-BTC_UNUSED static int64_t
-btc_pool_now(struct btc_pool_s *pool) {
-  if (pool->timedata == NULL)
-    return btc_now();
-
-  return btc_timedata_now(pool->timedata);
-}

@@ -100,10 +100,10 @@ struct btc_chain_s {
   btc_deployment_state_t state;
   btc_verify_error_t error;
   int synced;
-  btc_connect_cb *on_connect;
-  btc_connect_cb *on_disconnect;
-  btc_reorganize_cb *on_reorganize;
-  btc_badorphan_cb *on_badorphan;
+  btc_chain_connect_cb *on_connect;
+  btc_chain_connect_cb *on_disconnect;
+  btc_chain_reorganize_cb *on_reorganize;
+  btc_chain_badorphan_cb *on_badorphan;
   void *arg;
   int checkpoints_enabled;
   int bip91_enabled;
@@ -172,22 +172,25 @@ btc_chain_set_timedata(struct btc_chain_s *chain, const btc_timedata_t *td) {
 }
 
 void
-btc_chain_on_connect(struct btc_chain_s *chain, btc_connect_cb *handler) {
+btc_chain_on_connect(struct btc_chain_s *chain, btc_chain_connect_cb *handler) {
   chain->on_connect = handler;
 }
 
 void
-btc_chain_on_disconnect(struct btc_chain_s *chain, btc_connect_cb *handler) {
+btc_chain_on_disconnect(struct btc_chain_s *chain,
+                        btc_chain_connect_cb *handler) {
   chain->on_disconnect = handler;
 }
 
 void
-btc_chain_on_reorganize(struct btc_chain_s *chain, btc_reorganize_cb *handler) {
+btc_chain_on_reorganize(struct btc_chain_s *chain,
+                        btc_chain_reorganize_cb *handler) {
   chain->on_reorganize = handler;
 }
 
 void
-btc_chain_on_badorphan(struct btc_chain_s *chain, btc_badorphan_cb *handler) {
+btc_chain_on_badorphan(struct btc_chain_s *chain,
+                       btc_chain_badorphan_cb *handler) {
   chain->on_badorphan = handler;
 }
 
@@ -236,14 +239,6 @@ btc_chain_open(struct btc_chain_s *chain, const char *prefix, size_t map_size) {
 void
 btc_chain_close(struct btc_chain_s *chain) {
   btc_chaindb_close(chain->db);
-}
-
-static int64_t
-btc_chain_now(struct btc_chain_s *chain) {
-  if (chain->timedata == NULL)
-    return btc_now();
-
-  return btc_timedata_now(chain->timedata);
 }
 
 static void
@@ -620,7 +615,8 @@ btc_chain_get_target(struct btc_chain_s *chain,
 
 uint32_t
 btc_chain_get_current_target(struct btc_chain_s *chain) {
-  return btc_chain_get_target(chain, btc_chain_now(chain), chain->tip);
+  int64_t time = btc_timedata_now(chain->timedata);
+  return btc_chain_get_target(chain, time, chain->tip);
 }
 
 static int
@@ -960,7 +956,7 @@ btc_chain_verify(struct btc_chain_s *chain,
   /* Check timestamp against adjtime+2hours.
      If this fails we may be able to accept
      the block later. */
-  if (hdr->time > btc_chain_now(chain) + 2 * 60 * 60)
+  if (hdr->time > btc_timedata_now(chain->timedata) + 2 * 60 * 60)
     return btc_chain_throw(chain, hdr, "invalid", "time-too-new", 0, 1);
 
   /* Calculate height of current block. */
@@ -1153,7 +1149,7 @@ btc_chain_verify_final(struct btc_chain_s *chain,
     return btc_tx_is_final(tx, height, ts);
   }
 
-  return btc_tx_is_final(tx, height, btc_chain_now(chain));
+  return btc_tx_is_final(tx, height, btc_timedata_now(chain->timedata));
 }
 
 int

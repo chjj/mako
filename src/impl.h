@@ -9,6 +9,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include "internal.h"
 
 struct btc_sha256_s;
@@ -472,6 +473,35 @@ btc_int64_read(int64_t *zp, const uint8_t **xp, size_t *xn) {
 BTC_UNUSED static void
 btc_int64_update(struct btc_sha256_s *ctx, int64_t x) {
   btc_uint64_update(ctx, (uint64_t)x);
+}
+
+BTC_UNUSED static size_t
+btc_double_size(double x) {
+  return sizeof(x);
+}
+
+BTC_UNUSED static uint8_t *
+btc_double_write(uint8_t *zp, double x) {
+  memcpy(zp, &x, sizeof(x));
+  return zp + sizeof(x);
+}
+
+BTC_UNUSED static int
+btc_double_read(double *zp, const uint8_t **xp, size_t *xn) {
+  if (*xn < sizeof(*zp))
+    return 0;
+
+  memcpy(zp, *xp, sizeof(*zp));
+
+  *xp += sizeof(*zp);
+  *xn -= sizeof(*zp);
+
+  return 1;
+}
+
+BTC_UNUSED static void
+btc_double_update(struct btc_sha256_s *ctx, double x) {
+  btc_hash256_update(ctx, &x, sizeof(x));
 }
 
 BTC_UNUSED static size_t

@@ -88,6 +88,9 @@ btc_timedata_add(btc_timedata_t *td, int64_t ts) {
 
 int64_t
 btc_timedata_now(const btc_timedata_t *td) {
+  if (td == NULL)
+    return btc_now();
+
   return btc_now() + td->offset;
 }
 

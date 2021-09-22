@@ -40,6 +40,30 @@
 #include "../internal.h"
 
 /*
+ * Callbacks
+ */
+
+static void
+on_connect(const btc_entry_t *entry,
+           const btc_block_t *block,
+           btc_view_t *view,
+           void *arg);
+
+static void
+on_disconnect(const btc_entry_t *entry,
+              const btc_block_t *block,
+              btc_view_t *view,
+              void *arg);
+
+
+static void
+on_reorganize(const btc_entry_t *old, const btc_entry_t *new_, void *arg);
+
+
+static void
+on_tx(const btc_mpentry_t *entry, btc_view_t *view, void *arg);
+
+/*
  * Node
  */
 
@@ -68,6 +92,14 @@ btc_node_create(const btc_network_t *network) {
   btc_mempool_set_timedata(node->mempool, node->timedata);
   btc_miner_set_timedata(node->miner, node->timedata);
   btc_pool_set_timedata(node->pool, node->timedata);
+
+  btc_chain_set_context(node->chain, node);
+  btc_chain_on_connect(node->chain, on_connect);
+  btc_chain_on_disconnect(node->chain, on_disconnect);
+  btc_chain_on_reorganize(node->chain, on_reorganize);
+
+  btc_mempool_set_context(node->mempool, node);
+  btc_mempool_on_tx(node->mempool, on_tx);
 
   return node;
 }
@@ -159,4 +191,51 @@ btc_node_start(btc_node_t *node) {
 void
 btc_node_stop(btc_node_t *node) {
   btc_loop_stop(node->loop);
+}
+
+/*
+ * Event Handling
+ */
+
+static void
+on_connect(const btc_entry_t *entry,
+           const btc_block_t *block,
+           btc_view_t *view,
+           void *arg) {
+  btc_node_t *node = (btc_node_t *)arg;
+
+  (void)view;
+
+  btc_mempool_add_block(node->mempool, entry, block);
+}
+
+static void
+on_disconnect(const btc_entry_t *entry,
+              const btc_block_t *block,
+              btc_view_t *view,
+              void *arg) {
+  btc_node_t *node = (btc_node_t *)arg;
+
+  (void)view;
+
+  btc_mempool_remove_block(node->mempool, entry, block);
+}
+
+static void
+on_reorganize(const btc_entry_t *old, const btc_entry_t *new_, void *arg) {
+  btc_node_t *node = (btc_node_t *)arg;
+
+  (void)old;
+  (void)new_;
+
+  btc_mempool_handle_reorg(node->mempool);
+}
+
+static void
+on_tx(const btc_mpentry_t *entry, btc_view_t *view, void *arg) {
+  btc_node_t *node = (btc_node_t *)arg;
+
+  (void)node;
+  (void)entry;
+  (void)view;
 }
