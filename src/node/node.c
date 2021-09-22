@@ -37,21 +37,11 @@
 #include <satoshi/util.h>
 #include <satoshi/vector.h>
 
+#include "../internal.h"
+
 /*
  * Node
  */
-
-typedef struct btc_node_s {
-  const btc_network_t *network;
-  btc_loop_t *loop;
-  btc_logger_t *logger;
-  const btc_timedata_t *timedata;
-  btc_chain_t *chain;
-  btc_mempool_t *mempool;
-  btc_miner_t *miner;
-  btc_pool_t *pool;
-  btc_rpc_t *rpc;
-} btc_node_t;
 
 btc_node_t *
 btc_node_create(const btc_network_t *network) {
@@ -69,15 +59,15 @@ btc_node_create(const btc_network_t *network) {
   node->pool = btc_pool_create(network, node->loop, node->chain, node->mempool);
   node->rpc = btc_rpc_create(node);
 
-  btc_chain_set_logger(chain, node->logger);
-  btc_mempool_set_logger(chain, node->logger);
-  btc_miner_set_logger(chain, node->logger);
-  btc_pool_set_logger(chain, node->logger);
+  btc_chain_set_logger(node->chain, node->logger);
+  btc_mempool_set_logger(node->mempool, node->logger);
+  btc_miner_set_logger(node->miner, node->logger);
+  btc_pool_set_logger(node->pool, node->logger);
 
-  btc_chain_set_timedata(chain, node->timedata);
-  btc_mempool_set_timedata(chain, node->timedata);
-  btc_miner_set_timedata(chain, node->timedata);
-  btc_pool_set_timedata(chain, node->timedata);
+  btc_chain_set_timedata(node->chain, node->timedata);
+  btc_mempool_set_timedata(node->mempool, node->timedata);
+  btc_miner_set_timedata(node->miner, node->timedata);
+  btc_pool_set_timedata(node->pool, node->timedata);
 
   return node;
 }
@@ -145,7 +135,7 @@ fail4:
 fail3:
   btc_mempool_close(node->mempool);
 fail2:
-  btc_chain_close(node->mempool);
+  btc_chain_close(node->chain);
 fail1:
   btc_logger_close(node->logger);
   return 0;

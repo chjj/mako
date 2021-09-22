@@ -55,12 +55,12 @@ typedef struct btc_socket_s {
   int state;
   int fd;
   size_t index;
-  btc_connect_cb *on_socket;
-  btc_connect_cb *on_connect;
-  btc_connect_cb *on_disconnect;
-  btc_error_cb *on_error;
-  btc_data_cb *on_data;
-  btc_drain_cb *on_drain;
+  btc_connect_f *on_socket;
+  btc_connect_f *on_connect;
+  btc_connect_f *on_disconnect;
+  btc_error_f *on_error;
+  btc_data_f *on_data;
+  btc_drain_f *on_drain;
   void *data;
 } btc__socket_t;
 
@@ -69,7 +69,7 @@ typedef struct btc_loop_s {
   btc__socket_t *sockets[128];
   size_t length;
   int running;
-  btc_tick_cb *on_tick[8];
+  btc_tick_f *on_tick[8];
   size_t on_ticks;
   void *data[8];
 } btc__loop_t;
@@ -232,32 +232,32 @@ btc_socket_address(btc_sockaddr_t *addr, btc__socket_t *socket) {
 }
 
 void
-btc_socket_on_socket(btc__socket_t *socket, btc_connect_cb *handler) {
+btc_socket_on_socket(btc__socket_t *socket, btc_connect_f *handler) {
   socket->on_socket = handler;
 }
 
 void
-btc_socket_on_connect(btc__socket_t *socket, btc_connect_cb *handler) {
+btc_socket_on_connect(btc__socket_t *socket, btc_connect_f *handler) {
   socket->on_connect = handler;
 }
 
 void
-btc_socket_on_disconnect(btc__socket_t *socket, btc_connect_cb *handler) {
+btc_socket_on_disconnect(btc__socket_t *socket, btc_connect_f *handler) {
   socket->on_disconnect = handler;
 }
 
 void
-btc_socket_on_error(btc__socket_t *socket, btc_error_cb *handler) {
+btc_socket_on_error(btc__socket_t *socket, btc_error_f *handler) {
   socket->on_error = handler;
 }
 
 void
-btc_socket_on_data(btc__socket_t *socket, btc_data_cb *handler) {
+btc_socket_on_data(btc__socket_t *socket, btc_data_f *handler) {
   socket->on_data = handler;
 }
 
 void
-btc_socket_on_drain(btc__socket_t *socket, btc_drain_cb *handler) {
+btc_socket_on_drain(btc__socket_t *socket, btc_drain_f *handler) {
   socket->on_drain = handler;
 }
 
@@ -520,7 +520,7 @@ btc_loop_destroy(btc__loop_t *loop) {
 }
 
 void
-btc_loop_on_tick(btc__loop_t *loop, btc_tick_cb *handler) {
+btc_loop_on_tick(btc__loop_t *loop, btc_tick_f *handler) {
   CHECK(loop->on_ticks < lengthof(loop->on_tick));
   loop->on_tick[loop->on_ticks++] = handler;
 }

@@ -16,6 +16,22 @@ extern "C" {
 #include "../satoshi/common.h"
 #include "../satoshi/types.h"
 
+/*
+ * RPC
+ */
+
+BTC_EXTERN btc_rpc_t *
+btc_rpc_create(btc_node_t *node);
+
+BTC_EXTERN void
+btc_rpc_destroy(btc_rpc_t *rpc);
+
+BTC_EXTERN int
+btc_rpc_open(btc_rpc_t *rpc);
+
+BTC_EXTERN void
+btc_rpc_close(btc_rpc_t *rpc);
+
 #ifdef __cplusplus
 }
 #endif

@@ -18,6 +18,9 @@ extern "C" {
  * Types
  */
 
+struct btc_network_s;
+struct btc_loop_s;
+
 typedef struct btc_addrman_s btc_addrman_t;
 
 typedef struct btc_deployment_state_s {
@@ -38,6 +41,26 @@ typedef struct btc_timedata_s {
   int64_t offset;
   int checked;
 } btc_timedata_t;
+
+typedef struct btc_pool_s btc_pool_t;
+
+typedef struct btc_mempool_s btc_mempool_t;
+
+typedef struct btc_miner_s btc_miner_t;
+
+typedef struct btc_rpc_s btc_rpc_t;
+
+typedef struct btc_node_s {
+  const struct btc_network_s *network;
+  struct btc_loop_s *loop;
+  btc_logger_t *logger;
+  btc_timedata_t *timedata;
+  btc_chain_t *chain;
+  btc_mempool_t *mempool;
+  btc_miner_t *miner;
+  btc_pool_t *pool;
+  btc_rpc_t *rpc;
+} btc_node_t;
 
 #ifdef __cplusplus
 }

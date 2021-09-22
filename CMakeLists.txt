@@ -82,6 +82,11 @@ list(APPEND node_sources src/node/addrman.c
                          src/node/chain.c
                          src/node/chaindb.c
                          src/node/logger.c
+                         src/node/mempool.c
+                         src/node/miner.c
+                         src/node/node.c
+                         src/node/pool.c
+                         src/node/rpc.c
                          src/node/timedata.c)
 
 if(WIN32 AND NOT MINGW)
@@ -94,11 +99,13 @@ else()
   endif()
 endif()
 
-if(WIN32)
-  string(REPLACE "/" "\\" srcdir "${PROJECT_SOURCE_DIR}")
-  list(APPEND satoshi_defines BTC_PREFIX="${srcdir}\\tmp")
-else()
-  list(APPEND satoshi_defines BTC_PREFIX="${PROJECT_SOURCE_DIR}/tmp")
+if(NOT CMAKE_CROSSCOMPILING)
+  if(WIN32)
+    string(REPLACE "/" "\\" srcdir "${PROJECT_SOURCE_DIR}")
+    list(APPEND satoshi_defines BTC_PREFIX="${srcdir}\\tmp")
+  else()
+    list(APPEND satoshi_defines BTC_PREFIX="${PROJECT_SOURCE_DIR}/tmp")
+  endif()
 endif()
 
 if(MSVC)
@@ -156,6 +163,12 @@ target_compile_options(satoshi_tests PUBLIC ${satoshi_cflags})
 target_include_directories(satoshi_tests PUBLIC ${satoshi_includes})
 target_link_options(satoshi_tests INTERFACE ${satoshi_ldflags})
 set_property(TARGET satoshi_tests PROPERTY OUTPUT_NAME tests)
+
+add_executable(satoshid src/node/main.c)
+target_link_options(satoshid PRIVATE -Wl,-z,now)
+target_link_libraries(satoshid PRIVATE satoshi_node
+                                       satoshi_io
+                                       satoshi_static)
 
 foreach(name ecdsa bip340 sighash script tx chaindb chain)
   add_executable(t-${name} test/t-${name}.c)

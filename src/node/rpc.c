@@ -44,11 +44,11 @@
  */
 
 struct btc_rpc_s {
+  btc_node_t *node;
   const btc_network_t *network;
   btc_loop_t *loop;
   btc_logger_t *logger;
   const btc_timedata_t *timedata;
-  btc_node_t *node;
   btc_chain_t *chain;
   btc_mempool_t *mempool;
   btc_miner_t *miner;
@@ -56,17 +56,17 @@ struct btc_rpc_s {
 };
 
 struct btc_rpc_s *
-btc_rpc_create(const btc_network_t *network, btc_node_t *node) {
+btc_rpc_create(btc_node_t *node) {
   struct btc_rpc_s *rpc =
     (struct btc_rpc_s *)btc_malloc(sizeof(struct btc_rpc_s));
 
   memset(rpc, 0, sizeof(*rpc));
 
-  rpc->network = network;
-  rpc->loop = loop;
+  rpc->node = node;
+  rpc->network = node->network;
+  rpc->loop = node->loop;
   rpc->logger = node->logger;
   rpc->timedata = node->timedata;
-  rpc->node = node;
   rpc->chain = node->chain;
   rpc->mempool = node->mempool;
   rpc->miner = node->miner;
