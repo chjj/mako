@@ -2371,8 +2371,6 @@ btc_pool_add_block(struct btc_pool_s *pool,
 
   peer->block_time = btc_ms();
 
-  btc_pool_log(pool, "Adding block: %H (%N).", hash, &peer->addr);
-
   if (!btc_chain_add(pool->chain, block, flags, peer->id)) {
 #if 0
     btc_peer_reject(peer, BTC_MSG_BLOCK, btc_chain_error(pool->chain));

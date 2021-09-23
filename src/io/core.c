@@ -107,3 +107,21 @@ btc_ms(void) {
 
   return (ts.tv_sec * 1000) + (ts.tv_nsec / 1000000);
 }
+
+int64_t
+btc_us(void) {
+  btc_timespec_t ts;
+
+  btc_time_get(&ts);
+
+  return (ts.tv_sec * 1000000) + (ts.tv_nsec / 1000);
+}
+
+int64_t
+btc_ns(void) {
+  btc_timespec_t ts;
+
+  btc_time_get(&ts);
+
+  return (ts.tv_sec * 1000000000) + ts.tv_nsec;
+}

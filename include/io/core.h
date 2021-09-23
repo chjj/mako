@@ -317,6 +317,12 @@ btc_path_join(char *zp, ...);
 BTC_EXTERN int64_t
 btc_ms(void);
 
+BTC_EXTERN int64_t
+btc_us(void);
+
+BTC_EXTERN int64_t
+btc_ns(void);
+
 /*
  * Socket Address
  */

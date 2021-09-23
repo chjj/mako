@@ -92,7 +92,7 @@ btc_chainfile_copy(btc_chainfile_t *z, const btc_chainfile_t *x) {
 static size_t
 btc_chainfile_size(const btc_chainfile_t *x) {
   (void)x;
-  return 29;
+  return 37;
 }
 
 static uint8_t *
@@ -101,8 +101,8 @@ btc_chainfile_write(uint8_t *zp, const btc_chainfile_t *x) {
   zp = btc_int32_write(zp, x->id);
   zp = btc_int32_write(zp, x->pos);
   zp = btc_int32_write(zp, x->items);
-  zp = btc_time_write(zp, x->min_time);
-  zp = btc_time_write(zp, x->max_time);
+  zp = btc_int64_write(zp, x->min_time);
+  zp = btc_int64_write(zp, x->max_time);
   zp = btc_int32_write(zp, x->min_height);
   zp = btc_int32_write(zp, x->max_height);
   return zp;
@@ -122,10 +122,10 @@ btc_chainfile_read(btc_chainfile_t *z, const uint8_t **xp, size_t *xn) {
   if (!btc_int32_read(&z->items, xp, xn))
     return 0;
 
-  if (!btc_time_read(&z->min_time, xp, xn))
+  if (!btc_int64_read(&z->min_time, xp, xn))
     return 0;
 
-  if (!btc_time_read(&z->max_time, xp, xn))
+  if (!btc_int64_read(&z->max_time, xp, xn))
     return 0;
 
   if (!btc_int32_read(&z->min_height, xp, xn))
@@ -185,9 +185,9 @@ btc_chaindb_path(struct btc_chaindb_s *db, char *path, int type, int id) {
   const char *str = (type == 0 ? "blk" : "rev");
 
 #if defined(_WIN32)
-  sprintf(path, "%s\\blocks\\%s%05d.dat", db->prefix, str, id);
+  sprintf(path, "%s\\blocks\\%s%.5d.dat", db->prefix, str, id);
 #else
-  sprintf(path, "%s/blocks/%s%05d.dat", db->prefix, str, id);
+  sprintf(path, "%s/blocks/%s%.5d.dat", db->prefix, str, id);
 #endif
 }
 
@@ -789,13 +789,13 @@ btc_chaindb_read(struct btc_chaindb_s *db,
   if (!btc_fs_pread(fd, tmp, 4, pos + 16))
     goto fail;
 
-  size = read32le(tmp);
+  size = 24 + read32le(tmp);
   data = (uint8_t *)malloc(size);
 
   if (data == NULL)
     goto fail;
 
-  if (!btc_fs_pread(fd, data, size, pos + 24))
+  if (!btc_fs_pread(fd, data, size, pos))
     goto fail;
 
   *raw = data;
@@ -827,7 +827,7 @@ btc_chaindb_read_block(struct btc_chaindb_s *db, const btc_entry_t *entry) {
     return NULL;
   }
 
-  block = btc_block_decode(buf, len);
+  block = btc_block_decode(buf + 24, len - 24);
 
   free(buf);
 
@@ -848,7 +848,7 @@ btc_chaindb_read_undo(struct btc_chaindb_s *db, const btc_entry_t *entry) {
     return NULL;
   }
 
-  undo = btc_undo_decode(buf, len);
+  undo = btc_undo_decode(buf + 24, len - 24);
 
   free(buf);
 
@@ -860,7 +860,7 @@ should_sync(const btc_entry_t *entry) {
   if (btc_now() - entry->header.time <= 24 * 60 * 60)
     return 1;
 
-  if ((entry->height % 1000) == 0)
+  if ((entry->height % 20000) == 0)
     return 1;
 
   return 0;
@@ -873,7 +873,7 @@ btc_chaindb_alloc(struct btc_chaindb_s *db,
                   size_t len) {
   char path[BTC_PATH_MAX + 1];
   MDB_val mkey, mval;
-  uint8_t raw[29];
+  uint8_t raw[37];
   uint8_t key[5];
   int fd;
 
@@ -922,7 +922,7 @@ btc_chaindb_write_block(struct btc_chaindb_s *db,
                         const btc_block_t *block) {
   MDB_val mkey, mval;
   uint8_t hash[32];
-  uint8_t raw[29];
+  uint8_t raw[37];
   size_t len;
 
   len = btc_block_export(db->slab + 24, block);
@@ -977,7 +977,7 @@ btc_chaindb_write_undo(struct btc_chaindb_s *db,
   uint8_t *buf = db->slab;
   MDB_val mkey, mval;
   uint8_t hash[32];
-  uint8_t raw[29];
+  uint8_t raw[37];
   int ret = 0;
 
   if (len > BTC_MAX_RAW_BLOCK_SIZE) {
@@ -1249,6 +1249,12 @@ btc_chaindb_save(struct btc_chaindb_s *db,
   if (mdb_txn_commit(txn) != 0)
     return 0;
 
+  /* Flush OS buffers. */
+  if (should_sync(entry)) {
+    if (mdb_env_sync(db->env, 1) != 0)
+      return 0;
+  }
+
   /* Update hashes. */
   it = kh_put(hashes, db->hashes, entry->hash, &rc);
 
@@ -1319,6 +1325,10 @@ btc_chaindb_reconnect(struct btc_chaindb_s *db,
   if (mdb_txn_commit(txn) != 0)
     return 0;
 
+  /* Flush OS buffers. */
+  if (mdb_env_sync(db->env, 1) != 0)
+    return 0;
+
   /* Set next pointer. */
   CHECK(entry->prev != NULL);
   CHECK(entry->next == NULL);
@@ -1367,6 +1377,12 @@ btc_chaindb_disconnect(struct btc_chaindb_s *db,
 
   /* Commit transaction. */
   if (mdb_txn_commit(txn) != 0) {
+    txn = NULL;
+    goto fail;
+  }
+
+  /* Flush OS buffers. */
+  if (mdb_env_sync(db->env, 1) != 0) {
     txn = NULL;
     goto fail;
   }

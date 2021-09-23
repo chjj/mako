@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <io/core.h>
+
 #include <node/chain.h>
 #include <node/chaindb.h>
 #include <node/logger.h>
@@ -1288,7 +1290,7 @@ btc_chain_verify_inputs(struct btc_chain_s *chain,
 
       reward += fee;
 
-      if (reward > BTC_MAX_MONEY) {
+      if (reward < 0 || reward > BTC_MAX_MONEY) {
         btc_chain_throw(chain, hdr,
                         "invalid",
                         "bad-cb-amount",
@@ -1720,8 +1722,10 @@ btc_chain_connect(struct btc_chain_s *chain,
                   const btc_entry_t *prev,
                   const btc_block_t *block,
                   unsigned int flags) {
+  const btc_network_t *network = chain->network;
   const btc_header_t *hdr = &block->header;
   btc_entry_t *entry = btc_entry_create();
+  int64_t now = btc_us();
 
   /* Sanity check. */
   CHECK(btc_hash_equal(hdr->prev_block, prev->hash));
@@ -1746,10 +1750,13 @@ btc_chain_connect(struct btc_chain_s *chain,
     }
   }
 
-  btc_chain_log(chain, "Block %H (%d) added to chain (txs=%zu).",
-                entry->hash,
-                entry->height,
-                block->txs.length);
+  if (entry->height % 20 == 0 || entry->height >= network->block.slow_height) {
+    btc_chain_log(chain, "Block %H (%d) added to chain (txs=%zu time=%.2f).",
+                  entry->hash,
+                  entry->height,
+                  block->txs.length,
+                  (double)(btc_us() - now) / 1000);
+  }
 
   return entry;
 }
