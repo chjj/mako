@@ -380,15 +380,7 @@ btc_nonces_init(btc_nonces_t *list) {
 
 static void
 btc_nonces_clear(btc_nonces_t *list) {
-  khiter_t it;
-
   kh_destroy(hosts, list->hosts);
-
-  for (it = kh_begin(list->map); it != kh_end(list->map); it++) {
-    if (kh_exist(list->map, it))
-      btc_netaddr_destroy(kh_value(list->map, it));
-  }
-
   kh_destroy(nonces, list->map);
 
   list->hosts = NULL;
@@ -411,12 +403,12 @@ btc_nonces_alloc(btc_nonces_t *list, const btc_netaddr_t *addr_) {
   for (;;) {
     nonce = ((uint64_t)btc_random() << 32) | btc_random();
 
-    if (btc_nonces_has(list, nonce))
-      continue;
-
     it = kh_put(nonces, list->map, nonce, &ret);
 
-    CHECK(ret > 0);
+    CHECK(ret != -1);
+
+    if (ret == 0)
+      continue;
 
     kh_value(list->map, it) = addr;
 
@@ -433,7 +425,6 @@ btc_nonces_alloc(btc_nonces_t *list, const btc_netaddr_t *addr_) {
 static int
 btc_nonces_remove(btc_nonces_t *list, const btc_netaddr_t *addr) {
   khiter_t it = kh_get(hosts, list->hosts, addr);
-  btc_netaddr_t *val;
   uint64_t nonce;
 
   if (it == kh_end(list->hosts))
@@ -447,11 +438,7 @@ btc_nonces_remove(btc_nonces_t *list, const btc_netaddr_t *addr) {
 
   CHECK(it != kh_end(list->map));
 
-  val = kh_value(list->map, it);
-
   kh_del(nonces, list->map, it);
-
-  btc_netaddr_destroy(val);
 
   return 1;
 }
