@@ -814,7 +814,18 @@ btc_peer_close(btc_peer_t *peer) {
 
 static int
 btc_peer_write(btc_peer_t *peer, uint8_t *data, size_t length) {
-  return btc_socket_write(peer->socket, data, length);
+  int rc = btc_socket_write(peer->socket, data, length);
+
+  if (rc == -1) {
+    const char *msg = btc_socket_strerror(peer->socket);
+
+    btc_peer_log(peer, "Write error (%N): %s", &peer->addr, msg);
+    btc_peer_close(peer);
+
+    return 0;
+  }
+
+  return rc;
 }
 
 static int
@@ -845,7 +856,7 @@ btc_peer_send(btc_peer_t *peer, const btc_msg_t *msg) {
   /* Checksum. */
   memcpy(data + 20, hash, 4);
 
-  return btc_socket_write(peer->socket, data, length);
+  return btc_peer_write(peer, data, length);
 }
 
 static int
