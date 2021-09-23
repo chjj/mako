@@ -131,15 +131,14 @@ target_link_options(satoshi_static INTERFACE ${satoshi_ldflags})
 target_link_libraries(satoshi_static INTERFACE ${satoshi_libs})
 set_property(TARGET satoshi_static PROPERTY OUTPUT_NAME satoshi)
 
-add_library(satoshi_shared SHARED ${satoshi_sources})
-target_compile_definitions(satoshi_shared PUBLIC ${satoshi_defines}
-                                          PRIVATE BTC_EXPORT)
-target_compile_options(satoshi_shared PUBLIC ${satoshi_cflags})
-target_include_directories(satoshi_shared PUBLIC ${satoshi_includes})
-target_link_options(satoshi_shared PUBLIC ${satoshi_ldflags})
-target_link_options(satoshi_shared PRIVATE -Wl,-z,now)
-target_link_libraries(satoshi_shared PRIVATE ${satoshi_libs})
-set_property(TARGET satoshi_shared PROPERTY OUTPUT_NAME satoshi)
+# add_library(satoshi_shared SHARED ${satoshi_sources})
+# target_compile_definitions(satoshi_shared PUBLIC ${satoshi_defines}
+#                                           PRIVATE BTC_EXPORT)
+# target_compile_options(satoshi_shared PUBLIC ${satoshi_cflags})
+# target_include_directories(satoshi_shared PUBLIC ${satoshi_includes})
+# target_link_options(satoshi_shared PUBLIC ${satoshi_ldflags})
+# target_link_libraries(satoshi_shared PRIVATE ${satoshi_libs})
+# set_property(TARGET satoshi_shared PROPERTY OUTPUT_NAME satoshi)
 
 add_library(satoshi_io STATIC ${io_sources})
 target_compile_definitions(satoshi_io PUBLIC ${satoshi_defines})
@@ -165,7 +164,6 @@ target_link_options(satoshi_tests INTERFACE ${satoshi_ldflags})
 set_property(TARGET satoshi_tests PROPERTY OUTPUT_NAME tests)
 
 add_executable(satoshid src/node/main.c)
-target_link_options(satoshid PRIVATE -Wl,-z,now)
 target_link_libraries(satoshid PRIVATE satoshi_node
                                        satoshi_io
                                        satoshi_static)
@@ -222,10 +220,9 @@ set(tests # crypto
 
 foreach(name ${tests})
   add_executable(t-${name} test/t-${name}.c)
-  target_link_options(t-${name} PRIVATE -Wl,-z,now)
   target_link_libraries(t-${name} PRIVATE satoshi_tests
                                           satoshi_node
                                           satoshi_io
-                                          satoshi_shared)
+                                          satoshi_static)
   add_test(NAME ${name} COMMAND t-${name})
 endforeach()
