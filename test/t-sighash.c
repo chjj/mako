@@ -12,7 +12,7 @@
 #include <satoshi/tx.h>
 #include <satoshi/util.h>
 #include "data/sighash_vectors.h"
-#include "tests.h"
+#include "lib/tests.h"
 
 static void
 test_sighash_vector(const test_sighash_vector_t *vec, size_t index) {

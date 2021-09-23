@@ -9,7 +9,7 @@
 #include <node/chain.h>
 #include <satoshi/block.h>
 #include <satoshi/network.h>
-#include "tests.h"
+#include "lib/tests.h"
 #include "data/chain_vectors_main.h"
 
 #ifndef BTC_PREFIX

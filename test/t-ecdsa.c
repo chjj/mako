@@ -10,7 +10,7 @@
 #include <satoshi/crypto/ecc.h>
 #include <satoshi/util.h>
 #include "data/ecdsa_vectors.h"
-#include "tests.h"
+#include "lib/tests.h"
 
 static void
 test_ecdsa_vectors(void) {

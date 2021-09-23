@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include "tests.h"
+#include "lib/tests.h"
 
 int main(void) {
   return 0;

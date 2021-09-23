@@ -9,7 +9,7 @@
 #include <satoshi/crypto/drbg.h>
 #include <satoshi/crypto/ecc.h>
 #include "data/bip340_vectors.h"
-#include "tests.h"
+#include "lib/tests.h"
 
 static void
 test_bip340_vectors(void) {

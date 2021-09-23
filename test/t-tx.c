@@ -14,7 +14,7 @@
 #include <satoshi/util.h>
 #include "data/tx_valid_vectors.h"
 #include "data/tx_invalid_vectors.h"
-#include "tests.h"
+#include "lib/tests.h"
 
 static void
 test_tx_valid_vector(const test_valid_vector_t *vec, size_t index) {

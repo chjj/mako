@@ -156,7 +156,7 @@ target_link_options(satoshi_node INTERFACE ${satoshi_ldflags})
 target_link_libraries(satoshi_node PRIVATE lmdb)
 set_property(TARGET satoshi_node PROPERTY OUTPUT_NAME node)
 
-add_library(satoshi_tests STATIC test/tests.c)
+add_library(satoshi_tests STATIC test/lib/tests.c)
 target_compile_definitions(satoshi_tests PUBLIC ${satoshi_defines})
 target_compile_options(satoshi_tests PUBLIC ${satoshi_cflags})
 target_include_directories(satoshi_tests PUBLIC ${satoshi_includes})

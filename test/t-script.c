@@ -13,7 +13,7 @@
 #include <satoshi/tx.h>
 #include <satoshi/util.h>
 #include "data/script_vectors.h"
-#include "tests.h"
+#include "lib/tests.h"
 
 static void
 test_script_vector(const test_script_vector_t *vec, size_t index) {

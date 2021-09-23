@@ -8,7 +8,7 @@
 #include <string.h>
 #include <node/chaindb.h>
 #include <satoshi/network.h>
-#include "tests.h"
+#include "lib/tests.h"
 
 #ifndef BTC_PREFIX
 #  define BTC_PREFIX "./tmp"
