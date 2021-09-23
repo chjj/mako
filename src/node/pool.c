@@ -69,7 +69,6 @@ typedef struct parser_s {
   size_t waiting;
   /* Header */
   char cmd[12];
-  size_t size;
   int has_header;
   uint32_t checksum;
   /* Callback */
@@ -469,7 +468,6 @@ parser_init(parser_t *parser, uint32_t magic) {
   parser->total = 0;
   parser->waiting = 24;
   parser->cmd[0] = '\0';
-  parser->size = 0;
   parser->has_header = 0;
   parser->checksum = 0;
   parser->on_msg = NULL;
@@ -511,7 +509,7 @@ parser_append(parser_t *parser, const uint8_t *data, size_t length) {
 
 static int
 parser_parse_header(parser_t *parser, const uint8_t *data) {
-  size_t i;
+  size_t i, size;
 
   if (read32le(data) != parser->magic)
     return 0;
@@ -523,14 +521,14 @@ parser_parse_header(parser_t *parser, const uint8_t *data) {
 
   memcpy(parser->cmd, data + 4, i + 1);
 
-  parser->size = read32le(data + 16);
+  size = read32le(data + 16);
 
-  if (parser->size > BTC_NET_MAX_MESSAGE) {
+  if (size > BTC_NET_MAX_MESSAGE) {
     parser->waiting = 24;
     return 0;
   }
 
-  parser->waiting = parser->size;
+  parser->waiting = size;
   parser->checksum = read32le(data + 20);
   parser->has_header = 1;
 
@@ -593,6 +591,9 @@ parser_feed(parser_t *parser, const uint8_t *data, size_t length) {
     ptr += wait;
     len -= wait;
   }
+
+  if (len > 0 && ptr != parser->pending)
+    memmove(parser->pending, ptr, len);
 
   parser->total = len;
 
@@ -2196,6 +2197,11 @@ btc_pool_on_blockinv(struct btc_pool_s *pool,
       btc_pool_resolve_orphan(pool, peer, item->hash);
       continue;
     }
+
+/*
+    if (btc_chain_has_invalid(pool->chain, item->hash))
+      continue;
+*/
 
     /* Request the block if we don't have it. */
     if (!btc_chain_has(pool->chain, item->hash)) {

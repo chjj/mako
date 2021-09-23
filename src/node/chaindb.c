@@ -264,10 +264,17 @@ btc_chaindb_load_prefix(struct btc_chaindb_s *db, const char *prefix) {
 
 static int
 btc_chaindb_load_database(struct btc_chaindb_s *db, size_t map_size) {
-  unsigned int flags = MDB_NOTLS | MDB_NOLOCK | MDB_NOSYNC;
   char path[BTC_PATH_MAX + 1];
+  unsigned int flags;
   MDB_txn *txn;
   int rc;
+
+  flags = MDB_WRITEMAP
+        | MDB_NOMETASYNC
+        | MDB_NOSYNC
+        | MDB_MAPASYNC
+        | MDB_NOTLS
+        | MDB_NOLOCK;
 
   rc = mdb_env_create(&db->env);
 

@@ -34,6 +34,7 @@ btc_output_clear(btc_output_t *z) {
 
 void
 btc_output_copy(btc_output_t *z, const btc_output_t *x) {
+  z->value = x->value;
   btc_script_copy(&z->script, &x->script);
 }
 

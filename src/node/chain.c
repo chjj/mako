@@ -1288,7 +1288,7 @@ btc_chain_verify_inputs(struct btc_chain_s *chain,
 
       reward += fee;
 
-      if (reward < 0 || reward > BTC_MAX_MONEY) {
+      if (reward > BTC_MAX_MONEY) {
         btc_chain_throw(chain, hdr,
                         "invalid",
                         "bad-cb-amount",
