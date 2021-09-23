@@ -52,6 +52,14 @@
 #  define TEST_NORETURN
 #endif
 
+#ifndef BTC_PREFIX
+#  if defined(_WIN32)
+#    define BTC_PREFIX ".\\tmp"
+#  else
+#    define BTC_PREFIX "./tmp"
+#  endif
+#endif
+
 TEST_NORETURN void
 test_assert_fail(const char *file, int line, const char *expr);
 
@@ -60,5 +68,8 @@ hex_parse(unsigned char *out, size_t size, const char *str);
 
 void
 hex_decode(unsigned char *out, size_t *size, const char *str);
+
+int
+btc_clean(const char *prefix);
 
 #endif /* BTC_TESTS_H */

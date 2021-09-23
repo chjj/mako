@@ -12,16 +12,14 @@
 #include "lib/tests.h"
 #include "data/chain_vectors_main.h"
 
-#ifndef BTC_PREFIX
-#  define BTC_PREFIX "./tmp"
-#endif
-
 int main(void) {
   unsigned int flags = BTC_CHAIN_DEFAULT_FLAGS;
   btc_chain_t *chain = btc_chain_create(btc_mainnet);
   unsigned char data[4096];
   btc_block_t block;
   size_t i;
+
+  btc_clean(BTC_PREFIX);
 
   ASSERT(btc_chain_open(chain, BTC_PREFIX, 20 << 20));
 
@@ -40,6 +38,8 @@ int main(void) {
 
   btc_chain_close(chain);
   btc_chain_destroy(chain);
+
+  btc_clean(BTC_PREFIX);
 
   return 0;
 }

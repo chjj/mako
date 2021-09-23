@@ -10,17 +10,17 @@
 #include <satoshi/network.h>
 #include "lib/tests.h"
 
-#ifndef BTC_PREFIX
-#  define BTC_PREFIX "./tmp"
-#endif
-
 int main(void) {
   btc_chaindb_t *db = btc_chaindb_create(btc_mainnet);
+
+  btc_clean(BTC_PREFIX);
 
   ASSERT(btc_chaindb_open(db, BTC_PREFIX, 20 << 20));
 
   btc_chaindb_close(db);
   btc_chaindb_destroy(db);
+
+  btc_clean(BTC_PREFIX);
 
   return 0;
 }
