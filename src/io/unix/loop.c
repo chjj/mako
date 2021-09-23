@@ -400,11 +400,12 @@ btc_socket_flush(btc__socket_t *socket) {
     CHECK(chunk->len <= INT_MAX);
 
     while (chunk->len > 0) {
-      do {
-        len = write(socket->fd, chunk->raw, chunk->len);
-      } while (len == -1 && errno == EINTR);
+      len = write(socket->fd, chunk->raw, chunk->len);
 
       if (len == -1) {
+        if (errno == EINTR)
+          continue;
+
         if (errno == EAGAIN)
           break;
 
@@ -662,6 +663,12 @@ handle_read(btc__loop_t *loop, btc__socket_t *socket) {
           break;
         }
 
+        if (len == 0) {
+          socket->loop->error = ENODATA;
+          socket->on_error(socket);
+          break;
+        }
+
         if ((size_t)len > size)
           abort();
 
@@ -737,11 +744,6 @@ btc_loop_start(btc__loop_t *loop) {
 
         if (pfd->revents & (POLLIN | POLLERR | POLLHUP))
           handle_read(loop, socket);
-
-        if (socket->state == BTC_SOCKET_DISCONNECTING
-            || socket->state == BTC_SOCKET_DISCONNECTED) {
-          continue;
-        }
 
         if (pfd->revents & (POLLOUT | POLLERR | POLLHUP))
           handle_write(loop, socket);
