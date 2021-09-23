@@ -1,3 +1,9 @@
+/*!
+ * t-ecdsa.c - ecdsa test for libsatoshi
+ * Copyright (c) 2021, Christopher Jeffrey (MIT License).
+ * https://github.com/chjj/libsatoshi
+ */
+
 #include <stddef.h>
 #include <string.h>
 #include <satoshi/crypto/drbg.h>

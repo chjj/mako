@@ -1,3 +1,9 @@
+/*!
+ * t-sighash.c - sighash test for libsatoshi
+ * Copyright (c) 2021, Christopher Jeffrey (MIT License).
+ * https://github.com/chjj/libsatoshi
+ */
+
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>

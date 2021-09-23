@@ -170,7 +170,57 @@ target_link_libraries(satoshid PRIVATE satoshi_node
                                        satoshi_io
                                        satoshi_static)
 
-foreach(name ecdsa bip340 sighash script tx chaindb chain)
+set(tests # crypto
+          bip340
+          chacha20
+          drbg
+          ecdsa
+          hash160
+          hash256
+          merkle
+          rand
+          ripemd160
+          sha1
+          sha256
+          # lib
+          address
+          base58
+          bech32
+          block
+          bloom
+          coin
+          entry
+          header
+          input
+          mpi
+          murmur3
+          netaddr
+          netmsg
+          outpoint
+          output
+          printf
+          script
+          sighash
+          tx
+          util
+          vector
+          view
+          # io
+          addrinfo
+          sockaddr
+          fs
+          loop
+          thread
+          # node
+          addrman
+          chaindb
+          chain
+          mempool
+          miner
+          rpc
+          timedata)
+
+foreach(name ${tests})
   add_executable(t-${name} test/t-${name}.c)
   target_link_options(t-${name} PRIVATE -Wl,-z,now)
   target_link_libraries(t-${name} PRIVATE satoshi_tests

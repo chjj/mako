@@ -1,3 +1,9 @@
+/*!
+ * t-tx.c - tx test for libsatoshi
+ * Copyright (c) 2021, Christopher Jeffrey (MIT License).
+ * https://github.com/chjj/libsatoshi
+ */
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
