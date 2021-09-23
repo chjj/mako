@@ -513,7 +513,7 @@ btc_reject_copy(btc_reject_t *z, const btc_reject_t *x) {
 }
 
 void
-btc_set_code(btc_reject_t *z, const char *code) {
+btc_reject_set_code(btc_reject_t *z, const char *code) {
   if (strcmp(code, "malformed") == 0)
     z->code = BTC_REJECT_MALFORMED;
   else if (strcmp(code, "invalid") == 0)
@@ -535,7 +535,7 @@ btc_set_code(btc_reject_t *z, const char *code) {
 }
 
 const char *
-btc_get_code(const btc_reject_t *x) {
+btc_reject_get_code(const btc_reject_t *x) {
   switch (x->code) {
     case BTC_REJECT_MALFORMED:
       return "malformed";
@@ -852,6 +852,9 @@ btc_msg_init(btc_msg_t *msg) {
 
 void
 btc_msg_clear(btc_msg_t *msg) {
+  if (msg->body == NULL)
+    return;
+
   switch (msg->type) {
     case BTC_MSG_VERSION:
       btc_version_clear((btc_version_t *)msg->body);

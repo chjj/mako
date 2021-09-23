@@ -53,4 +53,20 @@
   KHASH_INIT(name, const btc_outpoint_t *, khval_t, 1, btc_outpoint_hash,  \
                                                        btc_outpoint_equal)
 
+#define KHASH_SET_INIT_NETADDR(name)                            \
+  KHASH_INIT(name, btc_netaddr_t *, char, 0, btc_netaddr_hash,  \
+                                             btc_netaddr_equal)
+
+#define KHASH_MAP_INIT_NETADDR(name, khval_t)                      \
+  KHASH_INIT(name, btc_netaddr_t *, khval_t, 1, btc_netaddr_hash,  \
+                                                btc_netaddr_equal)
+
+#define KHASH_SET_INIT_CONST_NETADDR(name)                            \
+  KHASH_INIT(name, const btc_netaddr_t *, char, 0, btc_netaddr_hash,  \
+                                                   btc_netaddr_equal)
+
+#define KHASH_MAP_INIT_CONST_NETADDR(name, khval_t)                      \
+  KHASH_INIT(name, const btc_netaddr_t *, khval_t, 1, btc_netaddr_hash,  \
+                                                      btc_netaddr_equal)
+
 #endif /* BTC_MAP_H */

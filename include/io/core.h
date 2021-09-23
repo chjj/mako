@@ -314,6 +314,9 @@ btc_fs_close_lock(int fd);
 BTC_EXTERN size_t
 btc_path_join(char *zp, ...);
 
+BTC_EXTERN int64_t
+btc_ms(void);
+
 /*
  * Socket Address
  */

@@ -29,7 +29,7 @@ BTC_EXTERN void
 btc_pool_set_logger(btc_pool_t *pool, btc_logger_t *logger);
 
 BTC_EXTERN void
-btc_pool_set_timedata(btc_pool_t *pool, const btc_timedata_t *td);
+btc_pool_set_timedata(btc_pool_t *pool, btc_timedata_t *td);
 
 BTC_EXTERN int
 btc_pool_open(btc_pool_t *pool);

@@ -98,3 +98,12 @@ btc_path_join(char *zp, ...) {
 
   return zn;
 }
+
+int64_t
+btc_ms(void) {
+  btc_timespec_t ts;
+
+  btc_time_get(&ts);
+
+  return (ts.tv_sec * 1000) + (ts.tv_nsec / 1000000);
+}

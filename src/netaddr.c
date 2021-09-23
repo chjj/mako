@@ -143,7 +143,7 @@ btc_netaddr_hash(const btc_netaddr_t *x) {
 
 int
 btc_netaddr_equal(const btc_netaddr_t *x, const btc_netaddr_t *y) {
-  if (memcmp(x->raw, y->raw, 36) != 0)
+  if (memcmp(x->raw, y->raw, 16) != 0)
     return 0;
 
   if (x->port != y->port)
@@ -634,7 +634,7 @@ btc_netaddr_get_str(char *zp, const btc_netaddr_t *x) {
   int c;
 
   if (btc_netaddr_is_mapped(x)) {
-    CHECK(inet_ntop4(x->raw, tmp, sizeof(tmp) - 6) == 0);
+    CHECK(inet_ntop4(x->raw + 12, tmp, sizeof(tmp) - 6) == 0);
 
     if (x->port != 0) {
       c = sprintf(zp, "%s:%d", tmp, x->port);

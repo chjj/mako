@@ -79,7 +79,7 @@ btc_mempool_destroy(struct btc_mempool_s *mp) {
       btc_mpentry_destroy(kh_value(mp->map, it));
   }
 
-  kh_clear(entries, mp->map);
+  kh_destroy(entries, mp->map);
   btc_free(mp);
 }
 

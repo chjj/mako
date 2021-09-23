@@ -558,6 +558,7 @@ static void
 btc_loop_unregister(btc__loop_t *loop, btc__socket_t *socket) {
   loop->pfds[socket->index] = loop->pfds[loop->length - 1];
   loop->sockets[socket->index] = loop->sockets[loop->length - 1];
+  loop->sockets[socket->index]->index = socket->index;
   loop->length--;
 }
 
@@ -604,28 +605,10 @@ handle_read(btc__loop_t *loop, btc__socket_t *socket) {
 
       socket->on_socket(child);
 
-      handle_read(loop, child);
-
-      break;
-    }
-
-    case BTC_SOCKET_CONNECTING: {
-      if (safe_connect(socket->fd, socket->addr, socket->addrlen) == -1) {
-        if (errno != EISCONN) {
-          if (errno == EINPROGRESS || errno == EALREADY)
-            break;
-
-          socket->state = BTC_SOCKET_DISCONNECTING;
-          socket->on_error(socket, errno);
-
-          break;
-        }
-      }
-
-      socket->state = BTC_SOCKET_CONNECTED;
-      socket->on_connect(socket);
-
-      handle_read(loop, socket);
+      /*
+      if (child->state == BTC_SOCKET_CONNECTED)
+        handle_read(loop, child);
+      */
 
       break;
     }
@@ -638,7 +621,7 @@ handle_read(btc__loop_t *loop, btc__socket_t *socket) {
 
       CHECK(size <= INT_MAX);
 
-      for (;;) {
+      while (socket->state == BTC_SOCKET_CONNECTED) {
         len = read(fd, buf, size);
 
         if (len == -1) {
@@ -672,6 +655,30 @@ handle_write(btc__loop_t *loop, btc__socket_t *socket) {
   (void)loop;
 
   switch (socket->state) {
+    case BTC_SOCKET_CONNECTING: {
+      if (safe_connect(socket->fd, socket->addr, socket->addrlen) == -1) {
+        if (errno != EISCONN) {
+          if (errno == EINPROGRESS || errno == EALREADY)
+            break;
+
+          socket->state = BTC_SOCKET_DISCONNECTING;
+          socket->on_error(socket, errno);
+
+          break;
+        }
+      }
+
+      socket->state = BTC_SOCKET_CONNECTED;
+      socket->on_connect(socket);
+
+      /*
+      if (socket->state == BTC_SOCKET_CONNECTED)
+        handle_read(loop, socket);
+      */
+
+      break;
+    }
+
     case BTC_SOCKET_CONNECTED: {
       if (btc_socket_flush(socket) == -1)
         socket->on_error(socket, errno);
@@ -692,8 +699,12 @@ btc_loop_start(btc__loop_t *loop) {
   while (loop->running) {
     c = poll(loop->pfds, loop->length, 1000);
 
-    if (c == -1)
+    if (c == -1) {
+      if (errno == EINTR)
+        continue;
+
       abort();
+    }
 
     if (c != 0) {
       for (i = 0; i < loop->length; i++) {

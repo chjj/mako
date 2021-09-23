@@ -43,7 +43,7 @@ btc_sockaddr_set(btc_sockaddr_t *z, const struct sockaddr *x) {
 
     z->family = 4;
 
-    memcpy(z->raw, (const uint8_t *)&sai->sin_addr, 4);
+    memcpy(z->raw, &sai->sin_addr, 4);
 
     z->port = ntohs(sai->sin_port);
 
@@ -55,7 +55,7 @@ btc_sockaddr_set(btc_sockaddr_t *z, const struct sockaddr *x) {
 
     z->family = 6;
 
-    memcpy(z->raw, (const uint8_t *)&sai->sin6_addr, 16);
+    memcpy(z->raw, &sai->sin6_addr, 16);
 
     z->port = ntohs(sai->sin6_port);
 

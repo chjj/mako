@@ -77,7 +77,6 @@ btc_addrman_open(struct btc_addrman_s *man) {
   int64_t now = btc_now();
   btc_sockaddr_t *res, *p;
   btc_netaddr_t addr;
-  int ret = 0;
   size_t i;
 
   for (i = 0; i < network->seeds.length; i++) {
@@ -93,16 +92,23 @@ btc_addrman_open(struct btc_addrman_s *man) {
         addr.services = BTC_NET_LOCAL_SERVICES;
         addr.port = network->port;
 
+        /* Temporary. */
+        btc_addrman_log(man, "Resolved %N.", &addr);
+
         btc_vector_push(&man->addrs, btc_netaddr_clone(&addr));
       }
 
       btc_freeaddrinfo(res);
     }
+
+    /* Temporary. */
+    if (man->addrs.length >= 10)
+      break;
   }
 
   btc_addrman_log(man, "Resolved %zu seeds.", man->addrs.length);
 
-  return ret;
+  return man->addrs.length > 0;
 }
 
 void
@@ -117,14 +123,6 @@ btc_addrman_close(struct btc_addrman_s *man) {
   }
 
   man->addrs.length = 0;
-}
-
-BTC_UNUSED static int64_t
-btc_addrman_now(struct btc_addrman_s *man) {
-  if (man->timedata == NULL)
-    return btc_now();
-
-  return btc_timedata_now(man->timedata);
 }
 
 void

@@ -725,7 +725,7 @@ btc_string_read(char *zp, const uint8_t **xp, size_t *xn, size_t max) {
   }
 
   if (zn > 0)
-    memcpy(zp, xp, zn);
+    memcpy(zp, *xp, zn);
 
   zp[zn] = '\0';
 

@@ -377,10 +377,10 @@ BTC_EXTERN void
 btc_reject_copy(btc_reject_t *z, const btc_reject_t *x);
 
 BTC_EXTERN void
-btc_set_code(btc_reject_t *z, const char *code);
+btc_reject_set_code(btc_reject_t *z, const char *code);
 
 BTC_EXTERN const char *
-btc_get_code(const btc_reject_t *x);
+btc_reject_get_code(const btc_reject_t *x);
 
 BTC_EXTERN size_t
 btc_reject_size(const btc_reject_t *x);
