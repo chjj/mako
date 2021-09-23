@@ -85,6 +85,8 @@ btc_addrman_open(struct btc_addrman_s *man) {
     btc_addrman_log(man, "Resolving %s...", seed);
 
     if (btc_getaddrinfo(&res, seed)) {
+      int total = 0;
+
       for (p = res; p != NULL; p = p->next) {
         btc_netaddr_set_sockaddr(&addr, p);
 
@@ -92,13 +94,16 @@ btc_addrman_open(struct btc_addrman_s *man) {
         addr.services = BTC_NET_LOCAL_SERVICES;
         addr.port = network->port;
 
-        /* Temporary. */
-        btc_addrman_log(man, "Resolved %N.", &addr);
-
         btc_vector_push(&man->addrs, btc_netaddr_clone(&addr));
+
+        total += 1;
       }
 
+      btc_addrman_log(man, "Resolved %d seeds from %s.", total, seed);
+
       btc_freeaddrinfo(res);
+    } else {
+      btc_addrman_log(man, "Could not resolve %s.", seed);
     }
 
     /* Temporary. */

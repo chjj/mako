@@ -620,7 +620,7 @@ static void
 btc_peer_on_disconnect(btc_peer_t *peer);
 
 static void
-btc_peer_on_error(btc_peer_t *peer, int code);
+btc_peer_on_error(btc_peer_t *peer, const char *msg);
 
 static void
 btc_peer_on_data(btc_peer_t *peer, const uint8_t *data, size_t size);
@@ -663,8 +663,9 @@ on_disconnect(btc_socket_t *socket) {
 }
 
 static void
-on_error(btc_socket_t *socket, int code) {
-  btc_peer_on_error((btc_peer_t *)btc_socket_get_data(socket), code);
+on_error(btc_socket_t *socket) {
+  btc_peer_on_error((btc_peer_t *)btc_socket_get_data(socket),
+                    btc_socket_strerror(socket));
 }
 
 static void
@@ -770,8 +771,6 @@ btc_peer_open(btc_peer_t *peer, const btc_netaddr_t *addr) {
   btc_sockaddr_t sa;
 
   btc_netaddr_get_sockaddr(&sa, addr);
-
-  btc_peer_log(peer, "Opening peer.");
 
   socket = btc_loop_connect(peer->loop, &sa);
 
@@ -1020,14 +1019,11 @@ btc_peer_on_connect(btc_peer_t *peer) {
   if (peer->outbound) {
     /* Say hello. */
     btc_peer_send_version(peer);
-
-    peer->state = BTC_PEER_WAIT_VERACK;
   } else {
-    /* NOTE: Need to call this manually. */
-
     /* We're shy. Wait for an introduction. */
-    peer->state = BTC_PEER_WAIT_VERSION;
   }
+
+  peer->state = BTC_PEER_WAIT_VERSION;
 
   btc_pool_on_connect(peer->pool, peer);
 }
@@ -1045,13 +1041,11 @@ btc_pool_on_complete(struct btc_pool_s *pool, btc_peer_t *peer);
 
 static int
 btc_peer_on_version(btc_peer_t *peer, const btc_version_t *msg) {
-  /*
   if (peer->state != BTC_PEER_WAIT_VERSION) {
     btc_peer_log(peer, "Peer sent unsolicited version (%N).", &peer->addr);
     btc_peer_close(peer);
     return 0;
   }
-  */
 
   peer->version = msg->version;
   peer->services = msg->services;
@@ -1084,38 +1078,28 @@ btc_peer_on_version(btc_peer_t *peer, const btc_version_t *msg) {
     }
   }
 
-  if (peer->outbound) {
-    btc_peer_send_verack(peer);
-    peer->state = BTC_PEER_CONNECTED;
-    btc_peer_log(peer, "Version handshake complete (%N).", &peer->addr);
-    btc_pool_on_complete(peer->pool, peer);
-  } else {
-    btc_peer_send_verack(peer);
+  if (!peer->outbound)
     btc_peer_send_version(peer);
 
-    peer->state = BTC_PEER_WAIT_VERACK;
-  }
+  btc_peer_send_verack(peer);
+
+  peer->state = BTC_PEER_WAIT_VERACK;
 
   return 1;
 }
 
 static int
 btc_peer_on_verack(btc_peer_t *peer) {
-  /*
   if (peer->state != BTC_PEER_WAIT_VERACK) {
     btc_peer_log(peer, "Peer sent unsolicited verack (%N).", &peer->addr);
     btc_peer_close(peer);
     return 0;
   }
-  */
 
-  if (peer->outbound) {
-    peer->state = BTC_PEER_WAIT_VERSION;
-  } else {
-    peer->state = BTC_PEER_CONNECTED;
-    btc_peer_log(peer, "Version handshake complete (%N).", &peer->addr);
-    btc_pool_on_complete(peer->pool, peer);
-  }
+  peer->state = BTC_PEER_CONNECTED;
+
+  btc_peer_log(peer, "Version handshake complete (%N).", &peer->addr);
+  btc_pool_on_complete(peer->pool, peer);
 
   return 1;
 }
@@ -1216,8 +1200,8 @@ btc_peer_on_sendcmpct(btc_peer_t *peer, const btc_sendcmpct_t *msg) {
 }
 
 static void
-btc_peer_on_error(btc_peer_t *peer, int code) {
-  btc_peer_log(peer, "Peer error (%N): %s", &peer->addr, strerror(code));
+btc_peer_on_error(btc_peer_t *peer, const char *msg) {
+  btc_peer_log(peer, "Socket error (%N): %s", &peer->addr, msg);
   btc_peer_close(peer);
 }
 
@@ -1562,7 +1546,11 @@ btc_pool_create_outbound(struct btc_pool_s *pool, const btc_netaddr_t *addr) {
   btc_pool_log(pool, "Connecting to %N.", addr);
 
   if (!btc_peer_open(peer, addr)) {
+    const char *msg = btc_loop_strerror(pool->loop);
+
+    btc_pool_log(pool, "Connection failed: %s (%N).", msg, addr);
     btc_peer_destroy(peer);
+
     return NULL;
   }
 
@@ -2095,13 +2083,11 @@ btc_pool_getblock(struct btc_pool_s *pool,
   int64_t now;
   size_t i;
 
-/*
   if (peer->state != BTC_PEER_CONNECTED) {
     btc_pool_log(pool, "Peer handshake not complete (getdata) (%N).",
                        &peer->addr);
     return;
   }
-*/
 
   now = btc_ms();
 
@@ -2386,6 +2372,8 @@ btc_pool_add_block(struct btc_pool_s *pool,
   }
 
   peer->block_time = btc_ms();
+
+  btc_pool_log(pool, "Adding block: %H (%N).", hash, &peer->addr);
 
   if (!btc_chain_add(pool->chain, block, flags, peer->id)) {
 #if 0

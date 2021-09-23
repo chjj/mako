@@ -68,6 +68,7 @@ typedef struct btc_loop_s {
   struct pollfd pfds[128];
   btc__socket_t *sockets[128];
   size_t length;
+  int error;
   int running;
   btc_loop_tick_cb *on_tick[8];
   size_t on_ticks;
@@ -272,6 +273,11 @@ btc_socket_get_data(btc__socket_t *socket) {
   return socket->data;
 }
 
+const char *
+btc_socket_strerror(btc__socket_t *socket) {
+  return strerror(socket->loop->error);
+}
+
 size_t
 btc_socket_buffered(btc__socket_t *socket) {
   return socket->total;
@@ -299,22 +305,28 @@ btc_socket_listen(btc__socket_t *server, const btc_sockaddr_t *addr, int max) {
   int option = 1;
   int fd;
 
-  if (!btc_socket_setaddr(server, addr))
+  if (!btc_socket_setaddr(server, addr)) {
+    server->loop->error = EAFNOSUPPORT;
     return 0;
+  }
 
   fd = safe_socket(server->addr->sa_family, SOCK_STREAM, 0);
 
-  if (fd == -1)
+  if (fd == -1) {
+    server->loop->error = errno;
     return 0;
+  }
 
   setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
 
   if (bind(fd, server->addr, server->addrlen) == -1) {
+    server->loop->error = errno;
     close(fd);
     return 0;
   }
 
   if (listen(fd, max) == -1) {
+    server->loop->error = errno;
     close(fd);
     return 0;
   }
@@ -335,8 +347,10 @@ btc_socket_accept(btc__socket_t *socket, btc__socket_t *server) {
 
   fd = safe_accept(server->fd, socket->addr, &socket->addrlen);
 
-  if (fd == -1)
+  if (fd == -1) {
+    socket->loop->error = errno;
     return 0;
+  }
 
   socket->fd = fd;
   socket->state = BTC_SOCKET_CONNECTED;
@@ -348,18 +362,23 @@ static int
 btc_socket_connect(btc__socket_t *socket, const btc_sockaddr_t *addr) {
   int fd;
 
-  if (!btc_socket_setaddr(socket, addr))
+  if (!btc_socket_setaddr(socket, addr)) {
+    socket->loop->error = EAFNOSUPPORT;
     return 0;
+  }
 
   fd = safe_socket(socket->addr->sa_family, SOCK_STREAM, 0);
 
-  if (fd == -1)
+  if (fd == -1) {
+    socket->loop->error = errno;
     return 0;
+  }
 
   CHECK(safe_connect(fd, socket->addr, socket->addrlen) == -1);
   CHECK(errno != EISCONN);
 
   if (errno != EINPROGRESS && errno != EALREADY) {
+    socket->loop->error = errno;
     close(fd);
     return 0;
   }
@@ -391,6 +410,8 @@ btc_socket_flush(btc__socket_t *socket) {
 
         if (errno == EWOULDBLOCK)
           break;
+
+        socket->loop->error = errno;
 
         return -1;
       }
@@ -438,7 +459,7 @@ btc_socket_write(btc__socket_t *socket, unsigned char *raw, size_t len) {
 
   if (socket->state != BTC_SOCKET_CONNECTING
       && socket->state != BTC_SOCKET_CONNECTED) {
-    errno = EPIPE;
+    socket->loop->error = EPIPE;
     return -1;
   }
 
@@ -507,8 +528,9 @@ btc_loop_create(void) {
   memset(loop, 0, sizeof(*loop));
 
   loop->length = 0;
-  loop->on_ticks = 0;
+  loop->error = 0;
   loop->running = 0;
+  loop->on_ticks = 0;
 
   return loop;
 }
@@ -536,6 +558,11 @@ void *
 btc_loop_get_data(btc__loop_t *loop, int name) {
   CHECK((size_t)name < lengthof(loop->data));
   return loop->data[name];
+}
+
+const char *
+btc_loop_strerror(btc__loop_t *loop) {
+  return strerror(loop->error);
 }
 
 static void
@@ -605,11 +632,6 @@ handle_read(btc__loop_t *loop, btc__socket_t *socket) {
 
       socket->on_socket(child);
 
-      /*
-      if (child->state == BTC_SOCKET_CONNECTED)
-        handle_read(loop, child);
-      */
-
       break;
     }
 
@@ -634,7 +656,8 @@ handle_read(btc__loop_t *loop, btc__socket_t *socket) {
           if (errno == EWOULDBLOCK)
             break;
 
-          socket->on_error(socket, errno);
+          socket->loop->error = errno;
+          socket->on_error(socket);
 
           break;
         }
@@ -662,7 +685,8 @@ handle_write(btc__loop_t *loop, btc__socket_t *socket) {
             break;
 
           socket->state = BTC_SOCKET_DISCONNECTING;
-          socket->on_error(socket, errno);
+          socket->loop->error = errno;
+          socket->on_error(socket);
 
           break;
         }
@@ -671,17 +695,12 @@ handle_write(btc__loop_t *loop, btc__socket_t *socket) {
       socket->state = BTC_SOCKET_CONNECTED;
       socket->on_connect(socket);
 
-      /*
-      if (socket->state == BTC_SOCKET_CONNECTED)
-        handle_read(loop, socket);
-      */
-
       break;
     }
 
     case BTC_SOCKET_CONNECTED: {
       if (btc_socket_flush(socket) == -1)
-        socket->on_error(socket, errno);
+        socket->on_error(socket);
       break;
     }
   }
@@ -718,6 +737,11 @@ btc_loop_start(btc__loop_t *loop) {
 
         if (pfd->revents & (POLLIN | POLLERR | POLLHUP))
           handle_read(loop, socket);
+
+        if (socket->state == BTC_SOCKET_DISCONNECTING
+            || socket->state == BTC_SOCKET_DISCONNECTED) {
+          continue;
+        }
 
         if (pfd->revents & (POLLOUT | POLLERR | POLLHUP))
           handle_write(loop, socket);
