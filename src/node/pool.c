@@ -179,6 +179,7 @@ struct btc_pool_s {
   uint64_t required_services;
   size_t max_outbound;
   size_t max_inbound;
+  int synced;
 };
 
 /*
@@ -1435,6 +1436,7 @@ btc_pool_create(const btc_network_t *network,
   pool->required_services = BTC_NET_LOCAL_SERVICES;
   pool->max_outbound = 8;
   pool->max_inbound = 8;
+  pool->synced = 0;
 
   btc_loop_set_data(loop, 0, pool);
   btc_loop_on_tick(loop, on_tick);
@@ -1480,6 +1482,8 @@ btc_pool_open(struct btc_pool_s *pool) {
 
   if (!btc_addrman_open(pool->addrman))
     return 0;
+
+  pool->synced = btc_chain_synced(pool->chain);
 
   return 1;
 }
@@ -1587,7 +1591,7 @@ btc_pool_is_syncable(struct btc_pool_s *pool, btc_peer_t *peer) {
   if (peer->state != BTC_PEER_CONNECTED)
     return 0;
 
-  if ((peer->services & BTC_NET_SERVICE_NETWORK) == 0)
+  if ((peer->services & pool->required_services) != pool->required_services)
     return 0;
 
   if (!peer->loader) {
@@ -1791,9 +1795,8 @@ btc_pool_on_complete(struct btc_pool_s *pool, btc_peer_t *peer) {
     btc_addrman_mark_ack(pool->addrman, &peer->addr, peer->services);
 
     /* If we don't have an ack'd loader yet, consider it dead. */
-    if (!peer->loader) {
-      if (pool->peers.load != NULL
-          && pool->peers.load->state != BTC_PEER_CONNECTED) {
+    if (!peer->loader && pool->peers.load != NULL) {
+      if (pool->peers.load->state != BTC_PEER_CONNECTED) {
         pool->peers.load->loader = 0;
         pool->peers.load = NULL;
       }
@@ -1991,8 +1994,28 @@ btc_pool_on_version(struct btc_pool_s *pool, btc_peer_t *peer, btc_version_t *ms
     msg->services,
     msg->agent);
 
-  if (pool->timedata != NULL)
-    btc_timedata_add(pool->timedata, msg->time);
+  if (pool->timedata != NULL) {
+    size_t length = pool->timedata->length;
+    int64_t offset = pool->timedata->offset;
+
+    if (!btc_timedata_add(pool->timedata, msg->time)) {
+      btc_pool_log(pool, "Adjusted time mismatch!");
+      btc_pool_log(pool, "Please make sure your system clock is correct!");
+    }
+
+    if (pool->timedata->length != length) {
+      int64_t sample = msg->time - btc_now();
+
+      btc_pool_log(pool, "Added time data: total=%zu, sample=%T (%T minutes).",
+                         pool->timedata->length, sample, sample / 60);
+    }
+
+    if (pool->timedata->offset != offset) {
+      btc_pool_log(pool, "Time offset: %T (%T minutes).",
+                         pool->timedata->offset,
+                         pool->timedata->offset / 60);
+    }
+  }
 
   btc_nonces_remove(&pool->nonces, &peer->addr);
 
@@ -2175,6 +2198,10 @@ btc_pool_on_blockinv(struct btc_pool_s *pool,
   for (i = 0; i < items->length; i++) {
     item = (btc_invitem_t *)items->items[i];
 
+    /* Ignore invalid (maybe ban?). */
+    if (btc_chain_has_invalid(pool->chain, item->hash))
+      continue;
+
     /* Resolve orphan chain. */
     if (btc_chain_has_orphan(pool->chain, item->hash)) {
       btc_pool_log(pool, "Received known orphan hash (%N).", &peer->addr);
@@ -2182,13 +2209,8 @@ btc_pool_on_blockinv(struct btc_pool_s *pool,
       continue;
     }
 
-/*
-    if (btc_chain_has_invalid(pool->chain, item->hash))
-      continue;
-*/
-
     /* Request the block if we don't have it. */
-    if (!btc_chain_has(pool->chain, item->hash)) {
+    if (!btc_chain_has_hash(pool->chain, item->hash)) {
       btc_vector_push(&out, item);
       continue;
     }
@@ -2406,6 +2428,11 @@ btc_pool_add_block(struct btc_pool_s *pool,
     return;
   }
 
+  if (!pool->synced && btc_chain_synced(pool->chain)) {
+    pool->synced = 1;
+    btc_pool_resync(pool, 0);
+  }
+
   if (btc_chain_synced(pool->chain)) {
     const btc_entry_t *entry = btc_chain_by_hash(pool->chain, hash);
 
@@ -2422,12 +2449,12 @@ btc_pool_add_block(struct btc_pool_s *pool,
 
   if (height % 20 == 0) {
     btc_pool_log(pool, "Status:"
-                       " time=%D height=%d progress=%.2f"
+                       " time=%D height=%d progress=%.2f%%"
                        " orphans=%d active=%zu"
                        " target=%#.8x peers=%zu",
       block->header.time,
       height,
-      (double)0.0,
+      btc_chain_progress(pool->chain) * 100.0,
       0,
       hashset_size(pool->block_map),
       block->header.bits,

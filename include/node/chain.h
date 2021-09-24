@@ -47,6 +47,10 @@ enum btc_threshold_state {
  * Types
  */
 
+typedef void btc_chain_block_cb(const btc_block_t *block,
+                                const btc_entry_t *entry,
+                                void *arg);
+
 typedef void btc_chain_connect_cb(const btc_entry_t *entry,
                                   const btc_block_t *block,
                                   btc_view_t *view,
@@ -77,6 +81,9 @@ BTC_EXTERN void
 btc_chain_set_timedata(btc_chain_t *chain, const btc_timedata_t *td);
 
 BTC_EXTERN void
+btc_chain_on_block(btc_chain_t *chain, btc_chain_block_cb *handler);
+
+BTC_EXTERN void
 btc_chain_on_connect(btc_chain_t *chain, btc_chain_connect_cb *handler);
 
 BTC_EXTERN void
@@ -102,6 +109,9 @@ btc_chain_close(btc_chain_t *chain);
 
 BTC_EXTERN int
 btc_chain_has_orphan(btc_chain_t *chain, const uint8_t *hash);
+
+BTC_EXTERN int
+btc_chain_has_invalid(btc_chain_t *chain, const uint8_t *hash);
 
 BTC_EXTERN uint32_t
 btc_chain_get_target(btc_chain_t *chain,
@@ -142,8 +152,14 @@ btc_chain_state(btc_chain_t *chain);
 BTC_EXTERN const btc_verify_error_t *
 btc_chain_error(btc_chain_t *chain);
 
+BTC_EXTERN double
+btc_chain_progress(btc_chain_t *chain);
+
 BTC_EXTERN int
 btc_chain_synced(btc_chain_t *chain);
+
+BTC_EXTERN int
+btc_chain_has_hash(btc_chain_t *chain, const uint8_t *hash);
 
 BTC_EXTERN const btc_entry_t *
 btc_chain_by_hash(btc_chain_t *chain, const uint8_t *hash);
@@ -170,9 +186,6 @@ btc_chain_get_raw_block(btc_chain_t *chain,
                         uint8_t **data,
                         size_t *length,
                         const btc_entry_t *entry);
-
-BTC_EXTERN int
-btc_chain_has(btc_chain_t *chain, const uint8_t *hash);
 
 BTC_EXTERN const uint8_t *
 btc_chain_get_orphan_root(btc_chain_t *chain, const uint8_t *hash);

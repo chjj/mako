@@ -102,6 +102,7 @@ struct btc_chain_s {
   btc_deployment_state_t state;
   btc_verify_error_t error;
   int synced;
+  btc_chain_block_cb *on_block;
   btc_chain_connect_cb *on_connect;
   btc_chain_connect_cb *on_disconnect;
   btc_chain_reorganize_cb *on_reorganize;
@@ -174,6 +175,11 @@ btc_chain_set_timedata(struct btc_chain_s *chain, const btc_timedata_t *td) {
 }
 
 void
+btc_chain_on_block(struct btc_chain_s *chain, btc_chain_block_cb *handler) {
+  chain->on_block = handler;
+}
+
+void
 btc_chain_on_connect(struct btc_chain_s *chain, btc_chain_connect_cb *handler) {
   chain->on_connect = handler;
 }
@@ -218,6 +224,32 @@ static void
 btc_chain_get_deployment_state(struct btc_chain_s *chain,
                                btc_deployment_state_t *state);
 
+static void
+btc_chain_maybe_sync(struct btc_chain_s *chain) {
+  const btc_network_t *network = chain->network;
+  int64_t now;
+
+  if (chain->synced)
+    return;
+
+  if (chain->checkpoints_enabled) {
+    if (chain->height < network->last_checkpoint)
+      return;
+  }
+
+  if (btc_hash_compare(chain->tip->chainwork, network->pow.chainwork) < 0)
+    return;
+
+  now = btc_timedata_now(chain->timedata);
+
+  if (chain->tip->header.time < now - network->block.max_tip_age)
+    return;
+
+  btc_chain_log(chain, "Chain is fully synced (height=%d).", chain->height);
+
+  chain->synced = 1;
+}
+
 int
 btc_chain_open(struct btc_chain_s *chain, const char *prefix, size_t map_size) {
   btc_chain_log(chain, "Chain is loading.");
@@ -230,10 +262,13 @@ btc_chain_open(struct btc_chain_s *chain, const char *prefix, size_t map_size) {
 
   chain->tip = (btc_entry_t *)btc_chaindb_tail(chain->db);
   chain->height = chain->tip->height;
+  chain->synced = 0;
 
   btc_chain_get_deployment_state(chain, &chain->state);
 
   btc_chain_log(chain, "Chain Height: %d", chain->height);
+
+  btc_chain_maybe_sync(chain);
 
   return 1;
 }
@@ -437,7 +472,7 @@ btc_chain_remove_invalid(struct btc_chain_s *chain, const uint8_t *hash) {
   kh_del(invalid, chain->invalid, it);
 }
 
-static int
+int
 btc_chain_has_invalid(struct btc_chain_s *chain, const uint8_t *hash) {
   khiter_t it = kh_get(invalid, chain->invalid, (uint8_t *)hash);
   return it != kh_end(chain->invalid);
@@ -1709,6 +1744,9 @@ btc_chain_set_best_chain(struct btc_chain_s *chain,
   chain->height = entry->height;
   chain->state = state;
 
+  if (chain->on_block != NULL)
+    chain->on_block(block, entry, chain->arg);
+
   if (chain->on_connect != NULL)
     chain->on_connect(entry, block, view, chain->arg);
 
@@ -1757,6 +1795,8 @@ btc_chain_connect(struct btc_chain_s *chain,
                   block->txs.length,
                   (double)(btc_us() - now) / 1000);
   }
+
+  btc_chain_maybe_sync(chain);
 
   return entry;
 }
@@ -1875,9 +1915,33 @@ btc_chain_error(struct btc_chain_s *chain) {
   return &chain->error;
 }
 
+double
+btc_chain_progress(struct btc_chain_s *chain) {
+  int64_t now = btc_timedata_now(chain->timedata);
+  int64_t start = chain->network->genesis.header.time;
+  int64_t current = chain->tip->header.time - start;
+  int64_t end = (now - start) - 40 * 60;
+  double progress;
+
+  if (end < 1)
+    end = 1;
+
+  progress = (double)current / (double)end;
+
+  if (progress > 1.0)
+    progress = 1.0;
+
+  return progress;
+}
+
 int
 btc_chain_synced(struct btc_chain_s *chain) {
   return chain->synced;
+}
+
+int
+btc_chain_has_hash(struct btc_chain_s *chain, const uint8_t *hash) {
+  return btc_chaindb_by_hash(chain->db, hash) != NULL;
 }
 
 const btc_entry_t *
@@ -1891,7 +1955,7 @@ btc_chain_by_height(struct btc_chain_s *chain, int32_t height) {
 }
 
 int
-btc_chain_is_main(btc_chain_t *chain, const btc_entry_t *entry) {
+btc_chain_is_main(struct btc_chain_s *chain, const btc_entry_t *entry) {
   return btc_chaindb_is_main(chain->db, entry);
 }
 
@@ -1918,17 +1982,6 @@ btc_chain_get_raw_block(struct btc_chain_s *chain,
                         size_t *length,
                         const btc_entry_t *entry) {
   return btc_chaindb_get_raw_block(chain->db, data, length, entry);
-}
-
-int
-btc_chain_has(struct btc_chain_s *chain, const uint8_t *hash) {
-  if (btc_chain_has_orphan(chain, hash))
-    return 1;
-
-  if (btc_chain_has_invalid(chain, hash))
-    return 1;
-
-  return btc_chaindb_by_hash(chain->db, hash) != NULL;
 }
 
 const uint8_t *
