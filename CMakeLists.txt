@@ -33,6 +33,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/base58.c
                             src/bech32.c
                             src/block.c
+                            src/bloom.c
                             src/buffer.c
                             src/coin.c
                             src/compact.c
@@ -120,6 +121,7 @@ else()
 endif()
 
 list(APPEND satoshi_includes ${PROJECT_SOURCE_DIR}/include)
+list(APPEND satoshi_libs m)
 
 add_subdirectory(deps/lmdb)
 
@@ -128,7 +130,7 @@ target_compile_definitions(satoshi_static PUBLIC ${satoshi_defines})
 target_compile_options(satoshi_static PUBLIC ${satoshi_cflags})
 target_include_directories(satoshi_static PUBLIC ${satoshi_includes})
 target_link_options(satoshi_static INTERFACE ${satoshi_ldflags})
-target_link_libraries(satoshi_static INTERFACE ${satoshi_libs})
+target_link_libraries(satoshi_static PRIVATE ${satoshi_libs})
 set_property(TARGET satoshi_static PROPERTY OUTPUT_NAME satoshi)
 
 # add_library(satoshi_shared SHARED ${satoshi_sources})

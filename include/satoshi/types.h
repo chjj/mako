@@ -186,4 +186,22 @@ typedef struct btc_netaddr_s {
   int port;
 } btc_netaddr_t;
 
+typedef struct btc_bloom_s {
+  uint8_t *data;
+  size_t size;
+  uint32_t n;
+  uint32_t tweak;
+  uint8_t update;
+} btc_bloom_t;
+
+typedef struct btc_filter_s {
+  uint64_t *data;
+  size_t length;
+  int entries;
+  int limit;
+  int generation;
+  int n;
+  uint32_t tweak;
+} btc_filter_t;
+
 #endif /* BTC_TYPES_H */
