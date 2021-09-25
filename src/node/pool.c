@@ -1057,6 +1057,18 @@ btc_peer_send_getheaders(btc_peer_t *peer,
   return btc_peer_sendmsg(peer, BTC_MSG_GETHEADERS, &msg);
 }
 
+static int
+btc_peer_send_getheaders_1(btc_peer_t *peer,
+                           const uint8_t *hash,
+                           const uint8_t *stop) {
+  void *items[1];
+  btc_vector_t locator = { items, 0, 1 };
+
+  items[0] = (void *)hash;
+
+  return btc_peer_send_getheaders(peer, &locator, stop);
+}
+
 BTC_UNUSED static int
 btc_peer_send_mempool(btc_peer_t *peer) {
   if (!(peer->services & BTC_NET_SERVICE_BLOOM)) {
@@ -2549,16 +2561,14 @@ btc_pool_on_getaddr(struct btc_pool_s *pool, btc_peer_t *peer) {
     if (btc_filter_has_addr(&peer->addr_filter, addr))
       continue;
 
+    total += 1;
+
     btc_filter_add_addr(&peer->addr_filter, addr);
 
     btc_addrs_push(&addrs, (btc_netaddr_t *)addr);
 
-    if (addrs.length == 1000) {
-      btc_peer_send_addr(peer, &addrs);
-      addrs.length = 0;
-    }
-
-    total += 1;
+    if (addrs.length == 1000)
+      break;
   }
 
   if (addrs.length > 0) {
@@ -3178,17 +3188,12 @@ btc_pool_resolve_chain(struct btc_pool_s *pool,
 
   if (node->height < pool->network->last_checkpoint) {
     if (node->height == pool->header_tip->height) {
-      void *items[1];
-      btc_vector_t locator = { items, 0, 1 };
-
-      items[0] = (void *)hash;
-
       btc_pool_log(pool, "Received checkpoint %H (%d).",
                          node->inv.hash, node->height);
 
       pool->header_tip = btc_pool_next_tip(pool, node->height);
 
-      btc_peer_send_getheaders(peer, &locator, pool->header_tip->hash);
+      btc_peer_send_getheaders_1(peer, hash, pool->header_tip->hash);
 
       return;
     }
@@ -3198,7 +3203,8 @@ btc_pool_resolve_chain(struct btc_pool_s *pool,
 
     btc_hdrentry_destroy(node);
 
-    CHECK(pool->header_head != NULL);
+    if (pool->header_head == NULL)
+      pool->header_tail = NULL;
 
     btc_pool_resolve_headers(pool, peer);
 
@@ -3298,7 +3304,8 @@ btc_pool_on_headers(struct btc_pool_s *pool,
 
     btc_hdrentry_destroy(node);
 
-    CHECK(pool->header_head != NULL);
+    if (pool->header_head == NULL)
+      pool->header_tail = NULL;
 
     btc_pool_resolve_headers(pool, peer);
 
@@ -3306,12 +3313,7 @@ btc_pool_on_headers(struct btc_pool_s *pool,
   }
 
   /* Request more headers. */
-  {
-    void *items[1] = { node->inv.hash };
-    btc_vector_t locator = { items, 0, 1 };
-
-    btc_peer_send_getheaders(peer, &locator, pool->header_tip->hash);
-  }
+  btc_peer_send_getheaders_1(peer, node->inv.hash, pool->header_tip->hash);
 }
 
 static void
