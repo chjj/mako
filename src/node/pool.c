@@ -2071,7 +2071,7 @@ btc_pool_open(struct btc_pool_s *pool) {
 
 void
 btc_pool_close(struct btc_pool_s *pool) {
-  btc_peers_close(pool);
+  btc_peers_close(&pool->peers);
   btc_pool_clear_chain(pool);
   btc_addrman_close(pool->addrman);
 }
@@ -3203,6 +3203,20 @@ btc_pool_resolve_headers(struct btc_pool_s *pool, btc_peer_t *peer) {
 }
 
 static void
+btc_pool_shift_header(struct btc_pool_s *pool) {
+  btc_hdrentry_t *node = pool->header_head;
+
+  pool->header_head = node->next;
+
+  btc_hdrentry_destroy(node);
+
+  if (pool->header_head == NULL) {
+    pool->header_tail = NULL;
+    pool->header_next = NULL;
+  }
+}
+
+static void
 btc_pool_resolve_chain(struct btc_pool_s *pool,
                        btc_peer_t *peer,
                        const uint8_t *hash) {
@@ -3242,16 +3256,7 @@ btc_pool_resolve_chain(struct btc_pool_s *pool,
       return;
     }
 
-    /* Shift. */
-    pool->header_head = node->next;
-
-    btc_hdrentry_destroy(node);
-
-    if (pool->header_head == NULL) {
-      pool->header_tail = NULL;
-      pool->header_next = NULL;
-    }
-
+    btc_pool_shift_header(pool);
     btc_pool_resolve_headers(pool, peer);
 
     return;
@@ -3346,19 +3351,8 @@ btc_pool_on_headers(struct btc_pool_s *pool,
 
   /* Request the blocks we just added. */
   if (checkpoint) {
-    /* Shift. */
-    node = pool->header_head;
-    pool->header_head = node->next;
-
-    btc_hdrentry_destroy(node);
-
-    if (pool->header_head == NULL) {
-      pool->header_tail = NULL;
-      pool->header_next = NULL;
-    }
-
+    btc_pool_shift_header(pool);
     btc_pool_resolve_headers(pool, peer);
-
     return;
   }
 
