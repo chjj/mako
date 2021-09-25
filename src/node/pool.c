@@ -161,7 +161,7 @@ typedef struct btc_peers_s {
 } btc_peers_t;
 
 typedef struct btc_hdrentry_s {
-  uint8_t hash[32];
+  btc_invitem_t inv;
   int32_t height;
   struct btc_hdrentry_s *next;
 } btc_hdrentry_t;
@@ -179,15 +179,17 @@ struct btc_pool_s {
   khash_t(hashes) *block_map;
   khash_t(hashes) *tx_map;
   khash_t(hashes) *compact_map;
+  int checkpoints_enabled;
+  int bip37_enabled;
   int checkpoints;
   int listening;
-  btc_hdrentry_t *header_chain;
+  const btc_checkpoint_t *header_tip;
+  btc_hdrentry_t *header_head;
+  btc_hdrentry_t *header_tail;
   btc_hdrentry_t *header_next;
-  btc_hdrentry_t *header_tip;
   int64_t refill_timer;
   unsigned int id;
   uint64_t required_services;
-  int syncing;
   size_t max_outbound;
   size_t max_inbound;
   int synced;
@@ -1409,6 +1411,11 @@ btc_pool_on_msg(struct btc_pool_s *pool, btc_peer_t *peer, btc_msg_t *msg);
 
 static void
 btc_peer_on_msg(btc_peer_t *peer, btc_msg_t *msg) {
+  if (peer->state == BTC_PEER_DEAD) {
+    btc_msg_destroy(msg);
+    return;
+  }
+
   switch (msg->type) {
     case BTC_MSG_VERSION:
       if (!btc_peer_on_version(peer, (const btc_version_t *)msg->body)) {
@@ -1784,6 +1791,29 @@ btc_peers_close(btc_peers_t *list) {
 }
 
 /*
+ * Header Entry
+ */
+
+static btc_hdrentry_t *
+btc_hdrentry_create(const uint8_t *hash, int32_t height) {
+  btc_hdrentry_t *entry = (btc_hdrentry_t *)btc_malloc(sizeof(btc_hdrentry_t));
+
+  btc_hash_copy(entry->inv.hash, hash);
+
+  entry->inv.type = BTC_INV_BLOCK;
+  entry->inv.next = NULL;
+  entry->height = height;
+  entry->next = NULL;
+
+  return entry;
+}
+
+static void
+btc_hdrentry_destroy(btc_hdrentry_t *entry) {
+  btc_free(entry);
+}
+
+/*
  * Pool
  */
 
@@ -1809,21 +1839,22 @@ btc_pool_create(const btc_network_t *network,
   pool->block_map = hashset_create();
   pool->tx_map = hashset_create();
   pool->compact_map = hashset_create();
-  pool->checkpoints = 0;
-  pool->header_chain = NULL;
-  pool->header_next = NULL;
+  pool->checkpoints_enabled = 1;
+  pool->bip37_enabled = 0;
+  pool->checkpoints = pool->checkpoints_enabled;
   pool->header_tip = NULL;
+  pool->header_head = NULL;
+  pool->header_tail = NULL;
+  pool->header_next = NULL;
   pool->refill_timer = 0;
   pool->id = 0;
   pool->required_services = BTC_NET_LOCAL_SERVICES;
-  pool->syncing = 1;
   pool->max_outbound = 8;
   pool->max_inbound = 8;
   pool->synced = 0;
 
   btc_loop_set_data(loop, 0, pool);
   btc_loop_on_tick(loop, on_tick);
-  /* btc_loop_on_socket(loop, on_socket); */
 
   return pool;
 }
@@ -1859,6 +1890,66 @@ btc_pool_log(struct btc_pool_s *pool, const char *fmt, ...) {
   va_end(ap);
 }
 
+static const btc_checkpoint_t *
+btc_pool_next_tip(struct btc_pool_s *pool, int32_t height) {
+  const btc_network_t *network = pool->network;
+  const btc_checkpoint_t *chk;
+  size_t i;
+
+  for (i = 0; i < network->checkpoints.length; i++) {
+    chk = &network->checkpoints.items[i];
+
+    if (chk->height > height)
+      return chk;
+  }
+
+  btc_abort(); /* LCOV_EXCL_LINE */
+  return NULL; /* LCOV_EXCL_LINE */
+}
+
+static void
+btc_pool_clear_chain(struct btc_pool_s *pool) {
+  btc_hdrentry_t *entry, *next;
+
+  for (entry = pool->header_head; entry != NULL; entry = next) {
+    next = entry->next;
+    btc_hdrentry_destroy(entry);
+  }
+
+  pool->checkpoints = 0;
+  pool->header_tip = NULL;
+  pool->header_head = NULL;
+  pool->header_tail = NULL;
+  pool->header_next = NULL;
+}
+
+static void
+btc_pool_reset_chain(struct btc_pool_s *pool) {
+  const btc_network_t *network = pool->network;
+  const btc_entry_t *tip;
+
+  if (!pool->checkpoints_enabled)
+    return;
+
+  if (network->checkpoints.length == 0)
+    return;
+
+  btc_pool_clear_chain(pool);
+
+  tip = btc_chain_tip(pool->chain);
+
+  if (tip->height < network->last_checkpoint) {
+    pool->checkpoints = 1;
+    pool->header_tip = btc_pool_next_tip(pool, tip->height);
+    pool->header_head = btc_hdrentry_create(tip->hash, tip->height);
+    pool->header_tail = pool->header_head;
+
+    btc_pool_log(pool,
+      "Initialized header chain to height %d (checkpoint=%H).",
+      tip->height, pool->header_tip->hash);
+  }
+}
+
 int
 btc_pool_open(struct btc_pool_s *pool) {
   btc_pool_log(pool, "Opening pool.");
@@ -1868,11 +1959,14 @@ btc_pool_open(struct btc_pool_s *pool) {
 
   pool->synced = btc_chain_synced(pool->chain);
 
+  btc_pool_reset_chain(pool);
+
   return 1;
 }
 
 void
 btc_pool_close(struct btc_pool_s *pool) {
+  btc_pool_clear_chain(pool);
   btc_addrman_close(pool->addrman);
 }
 
@@ -1891,10 +1985,8 @@ btc_pool_get_addr(struct btc_pool_s *pool) {
     if (btc_peers_has(&pool->peers, addr))
       continue;
 
-#if 0
     if (btc_addrman_has_local(pool->addrman, addr))
       continue;
-#endif
 
     if (btc_addrman_is_banned(pool->addrman, addr))
       continue;
@@ -2013,12 +2105,10 @@ btc_pool_send_locator(struct btc_pool_s *pool,
   peer->syncing = 1;
   peer->block_time = btc_ms();
 
-#if 0
   if (pool->checkpoints) {
     btc_peer_send_getheaders(peer, locator, pool->header_tip->hash);
     return 1;
   }
-#endif
 
   btc_peer_send_getblocks(peer, locator, NULL);
 
@@ -2199,9 +2289,6 @@ btc_pool_resync(struct btc_pool_s *pool, int force) {
   btc_vector_t locator;
   btc_peer_t *peer;
 
-  if (!pool->syncing)
-    return;
-
   btc_vector_init(&locator);
   btc_chain_get_locator(pool->chain, &locator, NULL);
 
@@ -2350,10 +2437,8 @@ btc_pool_on_disconnect(struct btc_pool_s *pool, btc_peer_t *peer) {
 
   if (loader) {
     btc_pool_log(pool, "Removed loader peer (%N).", &peer->addr);
-#if 0
     if (pool->checkpoints)
       btc_pool_reset_chain(pool);
-#endif
   }
 
   btc_nonces_remove(&pool->nonces, &peer->addr);
@@ -2685,9 +2770,6 @@ btc_pool_on_blockinv(struct btc_pool_s *pool,
 
   CHECK(inv->length > 0);
 
-  if (!pool->syncing)
-    return;
-
   /* Always keep track of the peer's best hash. */
   if (!peer->loader || btc_chain_synced(pool->chain)) {
     item = (btc_invitem_t *)btc_vector_top(inv);
@@ -2699,11 +2781,9 @@ btc_pool_on_blockinv(struct btc_pool_s *pool,
   if (!btc_chain_synced(pool->chain) && !peer->loader)
     return;
 
-#if 0
   /* Request headers instead. */
   if (pool->checkpoints)
     return;
-#endif
 
   btc_pool_log(pool, "Received %zu block hashes from peer (%N).",
                      inv->length, &peer->addr);
@@ -2847,7 +2927,7 @@ btc_pool_on_txinv(struct btc_pool_s *pool,
 
   CHECK(inv->length > 0);
 
-  if (pool->syncing && !btc_chain_synced(pool->chain))
+  if (!btc_chain_synced(pool->chain))
     return;
 
   btc_vector_init(&out);
@@ -3049,13 +3129,189 @@ btc_pool_on_getheaders(struct btc_pool_s *pool,
 }
 
 static void
+btc_pool_resolve_headers(struct btc_pool_s *pool, btc_peer_t *peer) {
+  btc_hdrentry_t *node;
+  btc_vector_t items;
+
+  btc_vector_init(&items);
+
+  for (node = pool->header_next; node != NULL; node = node->next) {
+    pool->header_next = node;
+
+    btc_vector_push(&items, &node->inv);
+
+    if (items.length == BTC_NET_MAX_INV)
+      break;
+  }
+
+  btc_pool_get_block(pool, peer, &items);
+  btc_vector_clear(&items);
+}
+
+static void
+btc_pool_resolve_chain(struct btc_pool_s *pool,
+                       btc_peer_t *peer,
+                       const uint8_t *hash) {
+  btc_hdrentry_t *node;
+
+  if (!pool->checkpoints)
+    return;
+
+  if (!peer->loader)
+    return;
+
+  if (peer->state != BTC_PEER_CONNECTED)
+    return;
+
+  node = pool->header_head;
+
+  CHECK(node != NULL);
+
+  if (!btc_hash_equal(hash, node->inv.hash)) {
+    btc_pool_log(pool, "Header hash mismatch %H != %H (%N).",
+                       hash, node->inv.hash, &peer->addr);
+
+    btc_peer_close(peer);
+
+    return;
+  }
+
+  if (node->height < pool->network->last_checkpoint) {
+    if (node->height == pool->header_tip->height) {
+      void *items[1];
+      btc_vector_t locator = { items, 0, 1 };
+
+      items[0] = (void *)hash;
+
+      btc_pool_log(pool, "Received checkpoint %H (%d).",
+                         node->inv.hash, node->height);
+
+      pool->header_tip = btc_pool_next_tip(pool, node->height);
+
+      btc_peer_send_getheaders(peer, &locator, pool->header_tip->hash);
+
+      return;
+    }
+
+    /* Shift. */
+    pool->header_head = node->next;
+
+    btc_hdrentry_destroy(node);
+
+    CHECK(pool->header_head != NULL);
+
+    btc_pool_resolve_headers(pool, peer);
+
+    return;
+  }
+
+  btc_pool_log(pool, "Switching to getblocks (%N).",
+                     &peer->addr);
+
+  btc_pool_clear_chain(pool);
+
+  btc_pool_getblocks(pool, peer, hash, NULL);
+}
+
+static void
 btc_pool_on_headers(struct btc_pool_s *pool,
                     btc_peer_t *peer,
                     const btc_headers_t *msg) {
-  /* TODO */
-  (void)pool;
-  (void)peer;
-  (void)msg;
+  btc_hdrentry_t *node = NULL;
+  int checkpoint = 0;
+  size_t i;
+
+  if (!pool->checkpoints)
+    return;
+
+  if (!peer->loader)
+    return;
+
+  if (msg->length == 0)
+    return;
+
+  if (msg->length > 2000) {
+    btc_peer_increase_ban(peer, 100);
+    return;
+  }
+
+  CHECK(pool->header_head != NULL);
+
+  for (i = 0; i < msg->length; i++) {
+    const btc_header_t *hdr = msg->items[i];
+    btc_hdrentry_t *last = pool->header_tail;
+    int32_t height = last->height + 1;
+    uint8_t hash[32];
+
+    if (!btc_header_verify(hdr)) {
+      btc_pool_log(pool, "Peer sent an invalid header (%N).",
+                         &peer->addr);
+      btc_peer_increase_ban(peer, 100);
+      return;
+    }
+
+    if (!btc_hash_equal(hdr->prev_block, last->inv.hash)) {
+      btc_pool_log(pool, "Peer sent a bad header chain (%N).",
+                         &peer->addr);
+      btc_peer_close(peer);
+      return;
+    }
+
+    btc_header_hash(hash, hdr);
+
+    if (height == pool->header_tip->height) {
+      if (!btc_hash_equal(hash, pool->header_tip->hash)) {
+        btc_pool_log(pool, "Peer sent an invalid checkpoint (%N).",
+                           &peer->addr);
+        btc_peer_close(peer);
+        return;
+      }
+      checkpoint = 1;
+    }
+
+    node = btc_hdrentry_create(hash, height);
+
+    if (pool->header_next == NULL)
+      pool->header_next = node;
+
+    if (pool->header_head == NULL)
+      pool->header_head = node;
+
+    if (pool->header_tail != NULL)
+      pool->header_tail->next = node;
+
+    pool->header_tail = node;
+  }
+
+  btc_pool_log(pool, "Received %zu headers from peer (%N).",
+                     msg->length, &peer->addr);
+
+  /* If we received a valid header
+     chain, consider this a "block". */
+  peer->block_time = btc_ms();
+
+  /* Request the blocks we just added. */
+  if (checkpoint) {
+    /* Shift. */
+    node = pool->header_head;
+    pool->header_head = node->next;
+
+    btc_hdrentry_destroy(node);
+
+    CHECK(pool->header_head != NULL);
+
+    btc_pool_resolve_headers(pool, peer);
+
+    return;
+  }
+
+  /* Request more headers. */
+  {
+    void *items[1] = { node->inv.hash };
+    btc_vector_t locator = { items, 0, 1 };
+
+    btc_peer_send_getheaders(peer, &locator, pool->header_tip->hash);
+  }
 }
 
 static void
@@ -3083,11 +3339,6 @@ btc_pool_add_block(struct btc_pool_s *pool,
                    unsigned int flags) {
   uint8_t hash[32];
   int32_t height;
-
-#if 0
-  if (!pool->syncing)
-    return;
-#endif
 
   btc_header_hash(hash, &block->header);
 
@@ -3171,7 +3422,7 @@ btc_pool_add_block(struct btc_pool_s *pool,
                        height, hash);
   }
 
-  /* btc_pool_resolve_chain(pool, peer, hash); */
+  btc_pool_resolve_chain(pool, peer, hash);
 
   if (btc_chain_synced(pool->chain))
     btc_pool_announce(pool, BTC_INV_BLOCK, hash);
@@ -3243,14 +3494,12 @@ btc_pool_on_mempool(struct btc_pool_s *pool, btc_peer_t *peer) {
   if (!btc_chain_synced(pool->chain))
     return;
 
-#if 0
   if (!pool->bip37_enabled) {
     btc_pool_log(pool, "Peer requested mempool without bip37 enabled (%N).",
                        &peer->addr);
     btc_peer_close(peer);
     return;
   }
-#endif
 
   btc_pool_log(pool, "Sending mempool snapshot (%N).", &peer->addr);
 

@@ -220,6 +220,14 @@ btc_addrman_mark_ack(struct btc_addrman_s *man,
   (void)services;
 }
 
+int
+btc_addrman_has_local(struct btc_addrman_s *man,
+                      const btc_netaddr_t *src) {
+  (void)man;
+  (void)src;
+  return 0;
+}
+
 const btc_netaddr_t *
 btc_addrman_get_local(struct btc_addrman_s *man,
                       const btc_netaddr_t *src) {

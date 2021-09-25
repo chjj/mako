@@ -154,6 +154,10 @@ btc_addrman_mark_ack(btc_addrman_t *man,
                      const btc_netaddr_t *addr,
                      int64_t services);
 
+BTC_EXTERN int
+btc_addrman_has_local(btc_addrman_t *man,
+                      const btc_netaddr_t *src);
+
 BTC_EXTERN const btc_netaddr_t *
 btc_addrman_get_local(btc_addrman_t *man,
                       const btc_netaddr_t *src);
