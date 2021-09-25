@@ -121,8 +121,6 @@ typedef struct btc_peer_s {
   int64_t last_ping;
   int64_t min_ping;
   int64_t block_time;
-  uint8_t best_hash[32];
-  int32_t best_height;
   uint8_t last_tip[32];
   uint8_t last_stop[32];
   int64_t ping_timer;
@@ -710,7 +708,6 @@ btc_peer_create(struct btc_pool_s *pool) {
   peer->last_ping = -1;
   peer->min_ping = -1;
   peer->block_time = -1;
-  peer->best_height = -1;
 
   parser_init(&peer->parser, peer->network->magic);
   parser_on_msg(&peer->parser, on_msg, peer);
@@ -2773,19 +2770,11 @@ static void
 btc_pool_on_blockinv(struct btc_pool_s *pool,
                      btc_peer_t *peer,
                      btc_vector_t *inv) {
-  const uint8_t *exists = NULL;
   btc_invitem_t *item;
   btc_vector_t out;
   size_t i;
 
   CHECK(inv->length > 0);
-
-  /* Always keep track of the peer's best hash. */
-  if (!peer->loader || btc_chain_synced(pool->chain)) {
-    item = (btc_invitem_t *)btc_vector_top(inv);
-
-    btc_hash_copy(peer->best_hash, item->hash);
-  }
 
   /* Ignore for now if we're still syncing. */
   if (!btc_chain_synced(pool->chain) && !peer->loader)
@@ -2820,8 +2809,6 @@ btc_pool_on_blockinv(struct btc_pool_s *pool,
       continue;
     }
 
-    exists = item->hash;
-
     /* Normally we request the hashContinue.
        In the odd case where we already have
        it, we can do one of two things: either
@@ -2832,15 +2819,6 @@ btc_pool_on_blockinv(struct btc_pool_s *pool,
       btc_pool_log(pool, "Received existing hash (%N).", &peer->addr);
       btc_pool_getblocks(pool, peer, item->hash, NULL);
     }
-  }
-
-  /* Attempt to update the peer's best height
-     with the last existing hash we know of. */
-  if (exists != NULL && btc_chain_synced(pool->chain)) {
-    const btc_entry_t *entry = btc_chain_by_hash(pool->chain, item->hash);
-
-    if (entry != NULL)
-      peer->best_height = entry->height;
   }
 
   btc_pool_get_block(pool, peer, &out);
@@ -3366,21 +3344,7 @@ btc_pool_add_block(struct btc_pool_s *pool,
       return;
     }
 
-    /* During a getblocks sync, peers send
-       their best tip frequently. We can grab
-       the height commitment from the coinbase. */
-    height = btc_block_coinbase_height(block);
-
-    if (height != -1) {
-      btc_hash_copy(peer->best_hash, hash);
-
-      peer->best_height = height;
-
-      /* btc_pool_resolve_height(pool, hash, height); */
-    }
-
     btc_pool_log(pool, "Peer sent an orphan block. Resolving.");
-
     btc_pool_resolve_orphan(pool, peer, hash);
 
     return;
@@ -3389,18 +3353,6 @@ btc_pool_add_block(struct btc_pool_s *pool,
   if (!pool->synced && btc_chain_synced(pool->chain)) {
     pool->synced = 1;
     btc_pool_resync(pool, 0);
-  }
-
-  if (btc_chain_synced(pool->chain)) {
-    const btc_entry_t *entry = btc_chain_by_hash(pool->chain, hash);
-
-    CHECK(entry != NULL);
-
-    btc_hash_copy(peer->best_hash, entry->hash);
-
-    peer->best_height = entry->height;
-
-    /* btc_pool_resolve_height(pool, entry->hash, entry->height); */
   }
 
   height = btc_chain_height(pool->chain);
