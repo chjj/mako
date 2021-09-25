@@ -44,6 +44,7 @@ struct btc_mempool_s {
   const btc_timedata_t *timedata;
   khash_t(entries) *map;
   btc_chain_t *chain;
+  btc_verify_error_t error;
   btc_mempool_tx_cb *on_tx;
   btc_mempool_badorphan_cb *on_badorphan;
   void *arg;
@@ -128,6 +129,32 @@ btc_mempool_close(struct btc_mempool_s *mp) {
   (void)mp;
 }
 
+BTC_UNUSED static int
+btc_chain_throw(struct btc_mempool_s *mp,
+                const uint8_t *hash,
+                const char *code,
+                const char *reason,
+                int score,
+                int malleated) {
+  btc_hash_copy(mp->error.hash, hash);
+
+  mp->error.code = code;
+  mp->error.reason = reason;
+  mp->error.score = score;
+  mp->error.malleated = malleated;
+
+  btc_mempool_log(mp, "Verification error: %s "
+                      "(code=%s score=%d hash=%H)",
+                  reason, code, score, hash);
+
+  return 0;
+}
+
+const btc_verify_error_t *
+btc_mempool_error(struct btc_mempool_s *mp) {
+  return &mp->error;
+}
+
 void
 btc_mempool_add_block(struct btc_mempool_s *mp,
                       const btc_entry_t *entry,
@@ -152,11 +179,15 @@ btc_mempool_handle_reorg(struct btc_mempool_s *mp) {
 }
 
 int
-btc_mempool_add(struct btc_mempool_s *mp, const btc_tx_t *tx, int id) {
+btc_mempool_add(struct btc_mempool_s *mp,
+                btc_vector_t *missing,
+                const btc_tx_t *tx,
+                int id) {
   btc_mpentry_t *entry = btc_mpentry_create();
   int ret = -1;
   khiter_t it;
 
+  (void)missing;
   (void)id;
 
   btc_mpentry_set(entry, tx);

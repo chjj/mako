@@ -220,6 +220,14 @@ btc_addrman_mark_ack(struct btc_addrman_s *man,
   (void)services;
 }
 
+const btc_netaddr_t *
+btc_addrman_get_local(struct btc_addrman_s *man,
+                      const btc_netaddr_t *src) {
+  (void)man;
+  (void)src;
+  return NULL;
+}
+
 void
 btc_addrman_add_local(struct btc_addrman_s *man,
                       const btc_netaddr_t *addr,
@@ -229,10 +237,27 @@ btc_addrman_add_local(struct btc_addrman_s *man,
   (void)score;
 }
 
-const btc_netaddr_t *
-btc_addrman_get_local(struct btc_addrman_s *man,
-                      const btc_netaddr_t *src) {
+void
+btc_addrman_mark_local(struct btc_addrman_s *man,
+                       const btc_netaddr_t *addr) {
   (void)man;
-  (void)src;
-  return NULL;
+  (void)addr;
+}
+
+void
+btc_addrman_iterate(btc_addriter_t *iter, struct btc_addrman_s *man) {
+  iter->man = man;
+  iter->it = 0;
+}
+
+int
+btc_addrman_next(const btc_netaddr_t **addr, btc_addriter_t *iter) {
+  struct btc_addrman_s *man = iter->man;
+
+  if (iter->it >= man->addrs.length)
+    return 0;
+
+  *addr = man->addrs.items[iter->it++];
+
+  return 1;
 }

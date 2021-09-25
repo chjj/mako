@@ -291,6 +291,19 @@ btc_block_virtual_size(const btc_block_t *blk) {
 }
 
 uint8_t *
+btc_block_base_write(uint8_t *zp, const btc_block_t *x) {
+  size_t i;
+
+  zp = btc_header_write(zp, &x->header);
+  zp = btc_size_write(zp, x->txs.length);
+
+  for (i = 0; i < x->txs.length; i++)
+    zp = btc_tx_base_write(zp, x->txs.items[i]);
+
+  return zp;
+}
+
+uint8_t *
 btc_block_write(uint8_t *zp, const btc_block_t *x) {
   zp = btc_header_write(zp, &x->header);
   zp = btc_txvec_write(zp, &x->txs);

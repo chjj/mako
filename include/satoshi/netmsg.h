@@ -50,6 +50,8 @@ enum btc_msgtype {
   BTC_MSG_BLOCKTXN,
   BTC_MSG_UNKNOWN,
   /* Internal */
+  BTC_MSG_BLOCK_BASE,
+  BTC_MSG_TX_BASE,
   BTC_MSG_INTERNAL,
   BTC_MSG_DATA
 };
@@ -112,6 +114,7 @@ typedef struct btc_addrs_s {
 typedef struct btc_invitem_s {
   uint32_t type;
   uint8_t hash[32];
+  struct btc_invitem_s *next;
 } btc_invitem_t;
 
 typedef struct btc_inv_s {
@@ -291,6 +294,9 @@ btc_invitem_read(btc_invitem_t *z, const uint8_t **xp, size_t *xn);
  */
 
 BTC_DEFINE_SERIALIZABLE_VECTOR(btc_inv, btc_invitem, BTC_EXTERN)
+
+BTC_EXTERN void
+btc_inv_push_item(btc_inv_t *inv, uint32_t type, const uint8_t *hash);
 
 /*
  * GetData

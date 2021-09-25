@@ -12,6 +12,7 @@ extern "C" {
 #endif
 
 #include <stddef.h>
+#include <stdint.h>
 #include "types.h"
 #include "../satoshi/common.h"
 #include "../satoshi/types.h"
@@ -76,6 +77,15 @@ enum btc_score {
   BTC_SCORE_MANUAL,
   BTC_SCORE_MAX
 };
+
+/*
+ * Types
+ */
+
+typedef struct btc_addriter_s {
+  btc_addrman_t *man;
+  uint32_t it;
+} btc_addriter_t;
 
 /*
  * Address Manager
@@ -144,14 +154,24 @@ btc_addrman_mark_ack(btc_addrman_t *man,
                      const btc_netaddr_t *addr,
                      int64_t services);
 
+BTC_EXTERN const btc_netaddr_t *
+btc_addrman_get_local(btc_addrman_t *man,
+                      const btc_netaddr_t *src);
+
 BTC_EXTERN void
 btc_addrman_add_local(btc_addrman_t *man,
                       const btc_netaddr_t *addr,
                       enum btc_score score);
 
-BTC_EXTERN const btc_netaddr_t *
-btc_addrman_get_local(btc_addrman_t *man,
-                      const btc_netaddr_t *src);
+BTC_EXTERN void
+btc_addrman_mark_local(btc_addrman_t *man,
+                       const btc_netaddr_t *addr);
+
+BTC_EXTERN void
+btc_addrman_iterate(btc_addriter_t *iter, btc_addrman_t *man);
+
+BTC_EXTERN int
+btc_addrman_next(const btc_netaddr_t **addr, btc_addriter_t *iter);
 
 #ifdef __cplusplus
 }

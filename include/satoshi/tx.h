@@ -257,6 +257,9 @@ BTC_EXTERN size_t
 btc_tx_sigops_size(const btc_tx_t *tx, int sigops);
 
 BTC_EXTERN uint8_t *
+btc_tx_base_write(uint8_t *zp, const btc_tx_t *tx);
+
+BTC_EXTERN uint8_t *
 btc_tx_write(uint8_t *zp, const btc_tx_t *tx);
 
 BTC_EXTERN int

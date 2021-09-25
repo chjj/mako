@@ -339,7 +339,13 @@ btc_raw(char *z, const unsigned char *xp, size_t xn) {
 
 static int
 btc_hash(char *z, const unsigned char *hash) {
+  if (hash == NULL) {
+    strcpy(z, "NULL");
+    return 4;
+  }
+
   btc_hash_export(z, hash);
+
   return 64;
 }
 

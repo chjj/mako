@@ -12,6 +12,7 @@
 #include <string.h>
 #include <satoshi/bloom.h>
 #include <satoshi/crypto/rand.h>
+#include <satoshi/types.h>
 #include <satoshi/util.h>
 #include "impl.h"
 #include "internal.h"
@@ -342,4 +343,24 @@ btc_filter_has(const btc_filter_t *filter, const uint8_t *val, size_t len) {
   }
 
   return 1;
+}
+
+void
+btc_filter_add_addr(btc_filter_t *filter, const btc_netaddr_t *addr) {
+  uint8_t raw[18];
+
+  btc_raw_write(raw, addr->raw, 16);
+  btc_uint16_write(raw + 16, addr->port);
+
+  btc_filter_add(filter, raw, 18);
+}
+
+int
+btc_filter_has_addr(const btc_filter_t *filter, const btc_netaddr_t *addr) {
+  uint8_t raw[18];
+
+  btc_raw_write(raw, addr->raw, 16);
+  btc_uint16_write(raw + 16, addr->port);
+
+  return btc_filter_has(filter, raw, 18);
 }

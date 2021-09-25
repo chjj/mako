@@ -75,6 +75,9 @@ BTC_EXTERN size_t
 btc_block_virtual_size(const btc_block_t *blk);
 
 BTC_EXTERN uint8_t *
+btc_block_base_write(uint8_t *zp, const btc_block_t *x);
+
+BTC_EXTERN uint8_t *
 btc_block_write(uint8_t *zp, const btc_block_t *x);
 
 BTC_EXTERN int

@@ -139,6 +139,12 @@ btc_filter_add(btc_filter_t *filter, const uint8_t *val, size_t len);
 BTC_EXTERN int
 btc_filter_has(const btc_filter_t *filter, const uint8_t *val, size_t len);
 
+BTC_EXTERN void
+btc_filter_add_addr(btc_filter_t *filter, const btc_netaddr_t *addr);
+
+BTC_EXTERN int
+btc_filter_has_addr(const btc_filter_t *filter, const btc_netaddr_t *addr);
+
 #ifdef __cplusplus
 }
 #endif

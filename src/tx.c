@@ -1004,6 +1004,15 @@ btc_tx_sigops_size(const btc_tx_t *tx, int sigops) {
 }
 
 uint8_t *
+btc_tx_base_write(uint8_t *zp, const btc_tx_t *tx) {
+  zp = btc_uint32_write(zp, tx->version);
+  zp = btc_inpvec_write(zp, &tx->inputs);
+  zp = btc_outvec_write(zp, &tx->outputs);
+  zp = btc_uint32_write(zp, tx->locktime);
+  return zp;
+}
+
+uint8_t *
 btc_tx_write(uint8_t *zp, const btc_tx_t *tx) {
   int witness = btc_tx_has_witness(tx);
   size_t i;

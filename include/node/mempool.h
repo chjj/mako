@@ -83,6 +83,9 @@ btc_mempool_open(btc_mempool_t *mp);
 BTC_EXTERN void
 btc_mempool_close(btc_mempool_t *mp);
 
+BTC_EXTERN const btc_verify_error_t *
+btc_mempool_error(btc_mempool_t *mp);
+
 BTC_EXTERN void
 btc_mempool_add_block(btc_mempool_t *mp,
                       const btc_entry_t *entry,
@@ -97,7 +100,10 @@ BTC_EXTERN void
 btc_mempool_handle_reorg(btc_mempool_t *mp);
 
 BTC_EXTERN int
-btc_mempool_add(btc_mempool_t *mp, const btc_tx_t *tx, int id);
+btc_mempool_add(btc_mempool_t *mp,
+                btc_vector_t *missing,
+                const btc_tx_t *tx,
+                int id);
 
 BTC_EXTERN int
 btc_mempool_has(btc_mempool_t *mp, const uint8_t *hash);
