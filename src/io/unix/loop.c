@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -22,6 +23,8 @@
 /*
  * Constants
  */
+
+#define BTC_TICK_RATE 40
 
 enum btc_socket_state {
   BTC_SOCKET_DISCONNECTED,
@@ -76,7 +79,7 @@ typedef struct btc_loop_s {
 } btc__loop_t;
 
 /*
- * Helpers
+ * Socket Helpers
  */
 
 static int
@@ -170,6 +173,41 @@ safe_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
   } while (rc == -1 && errno == EINTR);
 
   return rc;
+}
+
+/*
+ * Time Helpers
+ */
+
+static void
+time_sleep(long long ms) {
+  struct timeval tv;
+  int rc;
+
+  if (ms <= 0)
+    return;
+
+  memset(&tv, 0, sizeof(tv));
+
+  tv.tv_sec = 0;
+  tv.tv_usec = ms * 1000;
+
+  /* Linux updates the timeval. This is one
+     situation where we actually _want_ that
+     behavior. */
+  do {
+    rc = select(0, NULL, NULL, NULL, &tv);
+  } while (rc == -1 && errno == EINTR);
+}
+
+static long long
+time_msec(void) {
+  struct timeval tv;
+
+  if (gettimeofday(&tv, NULL) != 0)
+    abort(); /* LCOV_EXCL_LINE */
+
+  return (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
 /*
@@ -716,23 +754,29 @@ handle_write(btc__loop_t *loop, btc__socket_t *socket) {
 void
 btc_loop_start(btc__loop_t *loop) {
   btc__socket_t *socket;
+  long long prev, diff;
   struct pollfd *pfd;
+  int count;
   size_t i;
-  int c;
 
   loop->running = 1;
 
   while (loop->running) {
-    c = poll(loop->pfds, loop->length, 1000);
+    prev = time_msec();
+    count = poll(loop->pfds, loop->length, BTC_TICK_RATE);
+    diff = time_msec() - prev;
 
-    if (c == -1) {
+    if (diff < 0)
+      diff = 0;
+
+    if (count == -1) {
       if (errno == EINTR)
         continue;
 
       abort();
     }
 
-    if (c != 0) {
+    if (count != 0) {
       for (i = 0; i < loop->length; i++) {
         socket = loop->sockets[i];
         pfd = &loop->pfds[i];
@@ -771,6 +815,8 @@ btc_loop_start(btc__loop_t *loop) {
         i -= 1;
       }
     }
+
+    time_sleep(BTC_TICK_RATE - diff);
   }
 
   for (i = 0; i < loop->length; i++) {
