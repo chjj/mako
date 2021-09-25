@@ -182,7 +182,7 @@ int
 btc_mempool_add(struct btc_mempool_s *mp,
                 btc_vector_t *missing,
                 const btc_tx_t *tx,
-                int id) {
+                unsigned int id) {
   btc_mpentry_t *entry = btc_mpentry_create();
   int ret = -1;
   khiter_t it;

@@ -58,7 +58,7 @@ typedef struct btc_orphan_s {
   uint8_t hash[32];
   btc_block_t *block;
   unsigned int flags;
-  int id;
+  unsigned int id;
   int64_t time;
 } btc_orphan_t;
 
@@ -401,7 +401,7 @@ static void
 btc_chain_store_orphan(struct btc_chain_s *chain,
                        const btc_block_t *block,
                        unsigned int flags,
-                       int id) {
+                       unsigned int id) {
   const btc_header_t *hdr = &block->header;
   int32_t height = btc_block_coinbase_height(block);
   btc_orphan_t *orphan;
@@ -1833,7 +1833,7 @@ int
 btc_chain_add(struct btc_chain_s *chain,
               const btc_block_t *block,
               unsigned int flags,
-              int id) {
+              unsigned int id) {
   const btc_network_t *network = chain->network;
   const btc_header_t *hdr = &block->header;
   const btc_entry_t *prev, *entry;

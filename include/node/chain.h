@@ -61,7 +61,7 @@ typedef void btc_chain_reorganize_cb(const btc_entry_t *old,
                                      void *arg);
 
 typedef void btc_chain_badorphan_cb(const btc_verify_error_t *err,
-                                    int id,
+                                    unsigned int id,
                                     void *arg);
 
 /*
@@ -138,7 +138,7 @@ BTC_EXTERN int
 btc_chain_add(btc_chain_t *chain,
               const btc_block_t *block,
               unsigned int flags,
-              int id);
+              unsigned int id);
 
 BTC_EXTERN const btc_entry_t *
 btc_chain_tip(btc_chain_t *chain);

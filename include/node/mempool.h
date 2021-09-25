@@ -49,7 +49,7 @@ typedef void btc_mempool_tx_cb(const btc_mpentry_t *entry,
                                void *arg);
 
 typedef void btc_mempool_badorphan_cb(const btc_verify_error_t *err,
-                                      int id,
+                                      unsigned int id,
                                       void *arg);
 
 /*
@@ -103,7 +103,7 @@ BTC_EXTERN int
 btc_mempool_add(btc_mempool_t *mp,
                 btc_vector_t *missing,
                 const btc_tx_t *tx,
-                int id);
+                unsigned int id);
 
 BTC_EXTERN int
 btc_mempool_has(btc_mempool_t *mp, const uint8_t *hash);
