@@ -7,7 +7,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <satoshi/bip152.h>
 #include <satoshi/block.h>
+#include <satoshi/bloom.h>
 #include <satoshi/header.h>
 #include <satoshi/netaddr.h>
 #include <satoshi/netmsg.h>
@@ -625,7 +627,7 @@ btc_reject_read(btc_reject_t *z, const uint8_t **xp, size_t *xn) {
  * FilterLoad
  */
 
-/* TODO */
+/* already implemented */
 
 /*
  * FilterAdd
@@ -774,19 +776,19 @@ btc_sendcmpct_read(btc_sendcmpct_t *z, const uint8_t **xp, size_t *xn) {
  * CmpctBlock
  */
 
-/* TODO */
+/* already implemented */
 
 /*
  * GetBlockTxn
  */
 
-/* TODO */
+/* already implemented */
 
 /*
  * BlockTxn
  */
 
-/* TODO */
+/* already implemented */
 
 /*
  * Unknown
@@ -920,7 +922,7 @@ btc_msg_clear(btc_msg_t *msg) {
       msg->body = NULL;
       break;
     case BTC_MSG_FILTERLOAD:
-      /* btc_bloom_clear((btc_bloom_t *)msg->body); */
+      btc_bloom_clear((btc_bloom_t *)msg->body);
       break;
     case BTC_MSG_FILTERADD:
       btc_filteradd_clear((btc_filteradd_t *)msg->body);
@@ -938,13 +940,15 @@ btc_msg_clear(btc_msg_t *msg) {
       btc_sendcmpct_clear((btc_sendcmpct_t *)msg->body);
       break;
     case BTC_MSG_CMPCTBLOCK:
-      /* btc_cmpctblock_clear((btc_cmpctblock_t *)msg->body); */
+    case BTC_MSG_CMPCTBLOCK_BASE:
+      btc_cmpct_clear((btc_cmpct_t *)msg->body);
       break;
     case BTC_MSG_GETBLOCKTXN:
-      /* btc_getblocktxn_clear((btc_getblocktxn_t *)msg->body); */
+      btc_getblocktxn_clear((btc_getblocktxn_t *)msg->body);
       break;
     case BTC_MSG_BLOCKTXN:
-      /* btc_blocktxn_clear((btc_blocktxn_t *)msg->body); */
+    case BTC_MSG_BLOCKTXN_BASE:
+      btc_blocktxn_clear((btc_blocktxn_t *)msg->body);
       break;
     case BTC_MSG_UNKNOWN:
       btc_unknown_clear((btc_unknown_t *)msg->body);
@@ -1039,12 +1043,14 @@ btc_msg_set_type(btc_msg_t *msg, enum btc_msgtype type) {
       cmd = "sendcmpct";
       break;
     case BTC_MSG_CMPCTBLOCK:
+    case BTC_MSG_CMPCTBLOCK_BASE:
       cmd = "cmpctblock";
       break;
     case BTC_MSG_GETBLOCKTXN:
       cmd = "getblocktxn";
       break;
     case BTC_MSG_BLOCKTXN:
+    case BTC_MSG_BLOCKTXN_BASE:
       cmd = "blocktxn";
       break;
     default:
@@ -1176,7 +1182,7 @@ btc_msg_alloc(btc_msg_t *msg) {
       msg->body = NULL;
       break;
     case BTC_MSG_FILTERLOAD:
-      /* msg->body = btc_bloom_create(); */
+      msg->body = btc_bloom_create();
       break;
     case BTC_MSG_FILTERADD:
       msg->body = btc_filteradd_create();
@@ -1194,13 +1200,15 @@ btc_msg_alloc(btc_msg_t *msg) {
       msg->body = btc_sendcmpct_create();
       break;
     case BTC_MSG_CMPCTBLOCK:
-      /* msg->body = btc_cmpctblock_create(); */
+    case BTC_MSG_CMPCTBLOCK_BASE:
+      msg->body = btc_cmpct_create();
       break;
     case BTC_MSG_GETBLOCKTXN:
-      /* msg->body = btc_getblocktxn_create(); */
+      msg->body = btc_getblocktxn_create();
       break;
     case BTC_MSG_BLOCKTXN:
-      /* msg->body = btc_blocktxn_create(); */
+    case BTC_MSG_BLOCKTXN_BASE:
+      msg->body = btc_blocktxn_create();
       break;
     case BTC_MSG_UNKNOWN:
       msg->body = btc_unknown_create();
@@ -1253,8 +1261,7 @@ btc_msg_size(const btc_msg_t *x) {
     case BTC_MSG_MEMPOOL:
       return 0;
     case BTC_MSG_FILTERLOAD:
-      /* return btc_bloom_size((btc_bloom_t *)x->body); */
-      return 0;
+      return btc_bloom_size((btc_bloom_t *)x->body);
     case BTC_MSG_FILTERADD:
       return btc_filteradd_size((btc_filteradd_t *)x->body);
     case BTC_MSG_FILTERCLEAR:
@@ -1267,14 +1274,15 @@ btc_msg_size(const btc_msg_t *x) {
     case BTC_MSG_SENDCMPCT:
       return btc_sendcmpct_size((btc_sendcmpct_t *)x->body);
     case BTC_MSG_CMPCTBLOCK:
-      /* return btc_cmpctblock_size((btc_cmpctblock_t *)x->body); */
-      return 0;
+      return btc_cmpct_size((btc_cmpct_t *)x->body);
+    case BTC_MSG_CMPCTBLOCK_BASE:
+      return btc_cmpct_base_size((btc_cmpct_t *)x->body);
     case BTC_MSG_GETBLOCKTXN:
-      /* return btc_getblocktxn_size((btc_getblocktxn_t *)x->body); */
-      return 0;
+      return btc_getblocktxn_size((btc_getblocktxn_t *)x->body);
     case BTC_MSG_BLOCKTXN:
-      /* return btc_blocktxn_size((btc_blocktxn_t *)x->body); */
-      return 0;
+      return btc_blocktxn_size((btc_blocktxn_t *)x->body);
+    case BTC_MSG_BLOCKTXN_BASE:
+      return btc_blocktxn_base_size((btc_blocktxn_t *)x->body);
     case BTC_MSG_UNKNOWN:
       return btc_unknown_size((btc_unknown_t *)x->body);
     default:
@@ -1324,8 +1332,7 @@ btc_msg_write(uint8_t *zp, const btc_msg_t *x) {
     case BTC_MSG_MEMPOOL:
       return zp;
     case BTC_MSG_FILTERLOAD:
-      /* return btc_bloom_write(zp, (btc_bloom_t *)x->body); */
-      return zp;
+      return btc_bloom_write(zp, (btc_bloom_t *)x->body);
     case BTC_MSG_FILTERADD:
       return btc_filteradd_write(zp, (btc_filteradd_t *)x->body);
     case BTC_MSG_FILTERCLEAR:
@@ -1338,14 +1345,15 @@ btc_msg_write(uint8_t *zp, const btc_msg_t *x) {
     case BTC_MSG_SENDCMPCT:
       return btc_sendcmpct_write(zp, (btc_sendcmpct_t *)x->body);
     case BTC_MSG_CMPCTBLOCK:
-      /* return btc_cmpctblock_write(zp, (btc_cmpctblock_t *)x->body); */
-      return zp;
+      return btc_cmpct_write(zp, (btc_cmpct_t *)x->body);
+    case BTC_MSG_CMPCTBLOCK_BASE:
+      return btc_cmpct_base_write(zp, (btc_cmpct_t *)x->body);
     case BTC_MSG_GETBLOCKTXN:
-      /* return btc_getblocktxn_write(zp, (btc_getblocktxn_t *)x->body); */
-      return zp;
+      return btc_getblocktxn_write(zp, (btc_getblocktxn_t *)x->body);
     case BTC_MSG_BLOCKTXN:
-      /* return btc_blocktxn_write(zp, (btc_blocktxn_t *)x->body); */
-      return zp;
+      return btc_blocktxn_write(zp, (btc_blocktxn_t *)x->body);
+    case BTC_MSG_BLOCKTXN_BASE:
+      return btc_blocktxn_base_write(zp, (btc_blocktxn_t *)x->body);
     case BTC_MSG_UNKNOWN:
       return btc_unknown_write(zp, (btc_unknown_t *)x->body);
     default:
@@ -1393,8 +1401,7 @@ btc_msg_read(btc_msg_t *z, const uint8_t **xp, size_t *xn) {
     case BTC_MSG_MEMPOOL:
       return 1;
     case BTC_MSG_FILTERLOAD:
-      /* return btc_bloom_read((btc_bloom_t *)z->body, xp, xn); */
-      return 1;
+      return btc_bloom_read((btc_bloom_t *)z->body, xp, xn);
     case BTC_MSG_FILTERADD:
       return btc_filteradd_read((btc_filteradd_t *)z->body, xp, xn);
     case BTC_MSG_FILTERCLEAR:
@@ -1407,14 +1414,13 @@ btc_msg_read(btc_msg_t *z, const uint8_t **xp, size_t *xn) {
     case BTC_MSG_SENDCMPCT:
       return btc_sendcmpct_read((btc_sendcmpct_t *)z->body, xp, xn);
     case BTC_MSG_CMPCTBLOCK:
-      /* return btc_cmpctblock_read((btc_cmpctblock_t *)z->body, xp, xn); */
-      return 1;
+    case BTC_MSG_CMPCTBLOCK_BASE:
+      return btc_cmpct_read((btc_cmpct_t *)z->body, xp, xn);
     case BTC_MSG_GETBLOCKTXN:
-      /* return btc_getblocktxn_read((btc_getblocktxn_t *)z->body, xp, xn); */
-      return 1;
+      return btc_getblocktxn_read((btc_getblocktxn_t *)z->body, xp, xn);
     case BTC_MSG_BLOCKTXN:
-      /* return btc_blocktxn_read((btc_blocktxn_t *)z->body, xp, xn); */
-      return 1;
+    case BTC_MSG_BLOCKTXN_BASE:
+      return btc_blocktxn_read((btc_blocktxn_t *)z->body, xp, xn);
     case BTC_MSG_UNKNOWN:
       return btc_unknown_read((btc_unknown_t *)z->body, xp, xn);
     default:

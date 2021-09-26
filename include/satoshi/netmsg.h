@@ -52,6 +52,8 @@ enum btc_msgtype {
   /* Internal */
   BTC_MSG_BLOCK_BASE,
   BTC_MSG_TX_BASE,
+  BTC_MSG_CMPCTBLOCK_BASE,
+  BTC_MSG_BLOCKTXN_BASE,
   BTC_MSG_INTERNAL,
   BTC_MSG_DATA
 };
