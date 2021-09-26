@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <satoshi/array.h>
 #include <satoshi/buffer.h>
 #include <satoshi/consensus.h>
 #include <satoshi/crypto/ecc.h>
@@ -277,59 +278,6 @@ btc_stack_swap(btc_stack_t *stack, int i1, int i2) {
 
   stack->items[i1] = v2;
   stack->items[i2] = v1;
-}
-
-/*
- * State
- */
-
-typedef struct btc_state_s {
-  uint8_t *items;
-  size_t alloc;
-  size_t length;
-} btc_state_t;
-
-static void
-btc_state_init(btc_state_t *z) {
-  z->items = NULL;
-  z->alloc = 0;
-  z->length = 0;
-}
-
-static void
-btc_state_clear(btc_state_t *z) {
-  if (z->alloc > 0)
-    free(z->items);
-
-  z->items = NULL;
-  z->alloc = 0;
-  z->length = 0;
-}
-
-static void
-btc_state_grow(btc_state_t *z, size_t zn) {
-  if (zn > z->alloc) {
-    uint8_t *zp = (uint8_t *)realloc(z->items, zn);
-
-    CHECK(zp != NULL);
-
-    z->items = zp;
-    z->alloc = zn;
-  }
-}
-
-static void
-btc_state_push(btc_state_t *z, int x) {
-  if (z->length == z->alloc)
-    btc_state_grow(z, (z->alloc * 3) / 2 + (z->alloc <= 1));
-
-  z->items[z->length++] = x;
-}
-
-static int
-btc_state_pop(btc_state_t *z) {
-  CHECK(z->length > 0);
-  return z->items[--z->length];
 }
 
 /*
@@ -1662,7 +1610,7 @@ btc_script_execute(const btc_script_t *script,
   int negate = 0;
   int minimal = 0;
 
-  btc_state_t state;
+  btc_array_t state;
   btc_stack_t alt;
   btc_reader_t reader;
   btc_script_t subscript;
@@ -1674,7 +1622,7 @@ btc_script_execute(const btc_script_t *script,
   if (flags & BTC_SCRIPT_VERIFY_MINIMALDATA)
     minimal = 1;
 
-  btc_state_init(&state);
+  btc_array_init(&state);
   btc_stack_init(&alt);
   btc_script_init(&subscript);
   btc_reader_init(&reader, script);
@@ -1826,7 +1774,7 @@ btc_script_execute(const btc_script_t *script,
           btc_stack_drop(stack);
         }
 
-        btc_state_push(&state, val);
+        btc_array_push(&state, val);
 
         if (!val)
           negate += 1;
@@ -1850,7 +1798,7 @@ btc_script_execute(const btc_script_t *script,
         if (state.length == 0)
           THROW(BTC_SCRIPT_ERR_UNBALANCED_CONDITIONAL);
 
-        if (!btc_state_pop(&state))
+        if (!btc_array_pop(&state))
           negate -= 1;
 
         break;
@@ -2548,7 +2496,7 @@ btc_script_execute(const btc_script_t *script,
     THROW(BTC_SCRIPT_ERR_UNBALANCED_CONDITIONAL);
 
 done:
-  btc_state_clear(&state);
+  btc_array_clear(&state);
   btc_stack_clear(&alt);
   btc_script_clear(&subscript);
   return err;

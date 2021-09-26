@@ -23,17 +23,11 @@ extern "C" {
 
 struct btc_mempool_s;
 
-typedef struct btc_idvec_s {
-  uint64_t *items;
-  size_t alloc;
-  size_t length;
-} btc_idvec_t;
-
 typedef struct btc_cmpct_s {
   uint8_t hash[32];
   btc_header_t header;
   uint64_t key_nonce;
-  btc_idvec_t ids;
+  btc_array_t ids;
   btc_txvec_t ptx;
   btc_vector_t avail;
   btc_longtab_t *id_map;
@@ -44,7 +38,7 @@ typedef struct btc_cmpct_s {
 
 typedef struct btc_getblocktxn_s {
   uint8_t hash[32];
-  btc_idvec_t indexes;
+  btc_array_t indexes;
 } btc_getblocktxn_t;
 
 typedef struct btc_blocktxn_s {

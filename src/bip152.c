@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <satoshi/array.h>
 #include <satoshi/bip152.h>
 #include <satoshi/block.h>
 #include <satoshi/consensus.h>
@@ -24,43 +25,6 @@
 #include "internal.h"
 
 /*
- * ID Vector
- */
-
-static void
-idvec_init(btc_idvec_t *z) {
-  z->items = NULL;
-  z->alloc = 0;
-  z->length = 0;
-}
-
-static void
-idvec_clear(btc_idvec_t *z) {
-  if (z->alloc > 0)
-    free(z->items);
-
-  z->items = NULL;
-  z->alloc = 0;
-  z->length = 0;
-}
-
-static void
-idvec_grow(btc_idvec_t *z, size_t zn) {
-  if (zn > z->alloc) {
-    z->items = (uint64_t *)btc_realloc(z->items, zn * sizeof(uint64_t));
-    z->alloc = zn;
-  }
-}
-
-static void
-idvec_push(btc_idvec_t *z, uint64_t x) {
-  if (z->length == z->alloc)
-    idvec_grow(z, (z->alloc * 3) / 2 + (z->alloc <= 1));
-
-  z->items[z->length++] = x;
-}
-
-/*
  * Compact Block
  */
 
@@ -71,7 +35,7 @@ btc_cmpct_init(btc_cmpct_t *z) {
   btc_hash_init(z->hash);
   btc_header_init(&z->header);
   z->key_nonce = 0;
-  idvec_init(&z->ids);
+  btc_array_init(&z->ids);
   btc_txvec_init(&z->ptx);
   btc_vector_init(&z->avail);
   z->id_map = btc_longtab_create();
@@ -85,9 +49,7 @@ btc_cmpct_clear(btc_cmpct_t *z) {
   size_t i;
 
   btc_header_clear(&z->header);
-
-  idvec_clear(&z->ids);
-
+  btc_array_clear(&z->ids);
   btc_txvec_clear(&z->ptx);
 
   for (i = 0; i < z->avail.length; i++) {
@@ -96,7 +58,6 @@ btc_cmpct_clear(btc_cmpct_t *z) {
   }
 
   btc_vector_clear(&z->avail);
-
   btc_longtab_destroy(z->id_map);
 }
 
@@ -147,7 +108,7 @@ btc_cmpct_set_block(btc_cmpct_t *z, const btc_block_t *x, int witness) {
     else
       btc_tx_txid(hash, tx);
 
-    idvec_push(&z->ids, btc_cmpct_sid(z, hash));
+    btc_array_push(&z->ids, btc_cmpct_sid(z, hash));
   }
 
   CHECK(z->ptx.length == 0);
@@ -368,7 +329,7 @@ btc_cmpct_read(btc_cmpct_t *z, const uint8_t **xp, size_t *xn) {
     if (!btc_uint16_read(&hi, xp, xn))
       return 0;
 
-    idvec_push(&z->ids, ((uint64_t)hi << 32) | lo);
+    btc_array_push(&z->ids, ((uint64_t)hi << 32) | lo);
   }
 
   if (!btc_size_read(&txlen, xp, xn))
@@ -410,12 +371,12 @@ DEFINE_SERIALIZABLE_OBJECT(btc_getblocktxn, SCOPE_EXTERN)
 void
 btc_getblocktxn_init(btc_getblocktxn_t *z) {
   btc_hash_init(z->hash);
-  idvec_init(&z->indexes);
+  btc_array_init(&z->indexes);
 }
 
 void
 btc_getblocktxn_clear(btc_getblocktxn_t *z) {
-  idvec_clear(&z->indexes);
+  btc_array_clear(&z->indexes);
 }
 
 void
@@ -435,7 +396,7 @@ btc_getblocktxn_set_cmpct(btc_getblocktxn_t *z, const btc_cmpct_t *x) {
 
   for (i = 0; i < x->avail.length; i++) {
     if (x->avail.items[i] == NULL)
-      idvec_push(&z->indexes, i);
+      btc_array_push(&z->indexes, i);
   }
 }
 
@@ -498,7 +459,7 @@ btc_getblocktxn_read(btc_getblocktxn_t *z, const uint8_t **xp, size_t *xn) {
     if (index > 0xffff)
       return 0;
 
-    idvec_push(&z->indexes, index);
+    btc_array_push(&z->indexes, index);
   }
 
   for (i = 0; i < count; i++) {
