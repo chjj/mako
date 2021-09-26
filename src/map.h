@@ -4,8 +4,8 @@
  * https://github.com/chjj/libsatoshi
  */
 
-#ifndef BTC_MAP_H
-#define BTC_MAP_H
+#ifndef BTC_MAP_INTERNAL_OLD_H
+#define BTC_MAP_INTERNAL_OLD_H
 
 #include <stdint.h>
 #include <string.h>
@@ -69,4 +69,4 @@
   KHASH_INIT(name, const btc_netaddr_t *, khval_t, 1, btc_netaddr_hash,  \
                                                       btc_netaddr_equal)
 
-#endif /* BTC_MAP_H */
+#endif /* BTC_MAP_INTERNAL_OLD_H */

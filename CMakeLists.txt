@@ -30,6 +30,15 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/crypto/sha256.c
                             src/crypto/siphash.c
                             src/crypto/sys.c
+                            src/map/addrmap.c
+                            src/map/hashmap.c
+                            src/map/hashset.c
+                            src/map/hashtab.c
+                            src/map/intmap.c
+                            src/map/longmap.c
+                            src/map/longset.c
+                            src/map/longtab.c
+                            src/map/outset.c
                             src/address.c
                             src/base58.c
                             src/bech32.c
