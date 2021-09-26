@@ -43,6 +43,12 @@ typedef struct btc_buffer_s {
   size_t length;
 } btc_buffer_t;
 
+typedef struct btc_array_s {
+  int64_t *items;
+  size_t alloc;
+  size_t length;
+} btc_array_t;
+
 typedef struct btc_vector_s {
   void **items;
   size_t alloc;
