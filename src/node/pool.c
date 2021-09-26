@@ -100,6 +100,7 @@ typedef struct btc_peer_s {
   int loader;
   btc_netaddr_t addr;
   btc_netaddr_t local;
+  uint64_t nonce;
   int64_t time;
   int64_t last_send;
   int64_t last_recv;
@@ -138,12 +139,10 @@ typedef struct btc_peer_s {
   struct btc_peer_s *next;
 } btc_peer_t;
 
-KHASH_MAP_INIT_INT64(nonces, btc_netaddr_t *)
-KHASH_MAP_INIT_CONST_NETADDR(hosts, uint64_t)
+KHASH_SET_INIT_INT64(nonces)
 
 typedef struct btc_nonces_s {
-  khash_t(nonces) *map; /* uint64_t -> btc_netaddr_t */
-  khash_t(hosts) *hosts; /* btc_netaddr_t -> uint64_t */
+  khash_t(nonces) *set;
 } btc_nonces_t;
 
 KHASH_MAP_INIT_CONST_NETADDR(addrs, btc_peer_t *)
@@ -377,74 +376,52 @@ cmpctmap_del(khash_t(cmpct) *map, const uint8_t *hash) {
 
 static void
 btc_nonces_init(btc_nonces_t *list) {
-  list->map = kh_init(nonces);
-  list->hosts = kh_init(hosts);
+  list->set = kh_init(nonces);
 
-  CHECK(list->map != NULL);
-  CHECK(list->hosts != NULL);
+  CHECK(list->set != NULL);
 }
 
 static void
 btc_nonces_clear(btc_nonces_t *list) {
-  kh_destroy(hosts, list->hosts);
-  kh_destroy(nonces, list->map);
+  kh_destroy(nonces, list->set);
 
-  list->hosts = NULL;
-  list->map = NULL;
+  list->set = NULL;
 }
 
 static int
 btc_nonces_has(btc_nonces_t *list, uint64_t nonce) {
-  khiter_t it = kh_get(nonces, list->map, nonce);
-  return it != kh_end(list->map);
+  khiter_t it = kh_get(nonces, list->set, nonce);
+  return it != kh_end(list->set);
 }
 
 static uint64_t
-btc_nonces_alloc(btc_nonces_t *list, const btc_netaddr_t *addr_) {
-  btc_netaddr_t *addr = btc_netaddr_clone(addr_);
+btc_nonces_alloc(btc_nonces_t *list) {
   uint64_t nonce;
-  int ret = -1;
-  khiter_t it;
+  int ret;
 
   for (;;) {
     nonce = ((uint64_t)btc_random() << 32) | btc_random();
+    ret = -1;
 
-    it = kh_put(nonces, list->map, nonce, &ret);
+    kh_put(nonces, list->set, nonce, &ret);
 
     CHECK(ret != -1);
 
     if (ret == 0)
       continue;
 
-    kh_value(list->map, it) = addr;
-
-    it = kh_put(hosts, list->hosts, addr, &ret);
-
-    CHECK(ret > 0);
-
-    kh_value(list->hosts, it) = nonce;
-
     return nonce;
   }
 }
 
 static int
-btc_nonces_remove(btc_nonces_t *list, const btc_netaddr_t *addr) {
-  khiter_t it = kh_get(hosts, list->hosts, addr);
-  uint64_t nonce;
+btc_nonces_remove(btc_nonces_t *list, uint64_t nonce) {
+  khiter_t it = kh_get(nonces, list->set, nonce);
 
-  if (it == kh_end(list->hosts))
+  if (it == kh_end(list->set))
     return 0;
 
-  nonce = kh_value(list->hosts, it);
-
-  kh_del(hosts, list->hosts, it);
-
-  it = kh_get(nonces, list->map, nonce);
-
-  CHECK(it != kh_end(list->map));
-
-  kh_del(nonces, list->map, it);
+  kh_del(nonces, list->set, it);
 
   return 1;
 }
@@ -792,6 +769,7 @@ btc_peer_open(btc_peer_t *peer, const btc_netaddr_t *addr) {
   peer->addr = *addr;
   peer->outbound = 1;
   peer->time = btc_ms();
+  peer->nonce = btc_nonces_alloc(&peer->pool->nonces);
 
   btc_socket_set_data(socket, peer);
   btc_socket_on_connect(socket, on_connect);
@@ -817,6 +795,7 @@ btc_peer_accept(btc_peer_t *peer, btc_socket_t *socket) {
 
   peer->outbound = 0;
   peer->time = btc_ms();
+  peer->nonce = btc_nonces_alloc(&peer->pool->nonces);
 
   btc_socket_set_data(socket, peer);
   btc_socket_on_connect(socket, on_connect);
@@ -926,7 +905,7 @@ btc_peer_send_version(btc_peer_t *peer) {
   btc_netaddr_init(&msg.local);
 
   msg.local.services = BTC_NET_LOCAL_SERVICES;
-  msg.nonce = btc_nonces_alloc(&peer->pool->nonces, &peer->addr);
+  msg.nonce = peer->nonce;
 
   strcpy(msg.agent, BTC_NET_USER_AGENT);
 
@@ -2832,7 +2811,7 @@ btc_pool_on_disconnect(struct btc_pool_s *pool, btc_peer_t *peer) {
       btc_pool_reset_chain(pool);
   }
 
-  btc_nonces_remove(&pool->nonces, &peer->addr);
+  btc_nonces_remove(&pool->nonces, peer->nonce);
 
   if (btc_chain_synced(pool->chain) && size > 0) {
     btc_pool_log(pool, "Peer disconnected with requested blocks (%N).",
@@ -2879,7 +2858,7 @@ btc_pool_on_version(struct btc_pool_s *pool,
     }
   }
 
-  btc_nonces_remove(&pool->nonces, &peer->addr);
+  btc_nonces_remove(&pool->nonces, peer->nonce);
 
 #if 0
   if (!peer->outbound && btc_netaddr_is_routable(&msg->remote))
