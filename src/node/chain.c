@@ -134,23 +134,18 @@ btc_chain_create(const btc_network_t *network) {
 
 void
 btc_chain_destroy(struct btc_chain_s *chain) {
-  {
-    btc_hashsetiter_t iter;
+  btc_hashsetiter_t setiter;
+  btc_hashmapiter_t mapiter;
 
-    btc_hashset_iterate(&iter, chain->invalid);
+  btc_hashset_iterate(&setiter, chain->invalid);
 
-    while (btc_hashset_next(&iter))
-      btc_free(iter.key);
-  }
+  while (btc_hashset_next(&setiter))
+    btc_free(setiter.key);
 
-  {
-    btc_hashmapiter_t iter;
+  btc_hashmap_iterate(&mapiter, chain->orphan_map);
 
-    btc_hashmap_iterate(&iter, chain->orphan_map);
-
-    while (btc_hashmap_next(&iter))
-      btc_orphan_destroy(iter.val);
-  }
+  while (btc_hashmap_next(&mapiter))
+    btc_orphan_destroy(mapiter.val);
 
   btc_hashset_destroy(chain->invalid);
   btc_hashmap_destroy(chain->orphan_map);

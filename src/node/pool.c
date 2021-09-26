@@ -501,36 +501,30 @@ btc_peer_clear_data(btc_peer_t *peer);
 
 static void
 btc_peer_destroy(btc_peer_t *peer) {
+  btc_hashtabiter_t tabit;
+  btc_hashmapiter_t mapit;
+
   parser_clear(&peer->parser);
 
   btc_peer_clear_data(peer);
 
-  {
-    btc_hashtabiter_t iter;
+  /* Free block hashes. */
+  btc_hashtab_iterate(&tabit, peer->block_map);
 
-    btc_hashtab_iterate(&iter, peer->block_map);
+  while (btc_hashtab_next(&tabit))
+    btc_free(tabit.key);
 
-    while (btc_hashtab_next(&iter))
-      btc_free(iter.key);
-  }
+  /* Free TXIDs. */
+  btc_hashtab_iterate(&tabit, peer->tx_map);
 
-  {
-    btc_hashtabiter_t iter;
+  while (btc_hashtab_next(&tabit))
+    btc_free(tabit.key);
 
-    btc_hashtab_iterate(&iter, peer->tx_map);
+  /* Free compact blocks. */
+  btc_hashmap_iterate(&mapit, peer->compact_map);
 
-    while (btc_hashtab_next(&iter))
-      btc_free(iter.key);
-  }
-
-  {
-    btc_hashmapiter_t iter;
-
-    btc_hashmap_iterate(&iter, peer->compact_map);
-
-    while (btc_hashmap_next(&iter))
-      btc_cmpct_destroy(iter.val);
-  }
+  while (btc_hashmap_next(&mapit))
+    btc_cmpct_destroy(mapit.val);
 
   btc_inv_clear(&peer->inv_queue);
 
@@ -1737,45 +1731,36 @@ btc_peer_maybe_timeout(btc_peer_t *peer) {
   }
 
   if (btc_chain_synced(chain) || !peer->syncing) {
-    {
-      btc_hashtabiter_t iter;
+    btc_hashtabiter_t tabit;
+    btc_hashmapiter_t mapit;
 
-      btc_hashtab_iterate(&iter, peer->block_map);
+    btc_hashtab_iterate(&tabit, peer->block_map);
 
-      while (btc_hashtab_next(&iter)) {
-        if (now > iter.val + 120000) {
-          btc_peer_log(peer, "Peer is stalling (block) (%N).", &peer->addr);
-          btc_peer_close(peer);
-          return;
-        }
+    while (btc_hashtab_next(&tabit)) {
+      if (now > tabit.val + 120000) {
+        btc_peer_log(peer, "Peer is stalling (block) (%N).", &peer->addr);
+        btc_peer_close(peer);
+        return;
       }
     }
 
-    {
-      btc_hashtabiter_t iter;
+    btc_hashtab_iterate(&tabit, peer->tx_map);
 
-      btc_hashtab_iterate(&iter, peer->tx_map);
-
-      while (btc_hashtab_next(&iter)) {
-        if (now > iter.val + 120000) {
-          btc_peer_log(peer, "Peer is stalling (tx) (%N).", &peer->addr);
-          btc_peer_close(peer);
-          return;
-        }
+    while (btc_hashtab_next(&tabit)) {
+      if (now > tabit.val + 120000) {
+        btc_peer_log(peer, "Peer is stalling (tx) (%N).", &peer->addr);
+        btc_peer_close(peer);
+        return;
       }
     }
 
-    {
-      btc_hashmapiter_t iter;
+    btc_hashmap_iterate(&mapit, peer->compact_map);
 
-      btc_hashmap_iterate(&iter, peer->compact_map);
-
-      while (btc_hashmap_next(&iter)) {
-        if (now > ((btc_cmpct_t *)iter.val)->now + 30000) {
-          btc_peer_log(peer, "Peer is stalling (blocktxn) (%N).", &peer->addr);
-          btc_peer_close(peer);
-          return;
-        }
+    while (btc_hashmap_next(&mapit)) {
+      if (now > ((btc_cmpct_t *)mapit.val)->now + 30000) {
+        btc_peer_log(peer, "Peer is stalling (blocktxn) (%N).", &peer->addr);
+        btc_peer_close(peer);
+        return;
       }
     }
   }
@@ -2494,34 +2479,28 @@ btc_pool_resolve_item(struct btc_pool_s *pool,
 
 static void
 btc_pool_remove_peer(struct btc_pool_s *pool, btc_peer_t *peer) {
+  btc_hashtabiter_t tabit;
+  btc_hashmapiter_t mapit;
+
   btc_peers_remove(&pool->peers, peer);
 
-  {
-    btc_hashtabiter_t iter;
+  /* Remove block hashes. */
+  btc_hashtab_iterate(&tabit, peer->block_map);
 
-    btc_hashtab_iterate(&iter, peer->block_map);
+  while (btc_hashtab_next(&tabit))
+    CHECK(btc_hashset_del(pool->block_map, tabit.key));
 
-    while (btc_hashtab_next(&iter))
-      btc_hashset_del(pool->block_map, iter.key);
-  }
+  /* Remove TXIDs. */
+  btc_hashtab_iterate(&tabit, peer->tx_map);
 
-  {
-    btc_hashtabiter_t iter;
+  while (btc_hashtab_next(&tabit))
+    CHECK(btc_hashset_del(pool->tx_map, tabit.key));
 
-    btc_hashtab_iterate(&iter, peer->tx_map);
+  /* Remove compact block hashes. */
+  btc_hashmap_iterate(&mapit, peer->compact_map);
 
-    while (btc_hashtab_next(&iter))
-      btc_hashset_del(pool->tx_map, iter.key);
-  }
-
-  {
-    btc_hashmapiter_t iter;
-
-    btc_hashmap_iterate(&iter, peer->compact_map);
-
-    while (btc_hashmap_next(&iter))
-      btc_hashset_del(pool->compact_map, iter.key);
-  }
+  while (btc_hashmap_next(&mapit))
+    CHECK(btc_hashset_del(pool->compact_map, mapit.key));
 }
 
 static void
