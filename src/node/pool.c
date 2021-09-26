@@ -210,7 +210,7 @@ btc_nonces_has(btc_nonces_t *list, uint64_t nonce) {
 static uint64_t
 btc_nonces_alloc(btc_nonces_t *list) {
   for (;;) {
-    uint64_t nonce = ((uint64_t)btc_random() << 32) | btc_random();
+    uint64_t nonce = btc_nonce();
 
     if (btc_longset_put(list->set, nonce))
       return nonce;
@@ -735,7 +735,7 @@ btc_peer_send_ping(btc_peer_t *peer) {
   }
 
   peer->last_ping = btc_ms();
-  peer->challenge = ((uint64_t)btc_random() << 32) | btc_random();
+  peer->challenge = btc_nonce();
 
   ping.nonce = peer->challenge;
 

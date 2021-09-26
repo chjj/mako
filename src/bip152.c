@@ -94,7 +94,7 @@ btc_cmpct_set_block(btc_cmpct_t *z, const btc_block_t *x, int witness) {
   btc_header_hash(z->hash, &x->header);
   btc_header_copy(&z->header, &x->header);
 
-  z->key_nonce = ((uint64_t)btc_random() << 32) | btc_random();
+  z->key_nonce = btc_nonce();
 
   btc_cmpct_key(z->sipkey, z);
 

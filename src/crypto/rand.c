@@ -303,3 +303,18 @@ btc_uniform(uint32_t max) {
 
   return num;
 }
+
+uint64_t
+btc_nonce(void) {
+  uint32_t hi, lo;
+
+  rng_global_lock();
+  rng_global_init();
+
+  hi = rng_random(&rng_state);
+  lo = rng_random(&rng_state);
+
+  rng_global_unlock();
+
+  return ((uint64_t)hi << 32) | lo;
+}

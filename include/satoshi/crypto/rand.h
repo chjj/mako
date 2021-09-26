@@ -31,6 +31,9 @@ btc_random(void);
 BTC_EXTERN uint32_t
 btc_uniform(uint32_t max);
 
+BTC_EXTERN uint64_t
+btc_nonce(void);
+
 #ifdef __cplusplus
 }
 #endif
