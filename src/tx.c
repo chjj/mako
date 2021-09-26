@@ -1099,3 +1099,39 @@ btc_tx_coin(const btc_tx_t *tx, size_t index, int32_t height) {
  */
 
 DEFINE_SERIALIZABLE_VECTOR(btc_txvec, btc_tx, SCOPE_EXTERN)
+
+size_t
+btc_txvec_base_size(const btc_txvec_t *txs) {
+  size_t size = 0;
+  size_t i;
+
+  size += btc_size_size(txs->length);
+
+  for (i = 0; i < txs->length; i++)
+    size += btc_tx_base_size(txs->items[i]);
+
+  return size;
+}
+
+uint8_t *
+btc_txvec_base_write(uint8_t *zp, const btc_txvec_t *x) {
+  size_t i;
+
+  zp = btc_size_write(zp, x->length);
+
+  for (i = 0; i < x->length; i++)
+    zp = btc_tx_base_write(zp, x->items[i]);
+
+  return zp;
+}
+
+size_t
+btc_txvec_witness_size(const btc_txvec_t *txs) {
+  size_t size = 0;
+  size_t i;
+
+  for (i = 0; i < txs->length; i++)
+    size += btc_tx_witness_size(txs->items[i]);
+
+  return size;
+}

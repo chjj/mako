@@ -614,28 +614,13 @@ btc_blocktxn_set_block(btc_blocktxn_t *res,
 
 size_t
 btc_blocktxn_base_size(const btc_blocktxn_t *x) {
-  size_t size = 0;
-  size_t i;
-
-  size += 32;
-  size += btc_size_size(x->txs.length);
-
-  for (i = 0; i < x->txs.length; i++)
-    size += btc_tx_base_size(x->txs.items[i]);
-
-  return size;
+  return 32 + btc_txvec_base_size(&x->txs);
 }
 
 uint8_t *
 btc_blocktxn_base_write(uint8_t *zp, const btc_blocktxn_t *x) {
-  size_t i;
-
   zp = btc_raw_write(zp, x->hash, 32);
-  zp = btc_size_write(zp, x->txs.length);
-
-  for (i = 0; i < x->txs.length; i++)
-    zp = btc_tx_base_write(zp, x->txs.items[i]);
-
+  zp = btc_txvec_base_write(zp, &x->txs);
   return zp;
 }
 

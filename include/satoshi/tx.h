@@ -274,6 +274,15 @@ btc_tx_coin(const btc_tx_t *tx, size_t index, int32_t height);
 
 BTC_DEFINE_SERIALIZABLE_VECTOR(btc_txvec, btc_tx, BTC_EXTERN)
 
+BTC_EXTERN size_t
+btc_txvec_base_size(const btc_txvec_t *txs);
+
+BTC_EXTERN uint8_t *
+btc_txvec_base_write(uint8_t *zp, const btc_txvec_t *x);
+
+BTC_EXTERN size_t
+btc_txvec_witness_size(const btc_txvec_t *txs);
+
 #ifdef __cplusplus
 }
 #endif

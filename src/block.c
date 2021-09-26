@@ -249,27 +249,12 @@ btc_block_claimed(const btc_block_t *blk) {
 
 size_t
 btc_block_base_size(const btc_block_t *blk) {
-  size_t size = 0;
-  size_t i;
-
-  size += btc_header_size(&blk->header);
-  size += btc_size_size(blk->txs.length);
-
-  for (i = 0; i < blk->txs.length; i++)
-    size += btc_tx_base_size(blk->txs.items[i]);
-
-  return size;
+  return btc_header_size(&blk->header) + btc_txvec_base_size(&blk->txs);
 }
 
 size_t
 btc_block_witness_size(const btc_block_t *blk) {
-  size_t size = 0;
-  size_t i;
-
-  for (i = 0; i < blk->txs.length; i++)
-    size += btc_tx_witness_size(blk->txs.items[i]);
-
-  return size;
+  return btc_txvec_witness_size(&blk->txs);
 }
 
 size_t
@@ -292,14 +277,8 @@ btc_block_virtual_size(const btc_block_t *blk) {
 
 uint8_t *
 btc_block_base_write(uint8_t *zp, const btc_block_t *x) {
-  size_t i;
-
   zp = btc_header_write(zp, &x->header);
-  zp = btc_size_write(zp, x->txs.length);
-
-  for (i = 0; i < x->txs.length; i++)
-    zp = btc_tx_base_write(zp, x->txs.items[i]);
-
+  zp = btc_txvec_base_write(zp, &x->txs);
   return zp;
 }
 
