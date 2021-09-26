@@ -28,6 +28,7 @@
 #include <satoshi/crypto/rand.h>
 #include <satoshi/entry.h>
 #include <satoshi/header.h>
+#include <satoshi/list.h>
 #include <satoshi/map.h>
 #include <satoshi/net.h>
 #include <satoshi/netaddr.h>
@@ -147,7 +148,7 @@ typedef struct btc_peers_s {
   btc_peer_t *load;
   size_t inbound;
   size_t outbound;
-  size_t size;
+  size_t length;
 } btc_peers_t;
 
 typedef struct btc_hdrentry_s {
@@ -1861,7 +1862,7 @@ btc_peers_init(btc_peers_t *list) {
   list->load = NULL;
   list->inbound = 0;
   list->outbound = 0;
-  list->size = 0;
+  list->length = 0;
 }
 
 static void
@@ -1872,47 +1873,23 @@ btc_peers_clear(btc_peers_t *list) {
 
 static void
 btc_peers_add(btc_peers_t *list, btc_peer_t *peer) {
-  if (list->head == NULL)
-    list->head = peer;
-
-  if (list->tail != NULL)
-    list->tail->next = peer;
-
-  peer->prev = list->tail;
-  peer->next = NULL;
-
-  list->tail = peer;
-
   CHECK(btc_addrmap_put(list->map, &peer->addr, peer));
   CHECK(btc_intmap_put(list->ids, peer->id, peer));
+
+  btc_list_push(list, peer, btc_peer_t);
 
   if (peer->outbound)
     list->outbound += 1;
   else
     list->inbound += 1;
-
-  list->size += 1;
 }
 
 static void
 btc_peers_remove(btc_peers_t *list, btc_peer_t *peer) {
-  if (list->head == peer)
-    list->head = peer->next;
-
-  if (list->tail == peer)
-    list->tail = peer->prev != NULL ? peer->prev : list->head;
-
-  if (peer->prev != NULL)
-    peer->prev->next = peer->next;
-
-  if (peer->next != NULL)
-    peer->next->prev = peer->prev;
-
-  peer->prev = NULL;
-  peer->next = NULL;
-
   CHECK(btc_addrmap_del(list->map, &peer->addr) == &peer->addr);
   CHECK(btc_intmap_del(list->ids, peer->id) == peer->id);
+
+  btc_list_remove(list, peer, btc_peer_t);
 
   if (peer == list->load) {
     CHECK(peer->loader == 1);
@@ -1924,8 +1901,6 @@ btc_peers_remove(btc_peers_t *list, btc_peer_t *peer) {
     list->outbound -= 1;
   else
     list->inbound -= 1;
-
-  list->size -= 1;
 }
 
 static int
@@ -2740,7 +2715,7 @@ btc_pool_on_addr(struct btc_pool_s *pool,
     "Received %zu addrs (hosts=%zu, peers=%zu) (%N).",
     addrs->length,
     btc_addrman_size(pool->addrman),
-    pool->peers.size,
+    pool->peers.length,
     &peer->addr);
 
   if (relay.length > 0) {
@@ -3491,7 +3466,7 @@ btc_pool_add_block(struct btc_pool_s *pool,
       0,
       btc_hashset_size(pool->block_map),
       block->header.bits,
-      pool->peers.size);
+      pool->peers.length);
   }
 
   if (height % 2000 == 0) {
