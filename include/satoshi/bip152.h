@@ -13,7 +13,6 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdint.h>
-#include "../node/types.h"
 #include "types.h"
 #include "common.h"
 #include "impl.h"
@@ -21,6 +20,8 @@ extern "C" {
 /*
  * Types
  */
+
+struct btc_mempool_s;
 
 typedef struct btc_idvec_s {
   uint64_t *items;
@@ -67,6 +68,9 @@ btc_cmpct_clear(btc_cmpct_t *z);
 BTC_EXTERN void
 btc_cmpct_copy(btc_cmpct_t *z, const btc_cmpct_t *x);
 
+BTC_EXTERN uint64_t
+btc_cmpct_sid(const btc_cmpct_t *blk, const uint8_t *hash);
+
 BTC_EXTERN void
 btc_cmpct_set_block(btc_cmpct_t *z, const btc_block_t *x, int witness);
 
@@ -74,7 +78,7 @@ BTC_EXTERN int
 btc_cmpct_setup(btc_cmpct_t *blk);
 
 BTC_EXTERN int
-btc_cmpct_fill_mempool(btc_cmpct_t *blk, btc_mempool_t *mp, int witness);
+btc_cmpct_fill_mempool(btc_cmpct_t *blk, struct btc_mempool_s *mp, int witness);
 
 BTC_EXTERN int
 btc_cmpct_fill_missing(btc_cmpct_t *blk, const btc_blocktxn_t *msg);
@@ -158,6 +162,25 @@ btc_blocktxn_write(uint8_t *zp, const btc_blocktxn_t *x);
 
 BTC_EXTERN int
 btc_blocktxn_read(btc_blocktxn_t *z, const uint8_t **xp, size_t *xn);
+
+/*
+ * ID Map (id->offset)
+ */
+
+BTC_EXTERN struct kh_btc_idmap_s *
+btc_idmap_create(void);
+
+BTC_EXTERN void
+btc_idmap_destroy(struct kh_btc_idmap_s *map);
+
+BTC_EXTERN size_t
+btc_idmap_size(struct kh_btc_idmap_s *map);
+
+BTC_EXTERN int
+btc_idmap_put(struct kh_btc_idmap_s *map, uint64_t id, int offset);
+
+BTC_EXTERN int
+btc_idmap_get(struct kh_btc_idmap_s *map, uint64_t id);
 
 #ifdef __cplusplus
 }

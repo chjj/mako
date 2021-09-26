@@ -84,6 +84,7 @@ endif()
 list(APPEND node_sources src/node/addrman.c
                          src/node/chain.c
                          src/node/chaindb.c
+                         src/node/cmpct.c
                          src/node/logger.c
                          src/node/mempool.c
                          src/node/miner.c

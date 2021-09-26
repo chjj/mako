@@ -8,8 +8,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <node/mempool.h>
-
 #include <satoshi/bip152.h>
 #include <satoshi/block.h>
 #include <satoshi/consensus.h>
@@ -68,29 +66,29 @@ idvec_push(btc_idvec_t *z, uint64_t x) {
 
 KHASH_MAP_INIT_INT64(btc_idmap, int)
 
-typedef khash_t(btc_idmap) idmap_t;
+typedef khash_t(btc_idmap) btc_idmap_t;
 
-static idmap_t *
-idmap_create(void) {
-  idmap_t *map = kh_init(btc_idmap);
+btc_idmap_t *
+btc_idmap_create(void) {
+  btc_idmap_t *map = kh_init(btc_idmap);
 
   CHECK(map != NULL);
 
   return map;
 }
 
-static void
-idmap_destroy(idmap_t *map) {
+void
+btc_idmap_destroy(btc_idmap_t *map) {
   kh_destroy(btc_idmap, map);
 }
 
-static size_t
-idmap_size(idmap_t *map) {
+size_t
+btc_idmap_size(btc_idmap_t *map) {
   return kh_size(map);
 }
 
-static int
-idmap_put(idmap_t *map, uint64_t id, int offset) {
+int
+btc_idmap_put(btc_idmap_t *map, uint64_t id, int offset) {
   int ret = -1;
   khiter_t it;
 
@@ -106,8 +104,8 @@ idmap_put(idmap_t *map, uint64_t id, int offset) {
   return 1;
 }
 
-static int
-idmap_get(idmap_t *map, uint64_t id) {
+int
+btc_idmap_get(btc_idmap_t *map, uint64_t id) {
   khiter_t it = kh_get(btc_idmap, map, id);
 
   if (it == kh_end(map))
@@ -129,7 +127,7 @@ btc_cmpct_init(btc_cmpct_t *z) {
   idvec_init(&z->ids);
   btc_txvec_init(&z->ptx);
   btc_vector_init(&z->avail);
-  z->id_map = idmap_create();
+  z->id_map = btc_idmap_create();
   z->count = 0;
   btc_hash_init(z->sipkey);
   z->now = 0;
@@ -152,7 +150,7 @@ btc_cmpct_clear(btc_cmpct_t *z) {
 
   btc_vector_clear(&z->avail);
 
-  idmap_destroy(z->id_map);
+  btc_idmap_destroy(z->id_map);
 }
 
 void
@@ -162,7 +160,7 @@ btc_cmpct_copy(btc_cmpct_t *z, const btc_cmpct_t *x) {
   btc_abort(); /* LCOV_EXCL_LINE */
 }
 
-static uint64_t
+uint64_t
 btc_cmpct_sid(const btc_cmpct_t *blk, const uint8_t *hash) {
   return btc_siphash_sum(hash, 32, blk->sipkey) & UINT64_C(0xffffffffffff);
 }
@@ -253,7 +251,7 @@ btc_cmpct_setup(btc_cmpct_t *blk) {
     blk->count += 1;
   }
 
-  CHECK(idmap_size(blk->id_map) == 0);
+  CHECK(btc_idmap_size(blk->id_map) == 0);
 
   for (i = 0; i < blk->ids.length; i++) {
     uint64_t id = blk->ids.items[i];
@@ -261,71 +259,13 @@ btc_cmpct_setup(btc_cmpct_t *blk) {
     while (blk->avail.items[i + offset] != NULL)
       offset += 1;
 
-    if (!idmap_put(blk->id_map, id, i + offset)) {
+    if (!btc_idmap_put(blk->id_map, id, i + offset)) {
       /* Fails on siphash collision. */
       return 0;
     }
   }
 
   return 1;
-}
-
-int
-btc_cmpct_fill_mempool(btc_cmpct_t *blk, btc_mempool_t *mp, int witness) {
-  size_t total = blk->ptx.length + blk->ids.length;
-  const btc_mpentry_t *entry;
-  btc_mpiter_t iter;
-  uint8_t hash[32];
-  idmap_t *set;
-  uint64_t id;
-  int index;
-
-  if (blk->count == total)
-    return 1;
-
-  CHECK(blk->avail.length == total);
-
-  set = idmap_create();
-
-  btc_mempool_iterate(&iter, mp);
-
-  while (btc_mempool_next(&entry, &iter)) {
-    if (witness) {
-      btc_tx_wtxid(hash, &entry->tx);
-      id = btc_cmpct_sid(blk, hash);
-    } else {
-      id = btc_cmpct_sid(blk, entry->hash);
-    }
-
-    index = idmap_get(blk->id_map, id);
-
-    if (index == -1)
-      continue;
-
-    CHECK((size_t)index < blk->avail.length);
-
-    if (!idmap_put(set, index, 0)) {
-      /* Siphash collision, just request it. */
-      btc_tx_destroy((btc_tx_t *)blk->avail.items[index]);
-      blk->avail.items[index] = NULL;
-      blk->count -= 1;
-      continue;
-    }
-
-    blk->avail.items[index] = btc_tx_clone(&entry->tx);
-    blk->count += 1;
-
-    /* We actually may have a siphash collision
-       here, but exit early anyway for perf. */
-    if (blk->count == total) {
-      idmap_destroy(set);
-      return 1;
-    }
-  }
-
-  idmap_destroy(set);
-
-  return 0;
 }
 
 int
