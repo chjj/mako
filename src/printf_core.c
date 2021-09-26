@@ -6,9 +6,9 @@
 
 #include <errno.h>
 #include <limits.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <satoshi/netaddr.h>
@@ -245,40 +245,39 @@ btc_hex(char *z, unsigned long long x, int c, const state_t *st) {
 
 static int
 btc_float(char *z, double x, const state_t *st) {
-  /* Hard to do without -lm. */
-  char fmt[6 + 11 + 1 + 1];
-  char *ptr = fmt;
+  unsigned long long hi, lo;
+  double frac, iptr;
+  int prec = 6;
+  char *s = z;
 
-  *ptr++ = '%';
+  if (st != NULL && (st->flags & PRINTF_PRECISION))
+    prec = st->prec;
 
-  if (st != NULL) {
-    if (st->flags & PRINTF_ALT_FORM)
-      *ptr++ = '#';
+  if (x < 0.0) {
+    *z++ = '-';
+    x = -x;
+  }
 
-    if (st->flags & PRINTF_LEFT_JUSTIFY)
-      *ptr++ = '-';
+  frac = modf(x, &iptr);
+  hi = (unsigned long long)iptr;
+  lo = (unsigned long long)(frac * pow(10, prec));
 
-    if (st->flags & PRINTF_BLANK_POSITIVE)
-      *ptr++ = ' ';
+  z += btc_unsigned(z, hi, NULL);
 
-    if (st->flags & PRINTF_PLUS_MINUS)
-      *ptr++ = '+';
+  if (prec != 0) {
+    *z++ = '.';
 
-    if (st->flags & PRINTF_PRECISION) {
-      *ptr++ = '.';
-      ptr += sprintf(ptr, "%d", st->prec);
-    } else if (st->flags & PRINTF_WIDTH) {
-      if (st->flags & PRINTF_ZERO_PAD)
-        *ptr++ = '0';
+    if (lo != 0) {
+      z += btc_unsigned(z, lo, NULL);
+    } else {
+      while (prec--)
+        *z++ = '0';
 
-      ptr += sprintf(ptr, "%d", st->width);
+      *z = '\0';
     }
   }
 
-  *ptr++ = 'f';
-  *ptr++ = '\0';
-
-  return sprintf(z, fmt, x);
+  return z - s;
 }
 
 #ifdef UINTPTR_MAX
@@ -556,7 +555,7 @@ btc_printf_core(state_t *st, const char *fmt, va_list ap) {
             break;
           }
           case 'f': {
-            state_need(st, 32);
+            state_need(st, 42);
             st->ptr += btc_float(st->ptr, va_arg(ap, double), st);
             st->state = PRINTF_STATE_NONE;
             break;
