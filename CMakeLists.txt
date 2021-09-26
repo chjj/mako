@@ -28,6 +28,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/crypto/ripemd160.c
                             src/crypto/sha1.c
                             src/crypto/sha256.c
+                            src/crypto/siphash.c
                             src/crypto/sys.c
                             src/address.c
                             src/base58.c
@@ -80,6 +81,7 @@ else()
 endif()
 
 list(APPEND node_sources src/node/addrman.c
+                         src/node/bip152.c
                          src/node/chain.c
                          src/node/chaindb.c
                          src/node/logger.c
@@ -182,6 +184,7 @@ set(tests # crypto
           ripemd160
           sha1
           sha256
+          siphash
           # lib
           address
           base58
@@ -213,6 +216,7 @@ set(tests # crypto
           thread
           # node
           addrman
+          bip152
           chaindb
           chain
           mempool

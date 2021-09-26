@@ -99,6 +99,7 @@ typedef struct btc_tx_s {
   btc_inpvec_t inputs;
   btc_outvec_t outputs;
   uint32_t locktime;
+  int _index;
 } btc_tx_t;
 
 typedef struct btc_txvec_s {
