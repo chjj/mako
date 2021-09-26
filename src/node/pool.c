@@ -2997,7 +2997,7 @@ btc_pool_on_addr(struct btc_pool_s *pool,
 
     if (!peer->getting_addr && addrs->length < 10) {
       if (addr->time > since)
-        btc_vector_push(&relay, (void *)addr);
+        btc_vector_push(&relay, addr);
     }
 
     btc_addrman_add(pool->addrman, addr, &peer->addr);

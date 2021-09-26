@@ -699,7 +699,7 @@ btc_chain_get_state(struct btc_chain_s *chain,
       break;
     }
 
-    btc_vector_push(&compute, (void *)entry);
+    btc_vector_push(&compute, entry);
 
     height = entry->height - window;
 
@@ -2021,7 +2021,7 @@ btc_chain_get_locator(struct btc_chain_s *chain,
     CHECK(entry != NULL);
   }
 
-  btc_vector_push(hashes, (void *)entry->hash);
+  btc_vector_push(hashes, entry->hash);
 
   height = entry->height;
 
@@ -2038,7 +2038,7 @@ btc_chain_get_locator(struct btc_chain_s *chain,
 
     CHECK(entry != NULL);
 
-    btc_vector_push(hashes, (void *)entry->hash);
+    btc_vector_push(hashes, entry->hash);
   }
 }
 

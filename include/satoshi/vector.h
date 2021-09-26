@@ -35,7 +35,7 @@ BTC_EXTERN void
 btc_vector_grow(btc_vector_t *z, size_t zn);
 
 BTC_EXTERN void
-btc_vector_push(btc_vector_t *z, void *x);
+btc_vector_push(btc_vector_t *z, const void *x);
 
 BTC_EXTERN void *
 btc_vector_pop(btc_vector_t *z);

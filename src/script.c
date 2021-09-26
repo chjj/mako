@@ -95,14 +95,14 @@ btc_scriptnum_import(const uint8_t *xp, size_t xn) {
 
 DEFINE_HASHABLE_VECTOR(btc_stack, btc_buffer, SCOPE_EXTERN)
 
-const btc_buffer_t *
+btc_buffer_t *
 btc_stack_get(const btc_stack_t *stack, int index) {
   if (index < 0)
     index += (int)stack->length;
 
   CHECK((size_t)index < stack->length);
 
-  return stack->items[index];
+  return (btc_buffer_t *)stack->items[index];
 }
 
 int
@@ -1939,7 +1939,7 @@ btc_script_execute(const btc_script_t *script,
         break;
       }
       case BTC_OP_2ROT: {
-        const btc_buffer_t *v1, *v2;
+        btc_buffer_t *v1, *v2;
 
         if (stack->length < 6)
           THROW(BTC_SCRIPT_ERR_INVALID_STACK_OPERATION);
@@ -1948,8 +1948,8 @@ btc_script_execute(const btc_script_t *script,
         v2 = btc_stack_get(stack, -5);
 
         btc_stack_erase(stack, -6, -4);
-        btc_stack_push(stack, (btc_buffer_t *)v1);
-        btc_stack_push(stack, (btc_buffer_t *)v2);
+        btc_stack_push(stack, v1);
+        btc_stack_push(stack, v2);
 
         break;
       }

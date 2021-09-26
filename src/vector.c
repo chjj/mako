@@ -51,11 +51,11 @@ btc_vector_grow(btc_vector_t *z, size_t zn) {
 }
 
 void
-btc_vector_push(btc_vector_t *z, void *x) {
+btc_vector_push(btc_vector_t *z, const void *x) {
   if (z->length == z->alloc)
     btc_vector_grow(z, (z->alloc * 3) / 2 + (z->alloc <= 1));
 
-  z->items[z->length++] = x;
+  z->items[z->length++] = (void *)x;
 }
 
 void *
