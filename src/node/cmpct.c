@@ -11,6 +11,7 @@
 #include <node/mempool.h>
 
 #include <satoshi/bip152.h>
+#include <satoshi/map.h>
 #include <satoshi/tx.h>
 
 #include "../internal.h"
@@ -22,8 +23,8 @@
 int
 btc_cmpct_fill_mempool(btc_cmpct_t *blk, btc_mempool_t *mp, int witness) {
   size_t total = blk->ptx.length + blk->ids.length;
-  struct kh_btc_idmap_s *set;
   const btc_mpentry_t *entry;
+  btc_longset_t *set;
   btc_mpiter_t iter;
   uint8_t hash[32];
   uint64_t id;
@@ -34,7 +35,7 @@ btc_cmpct_fill_mempool(btc_cmpct_t *blk, btc_mempool_t *mp, int witness) {
 
   CHECK(blk->avail.length == total);
 
-  set = btc_idmap_create();
+  set = btc_longset_create();
 
   btc_mempool_iterate(&iter, mp);
 
@@ -46,14 +47,14 @@ btc_cmpct_fill_mempool(btc_cmpct_t *blk, btc_mempool_t *mp, int witness) {
       id = btc_cmpct_sid(blk, entry->hash);
     }
 
-    index = btc_idmap_get(blk->id_map, id);
+    index = btc_longtab_get(blk->id_map, id);
 
     if (index == -1)
       continue;
 
     CHECK((size_t)index < blk->avail.length);
 
-    if (!btc_idmap_put(set, index, 0)) {
+    if (!btc_longset_put(set, index)) {
       /* Siphash collision, just request it. */
       btc_tx_destroy((btc_tx_t *)blk->avail.items[index]);
       blk->avail.items[index] = NULL;
@@ -67,12 +68,12 @@ btc_cmpct_fill_mempool(btc_cmpct_t *blk, btc_mempool_t *mp, int witness) {
     /* We actually may have a siphash collision
        here, but exit early anyway for perf. */
     if (blk->count == total) {
-      btc_idmap_destroy(set);
+      btc_longset_destroy(set);
       return 1;
     }
   }
 
-  btc_idmap_destroy(set);
+  btc_longset_destroy(set);
 
   return 0;
 }

@@ -18,13 +18,13 @@
 #include <satoshi/consensus.h>
 #include <satoshi/crypto/hash.h>
 #include <satoshi/entry.h>
+#include <satoshi/map.h>
 #include <satoshi/network.h>
 #include <satoshi/tx.h>
 #include <satoshi/util.h>
 #include <satoshi/vector.h>
 
 #include "../bio.h"
-#include "../map.h"
 #include "../impl.h"
 #include "../internal.h"
 
@@ -158,8 +158,6 @@ btc_chainfile_update(btc_chainfile_t *z, const btc_entry_t *entry) {
  * Chain Database
  */
 
-KHASH_MAP_INIT_CONST_HASH(hashes, btc_entry_t *)
-
 struct btc_chaindb_s {
   const btc_network_t *network;
   char prefix[BTC_PATH_MAX + 1];
@@ -170,7 +168,7 @@ struct btc_chaindb_s {
   MDB_dbi db_index;
   MDB_dbi db_tip;
   MDB_dbi db_file;
-  khash_t(hashes) *hashes;
+  btc_hashmap_t *hashes;
   btc_vector_t heights;
   btc_entry_t *head;
   btc_entry_t *tail;
@@ -199,12 +197,10 @@ btc_chaindb_init(struct btc_chaindb_s *db, const btc_network_t *network) {
   db->prefix[0] = '/';
   db->pruning_enabled = 0;
 
-  db->hashes = kh_init(hashes);
+  db->hashes = btc_hashmap_create();
 
   btc_vector_init(&db->heights);
   btc_vector_init(&db->files);
-
-  CHECK(db->hashes != NULL);
 
   db->slab = (uint8_t *)malloc(24 + BTC_MAX_RAW_BLOCK_SIZE);
 
@@ -213,7 +209,7 @@ btc_chaindb_init(struct btc_chaindb_s *db, const btc_network_t *network) {
 
 static void
 btc_chaindb_clear(struct btc_chaindb_s *db) {
-  kh_destroy(hashes, db->hashes);
+  btc_hashmap_destroy(db->hashes);
   btc_vector_clear(&db->heights);
   btc_vector_clear(&db->files);
   free(db->slab);
@@ -501,9 +497,9 @@ static int
 btc_chaindb_load_index(struct btc_chaindb_s *db) {
   btc_entry_t *entry, *tip;
   btc_entry_t *gen = NULL;
+  btc_hashmapiter_t iter;
   uint8_t tip_hash[32];
   MDB_val mkey, mval;
-  khiter_t it, iter;
   MDB_cursor *cur;
   MDB_txn *txn;
   int rc;
@@ -537,12 +533,7 @@ btc_chaindb_load_index(struct btc_chaindb_s *db) {
     entry = btc_entry_create();
 
     CHECK(btc_entry_import(entry, mval.mv_data, mval.mv_size));
-
-    iter = kh_put(hashes, db->hashes, entry->hash, &rc);
-
-    CHECK(rc > 0);
-
-    kh_value(db->hashes, iter) = entry;
+    CHECK(btc_hashmap_put(db->hashes, entry->hash, entry));
 
     rc = mdb_cursor_get(cur, &mkey, &mval, MDB_NEXT);
   }
@@ -553,35 +544,30 @@ btc_chaindb_load_index(struct btc_chaindb_s *db) {
   mdb_txn_abort(txn);
 
   /* Create `prev` links and retrieve genesis block. */
-  for (it = kh_begin(db->hashes); it != kh_end(db->hashes); it++) {
-    if (!kh_exist(db->hashes, it))
-      continue;
+  btc_hashmap_iterate(&iter, db->hashes);
 
-    entry = kh_value(db->hashes, it);
+  while (btc_hashmap_next(&iter)) {
+    entry = iter.val;
 
     if (entry->height == 0) {
       gen = entry;
       continue;
     }
 
-    iter = kh_get(hashes, db->hashes, entry->header.prev_block);
+    entry->prev = btc_hashmap_get(db->hashes, entry->header.prev_block);
 
-    CHECK(iter != kh_end(db->hashes));
-
-    entry->prev = kh_value(db->hashes, iter);
+    CHECK(entry->prev != NULL);
   }
 
   CHECK(gen != NULL);
 
   /* Retrieve tip. */
-  iter = kh_get(hashes, db->hashes, tip_hash);
+  tip = btc_hashmap_get(db->hashes, tip_hash);
 
-  CHECK(iter != kh_end(db->hashes));
-
-  tip = kh_value(db->hashes, iter);
+  CHECK(tip != NULL);
 
   /* Create height->entry vector. */
-  btc_vector_grow(&db->heights, (kh_size(db->hashes) * 3) / 2);
+  btc_vector_grow(&db->heights, (btc_hashmap_size(db->hashes) * 3) / 2);
   btc_vector_resize(&db->heights, tip->height + 1);
 
   /* Populate height vector and create `next` links. */
@@ -606,14 +592,14 @@ btc_chaindb_load_index(struct btc_chaindb_s *db) {
 
 static void
 btc_chaindb_unload_index(struct btc_chaindb_s *db) {
-  khiter_t it;
+  btc_hashmapiter_t iter;
 
-  for (it = kh_begin(db->hashes); it != kh_end(db->hashes); it++) {
-    if (kh_exist(db->hashes, it))
-      btc_entry_destroy(kh_value(db->hashes, it));
-  }
+  btc_hashmap_iterate(&iter, db->hashes);
 
-  kh_clear(hashes, db->hashes);
+  while (btc_hashmap_next(&iter))
+    btc_entry_destroy(iter.val);
+
+  btc_hashmap_reset(db->hashes);
   btc_vector_clear(&db->heights);
 
   db->head = NULL;
@@ -1191,8 +1177,6 @@ btc_chaindb_save(struct btc_chaindb_s *db,
   uint8_t raw[BTC_ENTRY_SIZE];
   MDB_val mkey, mval;
   MDB_txn *txn;
-  khiter_t it;
-  int rc = -1;
 
   /* Sanity checks. */
   CHECK(entry->prev != NULL || entry->height == 0);
@@ -1256,11 +1240,7 @@ btc_chaindb_save(struct btc_chaindb_s *db,
   }
 
   /* Update hashes. */
-  it = kh_put(hashes, db->hashes, entry->hash, &rc);
-
-  CHECK(rc > 0);
-
-  kh_value(db->hashes, it) = entry;
+  CHECK(btc_hashmap_put(db->hashes, entry->hash, entry));
 
   /* Main-chain-only stuff. */
   if (view != NULL) {
@@ -1426,12 +1406,7 @@ btc_chaindb_height(struct btc_chaindb_s *db) {
 
 const btc_entry_t *
 btc_chaindb_by_hash(struct btc_chaindb_s *db, const uint8_t *hash) {
-  khiter_t iter = kh_get(hashes, db->hashes, hash);
-
-  if (iter == kh_end(db->hashes))
-    return NULL;
-
-  return kh_value(db->hashes, iter);
+  return btc_hashmap_get(db->hashes, hash);
 }
 
 const btc_entry_t *

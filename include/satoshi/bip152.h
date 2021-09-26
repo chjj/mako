@@ -29,8 +29,6 @@ typedef struct btc_idvec_s {
   size_t length;
 } btc_idvec_t;
 
-struct kh_btc_idmap_s;
-
 typedef struct btc_cmpct_s {
   uint8_t hash[32];
   btc_header_t header;
@@ -38,7 +36,7 @@ typedef struct btc_cmpct_s {
   btc_idvec_t ids;
   btc_txvec_t ptx;
   btc_vector_t avail;
-  struct kh_btc_idmap_s *id_map;
+  btc_longtab_t *id_map;
   size_t count;
   uint8_t sipkey[32];
   int64_t now;
@@ -163,25 +161,6 @@ btc_blocktxn_write(uint8_t *zp, const btc_blocktxn_t *x);
 
 BTC_EXTERN int
 btc_blocktxn_read(btc_blocktxn_t *z, const uint8_t **xp, size_t *xn);
-
-/*
- * ID Map (id->offset)
- */
-
-BTC_EXTERN struct kh_btc_idmap_s *
-btc_idmap_create(void);
-
-BTC_EXTERN void
-btc_idmap_destroy(struct kh_btc_idmap_s *map);
-
-BTC_EXTERN size_t
-btc_idmap_size(struct kh_btc_idmap_s *map);
-
-BTC_EXTERN int
-btc_idmap_put(struct kh_btc_idmap_s *map, uint64_t id, int offset);
-
-BTC_EXTERN int
-btc_idmap_get(struct kh_btc_idmap_s *map, uint64_t id);
 
 #ifdef __cplusplus
 }

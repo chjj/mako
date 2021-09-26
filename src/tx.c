@@ -11,12 +11,13 @@
 #include <satoshi/consensus.h>
 #include <satoshi/crypto/ecc.h>
 #include <satoshi/crypto/hash.h>
+#include <satoshi/map.h>
 #include <satoshi/policy.h>
 #include <satoshi/script.h>
 #include <satoshi/tx.h>
+#include <satoshi/util.h>
 #include "impl.h"
 #include "internal.h"
-#include "map.h"
 
 /*
  * Transaction
@@ -803,32 +804,22 @@ btc_tx_sigops(const btc_tx_t *tx, btc_view_t *view, unsigned int flags) {
   return (cost + BTC_WITNESS_SCALE_FACTOR - 1) / BTC_WITNESS_SCALE_FACTOR;
 }
 
-KHASH_SET_INIT_CONST_OUTPOINT(outpoints)
-
 int
 btc_tx_has_duplicate_inputs(const btc_tx_t *tx) {
-  khash_t(outpoints) *set = kh_init(outpoints);
+  btc_outset_t *set = btc_outset_create();
   const btc_input_t *input;
   size_t i;
-  int ret;
-
-  CHECK(set != NULL);
 
   for (i = 0; i < tx->inputs.length; i++) {
     input = tx->inputs.items[i];
-    ret = -1;
 
-    kh_put(outpoints, set, &input->prevout, &ret);
-
-    CHECK(ret != -1);
-
-    if (ret == 0) {
-      kh_destroy(outpoints, set);
+    if (!btc_outset_put(set, &input->prevout)) {
+      btc_outset_destroy(set);
       return 1;
     }
   }
 
-  kh_destroy(outpoints, set);
+  btc_outset_destroy(set);
 
   return 0;
 }

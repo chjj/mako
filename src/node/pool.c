@@ -28,6 +28,7 @@
 #include <satoshi/crypto/rand.h>
 #include <satoshi/entry.h>
 #include <satoshi/header.h>
+#include <satoshi/map.h>
 #include <satoshi/net.h>
 #include <satoshi/netaddr.h>
 #include <satoshi/netmsg.h>
@@ -39,7 +40,6 @@
 #include <satoshi/vector.h>
 
 #include "../bio.h"
-#include "../map.h"
 #include "../impl.h"
 #include "../internal.h"
 
@@ -58,10 +58,6 @@ enum btc_peer_state {
 /*
  * Types
  */
-
-KHASH_SET_INIT_HASH(hashes)
-KHASH_MAP_INIT_HASH(times, int64_t)
-KHASH_MAP_INIT_CONST_HASH(cmpct, btc_cmpct_t *)
 
 typedef void parser_on_msg_cb(btc_msg_t *msg, void *arg);
 
@@ -132,25 +128,20 @@ typedef struct btc_peer_s {
   int64_t stall_timer;
   btc_filter_t addr_filter;
   btc_filter_t inv_filter;
-  khash_t(times) *block_map;
-  khash_t(times) *tx_map;
-  khash_t(cmpct) *compact_map;
+  btc_hashtab_t *block_map;
+  btc_hashtab_t *tx_map;
+  btc_hashmap_t *compact_map;
   struct btc_peer_s *prev;
   struct btc_peer_s *next;
 } btc_peer_t;
 
-KHASH_SET_INIT_INT64(nonces)
-
 typedef struct btc_nonces_s {
-  khash_t(nonces) *set;
+  btc_longset_t *set;
 } btc_nonces_t;
 
-KHASH_MAP_INIT_CONST_NETADDR(addrs, btc_peer_t *)
-KHASH_MAP_INIT_INT(ids, btc_peer_t *)
-
 typedef struct btc_peers_s {
-  khash_t(addrs) *map;
-  khash_t(ids) *ids;
+  btc_addrmap_t *map;
+  btc_intmap_t *ids;
   btc_peer_t *head;
   btc_peer_t *tail;
   btc_peer_t *load;
@@ -175,9 +166,9 @@ struct btc_pool_s {
   btc_mempool_t *mempool;
   btc_peers_t peers;
   btc_nonces_t nonces;
-  khash_t(hashes) *block_map;
-  khash_t(hashes) *tx_map;
-  khash_t(hashes) *compact_map;
+  btc_hashset_t *block_map;
+  btc_hashset_t *tx_map;
+  btc_hashset_t *compact_map;
   int checkpoints_enabled;
   int bip37_enabled;
   int bip152_enabled;
@@ -197,233 +188,37 @@ struct btc_pool_s {
 };
 
 /*
- * Hash Set
- */
-
-static khash_t(hashes) *
-hashset_create(void) {
-  khash_t(hashes) *map = kh_init(hashes);
-
-  CHECK(map != NULL);
-
-  return map;
-}
-
-static void
-hashset_destroy(khash_t(hashes) *map) {
-  kh_destroy(hashes, map);
-}
-
-static size_t
-hashset_size(khash_t(hashes) *map) {
-  return kh_size(map);
-}
-
-static int
-hashset_has(khash_t(hashes) *map, const uint8_t *hash) {
-  khiter_t it = kh_get(hashes, map, (uint8_t *)hash);
-  return it != kh_end(map);
-}
-
-static int
-hashset_put(khash_t(hashes) *map, uint8_t *hash) {
-  int ret = -1;
-  khiter_t it;
-
-  it = kh_put(hashes, map, hash, &ret);
-
-  CHECK(ret != -1);
-
-  if (ret == 0) {
-    CHECK(kh_key(map, it) != hash);
-    return 0;
-  }
-
-  CHECK(kh_key(map, it) == hash);
-
-  return 1;
-}
-
-static int
-hashset_del(khash_t(hashes) *map, const uint8_t *hash) {
-  khiter_t it = kh_get(hashes, map, (uint8_t *)hash);
-
-  if (it == kh_end(map))
-    return 0;
-
-  kh_del(hashes, map, it);
-
-  return 1;
-}
-
-/*
- * Time Map (hash->time)
- */
-
-static khash_t(times) *
-timemap_create(void) {
-  khash_t(times) *map = kh_init(times);
-
-  CHECK(map != NULL);
-
-  return map;
-}
-
-static void
-timemap_destroy(khash_t(times) *map) {
-  kh_destroy(times, map);
-}
-
-static size_t
-timemap_size(khash_t(times) *map) {
-  return kh_size(map);
-}
-
-static int
-timemap_has(khash_t(times) *map, const uint8_t *hash) {
-  khiter_t it = kh_get(times, map, (uint8_t *)hash);
-  return it != kh_end(map);
-}
-
-static int
-timemap_put(khash_t(times) *map, uint8_t *hash, int64_t ts) {
-  int ret = -1;
-  khiter_t it;
-
-  it = kh_put(times, map, hash, &ret);
-
-  CHECK(ret != -1);
-
-  if (ret == 0)
-    return 0;
-
-  kh_value(map, it) = ts;
-
-  return 1;
-}
-
-/*
- * Compact Map (hash->cmpct)
- */
-
-static khash_t(cmpct) *
-cmpctmap_create(void) {
-  khash_t(cmpct) *map = kh_init(cmpct);
-
-  CHECK(map != NULL);
-
-  return map;
-}
-
-static void
-cmpctmap_destroy(khash_t(cmpct) *map) {
-  kh_destroy(cmpct, map);
-}
-
-static size_t
-cmpctmap_size(khash_t(cmpct) *map) {
-  return kh_size(map);
-}
-
-static int
-cmpctmap_has(khash_t(cmpct) *map, const uint8_t *hash) {
-  khiter_t it = kh_get(cmpct, map, hash);
-  return it != kh_end(map);
-}
-
-static btc_cmpct_t *
-cmpctmap_get(khash_t(cmpct) *map, const uint8_t *hash) {
-  khiter_t it = kh_get(cmpct, map, hash);
-
-  if (it == kh_end(map))
-    return NULL;
-
-  return kh_value(map, it);
-}
-
-static int
-cmpctmap_put(khash_t(cmpct) *map, const uint8_t *hash, btc_cmpct_t *block) {
-  int ret = -1;
-  khiter_t it;
-
-  it = kh_put(cmpct, map, hash, &ret);
-
-  CHECK(ret != -1);
-
-  if (ret == 0)
-    return 0;
-
-  kh_value(map, it) = block;
-
-  return 1;
-}
-
-static int
-cmpctmap_del(khash_t(cmpct) *map, const uint8_t *hash) {
-  khiter_t it = kh_get(cmpct, map, hash);
-
-  if (it == kh_end(map))
-    return 0;
-
-  kh_del(cmpct, map, it);
-
-  return 1;
-}
-
-/*
  * Nonce List
  */
 
 static void
 btc_nonces_init(btc_nonces_t *list) {
-  list->set = kh_init(nonces);
-
-  CHECK(list->set != NULL);
+  list->set = btc_longset_create();
 }
 
 static void
 btc_nonces_clear(btc_nonces_t *list) {
-  kh_destroy(nonces, list->set);
-
-  list->set = NULL;
+  btc_longset_destroy(list->set);
 }
 
 static int
 btc_nonces_has(btc_nonces_t *list, uint64_t nonce) {
-  khiter_t it = kh_get(nonces, list->set, nonce);
-  return it != kh_end(list->set);
+  return btc_longset_has(list->set, nonce);
 }
 
 static uint64_t
 btc_nonces_alloc(btc_nonces_t *list) {
-  uint64_t nonce;
-  int ret;
-
   for (;;) {
-    nonce = ((uint64_t)btc_random() << 32) | btc_random();
-    ret = -1;
+    uint64_t nonce = ((uint64_t)btc_random() << 32) | btc_random();
 
-    kh_put(nonces, list->set, nonce, &ret);
-
-    CHECK(ret != -1);
-
-    if (ret == 0)
-      continue;
-
-    return nonce;
+    if (btc_longset_put(list->set, nonce))
+      return nonce;
   }
 }
 
 static int
 btc_nonces_remove(btc_nonces_t *list, uint64_t nonce) {
-  khiter_t it = kh_get(nonces, list->set, nonce);
-
-  if (it == kh_end(list->set))
-    return 0;
-
-  kh_del(nonces, list->set, it);
-
-  return 1;
+  return btc_longset_del(list->set, nonce) != 0;
 }
 
 /*
@@ -693,9 +488,9 @@ btc_peer_create(struct btc_pool_s *pool) {
   btc_filter_init(&peer->inv_filter);
   btc_filter_set(&peer->inv_filter, 50000, 0.000001);
 
-  peer->block_map = timemap_create();
-  peer->tx_map = timemap_create();
-  peer->compact_map = cmpctmap_create();
+  peer->block_map = btc_hashtab_create();
+  peer->tx_map = btc_hashtab_create();
+  peer->compact_map = btc_hashmap_create();
 
   return peer;
 }
@@ -705,31 +500,35 @@ btc_peer_clear_data(btc_peer_t *peer);
 
 static void
 btc_peer_destroy(btc_peer_t *peer) {
-  khiter_t it;
-
   parser_clear(&peer->parser);
 
   btc_peer_clear_data(peer);
 
-  it = kh_begin(peer->block_map);
+  {
+    btc_hashtabiter_t iter;
 
-  for (; it != kh_end(peer->block_map); it++) {
-    if (kh_exist(peer->block_map, it))
-      btc_free(kh_key(peer->block_map, it));
+    btc_hashtab_iterate(&iter, peer->block_map);
+
+    while (btc_hashtab_next(&iter))
+      btc_free(iter.key);
   }
 
-  it = kh_begin(peer->tx_map);
+  {
+    btc_hashtabiter_t iter;
 
-  for (; it != kh_end(peer->tx_map); it++) {
-    if (kh_exist(peer->tx_map, it))
-      btc_free(kh_key(peer->tx_map, it));
+    btc_hashtab_iterate(&iter, peer->tx_map);
+
+    while (btc_hashtab_next(&iter))
+      btc_free(iter.key);
   }
 
-  it = kh_begin(peer->compact_map);
+  {
+    btc_hashmapiter_t iter;
 
-  for (; it != kh_end(peer->compact_map); it++) {
-    if (kh_exist(peer->compact_map, it))
-      btc_cmpct_destroy(kh_value(peer->compact_map, it));
+    btc_hashmap_iterate(&iter, peer->compact_map);
+
+    while (btc_hashmap_next(&iter))
+      btc_cmpct_destroy(iter.val);
   }
 
   btc_inv_clear(&peer->inv_queue);
@@ -737,9 +536,9 @@ btc_peer_destroy(btc_peer_t *peer) {
   btc_filter_clear(&peer->addr_filter);
   btc_filter_clear(&peer->inv_filter);
 
-  timemap_destroy(peer->block_map);
-  timemap_destroy(peer->tx_map);
-  cmpctmap_destroy(peer->compact_map);
+  btc_hashtab_destroy(peer->block_map);
+  btc_hashtab_destroy(peer->tx_map);
+  btc_hashmap_destroy(peer->compact_map);
 
   btc_free(peer);
 }
@@ -1937,42 +1736,45 @@ btc_peer_maybe_timeout(btc_peer_t *peer) {
   }
 
   if (btc_chain_synced(chain) || !peer->syncing) {
-    khiter_t it = kh_begin(peer->block_map);
+    {
+      btc_hashtabiter_t iter;
 
-    for (; it != kh_end(peer->block_map); it++) {
-      if (!kh_exist(peer->block_map, it))
-        continue;
+      btc_hashtab_iterate(&iter, peer->block_map);
 
-      if (now > kh_value(peer->block_map, it) + 120000) {
-        btc_peer_log(peer, "Peer is stalling (block) (%N).", &peer->addr);
-        btc_peer_close(peer);
-        return;
+      while (btc_hashtab_next(&iter)) {
+        if (now > iter.val + 120000) {
+          btc_peer_log(peer, "Peer is stalling (block) (%N).", &peer->addr);
+          btc_peer_close(peer);
+          return;
+        }
       }
     }
 
-    it = kh_begin(peer->tx_map);
+    {
+      btc_hashtabiter_t iter;
 
-    for (; it != kh_end(peer->tx_map); it++) {
-      if (!kh_exist(peer->tx_map, it))
-        continue;
+      btc_hashtab_iterate(&iter, peer->tx_map);
 
-      if (now > kh_value(peer->tx_map, it) + 120000) {
-        btc_peer_log(peer, "Peer is stalling (tx) (%N).", &peer->addr);
-        btc_peer_close(peer);
-        return;
+      while (btc_hashtab_next(&iter)) {
+        if (now > iter.val + 120000) {
+          btc_peer_log(peer, "Peer is stalling (tx) (%N).", &peer->addr);
+          btc_peer_close(peer);
+          return;
+        }
       }
     }
 
-    it = kh_begin(peer->compact_map);
+    {
+      btc_hashmapiter_t iter;
 
-    for (; it != kh_end(peer->compact_map); it++) {
-      if (!kh_exist(peer->compact_map, it))
-        continue;
+      btc_hashmap_iterate(&iter, peer->compact_map);
 
-      if (now > kh_value(peer->compact_map, it)->now + 30000) {
-        btc_peer_log(peer, "Peer is stalling (blocktxn) (%N).", &peer->addr);
-        btc_peer_close(peer);
-        return;
+      while (btc_hashmap_next(&iter)) {
+        if (now > ((btc_cmpct_t *)iter.val)->now + 30000) {
+          btc_peer_log(peer, "Peer is stalling (blocktxn) (%N).", &peer->addr);
+          btc_peer_close(peer);
+          return;
+        }
       }
     }
   }
@@ -2052,30 +1854,24 @@ btc_peer_on_tick(btc_peer_t *peer) {
 
 static void
 btc_peers_init(btc_peers_t *list) {
-  list->map = kh_init(addrs);
-  list->ids = kh_init(ids);
+  list->map = btc_addrmap_create(); /* addr->peer */
+  list->ids = btc_intmap_create(); /* id->peer */
   list->head = NULL;
   list->tail = NULL;
   list->load = NULL;
   list->inbound = 0;
   list->outbound = 0;
   list->size = 0;
-
-  CHECK(list->map != NULL);
-  CHECK(list->ids != NULL);
 }
 
 static void
 btc_peers_clear(btc_peers_t *list) {
-  kh_destroy(addrs, list->map);
-  kh_destroy(ids, list->ids);
+  btc_addrmap_destroy(list->map);
+  btc_intmap_destroy(list->ids);
 }
 
 static void
 btc_peers_add(btc_peers_t *list, btc_peer_t *peer) {
-  int ret = -1;
-  khiter_t it;
-
   if (list->head == NULL)
     list->head = peer;
 
@@ -2087,17 +1883,8 @@ btc_peers_add(btc_peers_t *list, btc_peer_t *peer) {
 
   list->tail = peer;
 
-  it = kh_put(addrs, list->map, &peer->addr, &ret);
-
-  CHECK(ret > 0);
-
-  kh_value(list->map, it) = peer;
-
-  it = kh_put(ids, list->ids, peer->id, &ret);
-
-  CHECK(ret > 0);
-
-  kh_value(list->ids, it) = peer;
+  CHECK(btc_addrmap_put(list->map, &peer->addr, peer));
+  CHECK(btc_intmap_put(list->ids, peer->id, peer));
 
   if (peer->outbound)
     list->outbound += 1;
@@ -2109,8 +1896,6 @@ btc_peers_add(btc_peers_t *list, btc_peer_t *peer) {
 
 static void
 btc_peers_remove(btc_peers_t *list, btc_peer_t *peer) {
-  khiter_t it;
-
   if (list->head == peer)
     list->head = peer->next;
 
@@ -2126,17 +1911,8 @@ btc_peers_remove(btc_peers_t *list, btc_peer_t *peer) {
   peer->prev = NULL;
   peer->next = NULL;
 
-  it = kh_get(addrs, list->map, &peer->addr);
-
-  CHECK(it != kh_end(list->map));
-
-  kh_del(addrs, list->map, it);
-
-  it = kh_get(ids, list->ids, peer->id);
-
-  CHECK(it != kh_end(list->ids));
-
-  kh_del(ids, list->ids, it);
+  CHECK(btc_addrmap_del(list->map, &peer->addr) == &peer->addr);
+  CHECK(btc_intmap_del(list->ids, peer->id) == peer->id);
 
   if (peer == list->load) {
     CHECK(peer->loader == 1);
@@ -2154,28 +1930,17 @@ btc_peers_remove(btc_peers_t *list, btc_peer_t *peer) {
 
 static int
 btc_peers_has(btc_peers_t *list, const btc_netaddr_t *addr) {
-  khiter_t it = kh_get(addrs, list->map, addr);
-  return it != kh_end(list->map);
+  return btc_addrmap_has(list->map, addr);
 }
 
 static btc_peer_t *
 btc_peers_get(btc_peers_t *list, const btc_netaddr_t *addr) {
-  khiter_t it = kh_get(addrs, list->map, addr);
-
-  if (it == kh_end(list->map))
-    return NULL;
-
-  return kh_value(list->map, it);
+  return btc_addrmap_get(list->map, addr);
 }
 
 static btc_peer_t *
 btc_peers_find(btc_peers_t *list, uint32_t id) {
-  khiter_t it = kh_get(ids, list->ids, id);
-
-  if (it == kh_end(list->ids))
-    return NULL;
-
-  return kh_value(list->ids, it);
+  return btc_intmap_get(list->ids, id);
 }
 
 static void
@@ -2234,9 +1999,9 @@ btc_pool_create(const btc_network_t *network,
   pool->mempool = mempool;
   btc_peers_init(&pool->peers);
   btc_nonces_init(&pool->nonces);
-  pool->block_map = hashset_create();
-  pool->tx_map = hashset_create();
-  pool->compact_map = hashset_create();
+  pool->block_map = btc_hashset_create();
+  pool->tx_map = btc_hashset_create();
+  pool->compact_map = btc_hashset_create();
   pool->checkpoints_enabled = 1;
   pool->bip37_enabled = 0;
   pool->bip152_enabled = 0;
@@ -2264,9 +2029,9 @@ btc_pool_destroy(struct btc_pool_s *pool) {
   btc_addrman_destroy(pool->addrman);
   btc_peers_clear(&pool->peers);
   btc_nonces_clear(&pool->nonces);
-  hashset_destroy(pool->block_map);
-  hashset_destroy(pool->tx_map);
-  hashset_destroy(pool->compact_map);
+  btc_hashset_destroy(pool->block_map);
+  btc_hashset_destroy(pool->tx_map);
+  btc_hashset_destroy(pool->compact_map);
   btc_free(pool);
 }
 
@@ -2705,21 +2470,12 @@ static int
 btc_pool_resolve_block(struct btc_pool_s *pool,
                        btc_peer_t *peer,
                        const uint8_t *hash) {
-  khiter_t it = kh_get(times, peer->block_map, (uint8_t *)hash);
-  uint8_t *key;
+  uint8_t *key = btc_hashtab_del(peer->block_map, hash);
 
-  if (it == kh_end(peer->block_map))
+  if (key == NULL)
     return 0;
 
-  kh_del(times, peer->block_map, it);
-
-  it = kh_get(hashes, pool->block_map, (uint8_t *)hash);
-
-  CHECK(it != kh_end(pool->block_map));
-
-  key = kh_key(pool->block_map, it);
-
-  kh_del(hashes, pool->block_map, it);
+  CHECK(btc_hashset_del(pool->block_map, hash) == key);
 
   btc_free(key);
 
@@ -2730,21 +2486,12 @@ static int
 btc_pool_resolve_tx(struct btc_pool_s *pool,
                     btc_peer_t *peer,
                     const uint8_t *hash) {
-  khiter_t it = kh_get(times, peer->tx_map, (uint8_t *)hash);
-  uint8_t *key;
+  uint8_t *key = btc_hashtab_del(peer->tx_map, hash);
 
-  if (it == kh_end(peer->tx_map))
+  if (key == NULL)
     return 0;
 
-  kh_del(times, peer->tx_map, it);
-
-  it = kh_get(hashes, pool->tx_map, (uint8_t *)hash);
-
-  CHECK(it != kh_end(pool->tx_map));
-
-  key = kh_key(pool->tx_map, it);
-
-  kh_del(hashes, pool->tx_map, it);
+  CHECK(btc_hashset_del(pool->tx_map, hash) == key);
 
   btc_free(key);
 
@@ -2772,36 +2519,40 @@ btc_pool_resolve_item(struct btc_pool_s *pool,
 
 static void
 btc_pool_remove_peer(struct btc_pool_s *pool, btc_peer_t *peer) {
-  khiter_t it;
-
   btc_peers_remove(&pool->peers, peer);
 
-  it = kh_begin(peer->block_map);
+  {
+    btc_hashtabiter_t iter;
 
-  for (; it != kh_end(peer->block_map); it++) {
-    if (kh_exist(peer->block_map, it))
-      hashset_del(pool->block_map, kh_key(peer->block_map, it));
+    btc_hashtab_iterate(&iter, peer->block_map);
+
+    while (btc_hashtab_next(&iter))
+      btc_hashset_del(pool->block_map, iter.key);
   }
 
-  it = kh_begin(peer->tx_map);
+  {
+    btc_hashtabiter_t iter;
 
-  for (; it != kh_end(peer->tx_map); it++) {
-    if (kh_exist(peer->tx_map, it))
-      hashset_del(pool->tx_map, kh_key(peer->tx_map, it));
+    btc_hashtab_iterate(&iter, peer->tx_map);
+
+    while (btc_hashtab_next(&iter))
+      btc_hashset_del(pool->tx_map, iter.key);
   }
 
-  it = kh_begin(peer->compact_map);
+  {
+    btc_hashmapiter_t iter;
 
-  for (; it != kh_end(peer->compact_map); it++) {
-    if (kh_exist(peer->compact_map, it))
-      hashset_del(pool->compact_map, kh_key(peer->compact_map, it));
+    btc_hashmap_iterate(&iter, peer->compact_map);
+
+    while (btc_hashmap_next(&iter))
+      btc_hashset_del(pool->compact_map, iter.key);
   }
 }
 
 static void
 btc_pool_on_disconnect(struct btc_pool_s *pool, btc_peer_t *peer) {
   int loader = peer->loader;
-  size_t size = timemap_size(peer->block_map);
+  size_t size = btc_hashtab_size(peer->block_map);
 
   btc_pool_remove_peer(pool, peer);
 
@@ -3084,13 +2835,13 @@ btc_pool_get_block(struct btc_pool_s *pool,
   for (i = 0; i < items->length; i++) {
     item = (btc_invitem_t *)items->items[i];
 
-    if (hashset_has(pool->block_map, item->hash))
+    if (btc_hashset_has(pool->block_map, item->hash))
       continue;
 
     hash = btc_hash_clone(item->hash);
 
-    hashset_put(pool->block_map, hash);
-    timemap_put(peer->block_map, hash, now);
+    btc_hashset_put(pool->block_map, hash);
+    btc_hashtab_put(peer->block_map, hash, now);
 
     if (btc_chain_synced(pool->chain))
       now += 100;
@@ -3105,7 +2856,7 @@ btc_pool_get_block(struct btc_pool_s *pool,
     return;
   }
 
-  if (timemap_size(peer->block_map) >= BTC_NET_MAX_BLOCK_REQUEST) {
+  if (btc_hashtab_size(peer->block_map) >= BTC_NET_MAX_BLOCK_REQUEST) {
     btc_pool_log(pool, "Peer advertised too many blocks (%N).",
                        &peer->addr);
     btc_peer_close(peer);
@@ -3113,7 +2864,7 @@ btc_pool_get_block(struct btc_pool_s *pool,
   }
 
   btc_pool_log(pool, "Requesting %zu/%zu blocks from peer with getdata (%N).",
-                     inv.length, hashset_size(pool->block_map), &peer->addr);
+                     inv.length, btc_hashset_size(pool->block_map), &peer->addr);
 
   btc_peer_send_getdata(peer, &inv);
 
@@ -3208,13 +2959,13 @@ btc_pool_get_tx(struct btc_pool_s *pool,
   for (i = 0; i < items->length; i++) {
     item = (btc_invitem_t *)items->items[i];
 
-    if (hashset_has(pool->tx_map, item->hash))
+    if (btc_hashset_has(pool->tx_map, item->hash))
       continue;
 
     hash = btc_hash_clone(item->hash);
 
-    hashset_put(pool->tx_map, hash);
-    timemap_put(peer->tx_map, hash, now);
+    btc_hashset_put(pool->tx_map, hash);
+    btc_hashtab_put(peer->tx_map, hash, now);
 
     if (btc_chain_synced(pool->chain))
       now += 50;
@@ -3229,7 +2980,7 @@ btc_pool_get_tx(struct btc_pool_s *pool,
     return;
   }
 
-  if (timemap_size(peer->tx_map) >= BTC_NET_MAX_TX_REQUEST) {
+  if (btc_hashtab_size(peer->tx_map) >= BTC_NET_MAX_TX_REQUEST) {
     btc_pool_log(pool, "Peer advertised too many txs (%N).",
                        &peer->addr);
     btc_peer_close(peer);
@@ -3237,7 +2988,7 @@ btc_pool_get_tx(struct btc_pool_s *pool,
   }
 
   btc_pool_log(pool, "Requesting %zu/%zu txs from peer with getdata (%N).",
-                     inv.length, hashset_size(pool->tx_map), &peer->addr);
+                     inv.length, btc_hashset_size(pool->tx_map), &peer->addr);
 
   btc_peer_send_getdata(peer, &inv);
 
@@ -3738,7 +3489,7 @@ btc_pool_add_block(struct btc_pool_s *pool,
       height,
       btc_chain_progress(pool->chain) * 100.0,
       0,
-      hashset_size(pool->block_map),
+      btc_hashset_size(pool->block_map),
       block->header.bits,
       pool->peers.size);
   }
@@ -3889,21 +3640,21 @@ btc_pool_on_cmpctblock(struct btc_pool_s *pool,
     return;
   }
 
-  if (cmpctmap_has(peer->compact_map, block->hash)) {
+  if (btc_hashmap_has(peer->compact_map, block->hash)) {
     btc_pool_log(pool,
       "Peer sent us a duplicate compact block (%N).",
       &peer->addr);
     return;
   }
 
-  if (hashset_has(pool->compact_map, block->hash)) {
+  if (btc_hashset_has(pool->compact_map, block->hash)) {
     btc_pool_log(pool,
       "Already waiting for compact block %H (%N).",
       block->hash, &peer->addr);
     return;
   }
 
-  if (!timemap_has(peer->block_map, block->hash)) {
+  if (!btc_hashtab_has(peer->block_map, block->hash)) {
     uint8_t *hash;
 
     if (pool->block_mode != 1) {
@@ -3916,12 +3667,12 @@ btc_pool_on_cmpctblock(struct btc_pool_s *pool,
 
     btc_filter_add(&peer->inv_filter, block->hash, 32);
 
-    CHECK(!hashset_has(pool->block_map, block->hash));
+    CHECK(!btc_hashset_has(pool->block_map, block->hash));
 
     hash = btc_hash_clone(block->hash);
 
-    hashset_put(pool->block_map, hash);
-    timemap_put(peer->block_map, hash, btc_ms());
+    btc_hashset_put(pool->block_map, hash);
+    btc_hashtab_put(peer->block_map, hash, btc_ms());
   }
 
   if (!btc_header_verify(&block->header)) {
@@ -3966,7 +3717,7 @@ btc_pool_on_cmpctblock(struct btc_pool_s *pool,
     return;
   }
 
-  if (cmpctmap_size(peer->compact_map) >= 15) {
+  if (btc_hashmap_size(peer->compact_map) >= 15) {
     btc_pool_log(pool, "Compact block DoS attempt (%N).", &peer->addr);
     btc_peer_close(peer);
     return;
@@ -3974,8 +3725,8 @@ btc_pool_on_cmpctblock(struct btc_pool_s *pool,
 
   block->now = btc_ms();
 
-  CHECK(hashset_put(pool->compact_map, block->hash));
-  CHECK(cmpctmap_put(peer->compact_map, block->hash, block));
+  CHECK(btc_hashset_put(pool->compact_map, block->hash));
+  CHECK(btc_hashmap_put(peer->compact_map, block->hash, block));
 
   /* Take ownership. */
   msg->body = NULL;
@@ -4034,7 +3785,7 @@ static void
 btc_pool_on_blocktxn(struct btc_pool_s *pool,
                      btc_peer_t *peer,
                      const btc_blocktxn_t *res) {
-  btc_cmpct_t *block = cmpctmap_get(peer->compact_map, res->hash);
+  btc_cmpct_t *block = btc_hashmap_get(peer->compact_map, res->hash);
   btc_block_t blk;
 
   if (block == NULL) {
@@ -4043,8 +3794,8 @@ btc_pool_on_blocktxn(struct btc_pool_s *pool,
     return;
   }
 
-  CHECK(hashset_del(pool->compact_map, res->hash));
-  CHECK(cmpctmap_del(peer->compact_map, res->hash));
+  CHECK(btc_hashset_del(pool->compact_map, res->hash));
+  CHECK(btc_hashmap_del(peer->compact_map, res->hash));
 
   if (!btc_cmpct_fill_missing(block, res)) {
     btc_pool_log(pool, "Peer sent non-full blocktxn for %H. "

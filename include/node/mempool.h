@@ -39,10 +39,7 @@ typedef struct btc_mpentry_s {
   int64_t desc_size;
 } btc_mpentry_t;
 
-typedef struct btc_mpiter_s {
-  btc_mempool_t *mp;
-  uint32_t it;
-} btc_mpiter_t;
+typedef btc_hashmapiter_t btc_mpiter_t;
 
 typedef void btc_mempool_tx_cb(const btc_mpentry_t *entry,
                                btc_view_t *view,

@@ -11,7 +11,7 @@
 #include <satoshi/tx.h>
 #include "impl.h"
 #include "internal.h"
-#include "map.h"
+#include "map/map.h"
 
 /*
  * Coins
@@ -87,7 +87,8 @@ btc_coins_put(btc_coins_t *coins, uint32_t index, btc_coin_t *coin) {
  * Coin View
  */
 
-KHASH_MAP_INIT_CONST_HASH(view, btc_coins_t *)
+KHASH_INIT(view, const uint8_t *, btc_coins_t *, 1, kh_hash_hash_func,
+                                                    kh_hash_hash_equal)
 
 typedef struct btc_view_s {
   khash_t(view) *map;

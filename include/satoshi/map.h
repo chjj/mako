@@ -49,8 +49,11 @@ name##_get(name##_t *map, const keytype key);                    \
 scope int                                                        \
 name##_put(name##_t *map, const keytype key, const valtype val); \
                                                                  \
-scope int                                                        \
+scope keytype                                                    \
 name##_del(name##_t *map, const keytype key);                    \
+                                                                 \
+scope valtype                                                    \
+name##_rem(name##_t *map, const keytype key);                    \
                                                                  \
 scope void                                                       \
 name##_iterate(name##iter_t *iter, name##_t *map);               \
@@ -86,9 +89,9 @@ scope int                                          \
 name##_has(name##_t *map, const keytype key);      \
                                                    \
 scope int                                          \
-name##_add(name##_t *map, const keytype key);      \
+name##_put(name##_t *map, const keytype key);      \
                                                    \
-scope int                                          \
+scope keytype                                      \
 name##_del(name##_t *map, const keytype key);      \
                                                    \
 scope void                                         \

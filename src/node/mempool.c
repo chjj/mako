@@ -21,6 +21,7 @@
 #include <satoshi/crypto/rand.h>
 #include <satoshi/entry.h>
 #include <satoshi/header.h>
+#include <satoshi/map.h>
 #include <satoshi/network.h>
 #include <satoshi/policy.h>
 #include <satoshi/script.h>
@@ -28,7 +29,6 @@
 #include <satoshi/util.h>
 #include <satoshi/vector.h>
 
-#include "../map.h"
 #include "../impl.h"
 #include "../internal.h"
 
@@ -36,13 +36,11 @@
  * Mempool
  */
 
-KHASH_MAP_INIT_CONST_HASH(entries, btc_mpentry_t *)
-
 struct btc_mempool_s {
   const btc_network_t *network;
   btc_logger_t *logger;
   const btc_timedata_t *timedata;
-  khash_t(entries) *map;
+  btc_hashmap_t *map;
   btc_chain_t *chain;
   btc_verify_error_t error;
   btc_mempool_tx_cb *on_tx;
@@ -60,27 +58,25 @@ btc_mempool_create(const btc_network_t *network, btc_chain_t *chain) {
   mp->network = network;
   mp->logger = NULL;
   mp->timedata = NULL;
-  mp->map = kh_init(entries);
+  mp->map = btc_hashmap_create();
   mp->chain = chain;
   mp->on_tx = NULL;
   mp->on_badorphan = NULL;
   mp->arg = NULL;
-
-  CHECK(mp->map != NULL);
 
   return mp;
 }
 
 void
 btc_mempool_destroy(struct btc_mempool_s *mp) {
-  khiter_t it;
+  btc_hashmapiter_t iter;
 
-  for (it = kh_begin(mp->map); it != kh_end(mp->map); it++) {
-    if (kh_exist(mp->map, it))
-      btc_mpentry_destroy(kh_value(mp->map, it));
-  }
+  btc_hashmap_iterate(&iter, mp->map);
 
-  kh_destroy(entries, mp->map);
+  while (btc_hashmap_next(&iter))
+    btc_mpentry_destroy(iter.val);
+
+  btc_hashmap_destroy(mp->map);
   btc_free(mp);
 }
 
@@ -184,8 +180,6 @@ btc_mempool_add(struct btc_mempool_s *mp,
                 const btc_tx_t *tx,
                 unsigned int id) {
   btc_mpentry_t *entry = btc_mpentry_create();
-  int ret = -1;
-  khiter_t it;
 
   (void)missing;
   (void)id;
@@ -195,34 +189,22 @@ btc_mempool_add(struct btc_mempool_s *mp,
   entry->height = btc_chain_height(mp->chain);
   entry->time = btc_timedata_now(mp->timedata);
 
-  it = kh_put(entries, mp->map, entry->hash, &ret);
-
-  CHECK(ret != -1);
-
-  if (ret == 0) {
+  if (!btc_hashmap_put(mp->map, entry->hash, entry)) {
     btc_mpentry_destroy(entry);
     return 0;
   }
-
-  kh_value(mp->map, it) = entry;
 
   return 1;
 }
 
 int
 btc_mempool_has(struct btc_mempool_s *mp, const uint8_t *hash) {
-  khiter_t it = kh_get(entries, mp->map, hash);
-  return it != kh_end(mp->map);
+  return btc_hashmap_has(mp->map, hash);
 }
 
 const btc_mpentry_t *
 btc_mempool_get(struct btc_mempool_s *mp, const uint8_t *hash) {
-  khiter_t it = kh_get(entries, mp->map, hash);
-
-  if (it == kh_end(mp->map))
-    return NULL;
-
-  return kh_value(mp->map, it);
+  return btc_hashmap_get(mp->map, hash);
 }
 
 int
@@ -234,22 +216,15 @@ btc_mempool_has_reject(struct btc_mempool_s *mp, const uint8_t *hash) {
 
 void
 btc_mempool_iterate(btc_mpiter_t *iter, struct btc_mempool_s *mp) {
-  iter->mp = mp;
-  iter->it = kh_begin(mp->map);
+  btc_hashmap_iterate(iter, mp->map);
 }
 
 int
 btc_mempool_next(const btc_mpentry_t **entry, btc_mpiter_t *iter) {
-  btc_mempool_t *mp = iter->mp;
-
-  for (; iter->it != kh_end(mp->map); iter->it++) {
-    if (kh_exist(mp->map, iter->it)) {
-      *entry = kh_value(mp->map, iter->it);
-      iter->it++;
-      return 1;
-    }
+  if (btc_hashmap_next(iter)) {
+    *entry = iter->val;
+    return 1;
   }
-
   return 0;
 }
 

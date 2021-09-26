@@ -15,13 +15,13 @@
 #include <satoshi/crypto/rand.h>
 #include <satoshi/crypto/siphash.h>
 #include <satoshi/header.h>
+#include <satoshi/map.h>
 #include <satoshi/tx.h>
 #include <satoshi/util.h>
 #include <satoshi/vector.h>
 
 #include "impl.h"
 #include "internal.h"
-#include "map.h"
 
 /*
  * ID Vector
@@ -61,60 +61,6 @@ idvec_push(btc_idvec_t *z, uint64_t x) {
 }
 
 /*
- * ID Map (id->offset)
- */
-
-KHASH_MAP_INIT_INT64(btc_idmap, int)
-
-typedef khash_t(btc_idmap) btc_idmap_t;
-
-btc_idmap_t *
-btc_idmap_create(void) {
-  btc_idmap_t *map = kh_init(btc_idmap);
-
-  CHECK(map != NULL);
-
-  return map;
-}
-
-void
-btc_idmap_destroy(btc_idmap_t *map) {
-  kh_destroy(btc_idmap, map);
-}
-
-size_t
-btc_idmap_size(btc_idmap_t *map) {
-  return kh_size(map);
-}
-
-int
-btc_idmap_put(btc_idmap_t *map, uint64_t id, int offset) {
-  int ret = -1;
-  khiter_t it;
-
-  it = kh_put(btc_idmap, map, id, &ret);
-
-  CHECK(ret != -1);
-
-  if (ret == 0)
-    return 0;
-
-  kh_value(map, it) = offset;
-
-  return 1;
-}
-
-int
-btc_idmap_get(btc_idmap_t *map, uint64_t id) {
-  khiter_t it = kh_get(btc_idmap, map, id);
-
-  if (it == kh_end(map))
-    return -1;
-
-  return kh_value(map, it);
-}
-
-/*
  * Compact Block
  */
 
@@ -128,7 +74,7 @@ btc_cmpct_init(btc_cmpct_t *z) {
   idvec_init(&z->ids);
   btc_txvec_init(&z->ptx);
   btc_vector_init(&z->avail);
-  z->id_map = btc_idmap_create();
+  z->id_map = btc_longtab_create();
   z->count = 0;
   btc_hash_init(z->sipkey);
   z->now = 0;
@@ -151,7 +97,7 @@ btc_cmpct_clear(btc_cmpct_t *z) {
 
   btc_vector_clear(&z->avail);
 
-  btc_idmap_destroy(z->id_map);
+  btc_longtab_destroy(z->id_map);
 }
 
 void
@@ -253,7 +199,7 @@ btc_cmpct_setup(btc_cmpct_t *blk) {
     blk->count += 1;
   }
 
-  CHECK(btc_idmap_size(blk->id_map) == 0);
+  CHECK(btc_longtab_size(blk->id_map) == 0);
 
   for (i = 0; i < blk->ids.length; i++) {
     uint64_t id = blk->ids.items[i];
@@ -261,7 +207,7 @@ btc_cmpct_setup(btc_cmpct_t *blk) {
     while (blk->avail.items[i + offset] != NULL)
       offset += 1;
 
-    if (!btc_idmap_put(blk->id_map, id, i + offset)) {
+    if (!btc_longtab_put(blk->id_map, id, i + offset)) {
       /* Fails on siphash collision. */
       return 0;
     }

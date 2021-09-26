@@ -23,6 +23,7 @@
 #include <satoshi/crypto/hash.h>
 #include <satoshi/entry.h>
 #include <satoshi/header.h>
+#include <satoshi/map.h>
 #include <satoshi/mpi.h>
 #include <satoshi/network.h>
 #include <satoshi/script.h>
@@ -30,7 +31,6 @@
 #include <satoshi/util.h>
 #include <satoshi/vector.h>
 
-#include "../map.h"
 #include "../impl.h"
 #include "../internal.h"
 
@@ -86,17 +86,14 @@ btc_orphan_copy(btc_orphan_t *z, const btc_orphan_t *x) {
  * Chain
  */
 
-KHASH_SET_INIT_HASH(invalid)
-KHASH_MAP_INIT_CONST_HASH(orphans, btc_orphan_t *)
-
 struct btc_chain_s {
   const btc_network_t *network;
   btc_logger_t *logger;
   btc_chaindb_t *db;
   const btc_timedata_t *timedata;
-  khash_t(invalid) *invalid;
-  khash_t(orphans) *orphan_map;
-  khash_t(orphans) *orphan_prev;
+  btc_hashset_t *invalid;
+  btc_hashmap_t *orphan_map;
+  btc_hashmap_t *orphan_prev;
   btc_entry_t *tip;
   int32_t height;
   btc_deployment_state_t state;
@@ -124,15 +121,11 @@ btc_chain_create(const btc_network_t *network) {
   chain->logger = NULL;
   chain->db = btc_chaindb_create(network);
   chain->timedata = NULL;
-  chain->invalid = kh_init(invalid);
-  chain->orphan_map = kh_init(orphans);
-  chain->orphan_prev = kh_init(orphans);
+  chain->invalid = btc_hashset_create();
+  chain->orphan_map = btc_hashmap_create();
+  chain->orphan_prev = btc_hashmap_create();
   chain->tip = NULL;
   chain->height = -1;
-
-  CHECK(chain->invalid != NULL);
-  CHECK(chain->orphan_map != NULL);
-  CHECK(chain->orphan_prev != NULL);
 
   btc_deployment_state_init(&chain->state);
 
@@ -141,23 +134,27 @@ btc_chain_create(const btc_network_t *network) {
 
 void
 btc_chain_destroy(struct btc_chain_s *chain) {
-  khiter_t it = kh_begin(chain->invalid);
+  {
+    btc_hashsetiter_t iter;
 
-  for (; it != kh_end(chain->invalid); it++) {
-    if (kh_exist(chain->invalid, it))
-      btc_free(kh_key(chain->invalid, it));
+    btc_hashset_iterate(&iter, chain->invalid);
+
+    while (btc_hashset_next(&iter))
+      btc_free(iter.key);
   }
 
-  it = kh_begin(chain->orphan_map);
+  {
+    btc_hashmapiter_t iter;
 
-  for (; it != kh_end(chain->orphan_map); it++) {
-    if (kh_exist(chain->orphan_map, it))
-      btc_orphan_destroy(kh_value(chain->orphan_map, it));
+    btc_hashmap_iterate(&iter, chain->orphan_map);
+
+    while (btc_hashmap_next(&iter))
+      btc_orphan_destroy(iter.val);
   }
 
-  kh_destroy(invalid, chain->invalid);
-  kh_destroy(orphans, chain->orphan_map);
-  kh_destroy(orphans, chain->orphan_prev);
+  btc_hashset_destroy(chain->invalid);
+  btc_hashmap_destroy(chain->orphan_map);
+  btc_hashmap_destroy(chain->orphan_prev);
 
   btc_chaindb_destroy(chain->db);
 
@@ -281,66 +278,41 @@ btc_chain_close(struct btc_chain_s *chain) {
 static void
 btc_chain_add_orphan(struct btc_chain_s *chain, btc_orphan_t *orphan) {
   btc_header_t *hdr = &orphan->block->header;
-  int ret = -1;
-  khiter_t it;
 
-  it = kh_put(orphans, chain->orphan_map, orphan->hash, &ret);
-
-  CHECK(ret > 0);
-
-  kh_value(chain->orphan_map, it) = orphan;
-
-  it = kh_put(orphans, chain->orphan_prev, hdr->prev_block, &ret);
-
-  CHECK(ret > 0);
-
-  kh_value(chain->orphan_prev, it) = orphan;
+  CHECK(btc_hashmap_put(chain->orphan_map, orphan->hash, orphan));
+  CHECK(btc_hashmap_put(chain->orphan_prev, hdr->prev_block, orphan));
 }
 
 static void
 btc_chain_remove_orphan(struct btc_chain_s *chain, const btc_orphan_t *orphan) {
   const btc_header_t *hdr = &orphan->block->header;
-  khiter_t it;
 
-  it = kh_get(orphans, chain->orphan_map, orphan->hash);
-
-  CHECK(it != kh_end(chain->orphan_map));
-
-  kh_del(orphans, chain->orphan_map, it);
-
-  it = kh_get(orphans, chain->orphan_prev, hdr->prev_block);
-
-  CHECK(it != kh_end(chain->orphan_prev));
-
-  kh_del(orphans, chain->orphan_prev, it);
+  CHECK(btc_hashmap_del(chain->orphan_map, orphan->hash));
+  CHECK(btc_hashmap_del(chain->orphan_prev, hdr->prev_block));
 }
 
 int
 btc_chain_has_orphan(struct btc_chain_s *chain, const uint8_t *hash) {
-  khiter_t it = kh_get(orphans, chain->orphan_map, hash);
-  return it != kh_end(chain->orphan_map);
+  return btc_hashmap_has(chain->orphan_map, hash);
 }
 
 static void
 btc_chain_limit_orphans(struct btc_chain_s *chain) {
+  btc_hashmapiter_t iter;
   btc_orphan_t *oldest = NULL;
   btc_orphan_t *orphan;
   btc_vector_t orphans;
-  khiter_t it;
   size_t i;
 
-  if (kh_size(chain->orphan_map) <= 20)
+  if (btc_hashmap_size(chain->orphan_map) <= 20)
     return;
 
   btc_vector_init(&orphans);
 
-  it = kh_begin(chain->orphan_map);
+  btc_hashmap_iterate(&iter, chain->orphan_map);
 
-  for (; it != kh_end(chain->orphan_map); it++) {
-    if (!kh_exist(chain->orphan_map, it))
-      continue;
-
-    orphan = kh_value(chain->orphan_map, it);
+  while (btc_hashmap_next(&iter)) {
+    orphan = iter.val;
 
     if (oldest == NULL || orphan->time < oldest->time)
       oldest = orphan;
@@ -363,34 +335,29 @@ btc_chain_limit_orphans(struct btc_chain_s *chain) {
 
 static void
 btc_chain_purge_orphans(struct btc_chain_s *chain) {
-  size_t count = kh_size(chain->orphan_map);
-  khiter_t it;
+  size_t count = btc_hashmap_size(chain->orphan_map);
+  btc_hashmapiter_t iter;
 
   if (count == 0)
     return;
 
-  it = kh_begin(chain->orphan_map);
+  btc_hashmap_iterate(&iter, chain->orphan_map);
 
-  for (; it != kh_end(chain->orphan_map); it++) {
-    if (kh_exist(chain->orphan_map, it))
-      btc_orphan_destroy(kh_value(chain->orphan_map, it));
-  }
+  while (btc_hashmap_next(&iter))
+    btc_orphan_destroy(iter.val);
 
-  kh_clear(orphans, chain->orphan_map);
-  kh_clear(orphans, chain->orphan_prev);
+  btc_hashmap_reset(chain->orphan_map);
+  btc_hashmap_reset(chain->orphan_prev);
 
   btc_chain_log(chain, "Purged %zu orphans.", count);
 }
 
 static btc_orphan_t *
 btc_chain_resolve_orphan(struct btc_chain_s *chain, const uint8_t *hash) {
-  khiter_t it = kh_get(orphans, chain->orphan_prev, hash);
-  btc_orphan_t *orphan;
+  btc_orphan_t *orphan = btc_hashmap_get(chain->orphan_prev, hash);
 
-  if (it == kh_end(chain->orphan_prev))
+  if (orphan == NULL)
     return NULL;
-
-  orphan = kh_value(chain->orphan_prev, it);
 
   btc_chain_remove_orphan(chain, orphan);
 
@@ -405,14 +372,11 @@ btc_chain_store_orphan(struct btc_chain_s *chain,
   const btc_header_t *hdr = &block->header;
   int32_t height = btc_block_coinbase_height(block);
   btc_orphan_t *orphan;
-  khiter_t it;
 
-  it = kh_get(orphans, chain->orphan_prev, hdr->prev_block);
+  orphan = btc_hashmap_get(chain->orphan_prev, hdr->prev_block);
 
   /* The orphan chain forked. */
-  if (it != kh_end(chain->orphan_prev)) {
-    orphan = kh_value(chain->orphan_prev, it);
-
+  if (orphan != NULL) {
     btc_chain_log(chain,
       "Removing forked orphan block: %H (%d).",
       orphan->hash, height);
@@ -441,59 +405,41 @@ btc_chain_store_orphan(struct btc_chain_s *chain,
 
 static int
 btc_chain_has_next_orphan(struct btc_chain_s *chain, const uint8_t *hash) {
-  khiter_t it = kh_get(orphans, chain->orphan_prev, hash);
-  return it != kh_end(chain->orphan_prev);
+  return btc_hashmap_has(chain->orphan_prev, hash);
 }
 
 static void
 btc_chain_set_invalid(struct btc_chain_s *chain, const uint8_t *hash) {
-  int ret = -1;
-  khiter_t it;
+  uint8_t *key = btc_hash_clone(hash);
 
-  it = kh_put(invalid, chain->invalid, (uint8_t *)hash, &ret);
-
-  CHECK(ret != -1);
-
-  if (ret == 0)
-    return;
-
-  kh_key(chain->invalid, it) = btc_hash_clone(hash);
+  if (!btc_hashset_put(chain->invalid, key))
+    btc_free(key); /* Should never happen. */
 }
 
 BTC_UNUSED static void
 btc_chain_remove_invalid(struct btc_chain_s *chain, const uint8_t *hash) {
-  khiter_t it = kh_get(invalid, chain->invalid, (uint8_t *)hash);
+  uint8_t *key = btc_hashset_del(chain->invalid, hash);
 
-  if (it == kh_end(chain->invalid))
-    return;
-
-  btc_free(kh_key(chain->invalid, it));
-
-  kh_del(invalid, chain->invalid, it);
+  if (key != NULL)
+    btc_free(key);
 }
 
 int
 btc_chain_has_invalid(struct btc_chain_s *chain, const uint8_t *hash) {
-  khiter_t it = kh_get(invalid, chain->invalid, (uint8_t *)hash);
-  return it != kh_end(chain->invalid);
+  return btc_hashset_has(chain->invalid, hash);
 }
 
 static int
 btc_chain_is_invalid(struct btc_chain_s *chain, const btc_block_t *block) {
   const btc_header_t *hdr = &block->header;
   uint8_t hash[32];
-  khiter_t it;
 
   btc_header_hash(hash, hdr);
 
-  it = kh_get(invalid, chain->invalid, hash);
-
-  if (it != kh_end(chain->invalid))
+  if (btc_hashset_has(chain->invalid, hash))
     return 1;
 
-  it = kh_get(invalid, chain->invalid, (uint8_t *)hdr->prev_block);
-
-  if (it != kh_end(chain->invalid)) {
+  if (btc_hashset_has(chain->invalid, hdr->prev_block)) {
     btc_chain_set_invalid(chain, hash);
     return 1;
   }
@@ -1988,15 +1934,12 @@ const uint8_t *
 btc_chain_get_orphan_root(struct btc_chain_s *chain, const uint8_t *hash) {
   const uint8_t *root = NULL;
   btc_orphan_t *orphan;
-  khiter_t it;
 
   for (;;) {
-    it = kh_get(orphans, chain->orphan_map, hash);
+    orphan = btc_hashmap_get(chain->orphan_map, hash);
 
-    if (it == kh_end(chain->orphan_map))
+    if (orphan == NULL)
       break;
-
-    orphan = kh_value(chain->orphan_map, it);
 
     root = hash;
     hash = orphan->block->header.prev_block;

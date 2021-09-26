@@ -27,6 +27,7 @@
 #include <satoshi/crypto/hash.h>
 #include <satoshi/entry.h>
 #include <satoshi/header.h>
+#include <satoshi/map.h>
 #include <satoshi/net.h>
 #include <satoshi/netaddr.h>
 #include <satoshi/netmsg.h>
@@ -36,7 +37,6 @@
 #include <satoshi/util.h>
 #include <satoshi/vector.h>
 
-#include "../map.h"
 #include "../internal.h"
 
 /*

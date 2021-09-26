@@ -16,9 +16,6 @@
 #define MAP_STATIC BTC_UNUSED static
 #define MAP_EXTERN
 
-#ifndef BTC_MAP_INTERNAL_OLD_H
-#define BTC_MAP_INTERNAL_OLD_H
-
 #define kh_inline BTC_INLINE
 #define kh_unused BTC_UNUSED
 
@@ -26,56 +23,6 @@
 
 #define kh_hash_hash_func(x) btc_murmur3_sum(x, 32, 0xfba4c795)
 #define kh_hash_hash_equal(x, y) (memcmp(x, y, 32) == 0)
-
-#define KHASH_SET_INIT_HASH(name)                          \
-  KHASH_INIT(name, uint8_t *, char, 0, kh_hash_hash_func,  \
-                                       kh_hash_hash_equal)
-
-#define KHASH_MAP_INIT_HASH(name, khval_t)                    \
-  KHASH_INIT(name, uint8_t *, khval_t, 1, kh_hash_hash_func,  \
-                                          kh_hash_hash_equal)
-
-#define KHASH_SET_INIT_CONST_HASH(name)                          \
-  KHASH_INIT(name, const uint8_t *, char, 0, kh_hash_hash_func,  \
-                                             kh_hash_hash_equal)
-
-#define KHASH_MAP_INIT_CONST_HASH(name, khval_t)                    \
-  KHASH_INIT(name, const uint8_t *, khval_t, 1, kh_hash_hash_func,  \
-                                                kh_hash_hash_equal)
-
-#define KHASH_SET_INIT_OUTPOINT(name)                             \
-  KHASH_INIT(name, btc_outpoint_t *, char, 0, btc_outpoint_hash,  \
-                                              btc_outpoint_equal)
-
-#define KHASH_MAP_INIT_OUTPOINT(name, khval_t)                       \
-  KHASH_INIT(name, btc_outpoint_t *, khval_t, 1, btc_outpoint_hash,  \
-                                                 btc_outpoint_equal)
-
-#define KHASH_SET_INIT_CONST_OUTPOINT(name)                             \
-  KHASH_INIT(name, const btc_outpoint_t *, char, 0, btc_outpoint_hash,  \
-                                                    btc_outpoint_equal)
-
-#define KHASH_MAP_INIT_CONST_OUTPOINT(name, khval_t)                       \
-  KHASH_INIT(name, const btc_outpoint_t *, khval_t, 1, btc_outpoint_hash,  \
-                                                       btc_outpoint_equal)
-
-#define KHASH_SET_INIT_NETADDR(name)                            \
-  KHASH_INIT(name, btc_netaddr_t *, char, 0, btc_netaddr_hash,  \
-                                             btc_netaddr_equal)
-
-#define KHASH_MAP_INIT_NETADDR(name, khval_t)                      \
-  KHASH_INIT(name, btc_netaddr_t *, khval_t, 1, btc_netaddr_hash,  \
-                                                btc_netaddr_equal)
-
-#define KHASH_SET_INIT_CONST_NETADDR(name)                            \
-  KHASH_INIT(name, const btc_netaddr_t *, char, 0, btc_netaddr_hash,  \
-                                                   btc_netaddr_equal)
-
-#define KHASH_MAP_INIT_CONST_NETADDR(name, khval_t)                      \
-  KHASH_INIT(name, const btc_netaddr_t *, khval_t, 1, btc_netaddr_hash,  \
-                                                      btc_netaddr_equal)
-
-#endif
 
 /*
  * Map
@@ -166,16 +113,34 @@ name##_put(kh_##name##_t *map, const keytype key, const valtype val) {       \
   return 1;                                                                  \
 }                                                                            \
                                                                              \
-scope int                                                                    \
+scope keytype                                                                \
 name##_del(kh_##name##_t *map, const keytype key) {                          \
   khiter_t it = kh_get_##name(map, (keytype)key);                            \
+  keytype ret;                                                               \
                                                                              \
   if (it == kh_end(map))                                                     \
-    return 0;                                                                \
+    return (keytype)0;                                                       \
+                                                                             \
+  ret = kh_key(map, it);                                                     \
                                                                              \
   kh_del_##name(map, it);                                                    \
                                                                              \
-  return 1;                                                                  \
+  return ret;                                                                \
+}                                                                            \
+                                                                             \
+scope valtype                                                                \
+name##_rem(kh_##name##_t *map, const keytype key) {                          \
+  khiter_t it = kh_get_##name(map, (keytype)key);                            \
+  valtype ret;                                                               \
+                                                                             \
+  if (it == kh_end(map))                                                     \
+    return (sentinel);                                                       \
+                                                                             \
+  ret = kh_value(map, it);                                                   \
+                                                                             \
+  kh_del_##name(map, it);                                                    \
+                                                                             \
+  return ret;                                                                \
 }                                                                            \
                                                                              \
 scope void                                                                   \
@@ -255,7 +220,7 @@ name##_has(kh_##name##_t *map, const keytype key) {                          \
 }                                                                            \
                                                                              \
 scope int                                                                    \
-name##_add(kh_##name##_t *map, const keytype key) {                          \
+name##_put(kh_##name##_t *map, const keytype key) {                          \
   int ret = -1;                                                              \
                                                                              \
   kh_put_##name(map, (keytype)key, &ret);                                    \
@@ -266,16 +231,19 @@ name##_add(kh_##name##_t *map, const keytype key) {                          \
   return ret > 0;                                                            \
 }                                                                            \
                                                                              \
-scope int                                                                    \
+scope keytype                                                                \
 name##_del(kh_##name##_t *map, const keytype key) {                          \
   khiter_t it = kh_get_##name(map, (keytype)key);                            \
+  keytype ret;                                                               \
                                                                              \
   if (it == kh_end(map))                                                     \
-    return 0;                                                                \
+    return (keytype)0;                                                       \
+                                                                             \
+  ret = kh_key(map, it);                                                     \
                                                                              \
   kh_del_##name(map, it);                                                    \
                                                                              \
-  return 1;                                                                  \
+  return ret;                                                                \
 }                                                                            \
                                                                              \
 scope void                                                                   \
