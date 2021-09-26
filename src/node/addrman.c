@@ -190,7 +190,11 @@ void
 btc_addrman_add(struct btc_addrman_s *man,
                 const btc_netaddr_t *addr,
                 const btc_netaddr_t *src) {
+  int64_t now = btc_timedata_now(man->timedata);
   btc_netaddr_t *entry = btc_netaddr_clone(addr);
+
+  if (entry->time <= 100000000 || entry->time > now + 10 * 60)
+    entry->time = now - 5 * 24 * 60 * 60;
 
   (void)src;
 

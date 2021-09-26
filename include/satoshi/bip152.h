@@ -32,6 +32,7 @@ typedef struct btc_idvec_s {
 struct kh_btc_idmap_s;
 
 typedef struct btc_cmpct_s {
+  uint8_t hash[32];
   btc_header_t header;
   uint64_t key_nonce;
   btc_idvec_t ids;

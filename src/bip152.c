@@ -122,6 +122,7 @@ DEFINE_SERIALIZABLE_OBJECT(btc_cmpct, SCOPE_EXTERN)
 
 void
 btc_cmpct_init(btc_cmpct_t *z) {
+  btc_hash_init(z->hash);
   btc_header_init(&z->header);
   z->key_nonce = 0;
   idvec_init(&z->ids);
@@ -183,6 +184,7 @@ btc_cmpct_set_block(btc_cmpct_t *z, const btc_block_t *x, int witness) {
 
   CHECK(x->txs.length > 0);
 
+  btc_header_hash(z->hash, &x->header);
   btc_header_copy(&z->header, &x->header);
 
   z->key_nonce = ((uint64_t)btc_random() << 32) | btc_random();
@@ -400,6 +402,8 @@ btc_cmpct_read(btc_cmpct_t *z, const uint8_t **xp, size_t *xn) {
 
   if (!btc_header_read(&z->header, xp, xn))
     return 0;
+
+  btc_header_hash(z->hash, &z->header);
 
   if (!btc_uint64_read(&z->key_nonce, xp, xn))
     return 0;
