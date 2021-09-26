@@ -8,9 +8,9 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <node/bip152.h>
 #include <node/mempool.h>
 
+#include <satoshi/bip152.h>
 #include <satoshi/block.h>
 #include <satoshi/consensus.h>
 #include <satoshi/crypto/hash.h>
@@ -21,9 +21,9 @@
 #include <satoshi/util.h>
 #include <satoshi/vector.h>
 
-#include "../impl.h"
-#include "../internal.h"
-#include "../map.h"
+#include "impl.h"
+#include "internal.h"
+#include "map.h"
 
 /*
  * ID Vector

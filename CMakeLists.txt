@@ -33,6 +33,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/address.c
                             src/base58.c
                             src/bech32.c
+                            src/bip152.c
                             src/block.c
                             src/bloom.c
                             src/buffer.c
@@ -81,7 +82,6 @@ else()
 endif()
 
 list(APPEND node_sources src/node/addrman.c
-                         src/node/bip152.c
                          src/node/chain.c
                          src/node/chaindb.c
                          src/node/logger.c

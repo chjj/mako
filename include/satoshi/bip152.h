@@ -13,10 +13,10 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdint.h>
+#include "../node/types.h"
 #include "types.h"
-#include "../satoshi/common.h"
-#include "../satoshi/impl.h"
-#include "../satoshi/types.h"
+#include "common.h"
+#include "impl.h"
 
 /*
  * Types
