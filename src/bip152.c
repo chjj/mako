@@ -182,7 +182,6 @@ btc_cmpct_fill_mempool(btc_cmpct_t *blk, btc_hashmapiter_t *iter, int witness) {
   size_t total = blk->ptx.length + blk->ids.length;
   const btc_mpentry_t *entry;
   btc_longset_t *set;
-  uint8_t hash[32];
   uint64_t id;
   int index;
 
@@ -196,12 +195,10 @@ btc_cmpct_fill_mempool(btc_cmpct_t *blk, btc_hashmapiter_t *iter, int witness) {
   while (btc_hashmap_next(iter)) {
     entry = iter->val;
 
-    if (witness) {
-      btc_tx_wtxid(hash, &entry->tx);
-      id = btc_cmpct_sid(blk, hash);
-    } else {
+    if (witness)
+      id = btc_cmpct_sid(blk, entry->whash);
+    else
       id = btc_cmpct_sid(blk, entry->hash);
-    }
 
     index = btc_longtab_get(blk->id_map, id);
 

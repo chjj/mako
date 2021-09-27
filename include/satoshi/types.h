@@ -236,6 +236,7 @@ typedef struct btc_filter_s {
 
 typedef struct btc_mpentry_s {
   uint8_t hash[32];
+  uint8_t whash[32];
   btc_tx_t tx;
   int32_t height;
   uint32_t size;

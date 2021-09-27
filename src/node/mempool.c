@@ -239,6 +239,7 @@ btc_mpentry_init(btc_mpentry_t *entry) {
   btc_tx_init(&entry->tx);
 
   memset(entry->hash, 0, 32);
+  memset(entry->whash, 0, 32);
 
   entry->height = -1;
   entry->size = 0;
@@ -264,6 +265,7 @@ btc_mpentry_copy(btc_mpentry_t *z, const btc_mpentry_t *x) {
   btc_tx_copy(&z->tx, &x->tx);
 
   memcpy(z->hash, x->hash, 32);
+  memcpy(z->whash, x->whash, 32);
 
   z->height = x->height;
   z->size = x->size;
@@ -283,6 +285,7 @@ void
 btc_mpentry_set(btc_mpentry_t *z, const btc_tx_t *tx) {
   btc_tx_copy(&z->tx, tx);
   btc_tx_txid(z->hash, tx);
+  btc_tx_wtxid(z->whash, tx);
 }
 
 size_t
@@ -338,6 +341,7 @@ btc_mpentry_read(btc_mpentry_t *z, const uint8_t **xp, size_t *xn) {
     return 0;
 
   btc_tx_txid(z->hash, &z->tx);
+  btc_tx_wtxid(z->whash, &z->tx);
 
   return 1;
 }
