@@ -705,46 +705,41 @@ btc_chaindb_fill(struct btc_chaindb_s *db,
 }
 
 static int
-iterate_view(const uint8_t *hash,
-             uint32_t index,
-             const btc_coin_t *coin,
-             void *arg1,
-             void *arg2) {
-  struct btc_chaindb_s *db = (struct btc_chaindb_s *)arg1;
-  MDB_txn *txn = (MDB_txn *)arg2;
+btc_chaindb_save_view(struct btc_chaindb_s *db,
+                      MDB_txn *txn,
+                      btc_view_t *view) {
   uint8_t *val = db->slab;
+  const btc_coin_t *coin;
+  btc_viewiter_t iter;
   MDB_val mkey, mval;
   uint8_t key[36];
   int rc;
 
-  btc_raw_write(key, hash, 32);
-  btc_uint32_write(key + 32, index);
+  btc_view_iterate(&iter, view);
 
-  mkey.mv_data = key;
-  mkey.mv_size = sizeof(key);
+  while (btc_view_next(&coin, &iter)) {
+    btc_raw_write(key, iter.hash, 32);
+    btc_uint32_write(key + 32, iter.index);
 
-  if (coin->spent) {
-    rc = mdb_del(txn, db->db_coin, &mkey, NULL);
-  } else {
-    mval.mv_data = val;
-    mval.mv_size = btc_coin_export(val, coin);
+    mkey.mv_data = key;
+    mkey.mv_size = sizeof(key);
 
-    rc = mdb_put(txn, db->db_coin, &mkey, &mval, 0);
-  }
+    if (coin->spent) {
+      rc = mdb_del(txn, db->db_coin, &mkey, NULL);
+    } else {
+      mval.mv_data = val;
+      mval.mv_size = btc_coin_export(val, coin);
 
-  if (rc != 0 && rc != MDB_NOTFOUND) {
-    fprintf(stderr, "mdb_put: %s\n", mdb_strerror(rc));
-    return 0;
+      rc = mdb_put(txn, db->db_coin, &mkey, &mval, 0);
+    }
+
+    if (rc != 0 && rc != MDB_NOTFOUND) {
+      fprintf(stderr, "mdb_put: %s\n", mdb_strerror(rc));
+      return 0;
+    }
   }
 
   return 1;
-}
-
-static int
-btc_chaindb_save_view(struct btc_chaindb_s *db,
-                      MDB_txn *txn,
-                      btc_view_t *view) {
-  return btc_view_iterate(view, iterate_view, db, txn);
 }
 
 static int

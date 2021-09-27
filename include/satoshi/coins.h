@@ -18,6 +18,25 @@ extern "C" {
 #include "types.h"
 
 /*
+ * Types
+ */
+
+typedef btc_coin_t *btc_coin_read_cb(const btc_outpoint_t *prevout,
+                                     void *arg1,
+                                     void *arg2);
+
+struct btc_coins_s;
+
+typedef struct btc_viewiter_s {
+  struct btc_view_s *view;
+  unsigned int itv;
+  unsigned int itc;
+  struct btc_coins_s *coins;
+  const uint8_t *hash;
+  uint32_t index;
+} btc_viewiter_t;
+
+/*
  * Coin
  */
 
@@ -71,33 +90,25 @@ btc_view_put(btc_view_t *view,
 BTC_EXTERN int
 btc_view_spend(btc_view_t *view,
                const btc_tx_t *tx,
-               btc_coin_t *(*read_coin)(const btc_outpoint_t *prevout,
-                                        void *arg1,
-                                        void *arg2),
+               btc_coin_read_cb *read_coin,
                void *arg1,
                void *arg2);
 
 BTC_EXTERN int
 btc_view_fill(btc_view_t *view,
               const btc_tx_t *tx,
-              btc_coin_t *(*read_coin)(const btc_outpoint_t *prevout,
-                                       void *arg1,
-                                       void *arg2),
+              btc_coin_read_cb *read_coin,
               void *arg1,
               void *arg2);
 
 BTC_EXTERN void
 btc_view_add(btc_view_t *view, const btc_tx_t *tx, int32_t height, int spent);
 
+BTC_EXTERN void
+btc_view_iterate(btc_viewiter_t *iter, btc_view_t *view);
+
 BTC_EXTERN int
-btc_view_iterate(btc_view_t *view,
-                 int (*cb)(const uint8_t *hash,
-                           uint32_t index,
-                           const btc_coin_t *coin,
-                           void *arg1,
-                           void *arg2),
-                 void *arg1,
-                 void *arg2);
+btc_view_next(const btc_coin_t **coin, btc_viewiter_t *iter);
 
 BTC_EXTERN btc_undo_t *
 btc_view_undo(btc_view_t *view);

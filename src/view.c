@@ -58,7 +58,7 @@ btc_coins_get(btc_coins_t *coins, uint32_t index) {
   khiter_t it = kh_get(coins, coins->map, index);
 
   if (it == kh_end(coins->map))
-    return 0;
+    return NULL;
 
   return kh_value(coins->map, it);
 }
@@ -188,9 +188,7 @@ btc_view_put(btc__view_t *view,
 int
 btc_view_spend(btc__view_t *view,
                const btc_tx_t *tx,
-               btc_coin_t *(*read_coin)(const btc_outpoint_t *prevout,
-                                        void *arg1,
-                                        void *arg2),
+               btc_coin_read_cb *read_coin,
                void *arg1,
                void *arg2) {
   const btc_outpoint_t *prevout;
@@ -226,9 +224,7 @@ btc_view_spend(btc__view_t *view,
 int
 btc_view_fill(btc__view_t *view,
               const btc_tx_t *tx,
-              btc_coin_t *(*read_coin)(const btc_outpoint_t *prevout,
-                                       void *arg1,
-                                       void *arg2),
+              btc_coin_read_cb *read_coin,
               void *arg1,
               void *arg2) {
   const btc_outpoint_t *prevout;
@@ -276,40 +272,50 @@ btc_view_add(btc__view_t *view, const btc_tx_t *tx, int32_t height, int spent) {
   }
 }
 
+void
+btc_view_iterate(btc_viewiter_t *iter, btc__view_t *view) {
+  iter->view = view;
+  iter->itv = kh_begin(view->map);
+  iter->itc = 0;
+  iter->coins = NULL;
+  iter->hash = NULL;
+  iter->index = 0;
+}
+
 int
-btc_view_iterate(btc__view_t *view,
-                 int (*cb)(const uint8_t *hash,
-                           uint32_t index,
-                           const btc_coin_t *coin,
-                           void *arg1,
-                           void *arg2),
-                 void *arg1,
-                 void *arg2) {
-  btc_coins_t *coins;
-  khiter_t itv, itc;
-  int rc;
+btc_view_next(const btc_coin_t **coin, btc_viewiter_t *iter) {
+  btc__view_t *view = iter->view;
 
-  for (itv = kh_begin(view->map); itv != kh_end(view->map); itv++) {
-    if (!kh_exist(view->map, itv))
-      continue;
+  for (;;) {
+    if (iter->coins == NULL) {
+      for (; iter->itv != kh_end(view->map); iter->itv++) {
+        if (kh_exist(view->map, iter->itv)) {
+          iter->coins = kh_value(view->map, iter->itv);
+          iter->itv++;
+          break;
+        }
+      }
 
-    coins = kh_value(view->map, itv);
+      if (iter->coins == NULL)
+        break;
 
-    for (itc = kh_begin(coins->map); itc != kh_end(coins->map); itc++) {
-      if (!kh_exist(coins->map, itc))
-        continue;
-
-      rc = cb(coins->hash, kh_key(coins->map, itc),
-                           kh_value(coins->map, itc),
-                           arg1,
-                           arg2);
-
-      if (rc == 0)
-        return 0;
+      iter->itc = kh_begin(iter->coins->map);
     }
+
+    for (; iter->itc != kh_end(iter->coins->map); iter->itc++) {
+      if (kh_exist(iter->coins->map, iter->itc)) {
+        iter->hash = iter->coins->hash;
+        iter->index = kh_key(iter->coins->map, iter->itc);
+        *coin = kh_value(iter->coins->map, iter->itc);
+        iter->itc++;
+        return 1;
+      }
+    }
+
+    iter->coins = NULL;
   }
 
-  return 1;
+  return 0;
 }
 
 btc_undo_t *
