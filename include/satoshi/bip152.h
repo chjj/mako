@@ -21,8 +21,6 @@ extern "C" {
  * Types
  */
 
-struct btc_mempool_s;
-
 typedef struct btc_cmpct_s {
   uint8_t hash[32];
   btc_header_t header;
@@ -71,7 +69,7 @@ BTC_EXTERN int
 btc_cmpct_setup(btc_cmpct_t *blk);
 
 BTC_EXTERN int
-btc_cmpct_fill_mempool(btc_cmpct_t *blk, struct btc_mempool_s *mp, int witness);
+btc_cmpct_fill_mempool(btc_cmpct_t *blk, btc_hashmapiter_t *iter, int witness);
 
 BTC_EXTERN int
 btc_cmpct_fill_missing(btc_cmpct_t *blk, const btc_blocktxn_t *msg);

@@ -3579,6 +3579,7 @@ btc_pool_on_cmpctblock(struct btc_pool_s *pool,
                        btc_peer_t *peer,
                        btc_msg_t *msg) {
   btc_cmpct_t *block = (btc_cmpct_t *)msg->body;
+  btc_mpiter_t iter;
   int rc;
 
   if (!pool->bip152_enabled) {
@@ -3658,7 +3659,9 @@ btc_pool_on_cmpctblock(struct btc_pool_s *pool,
     return;
   }
 
-  if (btc_cmpct_fill_mempool(block, pool->mempool, peer->compact_witness)) {
+  btc_mempool_iterate(&iter, pool->mempool);
+
+  if (btc_cmpct_fill_mempool(block, &iter, peer->compact_witness)) {
     btc_block_t blk;
 
     btc_pool_log(pool,
