@@ -14,24 +14,24 @@
  * Map
  */
 
-#define BTC_DEFINE_MAP_TYPES(name, keytype, valtype) \
-                                                     \
-struct kh_##name##_s;                                \
-typedef struct kh_##name##_s name##_t;               \
-                                                     \
-typedef struct name##iter_s {                        \
-  struct kh_##name##_s *map;                         \
-  unsigned int it;                                   \
-  keytype key;                                       \
-  valtype val;                                       \
+#define BTC_DEFINE_MAP_TYPES(name, key_t, val_t) \
+                                                 \
+struct kh_##name##_s;                            \
+typedef struct kh_##name##_s name##_t;           \
+                                                 \
+typedef struct name##iter_s {                    \
+  const struct kh_##name##_s *map;               \
+  unsigned int it;                               \
+  key_t key;                                     \
+  val_t val;                                     \
 } name##iter_t
 
 /*
  * Set
  */
 
-#define BTC_DEFINE_SET_TYPES(name, keytype) \
-  BTC_DEFINE_MAP_TYPES(name, keytype, int)
+#define BTC_DEFINE_SET_TYPES(name, key_t) \
+  BTC_DEFINE_MAP_TYPES(name, key_t, int)
 
 /*
  * Types
@@ -256,33 +256,33 @@ typedef struct btc_mpentry_s {
  * Maps (Key->Pointer)
  */
 
-BTC_DEFINE_MAP_TYPES(btc_hashmap, uint8_t *, void *);
-BTC_DEFINE_MAP_TYPES(btc_addrmap, btc_netaddr_t *, void *);
-/* BTC_DEFINE_MAP_TYPES(btc_outmap, btc_outpoint_t *, void *); */
-/* BTC_DEFINE_MAP_TYPES(btc_invmap, btc_invitem_t *, void *); */
 BTC_DEFINE_MAP_TYPES(btc_intmap, uint32_t, void *);
 BTC_DEFINE_MAP_TYPES(btc_longmap, uint64_t, void *);
+BTC_DEFINE_MAP_TYPES(btc_hashmap, uint8_t *, void *);
+/* BTC_DEFINE_MAP_TYPES(btc_outmap, btc_outpoint_t *, void *); */
+/* BTC_DEFINE_MAP_TYPES(btc_invmap, btc_invitem_t *, void *); */
+BTC_DEFINE_MAP_TYPES(btc_addrmap, btc_netaddr_t *, void *);
 
 /*
  * Tables (Key->Integer)
  */
 
-BTC_DEFINE_MAP_TYPES(btc_hashtab, uint8_t *, int64_t);
-/* BTC_DEFINE_MAP_TYPES(btc_addrtab, btc_netaddr_t *, uint64_t); */
-/* BTC_DEFINE_MAP_TYPES(btc_outtab, btc_outpoint_t *, int64_t); */
-/* BTC_DEFINE_MAP_TYPES(btc_invtab, btc_invitem_t *, int64_t); */
 /* BTC_DEFINE_MAP_TYPES(btc_inttab, uint32_t, int64_t); */
 BTC_DEFINE_MAP_TYPES(btc_longtab, uint64_t, int64_t);
+BTC_DEFINE_MAP_TYPES(btc_hashtab, uint8_t *, int64_t);
+/* BTC_DEFINE_MAP_TYPES(btc_outtab, btc_outpoint_t *, int64_t); */
+/* BTC_DEFINE_MAP_TYPES(btc_invtab, btc_invitem_t *, int64_t); */
+/* BTC_DEFINE_MAP_TYPES(btc_addrtab, btc_netaddr_t *, uint64_t); */
 
 /*
  * Sets (Key)
  */
 
-BTC_DEFINE_SET_TYPES(btc_hashset, uint8_t *);
-/* BTC_DEFINE_SET_TYPES(btc_addrset, btc_netaddr_t *); */
-BTC_DEFINE_SET_TYPES(btc_outset, btc_outpoint_t *);
-/* BTC_DEFINE_SET_TYPES(btc_invset, btc_invitem_t *); */
 /* BTC_DEFINE_SET_TYPES(btc_intset, uint32_t); */
 BTC_DEFINE_SET_TYPES(btc_longset, uint64_t);
+BTC_DEFINE_SET_TYPES(btc_hashset, uint8_t *);
+BTC_DEFINE_SET_TYPES(btc_outset, btc_outpoint_t *);
+/* BTC_DEFINE_SET_TYPES(btc_invset, btc_invitem_t *); */
+/* BTC_DEFINE_SET_TYPES(btc_addrset, btc_netaddr_t *); */
 
 #endif /* BTC_TYPES_H */

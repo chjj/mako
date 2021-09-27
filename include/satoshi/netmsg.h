@@ -282,6 +282,12 @@ btc_invitem_copy(btc_invitem_t *z, const btc_invitem_t *x);
 BTC_EXTERN void
 btc_invitem_set(btc_invitem_t *z, uint32_t type, const uint8_t *hash);
 
+BTC_EXTERN uint32_t
+btc_invitem_hash(const btc_invitem_t *x);
+
+BTC_EXTERN int
+btc_invitem_equal(const btc_invitem_t *x, const btc_invitem_t *y);
+
 BTC_EXTERN size_t
 btc_invitem_size(const btc_invitem_t *x);
 

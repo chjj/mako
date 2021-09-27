@@ -277,6 +277,37 @@ btc_invitem_set(btc_invitem_t *z, uint32_t type, const uint8_t *hash) {
   btc_hash_copy(z->hash, hash);
 }
 
+static uint32_t
+btc_invitem_type(const btc_invitem_t *x) {
+  uint32_t type = x->type;
+
+  type &= ~((uint32_t)BTC_INV_WITNESS_FLAG);
+
+  if (type > BTC_INV_BLOCK)
+    type = BTC_INV_BLOCK;
+
+  return type;
+}
+
+uint32_t
+btc_invitem_hash(const btc_invitem_t *x) {
+  uint8_t tmp[36];
+  btc_uint32_write(tmp, btc_invitem_type(x));
+  btc_raw_write(tmp + 4, x->hash, 32);
+  return btc_murmur3_sum(tmp, 36, 0xfba4c795);
+}
+
+int
+btc_invitem_equal(const btc_invitem_t *x, const btc_invitem_t *y) {
+  if (btc_invitem_type(x) != btc_invitem_type(y))
+    return 0;
+
+  if (memcmp(x->hash, y->hash, 32) != 0)
+    return 0;
+
+  return 1;
+}
+
 size_t
 btc_invitem_size(const btc_invitem_t *x) {
   (void)x;
