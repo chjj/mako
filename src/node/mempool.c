@@ -15,6 +15,7 @@
 #include <node/timedata.h>
 
 #include <satoshi/block.h>
+#include <satoshi/bloom.h>
 #include <satoshi/coins.h>
 #include <satoshi/consensus.h>
 #include <satoshi/crypto/hash.h>
@@ -33,6 +34,37 @@
 #include "../internal.h"
 
 /*
+ * Orphan Transaction
+ */
+
+typedef struct btc_orphan_s {
+  uint8_t hash[32];
+  btc_tx_t *tx;
+  int missing;
+  unsigned int id;
+} btc_orphan_t;
+
+DEFINE_OBJECT(btc_orphan, SCOPE_STATIC)
+
+static void
+btc_orphan_init(btc_orphan_t *orphan) {
+  memset(orphan, 0, sizeof(*orphan));
+}
+
+static void
+btc_orphan_clear(btc_orphan_t *orphan) {
+  if (orphan->tx != NULL)
+    btc_tx_destroy(orphan->tx);
+
+  orphan->tx = NULL;
+}
+
+static void
+btc_orphan_copy(btc_orphan_t *z, const btc_orphan_t *x) {
+  *z = *x;
+}
+
+/*
  * Mempool
  */
 
@@ -40,8 +72,15 @@ struct btc_mempool_s {
   const btc_network_t *network;
   btc_logger_t *logger;
   const btc_timedata_t *timedata;
-  btc_hashmap_t *map;
   btc_chain_t *chain;
+  size_t size;
+  double free_count;
+  int64_t last_time;
+  btc_hashmap_t *map;
+  btc_hashmap_t *waiting;
+  btc_hashmap_t *orphans;
+  btc_outmap_t *spents;
+  btc_filter_t rejects;
   btc_verify_error_t error;
   btc_mempool_tx_cb *on_tx;
   btc_mempool_badorphan_cb *on_badorphan;
@@ -56,13 +95,14 @@ btc_mempool_create(const btc_network_t *network, btc_chain_t *chain) {
   memset(mp, 0, sizeof(*mp));
 
   mp->network = network;
-  mp->logger = NULL;
-  mp->timedata = NULL;
-  mp->map = btc_hashmap_create();
   mp->chain = chain;
-  mp->on_tx = NULL;
-  mp->on_badorphan = NULL;
-  mp->arg = NULL;
+  mp->map = btc_hashmap_create();
+  mp->waiting = btc_hashmap_create(); /* orphan prevout hashes */
+  mp->orphans = btc_hashmap_create();
+  mp->spents = btc_outmap_create(); /* mempool entry's outpoints */
+
+  btc_filter_init(&mp->rejects);
+  btc_filter_set(&mp->rejects, 120000, 0.000001);
 
   return mp;
 }
@@ -76,7 +116,17 @@ btc_mempool_destroy(struct btc_mempool_s *mp) {
   while (btc_hashmap_next(&iter))
     btc_mpentry_destroy(iter.val);
 
+  btc_hashmap_iterate(&iter, mp->orphans);
+
+  while (btc_hashmap_next(&iter))
+    btc_orphan_destroy(iter.val);
+
   btc_hashmap_destroy(mp->map);
+  btc_hashmap_destroy(mp->waiting);
+  btc_hashmap_destroy(mp->orphans);
+  btc_outmap_destroy(mp->spents);
+  btc_filter_clear(&mp->rejects);
+
   btc_free(mp);
 }
 
@@ -126,12 +176,12 @@ btc_mempool_close(struct btc_mempool_s *mp) {
 }
 
 BTC_UNUSED static int
-btc_chain_throw(struct btc_mempool_s *mp,
-                const uint8_t *hash,
-                const char *code,
-                const char *reason,
-                int score,
-                int malleated) {
+btc_mempool_throw(struct btc_mempool_s *mp,
+                  const uint8_t *hash,
+                  const char *code,
+                  const char *reason,
+                  int score,
+                  int malleated) {
   btc_hash_copy(mp->error.hash, hash);
 
   mp->error.code = code;
@@ -209,9 +259,7 @@ btc_mempool_get(struct btc_mempool_s *mp, const uint8_t *hash) {
 
 int
 btc_mempool_has_reject(struct btc_mempool_s *mp, const uint8_t *hash) {
-  (void)mp;
-  (void)hash;
-  return 0;
+  return btc_filter_has(&mp->rejects, hash, 32);
 }
 
 void

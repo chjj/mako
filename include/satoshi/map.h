@@ -107,7 +107,7 @@ name##_next(name##iter_t *iter)
 BTC_DEFINE_MAP(btc_intmap, uint32_t, void *, BTC_EXTERN);
 BTC_DEFINE_MAP(btc_longmap, uint64_t, void *, BTC_EXTERN);
 BTC_DEFINE_MAP(btc_hashmap, uint8_t *, void *, BTC_EXTERN);
-/* BTC_DEFINE_MAP(btc_outmap, btc_outpoint_t *, void *, BTC_EXTERN); */
+BTC_DEFINE_MAP(btc_outmap, btc_outpoint_t *, void *, BTC_EXTERN);
 /* BTC_DEFINE_MAP(btc_invmap, btc_invitem_t *, void *, BTC_EXTERN); */
 BTC_DEFINE_MAP(btc_addrmap, btc_netaddr_t *, void *, BTC_EXTERN);
 

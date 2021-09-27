@@ -259,7 +259,7 @@ typedef struct btc_mpentry_s {
 BTC_DEFINE_MAP_TYPES(btc_intmap, uint32_t, void *);
 BTC_DEFINE_MAP_TYPES(btc_longmap, uint64_t, void *);
 BTC_DEFINE_MAP_TYPES(btc_hashmap, uint8_t *, void *);
-/* BTC_DEFINE_MAP_TYPES(btc_outmap, btc_outpoint_t *, void *); */
+BTC_DEFINE_MAP_TYPES(btc_outmap, btc_outpoint_t *, void *);
 /* BTC_DEFINE_MAP_TYPES(btc_invmap, btc_invitem_t *, void *); */
 BTC_DEFINE_MAP_TYPES(btc_addrmap, btc_netaddr_t *, void *);
 

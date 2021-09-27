@@ -38,6 +38,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/map/longmap.c
                             src/map/longset.c
                             src/map/longtab.c
+                            src/map/outmap.c
                             src/map/outset.c
                             src/address.c
                             src/array.c

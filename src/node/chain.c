@@ -64,12 +64,12 @@ typedef struct btc_orphan_s {
 
 DEFINE_OBJECT(btc_orphan, SCOPE_STATIC)
 
-void
+static void
 btc_orphan_init(btc_orphan_t *orphan) {
   memset(orphan, 0, sizeof(*orphan));
 }
 
-void
+static void
 btc_orphan_clear(btc_orphan_t *orphan) {
   if (orphan->block != NULL)
     btc_block_destroy(orphan->block);
@@ -77,7 +77,7 @@ btc_orphan_clear(btc_orphan_t *orphan) {
   orphan->block = NULL;
 }
 
-void
+static void
 btc_orphan_copy(btc_orphan_t *z, const btc_orphan_t *x) {
   *z = *x;
 }
