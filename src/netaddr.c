@@ -65,6 +65,24 @@ static const uint8_t btc_tor_onion[6] = {
   0xeb, 0x43
 };
 
+enum btc_ipnet {
+  BTC_IPNET_NONE,
+  BTC_IPNET_IPV4,
+  BTC_IPNET_IPV6,
+  BTC_IPNET_ONION,
+  BTC_IPNET_TEREDO
+};
+
+enum btc_reachability {
+  BTC_REACH_UNREACHABLE,
+  BTC_REACH_DEFAULT,
+  BTC_REACH_TEREDO,
+  BTC_REACH_IPV6_WEAK,
+  BTC_REACH_IPV4,
+  BTC_REACH_IPV6_STRONG,
+  BTC_REACH_PRIVATE
+};
+
 /*
  * Types
  */
@@ -494,6 +512,158 @@ btc_netaddr_is_routable(const btc_netaddr_t *addr) {
     return 0;
 
   return 1;
+}
+
+static enum btc_ipnet
+btc_netaddr_network(const btc_netaddr_t *addr) {
+  if (!btc_netaddr_is_routable(addr))
+    return BTC_IPNET_NONE;
+
+  if (btc_netaddr_is_ip4(addr))
+    return BTC_IPNET_IPV4;
+
+  if (btc_netaddr_is_rfc4380(addr))
+    return BTC_IPNET_TEREDO;
+
+  if (btc_netaddr_is_onion(addr))
+    return BTC_IPNET_ONION;
+
+  return BTC_IPNET_IPV6;
+}
+
+int
+btc_netaddr_reachability(const btc_netaddr_t *src, const btc_netaddr_t *dst) {
+  enum btc_ipnet srcnet, dstnet;
+
+  if (!btc_netaddr_is_routable(src))
+    return BTC_REACH_UNREACHABLE;
+
+  srcnet = btc_netaddr_network(src);
+  dstnet = btc_netaddr_network(dst);
+
+  switch (dstnet) {
+    case BTC_IPNET_IPV4:
+      switch (srcnet) {
+        case BTC_IPNET_IPV4:
+          return BTC_REACH_IPV4;
+        default:
+          return BTC_REACH_DEFAULT;
+      }
+      break;
+    case BTC_IPNET_IPV6:
+      switch (srcnet) {
+        case BTC_IPNET_TEREDO:
+          return BTC_REACH_TEREDO;
+        case BTC_IPNET_IPV4:
+          return BTC_REACH_IPV4;
+        case BTC_IPNET_IPV6:
+          if (btc_netaddr_is_rfc3964(src)
+              || btc_netaddr_is_rfc6052(src)
+              || btc_netaddr_is_rfc6145(src)) {
+            /* tunnel */
+            return BTC_REACH_IPV6_WEAK;
+          }
+          return BTC_REACH_IPV6_STRONG;
+        default:
+          return BTC_REACH_DEFAULT;
+      }
+      break;
+    case BTC_IPNET_ONION:
+      switch (srcnet) {
+        case BTC_IPNET_IPV4:
+          return BTC_REACH_IPV4;
+        case BTC_IPNET_ONION:
+          return BTC_REACH_PRIVATE;
+        default:
+          return BTC_REACH_DEFAULT;
+      }
+      break;
+    case BTC_IPNET_TEREDO:
+      switch (srcnet) {
+        case BTC_IPNET_TEREDO:
+          return BTC_REACH_TEREDO;
+        case BTC_IPNET_IPV6:
+          return BTC_REACH_IPV6_WEAK;
+        case BTC_IPNET_IPV4:
+          return BTC_REACH_IPV4;
+        default:
+          return BTC_REACH_DEFAULT;
+      }
+      break;
+    default:
+      switch (srcnet) {
+        case BTC_IPNET_TEREDO:
+          return BTC_REACH_TEREDO;
+        case BTC_IPNET_IPV6:
+          return BTC_REACH_IPV6_WEAK;
+        case BTC_IPNET_IPV4:
+          return BTC_REACH_IPV4;
+        case BTC_IPNET_ONION:
+          return BTC_REACH_PRIVATE;
+        default:
+          return BTC_REACH_DEFAULT;
+      }
+      break;
+  }
+
+  return BTC_REACH_UNREACHABLE;
+}
+
+uint8_t *
+btc_netaddr_groupkey(uint8_t *out, const btc_netaddr_t *addr) {
+  /* See: https://github.com/bitcoin/bitcoin/blob/e258ce7/src/netaddress.cpp#L413 */
+  /* Todo: Use IP->ASN mapping, see:
+     https://github.com/bitcoin/bitcoin/blob/adea5e1/src/addrman.h#L274 */
+  int type = 6; /* NET_IPV6 */
+  int start = 0;
+  int bits = 16;
+  int i = 0;
+
+  memset(out, 0, 6);
+
+  if (btc_netaddr_is_local(addr)) {
+    type = 255; /* NET_LOCAL */
+    bits = 0;
+  } else if (!btc_netaddr_is_routable(addr)) {
+    type = 0; /* NET_UNROUTABLE */
+    bits = 0;
+  } else if (btc_netaddr_is_ip4(addr)
+          || btc_netaddr_is_ip6(addr)
+          || btc_netaddr_is_rfc6052(addr)) {
+    type = 4; /* NET_IPV4 */
+    start = 12;
+  } else if (btc_netaddr_is_rfc3964(addr)) {
+    type = 4; /* NET_IPV4 */
+    start = 2;
+  } else if (btc_netaddr_is_rfc4380(addr)) {
+    out[0] = 4; /* NET_IPV4 */
+    out[1] = addr->raw[12] ^ 0xff;
+    out[2] = addr->raw[13] ^ 0xff;
+    return out;
+  } else if (btc_netaddr_is_onion(addr)) {
+    type = 8; /* NET_ONION */
+    start = 6;
+    bits = 4;
+  } else if (addr->raw[0] == 0x20
+          && addr->raw[1] == 0x01
+          && addr->raw[2] == 0x04
+          && addr->raw[3] == 0x70) {
+    bits = 36;
+  } else {
+    bits = 32;
+  }
+
+  out[i++] = type;
+
+  while (bits >= 8) {
+    out[i++] = addr->raw[start++];
+    bits -= 8;
+  }
+
+  if (bits > 0)
+    out[i++] = addr->raw[start] | ((1 << (8 - bits)) - 1);
+
+  return out;
 }
 
 void

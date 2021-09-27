@@ -143,6 +143,12 @@ btc_netaddr_is_valid(const btc_netaddr_t *addr);
 BTC_EXTERN int
 btc_netaddr_is_routable(const btc_netaddr_t *addr);
 
+BTC_EXTERN int
+btc_netaddr_reachability(const btc_netaddr_t *src, const btc_netaddr_t *dst);
+
+BTC_EXTERN uint8_t *
+btc_netaddr_groupkey(uint8_t *out, const btc_netaddr_t *addr);
+
 BTC_EXTERN void
 btc_netaddr_set_sockaddr(btc_netaddr_t *z, const struct btc_sockaddr_s *x);
 

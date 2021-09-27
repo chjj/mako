@@ -2098,15 +2098,18 @@ btc_pool_close(struct btc_pool_s *pool) {
 
 static const btc_netaddr_t *
 btc_pool_get_addr(struct btc_pool_s *pool) {
-  /* int64_t now = btc_timedata_now(pool->timedata); */
+  int64_t now = btc_timedata_now(pool->timedata);
+  const btc_addrent_t *entry;
   const btc_netaddr_t *addr;
   int i;
 
   for (i = 0; i < 100; i++) {
-    addr = btc_addrman_get(pool->addrman);
+    entry = btc_addrman_get(pool->addrman);
 
-    if (addr == NULL)
+    if (entry == NULL)
       break;
+
+    addr = &entry->addr;
 
     if (btc_peers_has(&pool->peers, addr))
       continue;
@@ -2126,10 +2129,8 @@ btc_pool_get_addr(struct btc_pool_s *pool) {
     if (btc_netaddr_is_onion(addr))
       continue;
 
-#if 0
     if (i < 30 && now - entry->last_attempt < 600)
       continue;
-#endif
 
     if (i < 50 && addr->port != pool->network->port)
       continue;
@@ -2147,6 +2148,7 @@ btc_pool_ban(struct btc_pool_s *pool, const btc_netaddr_t *addr) {
   btc_pool_log(pool, "Banning peer (%N).", addr);
 
   btc_addrman_ban(pool->addrman, addr);
+  btc_addrman_remove(pool->addrman, addr);
 
   if (peer != NULL)
     btc_peer_close(peer);

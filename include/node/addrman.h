@@ -17,53 +17,6 @@ extern "C" {
 #include "../satoshi/common.h"
 #include "../satoshi/types.h"
 
-/*
- * Constants
- */
-
-/**
- * Number of days before considering
- * an address stale.
- */
-
-#define BTC_ADDRMAN_HORIZON_DAYS 30
-
-/**
- * Number of retries (without success)
- * before considering an address stale.
- */
-
-#define BTC_ADDRMAN_RETRIES 3
-
-/**
- * Number of days after reaching
- * MAX_FAILURES to consider an
- * address stale.
- */
-
-#define BTC_ADDRMAN_MIN_FAIL_DAYS 7
-
-/**
- * Maximum number of failures
- * allowed before considering
- * an address stale.
- */
-
-#define BTC_ADDRMAN_MAX_FAILURES 10
-
-/**
- * Maximum number of references
- * in fresh buckets.
- */
-
-#define BTC_ADDRMAN_MAX_REFS 8
-
-/**
- * Serialization version.
- */
-
-#define BTC_ADDRMAN_VERSION 0
-
 /**
  * Local address scores.
  */
@@ -82,10 +35,19 @@ enum btc_score {
  * Types
  */
 
-typedef struct btc_addriter_s {
-  btc_addrman_t *man;
-  uint32_t it;
-} btc_addriter_t;
+typedef struct btc_addrent_s {
+  btc_netaddr_t addr;
+  btc_netaddr_t src;
+  struct btc_addrent_s *prev;
+  struct btc_addrent_s *next;
+  uint8_t used;
+  int32_t ref_count;
+  int32_t attempts;
+  int64_t last_success;
+  int64_t last_attempt;
+} btc_addrent_t;
+
+typedef btc_addrmapiter_t btc_addriter_t;
 
 /*
  * Address Manager
@@ -133,13 +95,16 @@ btc_addrman_is_banned(btc_addrman_t *man, const btc_netaddr_t *addr);
 BTC_EXTERN void
 btc_addrman_clear_banned(btc_addrman_t *man);
 
-BTC_EXTERN const btc_netaddr_t *
+BTC_EXTERN const btc_addrent_t *
 btc_addrman_get(btc_addrman_t *man);
 
-BTC_EXTERN void
+BTC_EXTERN int
 btc_addrman_add(btc_addrman_t *man,
                 const btc_netaddr_t *addr,
                 const btc_netaddr_t *src);
+
+BTC_EXTERN int
+btc_addrman_remove(btc_addrman_t *man, const btc_netaddr_t *addr);
 
 BTC_EXTERN void
 btc_addrman_mark_attempt(btc_addrman_t *man,
@@ -152,7 +117,7 @@ btc_addrman_mark_success(btc_addrman_t *man,
 BTC_EXTERN void
 btc_addrman_mark_ack(btc_addrman_t *man,
                      const btc_netaddr_t *addr,
-                     int64_t services);
+                     uint64_t services);
 
 BTC_EXTERN int
 btc_addrman_has_local(btc_addrman_t *man,
@@ -162,12 +127,12 @@ BTC_EXTERN const btc_netaddr_t *
 btc_addrman_get_local(btc_addrman_t *man,
                       const btc_netaddr_t *src);
 
-BTC_EXTERN void
+BTC_EXTERN int
 btc_addrman_add_local(btc_addrman_t *man,
                       const btc_netaddr_t *addr,
-                      enum btc_score score);
+                      int score);
 
-BTC_EXTERN void
+BTC_EXTERN int
 btc_addrman_mark_local(btc_addrman_t *man,
                        const btc_netaddr_t *addr);
 
