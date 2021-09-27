@@ -198,6 +198,7 @@ set(tests # crypto
           siphash
           # lib
           address
+          array
           base58
           bech32
           block
@@ -206,6 +207,8 @@ set(tests # crypto
           entry
           header
           input
+          "list"
+          map
           mpi
           murmur3
           netaddr
