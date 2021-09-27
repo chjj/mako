@@ -32,6 +32,9 @@ btc_outpoint_clear(btc_outpoint_t *z);
 BTC_EXTERN void
 btc_outpoint_copy(btc_outpoint_t *z, const btc_outpoint_t *x);
 
+BTC_EXTERN void
+btc_outpoint_set(btc_outpoint_t *z, const uint8_t *hash, uint32_t index);
+
 BTC_EXTERN uint32_t
 btc_outpoint_hash(const btc_outpoint_t *x);
 

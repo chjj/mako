@@ -1500,6 +1500,7 @@ btc_peer_flush_data(btc_peer_t *peer) {
   btc_notfound_t nf;
   int blk_count = 0;
   int tx_count = 0;
+  int cmpct_count = 0;
   int64_t unknown = -1;
   uint32_t type;
   size_t size;
@@ -1530,7 +1531,7 @@ btc_peer_flush_data(btc_peer_t *peer) {
       const btc_entry_t *entry = btc_chain_by_hash(chain, item->hash);
 
       /* Maybe fall back to full block. */
-      if (entry != NULL && entry->height < btc_chain_tip(chain)->height - 10)
+      if (entry != NULL && entry->height < btc_chain_height(chain) - 10)
         type = peer->compact_witness ? BTC_INV_WITNESS_BLOCK : BTC_INV_BLOCK;
     }
 
@@ -1607,6 +1608,7 @@ btc_peer_flush_data(btc_peer_t *peer) {
         btc_invitem_destroy(item);
 
         blk_count += 1;
+        cmpct_count += 1;
 
         break;
       }
@@ -1657,7 +1659,7 @@ btc_peer_flush_data(btc_peer_t *peer) {
   if (blk_count > 0) {
     btc_peer_log(peer,
       "Served %d blocks with getdata (notfound=%zu, cmpct=%d) (%N).",
-      blk_count, nf.length, 0, &peer->addr);
+      blk_count, nf.length, cmpct_count, &peer->addr);
   }
 
   if (tx_count > 0) {
@@ -3470,7 +3472,6 @@ btc_pool_on_block(struct btc_pool_s *pool,
 
 static void
 btc_pool_on_tx(struct btc_pool_s *pool, btc_peer_t *peer, const btc_tx_t *tx) {
-  btc_vector_t missing;
   uint8_t hash[32];
 
   btc_tx_txid(hash, tx);
@@ -3482,26 +3483,23 @@ btc_pool_on_tx(struct btc_pool_s *pool, btc_peer_t *peer, const btc_tx_t *tx) {
     return;
   }
 
-  btc_vector_init(&missing);
-
-  if (!btc_mempool_add(pool->mempool, &missing, tx, peer->id)) {
+  if (!btc_mempool_add(pool->mempool, tx, hash, peer->id)) {
     btc_peer_reject(peer, "tx", btc_mempool_error(pool->mempool));
-    btc_vector_clear(&missing);
     return;
   }
 
-  if (missing.length > 0) {
+  if (btc_mempool_has_orphan(pool->mempool, hash)) {
+    btc_vector_t *missing = btc_mempool_missing(pool->mempool, tx);
+
     btc_pool_log(pool, "Requesting %zu missing transactions (%N).",
-                       missing.length, &peer->addr);
+                       missing->length, &peer->addr);
 
-    /* Must be an invitem vector. */
-    btc_pool_get_tx(pool, peer, &missing);
-    btc_vector_clear(&missing);
+    /* TODO: account for hashes. */
+    btc_pool_get_tx(pool, peer, missing);
+    btc_vector_destroy(missing);
 
     return;
   }
-
-  btc_vector_clear(&missing);
 
   btc_pool_announce(pool, BTC_INV_TX, hash);
 }
@@ -3718,7 +3716,7 @@ btc_pool_on_getblocktxn(struct btc_pool_s *pool,
     return;
   }
 
-  if (entry->height < btc_chain_tip(pool->chain)->height - 15) {
+  if (entry->height < btc_chain_height(pool->chain) - 15) {
     btc_pool_log(pool, "Peer sent a getblocktxn for a block > 15 deep (%N)",
                        &peer->addr);
     return;

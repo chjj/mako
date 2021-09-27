@@ -52,7 +52,8 @@ BTC_EXTERN void
 btc_mempool_on_tx(btc_mempool_t *mp, btc_mempool_tx_cb *handler);
 
 BTC_EXTERN void
-btc_mempool_on_badorphan(btc_mempool_t *mp, btc_mempool_badorphan_cb *handler);
+btc_mempool_on_badorphan(btc_mempool_t *mp,
+                         btc_mempool_badorphan_cb *handler);
 
 BTC_EXTERN void
 btc_mempool_set_context(btc_mempool_t *mp, void *arg);
@@ -63,8 +64,11 @@ btc_mempool_open(btc_mempool_t *mp);
 BTC_EXTERN void
 btc_mempool_close(btc_mempool_t *mp);
 
-BTC_EXTERN const btc_verify_error_t *
-btc_mempool_error(btc_mempool_t *mp);
+BTC_EXTERN int
+btc_mempool_add(btc_mempool_t *mp,
+                const btc_tx_t *tx,
+                const uint8_t *hash,
+                unsigned int id);
 
 BTC_EXTERN void
 btc_mempool_add_block(btc_mempool_t *mp,
@@ -79,11 +83,8 @@ btc_mempool_remove_block(btc_mempool_t *mp,
 BTC_EXTERN void
 btc_mempool_handle_reorg(btc_mempool_t *mp);
 
-BTC_EXTERN int
-btc_mempool_add(btc_mempool_t *mp,
-                btc_vector_t *missing,
-                const btc_tx_t *tx,
-                unsigned int id);
+BTC_EXTERN const btc_verify_error_t *
+btc_mempool_error(btc_mempool_t *mp);
 
 BTC_EXTERN int
 btc_mempool_has(btc_mempool_t *mp, const uint8_t *hash);
@@ -92,40 +93,19 @@ BTC_EXTERN const btc_mpentry_t *
 btc_mempool_get(btc_mempool_t *mp, const uint8_t *hash);
 
 BTC_EXTERN int
+btc_mempool_has_orphan(btc_mempool_t *mp, const uint8_t *hash);
+
+BTC_EXTERN int
 btc_mempool_has_reject(btc_mempool_t *mp, const uint8_t *hash);
+
+BTC_EXTERN btc_vector_t *
+btc_mempool_missing(btc_mempool_t *mp, const btc_tx_t *tx);
 
 BTC_EXTERN void
 btc_mempool_iterate(btc_mpiter_t *iter, btc_mempool_t *mp);
 
 BTC_EXTERN int
 btc_mempool_next(const btc_mpentry_t **entry, btc_mpiter_t *iter);
-
-/**
- * Mempool Entry
- */
-
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_mpentry, BTC_EXTERN)
-
-BTC_EXTERN void
-btc_mpentry_init(btc_mpentry_t *entry);
-
-BTC_EXTERN void
-btc_mpentry_clear(btc_mpentry_t *entry);
-
-BTC_EXTERN void
-btc_mpentry_copy(btc_mpentry_t *z, const btc_mpentry_t *x);
-
-BTC_EXTERN void
-btc_mpentry_set(btc_mpentry_t *z, const btc_tx_t *tx);
-
-BTC_EXTERN size_t
-btc_mpentry_size(const btc_mpentry_t *x);
-
-BTC_EXTERN uint8_t *
-btc_mpentry_write(uint8_t *zp, const btc_mpentry_t *x);
-
-BTC_EXTERN int
-btc_mpentry_read(btc_mpentry_t *z, const uint8_t **xp, size_t *xn);
 
 #ifdef __cplusplus
 }

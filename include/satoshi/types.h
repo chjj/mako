@@ -241,11 +241,9 @@ typedef struct btc_mpentry_s {
   int32_t height;
   uint32_t size;
   uint32_t sigops;
-  double priority;
   int64_t fee;
   int64_t delta_fee;
   int64_t time;
-  int64_t value;
   uint8_t coinbase;
   uint8_t dependencies;
   int64_t desc_fee;

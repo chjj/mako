@@ -36,6 +36,12 @@ btc_outpoint_copy(btc_outpoint_t *z, const btc_outpoint_t *x) {
   z->index = x->index;
 }
 
+void
+btc_outpoint_set(btc_outpoint_t *z, const uint8_t *hash, uint32_t index) {
+  memcpy(z->hash, hash, 32);
+  z->index = index;
+}
+
 uint32_t
 btc_outpoint_hash(const btc_outpoint_t *x) {
   uint8_t tmp[36];
