@@ -508,8 +508,8 @@ btc_tx_sign_input(btc_tx_t *tx,
     return 0;
   }
 
-  btc_ripemd160(hash65, pub65, 65);
-  btc_ripemd160(hash33, pub33, 33);
+  btc_hash160(hash65, pub65, 65);
+  btc_hash160(hash33, pub33, 33);
 
   if (btc_script_get_p2pkh(hash, script)) {
     if (memcmp(hash, hash33, 20) == 0 || memcmp(hash, hash65, 20) == 0) {
