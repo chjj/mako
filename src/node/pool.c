@@ -60,9 +60,9 @@ enum btc_peer_state {
  * Types
  */
 
-typedef void parser_on_msg_cb(btc_msg_t *msg, void *arg);
+typedef void btc_parser_on_msg_cb(btc_msg_t *msg, void *arg);
 
-typedef struct parser_s {
+typedef struct btc_parser_s {
   uint32_t magic;
   uint8_t *pending;
   size_t alloc;
@@ -73,9 +73,9 @@ typedef struct parser_s {
   int has_header;
   uint32_t checksum;
   /* Callback */
-  parser_on_msg_cb *on_msg;
+  btc_parser_on_msg_cb *on_msg;
   void *arg;
-} parser_t;
+} btc_parser_t;
 
 typedef struct btc_sendqueue_s {
   btc_invitem_t *head;
@@ -89,7 +89,7 @@ typedef struct btc_peer_s {
   btc_logger_t *logger;
   btc_loop_t *loop;
   btc_socket_t *socket;
-  parser_t parser;
+  btc_parser_t parser;
   btc_sendqueue_t sending;
   enum btc_peer_state state;
   unsigned int id;
@@ -227,7 +227,7 @@ btc_nonces_remove(btc_nonces_t *list, uint64_t nonce) {
  */
 
 static void
-parser_init(parser_t *parser, uint32_t magic) {
+btc_parser_init(btc_parser_t *parser, uint32_t magic) {
   parser->magic = magic;
   parser->pending = NULL;
   parser->alloc = 0;
@@ -241,7 +241,7 @@ parser_init(parser_t *parser, uint32_t magic) {
 }
 
 static void
-parser_clear(parser_t *parser) {
+btc_parser_clear(btc_parser_t *parser) {
   if (parser->alloc > 0)
     btc_free(parser->pending);
 
@@ -249,13 +249,15 @@ parser_clear(parser_t *parser) {
 }
 
 static void
-parser_on_msg(parser_t *parser, parser_on_msg_cb *handler, void *arg) {
+btc_parser_on_msg(btc_parser_t *parser,
+                  btc_parser_on_msg_cb *handler,
+                  void *arg) {
   parser->on_msg = handler;
   parser->arg = arg;
 }
 
 static uint8_t *
-parser_append(parser_t *parser, const uint8_t *data, size_t length) {
+btc_parser_append(btc_parser_t *parser, const uint8_t *data, size_t length) {
   if (parser->total + length > parser->alloc) {
     void *ptr = btc_realloc(parser->pending, parser->total + length);
 
@@ -272,7 +274,7 @@ parser_append(parser_t *parser, const uint8_t *data, size_t length) {
 }
 
 static int
-parser_parse_header(parser_t *parser, const uint8_t *data) {
+btc_parser_parse_header(btc_parser_t *parser, const uint8_t *data) {
   size_t i, size;
 
   if (read32le(data) != parser->magic)
@@ -300,7 +302,7 @@ parser_parse_header(parser_t *parser, const uint8_t *data) {
 }
 
 static int
-parser_parse(parser_t *parser, const uint8_t *data, size_t length) {
+btc_parser_parse(btc_parser_t *parser, const uint8_t *data, size_t length) {
   uint8_t hash[32];
   btc_msg_t *msg;
 
@@ -308,7 +310,7 @@ parser_parse(parser_t *parser, const uint8_t *data, size_t length) {
 
   if (!parser->has_header) {
     CHECK(length == 24);
-    return parser_parse_header(parser, data);
+    return btc_parser_parse_header(parser, data);
   }
 
   btc_hash256(hash, data, length);
@@ -339,15 +341,15 @@ parser_parse(parser_t *parser, const uint8_t *data, size_t length) {
 }
 
 static int
-parser_feed(parser_t *parser, const uint8_t *data, size_t length) {
-  uint8_t *ptr = parser_append(parser, data, length);
+btc_parser_feed(btc_parser_t *parser, const uint8_t *data, size_t length) {
+  uint8_t *ptr = btc_parser_append(parser, data, length);
   size_t len = parser->total;
   size_t wait;
 
   while (len >= parser->waiting) {
     wait = parser->waiting;
 
-    if (!parser_parse(parser, ptr, wait)) {
+    if (!btc_parser_parse(parser, ptr, wait)) {
       parser->total = len;
       return 0;
     }
@@ -476,8 +478,8 @@ btc_peer_create(struct btc_pool_s *pool) {
   peer->gb_time = -1;
   peer->gh_time = -1;
 
-  parser_init(&peer->parser, peer->network->magic);
-  parser_on_msg(&peer->parser, on_msg, peer);
+  btc_parser_init(&peer->parser, peer->network->magic);
+  btc_parser_on_msg(&peer->parser, on_msg, peer);
 
   btc_inv_init(&peer->inv_queue);
 
@@ -502,7 +504,7 @@ btc_peer_destroy(btc_peer_t *peer) {
   btc_hashtabiter_t tabit;
   btc_hashmapiter_t mapit;
 
-  parser_clear(&peer->parser);
+  btc_parser_clear(&peer->parser);
 
   btc_peer_clear_data(peer);
 
@@ -1431,7 +1433,7 @@ static void
 btc_peer_on_data(btc_peer_t *peer, const uint8_t *data, size_t size) {
   peer->last_recv = btc_ms();
 
-  if (!parser_feed(&peer->parser, data, size)) {
+  if (!btc_parser_feed(&peer->parser, data, size)) {
     btc_peer_log(peer, "Parse error (%N).", &peer->addr);
     btc_peer_increase_ban(peer, 10);
   }
