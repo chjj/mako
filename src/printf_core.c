@@ -368,9 +368,10 @@ btc_date(char *z, int64_t x) {
 }
 
 static int
-btc_value(char *z, int64_t x) {
+btc_value(char *z, int64_t x, const state_t *st) {
   uint64_t hi, lo;
   char *s = z;
+  int prec;
 
   if (x < 0) {
     *z++ = '-';
@@ -380,11 +381,21 @@ btc_value(char *z, int64_t x) {
   hi = (uint64_t)x / 100000000;
   lo = (uint64_t)x % 100000000;
 
+  if (st != NULL && (st->flags & PRINTF_PRECISION)) {
+    prec = 8 - st->prec;
+
+    if (prec < 0)
+      prec = 0;
+
+    while (prec--)
+      lo /= 10;
+  }
+
   z += btc_unsigned(z, hi, NULL);
 
   if (lo != 0) {
     *z++ = '.';
-    z += btc_unsigned(z, lo, NULL);
+    z += btc_unsigned(z, lo, st);
   }
 
   return z - s;
@@ -627,7 +638,7 @@ btc_printf_core(state_t *st, const char *fmt, va_list ap) {
           case 'v': {
             /* bitcoin amount */
             state_grow(st, 22);
-            st->ptr += btc_value(st->ptr, va_arg(ap, int64_t));
+            st->ptr += btc_value(st->ptr, va_arg(ap, int64_t), st);
             st->state = PRINTF_STATE_NONE;
             break;
           }
