@@ -14,6 +14,7 @@
 #include <satoshi/header.h>
 #include <satoshi/script.h>
 #include <satoshi/tx.h>
+#include <satoshi/util.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -63,7 +64,7 @@ btc_block_merkle_root(uint8_t *root, const btc_block_t *blk) {
   CHECK(hashes != NULL);
 
   for (i = 0; i < length; i++)
-    memcpy(&hashes[i * 32], blk->txs.items[i]->hash, 32);
+    btc_hash_copy(&hashes[i * 32], blk->txs.items[i]->hash);
 
   ret = btc_merkle_root(root, hashes, length);
 
@@ -81,10 +82,10 @@ btc_block_witness_root(uint8_t *root, const btc_block_t *blk) {
 
   CHECK(hashes != NULL);
 
-  memset(hashes, 0, 32);
+  btc_hash_init(&hashes[0 * 32]);
 
   for (i = 1; i < length; i++)
-    memcpy(&hashes[i * 32], blk->txs.items[i]->whash, 32);
+    btc_hash_copy(&hashes[i * 32], blk->txs.items[i]->whash);
 
   ret = btc_merkle_root(root, hashes, length);
 
@@ -160,7 +161,7 @@ btc_block_get_commitment_hash(uint8_t *hash, const btc_block_t *blk) {
 
 #define THROW(r, s) do {      \
   if (err != NULL) {          \
-    memset(err->hash, 0, 32); \
+    btc_hash_init(err->hash); \
     err->code = "invalid";    \
     err->reason = (r);        \
     err->score = (s);         \
@@ -192,7 +193,7 @@ btc_block_check_body(btc_verify_error_t *err, const btc_block_t *blk) {
     THROW("bad-txns-duplicate", 100);
 
   /* Check merkle root. */
-  if (memcmp(blk->header.merkle_root, root, 32) != 0)
+  if (!btc_hash_equal(blk->header.merkle_root, root))
     THROW("bad-txnmrklroot", 100);
 
   /* Test all transactions. */

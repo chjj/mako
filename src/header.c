@@ -22,8 +22,8 @@ DEFINE_SERIALIZABLE_OBJECT(btc_header, SCOPE_EXTERN)
 void
 btc_header_init(btc_header_t *z) {
   z->version = 0;
-  memset(z->prev_block, 0, 32);
-  memset(z->merkle_root, 0, 32);
+  btc_hash_init(z->prev_block);
+  btc_hash_init(z->merkle_root);
   z->time = 0;
   z->bits = 0;
   z->nonce = 0;
@@ -37,8 +37,8 @@ btc_header_clear(btc_header_t *z) {
 void
 btc_header_copy(btc_header_t *z, const btc_header_t *x) {
   z->version = x->version;
-  memcpy(z->prev_block, x->prev_block, 32);
-  memcpy(z->merkle_root, x->merkle_root, 32);
+  btc_hash_copy(z->prev_block, x->prev_block);
+  btc_hash_copy(z->merkle_root, x->merkle_root);
   z->time = x->time;
   z->bits = x->bits;
   z->nonce = x->nonce;

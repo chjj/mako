@@ -302,7 +302,7 @@ btc_invitem_equal(const btc_invitem_t *x, const btc_invitem_t *y) {
   if (btc_invitem_type(x) != btc_invitem_type(y))
     return 0;
 
-  if (memcmp(x->hash, y->hash, 32) != 0)
+  if (!btc_hash_equal(x->hash, y->hash))
     return 0;
 
   return 1;

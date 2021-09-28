@@ -133,7 +133,7 @@ btc_tx_sighash_v0(uint8_t *hash,
     /* Bitcoind used to return 1 as an error code:
        it ended up being treated like a hash. */
     if (index >= tx->outputs.length) {
-      memset(hash, 0, 32);
+      btc_hash_init(hash);
       hash[0] = 0x01;
       return;
     }
@@ -262,13 +262,13 @@ btc_tx_sighash_v1(uint8_t *hash,
   btc_hash256_t ctx;
   size_t i;
 
-  memset(prevouts, 0, 32);
-  memset(sequences, 0, 32);
-  memset(outputs, 0, 32);
+  btc_hash_init(prevouts);
+  btc_hash_init(sequences);
+  btc_hash_init(outputs);
 
   if (!(type & BTC_SIGHASH_ANYONECANPAY)) {
     if (cache != NULL && cache->has_prevouts) {
-      memcpy(prevouts, cache->prevouts, 32);
+      btc_hash_copy(prevouts, cache->prevouts);
     } else {
       btc_hash256_init(&ctx);
 
@@ -278,7 +278,7 @@ btc_tx_sighash_v1(uint8_t *hash,
       btc_hash256_final(&ctx, prevouts);
 
       if (cache != NULL) {
-        memcpy(cache->prevouts, prevouts, 32);
+        btc_hash_copy(cache->prevouts, prevouts);
         cache->has_prevouts = 1;
       }
     }
@@ -288,7 +288,7 @@ btc_tx_sighash_v1(uint8_t *hash,
       && (type & 0x1f) != BTC_SIGHASH_SINGLE
       && (type & 0x1f) != BTC_SIGHASH_NONE) {
     if (cache != NULL && cache->has_sequences) {
-      memcpy(sequences, cache->sequences, 32);
+      btc_hash_copy(sequences, cache->sequences);
     } else {
       btc_hash256_init(&ctx);
 
@@ -298,7 +298,7 @@ btc_tx_sighash_v1(uint8_t *hash,
       btc_hash256_final(&ctx, sequences);
 
       if (cache != NULL) {
-        memcpy(cache->sequences, sequences, 32);
+        btc_hash_copy(cache->sequences, sequences);
         cache->has_sequences = 1;
       }
     }
@@ -307,7 +307,7 @@ btc_tx_sighash_v1(uint8_t *hash,
   if ((type & 0x1f) != BTC_SIGHASH_SINGLE
       && (type & 0x1f) != BTC_SIGHASH_NONE) {
     if (cache != NULL && cache->has_outputs) {
-      memcpy(outputs, cache->outputs, 32);
+      btc_hash_copy(outputs, cache->outputs);
     } else {
       btc_hash256_init(&ctx);
 
@@ -317,7 +317,7 @@ btc_tx_sighash_v1(uint8_t *hash,
       btc_hash256_final(&ctx, outputs);
 
       if (cache != NULL) {
-        memcpy(cache->outputs, outputs, 32);
+        btc_hash_copy(cache->outputs, outputs);
         cache->has_outputs = 1;
       }
     }
@@ -841,7 +841,7 @@ btc_tx_has_duplicate_inputs(const btc_tx_t *tx) {
 
 #define THROW(r, s, v) do {   \
   if (err != NULL) {          \
-    memset(err->hash, 0, 32); \
+    btc_hash_init(err->hash); \
     err->code = "invalid";    \
     err->reason = (r);        \
     err->score = (s);         \

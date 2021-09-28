@@ -11,6 +11,7 @@
 #include <satoshi/entry.h>
 #include <satoshi/header.h>
 #include <satoshi/mpi.h>
+#include <satoshi/util.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -22,7 +23,7 @@ DEFINE_SERIALIZABLE_OBJECT(btc_entry, SCOPE_EXTERN)
 
 void
 btc_entry_init(btc_entry_t *z) {
-  memset(z->hash, 0, 32);
+  btc_hash_init(z->hash);
   btc_header_init(&z->header);
   z->height = 0;
   memset(z->chainwork, 0, 32);
@@ -41,7 +42,7 @@ btc_entry_clear(btc_entry_t *z) {
 
 void
 btc_entry_copy(btc_entry_t *z, const btc_entry_t *x) {
-  memcpy(z->hash, x->hash, 32);
+  btc_hash_copy(z->hash, x->hash);
   btc_header_copy(&z->header, &x->header);
   z->height = x->height;
   memcpy(z->chainwork, x->chainwork, 32);

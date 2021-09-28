@@ -153,7 +153,7 @@ btc_view_ensure(btc__view_t *view, const uint8_t *hash) {
   } else {
     coins = btc_coins_create();
 
-    memcpy(coins->hash, hash, 32);
+    btc_hash_copy(coins->hash, hash);
 
     kh_key(view->map, it) = coins->hash;
     kh_value(view->map, it) = coins;

@@ -7,9 +7,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <satoshi/crypto/hash.h>
 #include <satoshi/tx.h>
 #include <satoshi/util.h>
-#include <satoshi/crypto/hash.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -21,7 +21,7 @@ DEFINE_SERIALIZABLE_OBJECT(btc_outpoint, SCOPE_EXTERN)
 
 void
 btc_outpoint_init(btc_outpoint_t *z) {
-  memset(z->hash, 0, 32);
+  btc_hash_init(z->hash);
   z->index = (uint32_t)-1;
 }
 
@@ -32,13 +32,13 @@ btc_outpoint_clear(btc_outpoint_t *z) {
 
 void
 btc_outpoint_copy(btc_outpoint_t *z, const btc_outpoint_t *x) {
-  memcpy(z->hash, x->hash, 32);
+  btc_hash_copy(z->hash, x->hash);
   z->index = x->index;
 }
 
 void
 btc_outpoint_set(btc_outpoint_t *z, const uint8_t *hash, uint32_t index) {
-  memcpy(z->hash, hash, 32);
+  btc_hash_copy(z->hash, hash);
   z->index = index;
 }
 
@@ -54,7 +54,7 @@ btc_outpoint_equal(const btc_outpoint_t *x, const btc_outpoint_t *y) {
   if (x->index != y->index)
     return 0;
 
-  if (memcmp(x->hash, y->hash, 32) != 0)
+  if (!btc_hash_equal(x->hash, y->hash))
     return 0;
 
   return 1;
