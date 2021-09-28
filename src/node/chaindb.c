@@ -1430,7 +1430,7 @@ btc_chaindb_has_coins(struct btc_chaindb_s *db, const btc_tx_t *tx) {
 
   CHECK(mdb_txn_begin(db->env, NULL, MDB_RDONLY, &txn) == 0);
 
-  btc_tx_txid(key, tx);
+  btc_raw_write(key, tx->hash, 32);
 
   for (i = 0; i < tx->outputs.length; i++) {
     btc_uint32_write(key + 32, i);

@@ -3472,23 +3472,19 @@ btc_pool_on_block(struct btc_pool_s *pool,
 
 static void
 btc_pool_on_tx(struct btc_pool_s *pool, btc_peer_t *peer, const btc_tx_t *tx) {
-  uint8_t hash[32];
-
-  btc_tx_txid(hash, tx);
-
-  if (!btc_pool_resolve_tx(pool, peer, hash)) {
+  if (!btc_pool_resolve_tx(pool, peer, tx->hash)) {
     btc_pool_log(pool, "Peer sent unrequested tx: %x (%s).",
-                       hash, &peer->addr);
+                       tx->hash, &peer->addr);
     btc_peer_close(peer);
     return;
   }
 
-  if (!btc_mempool_add(pool->mempool, tx, hash, peer->id)) {
+  if (!btc_mempool_add(pool->mempool, tx, peer->id)) {
     btc_peer_reject(peer, "tx", btc_mempool_error(pool->mempool));
     return;
   }
 
-  if (btc_mempool_has_orphan(pool->mempool, hash)) {
+  if (btc_mempool_has_orphan(pool->mempool, tx->hash)) {
     btc_vector_t *missing = btc_mempool_missing(pool->mempool, tx);
 
     btc_pool_log(pool, "Requesting %zu missing transactions (%N).",
@@ -3501,7 +3497,7 @@ btc_pool_on_tx(struct btc_pool_s *pool, btc_peer_t *peer, const btc_tx_t *tx) {
     return;
   }
 
-  btc_pool_announce(pool, BTC_INV_TX, hash);
+  btc_pool_announce(pool, BTC_INV_TX, tx->hash);
 }
 
 static void

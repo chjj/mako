@@ -38,7 +38,7 @@
  */
 
 typedef struct btc_orphan_s {
-  uint8_t hash[32];
+  const uint8_t *hash;
   btc_tx_t *tx;
   int missing;
   unsigned int id;
@@ -74,9 +74,8 @@ static void
 btc_mpentry_init(btc_mpentry_t *entry) {
   btc_tx_init(&entry->tx);
 
-  memset(entry->hash, 0, 32);
-  memset(entry->whash, 0, 32);
-
+  entry->hash = entry->tx.hash;
+  entry->whash = entry->tx.whash;
   entry->height = -1;
   entry->size = 0;
   entry->sigops = 0;
@@ -98,9 +97,8 @@ static void
 btc_mpentry_copy(btc_mpentry_t *z, const btc_mpentry_t *x) {
   btc_tx_copy(&z->tx, &x->tx);
 
-  memcpy(z->hash, x->hash, 32);
-  memcpy(z->whash, x->whash, 32);
-
+  z->hash = z->tx.hash;
+  z->whash = z->tx.whash;
   z->height = x->height;
   z->size = x->size;
   z->sigops = x->sigops;
@@ -116,7 +114,6 @@ btc_mpentry_copy(btc_mpentry_t *z, const btc_mpentry_t *x) {
 static void
 btc_mpentry_set(btc_mpentry_t *entry,
                 const btc_tx_t *tx,
-                const uint8_t *hash,
                 btc_view_t *view,
                 int32_t height) {
   unsigned int flags = BTC_SCRIPT_STANDARD_VERIFY_FLAGS;
@@ -129,12 +126,8 @@ btc_mpentry_set(btc_mpentry_t *entry,
 
   btc_tx_copy(&entry->tx, tx);
 
-  if (hash != NULL)
-    btc_hash_copy(entry->hash, hash);
-  else
-    btc_tx_txid(entry->hash, tx);
-
-  btc_tx_wtxid(entry->whash, tx);
+  entry->hash = entry->tx.hash;
+  entry->whash = entry->tx.whash;
 
   for (i = 0; i < tx->inputs.length; i++) {
     const btc_input_t *input = tx->inputs.items[i];
@@ -205,8 +198,8 @@ btc_mpentry_read(btc_mpentry_t *z, const uint8_t **xp, size_t *xn) {
   if (!btc_uint8_read(&z->dependencies, xp, xn))
     return 0;
 
-  btc_tx_txid(z->hash, &z->tx);
-  btc_tx_wtxid(z->whash, &z->tx);
+  z->hash = z->tx.hash;
+  z->whash = z->tx.whash;
 
   return 1;
 }
@@ -328,12 +321,12 @@ btc_mempool_close(struct btc_mempool_s *mp) {
 
 static int
 btc_mempool_throw(struct btc_mempool_s *mp,
-                  const uint8_t *hash,
+                  const btc_tx_t *tx,
                   const char *code,
                   const char *reason,
                   int score,
                   int malleated) {
-  btc_hash_copy(mp->error.hash, hash);
+  btc_hash_copy(mp->error.hash, tx->hash);
 
   mp->error.code = code;
   mp->error.reason = reason;
@@ -342,7 +335,7 @@ btc_mempool_throw(struct btc_mempool_s *mp,
 
   btc_mempool_log(mp, "Verification error: %s "
                       "(code=%s score=%d hash=%H)",
-                  reason, code, score, hash);
+                  reason, code, score, tx->hash);
 
   return 0;
 }
@@ -436,7 +429,6 @@ btc_mempool_should_orphan(struct btc_mempool_s *mp,
 static int
 btc_mempool_check_orphan(struct btc_mempool_s *mp,
                          const btc_tx_t *tx,
-                         const uint8_t *hash,
                          btc_view_t *view) {
   size_t i;
 
@@ -448,8 +440,9 @@ btc_mempool_check_orphan(struct btc_mempool_s *mp,
       continue;
 
     if (btc_mempool_has_reject(mp, prevout->hash)) {
-      btc_mempool_log(mp, "Not storing orphan %H (rejected parents).", hash);
-      return btc_mempool_throw(mp, hash,
+      btc_mempool_log(mp, "Not storing orphan %H (rejected parents).",
+                          tx->hash);
+      return btc_mempool_throw(mp, tx,
                                "duplicate",
                                "duplicate",
                                100,
@@ -457,8 +450,9 @@ btc_mempool_check_orphan(struct btc_mempool_s *mp,
     }
 
     if (btc_mempool_has(mp, prevout->hash)) {
-      btc_mempool_log(mp, "Not storing orphan %H (non-existent output).", hash);
-      return btc_mempool_throw(mp, hash,
+      btc_mempool_log(mp, "Not storing orphan %H (non-existent output).",
+                          tx->hash);
+      return btc_mempool_throw(mp, tx,
                                "invalid",
                                "bad-txns-inputs-missingorspent",
                                100,
@@ -468,8 +462,8 @@ btc_mempool_check_orphan(struct btc_mempool_s *mp,
 
   /* Weight limit for orphans. */
   if (btc_tx_weight(tx) > BTC_MAX_TX_WEIGHT) {
-    btc_mempool_log(mp, "Ignoring large orphan %H.", hash);
-    return btc_mempool_throw(mp, hash,
+    btc_mempool_log(mp, "Ignoring large orphan %H.", tx->hash);
+    return btc_mempool_throw(mp, tx,
                              "invalid",
                              "tx-size",
                              100,
@@ -482,7 +476,6 @@ btc_mempool_check_orphan(struct btc_mempool_s *mp,
 static void
 btc_mempool_add_orphan(struct btc_mempool_s *mp,
                        const btc_tx_t *tx,
-                       const uint8_t *hash,
                        btc_view_t *view,
                        unsigned int id) {
   btc_orphan_t *orphan = btc_orphan_create();
@@ -490,9 +483,8 @@ btc_mempool_add_orphan(struct btc_mempool_s *mp,
   btc_hashsetiter_t iter;
   size_t i;
 
-  btc_hash_copy(orphan->hash, hash);
-
   orphan->tx = btc_tx_clone(tx);
+  orphan->hash = orphan->tx->hash;
   orphan->missing = 0;
   orphan->id = id;
 
@@ -522,7 +514,7 @@ btc_mempool_add_orphan(struct btc_mempool_s *mp,
 
   CHECK(btc_hashmap_put(mp->orphans, orphan->hash, orphan));
 
-  btc_mempool_log(mp, "Added orphan %H to mempool.", hash);
+  btc_mempool_log(mp, "Added orphan %H to mempool.", tx->hash);
 }
 
 static btc_vector_t *
@@ -572,7 +564,7 @@ btc_mempool_handle_orphans(struct btc_mempool_s *mp, const uint8_t *parent) {
 
     btc_hash_copy(hash, orphan->hash);
 
-    if (!btc_mempool_add(mp, orphan->tx, orphan->hash, orphan->id)) {
+    if (!btc_mempool_add(mp, orphan->tx, orphan->id)) {
       btc_mempool_log(mp, "Could not resolve orphan %H.", hash);
       btc_orphan_destroy(orphan);
       continue;
@@ -853,7 +845,6 @@ btc_mempool_verify_inputs(struct btc_mempool_s *mp,
                           const btc_mpentry_t *entry,
                           btc_view_t *view,
                           unsigned int flags) {
-  const uint8_t *hash = entry->hash;
   const btc_tx_t *tx = &entry->tx;
 
   if (btc_tx_verify(tx, view, flags))
@@ -863,7 +854,7 @@ btc_mempool_verify_inputs(struct btc_mempool_s *mp,
     flags &= ~BTC_SCRIPT_ONLY_STANDARD_VERIFY_FLAGS;
 
     if (btc_tx_verify(tx, view, flags)) {
-      return btc_mempool_throw(mp, hash,
+      return btc_mempool_throw(mp, tx,
                                "invalid",
                                "non-mandatory-script-verify-flag",
                                0,
@@ -871,7 +862,7 @@ btc_mempool_verify_inputs(struct btc_mempool_s *mp,
     }
   }
 
-  return btc_mempool_throw(mp, hash,
+  return btc_mempool_throw(mp, tx,
                            "invalid",
                            "mandatory-script-verify-flag-failed",
                            100,
@@ -886,7 +877,6 @@ btc_mempool_verify(struct btc_mempool_s *mp,
   const btc_deployment_state_t *state = btc_chain_state(mp->chain);
   const btc_entry_t *tip = btc_chain_tip(mp->chain);
   int32_t height = tip->height + 1;
-  const uint8_t *hash = entry->hash;
   const btc_tx_t *tx = &entry->tx;
   btc_verify_error_t err;
   unsigned int flags;
@@ -894,7 +884,7 @@ btc_mempool_verify(struct btc_mempool_s *mp,
 
   /* Verify sequence locks. */
   if (!btc_chain_verify_locks(mp->chain, tip, tx, view, lock_flags)) {
-    return btc_mempool_throw(mp, hash,
+    return btc_mempool_throw(mp, tx,
                              "nonstandard",
                              "non-BIP68-final",
                              0,
@@ -904,7 +894,7 @@ btc_mempool_verify(struct btc_mempool_s *mp,
 #if 0
   /* Check input standardness. */
   if (!btc_tx_has_standard_inputs(tx, view)) {
-    return btc_mempool_throw(mp, hash,
+    return btc_mempool_throw(mp, tx,
                              "nonstandard",
                              "bad-txns-nonstandard-inputs",
                              0,
@@ -914,7 +904,7 @@ btc_mempool_verify(struct btc_mempool_s *mp,
   /* Check witness standardness. */
   if (state->flags & BTC_SCRIPT_VERIFY_WITNESS) {
     if (!btc_tx_has_standard_witness(tx, view)) {
-      return btc_mempool_throw(mp, hash,
+      return btc_mempool_throw(mp, tx,
                                "nonstandard",
                                "bad-witness-nonstandard",
                                0,
@@ -927,7 +917,7 @@ btc_mempool_verify(struct btc_mempool_s *mp,
 
   /* Annoying process known as sigops counting. */
   if (entry->sigops > BTC_MAX_TX_SIGOPS_COST) {
-    return btc_mempool_throw(mp, hash,
+    return btc_mempool_throw(mp, tx,
                              "nonstandard",
                              "bad-txns-too-many-sigops",
                              0,
@@ -938,7 +928,7 @@ btc_mempool_verify(struct btc_mempool_s *mp,
   minfee = btc_get_min_fee(entry->size, BTC_MIN_RELAY);
 
   if (entry->fee < minfee) {
-    return btc_mempool_throw(mp, hash,
+    return btc_mempool_throw(mp, tx,
                              "insufficientfee",
                              "insufficient priority",
                              0,
@@ -947,7 +937,7 @@ btc_mempool_verify(struct btc_mempool_s *mp,
 
   /* Important safety feature. */
   if (entry->fee > minfee * 10000) {
-    return btc_mempool_throw(mp, hash,
+    return btc_mempool_throw(mp, tx,
                              "highfee",
                              "absurdly-high-fee",
                              0,
@@ -956,7 +946,7 @@ btc_mempool_verify(struct btc_mempool_s *mp,
 
   /* Check ancestor depth. */
   if (btc_mempool_count_ancestors(mp, entry) + 1 > BTC_MEMPOOL_MAX_ANCESTORS) {
-    return btc_mempool_throw(mp, hash,
+    return btc_mempool_throw(mp, tx,
                              "nonstandard",
                              "too-long-mempool-chain",
                              0,
@@ -965,7 +955,7 @@ btc_mempool_verify(struct btc_mempool_s *mp,
 
   /* Contextual sanity checks. */
   if (btc_tx_check_inputs(&err, tx, view, height) == -1) {
-    return btc_mempool_throw(mp, hash,
+    return btc_mempool_throw(mp, tx,
                              "invalid",
                              err.reason,
                              err.score,
@@ -1012,7 +1002,6 @@ btc_mempool_verify(struct btc_mempool_s *mp,
 static int
 btc_mempool_insert(struct btc_mempool_s *mp,
                    const btc_tx_t *tx,
-                   const uint8_t *hash,
                    unsigned int id) {
   const btc_deployment_state_t *state = btc_chain_state(mp->chain);
   unsigned int lock_flags = BTC_CHAIN_STANDARD_LOCKTIME_FLAGS;
@@ -1024,7 +1013,7 @@ btc_mempool_insert(struct btc_mempool_s *mp,
 
   /* Basic sanity checks. */
   if (!btc_tx_check_sanity(&err, tx)) {
-    return btc_mempool_throw(mp, hash,
+    return btc_mempool_throw(mp, tx,
                              "invalid",
                              err.reason,
                              err.score,
@@ -1033,7 +1022,7 @@ btc_mempool_insert(struct btc_mempool_s *mp,
 
   /* Coinbases are an insta-ban. */
   if (btc_tx_is_coinbase(tx)) {
-    return btc_mempool_throw(mp, hash,
+    return btc_mempool_throw(mp, tx,
                              "invalid",
                              "coinbase",
                              100,
@@ -1043,7 +1032,7 @@ btc_mempool_insert(struct btc_mempool_s *mp,
   /* Do not allow CSV until it's activated. */
   if (!(state->flags & BTC_SCRIPT_VERIFY_CHECKSEQUENCEVERIFY)) {
     if (tx->version >= 2) {
-      return btc_mempool_throw(mp, hash,
+      return btc_mempool_throw(mp, tx,
                                "nonstandard",
                                "premature-version2-tx",
                                0,
@@ -1054,7 +1043,7 @@ btc_mempool_insert(struct btc_mempool_s *mp,
   /* Do not allow segwit until it's activated. */
   if (!(state->flags & BTC_SCRIPT_VERIFY_WITNESS)) {
     if (btc_tx_has_witness(tx)) {
-      return btc_mempool_throw(mp, hash,
+      return btc_mempool_throw(mp, tx,
                                "nonstandard",
                                "no-witness-yet",
                                0,
@@ -1065,7 +1054,7 @@ btc_mempool_insert(struct btc_mempool_s *mp,
 #if 0
   /* Non-contextual standardness checks. */
   if (!btc_tx_check_standard(&err, tx)) {
-    return btc_mempool_throw(mp, hash,
+    return btc_mempool_throw(mp, tx,
                              "invalid",
                              err.reason,
                              err.score,
@@ -1075,7 +1064,7 @@ btc_mempool_insert(struct btc_mempool_s *mp,
 
   /* Verify transaction finality. */
   if (!btc_chain_verify_final(mp->chain, tip, tx, lock_flags)) {
-    return btc_mempool_throw(mp, hash,
+    return btc_mempool_throw(mp, tx,
                              "nonstandard",
                              "non-final",
                              0,
@@ -1083,8 +1072,8 @@ btc_mempool_insert(struct btc_mempool_s *mp,
   }
 
   /* We can maybe ignore this. */
-  if (btc_mempool_exists(mp, hash)) {
-    return btc_mempool_throw(mp, hash,
+  if (btc_mempool_exists(mp, tx->hash)) {
+    return btc_mempool_throw(mp, tx,
                              "alreadyknown",
                              "txn-already-in-mempool",
                              0,
@@ -1095,7 +1084,7 @@ btc_mempool_insert(struct btc_mempool_s *mp,
      non-fully-spent transaction on
      the chain. */
   if (btc_chain_has_coins(mp->chain, tx)) {
-    return btc_mempool_throw(mp, hash,
+    return btc_mempool_throw(mp, tx,
                              "alreadyknown",
                              "txn-already-known",
                              0,
@@ -1106,7 +1095,7 @@ btc_mempool_insert(struct btc_mempool_s *mp,
      not double-spending an output in the
      mempool. */
   if (btc_mempool_is_double_spend(mp, tx)) {
-    return btc_mempool_throw(mp, hash,
+    return btc_mempool_throw(mp, tx,
                              "duplicate",
                              "bad-txns-inputs-spent",
                              0,
@@ -1119,12 +1108,12 @@ btc_mempool_insert(struct btc_mempool_s *mp,
   /* Maybe store as an orphan. */
   if (btc_mempool_should_orphan(mp, tx, view)) {
     /* Preliminary orphan checks. */
-    if (!btc_mempool_check_orphan(mp, tx, hash, view)) {
+    if (!btc_mempool_check_orphan(mp, tx, view)) {
       btc_view_destroy(view);
       return 0;
     }
 
-    btc_mempool_add_orphan(mp, tx, hash, view, id);
+    btc_mempool_add_orphan(mp, tx, view, id);
     btc_view_destroy(view);
 
     return 1;
@@ -1133,7 +1122,7 @@ btc_mempool_insert(struct btc_mempool_s *mp,
   /* Create a new mempool entry at current chain height. */
   entry = btc_mpentry_create();
 
-  btc_mpentry_set(entry, tx, hash, view, height);
+  btc_mpentry_set(entry, tx, view, height);
 
   /* Contextual verification. */
   if (!btc_mempool_verify(mp, entry, view)) {
@@ -1147,8 +1136,8 @@ btc_mempool_insert(struct btc_mempool_s *mp,
   btc_view_destroy(view);
 
   /* Trim size if we're too big. */
-  if (!btc_mempool_limit_size(mp, hash)) {
-    return btc_mempool_throw(mp, hash,
+  if (!btc_mempool_limit_size(mp, tx->hash)) {
+    return btc_mempool_throw(mp, tx,
                              "insufficientfee",
                              "mempool full",
                              0,
@@ -1161,13 +1150,12 @@ btc_mempool_insert(struct btc_mempool_s *mp,
 int
 btc_mempool_add(struct btc_mempool_s *mp,
                 const btc_tx_t *tx,
-                const uint8_t *hash,
                 unsigned int id) {
-  if (!btc_mempool_insert(mp, tx, hash, id)) {
+  if (!btc_mempool_insert(mp, tx, id)) {
     const btc_verify_error_t *err = &mp->error;
 
     if (!btc_tx_has_witness(tx) && !err->malleated)
-      btc_filter_add(&mp->rejects, hash, 32);
+      btc_filter_add(&mp->rejects, tx->hash, 32);
 
     return 0;
   }
@@ -1183,7 +1171,6 @@ void
 btc_mempool_add_block(struct btc_mempool_s *mp,
                       const btc_entry_t *entry,
                       const btc_block_t *block) {
-  uint8_t hash[32];
   int total = 0;
   size_t i;
 
@@ -1196,14 +1183,12 @@ btc_mempool_add_block(struct btc_mempool_s *mp,
     const btc_tx_t *tx = block->txs.items[i];
     btc_mpentry_t *ent;
 
-    btc_tx_txid(hash, tx);
-
-    ent = btc_hashmap_get(mp->map, hash);
+    ent = btc_hashmap_get(mp->map, tx->hash);
 
     if (ent == NULL) {
-      btc_mempool_remove_orphan(mp, hash);
+      btc_mempool_remove_orphan(mp, tx->hash);
       btc_mempool_remove_double_spends(mp, tx);
-      btc_mempool_handle_orphans(mp, hash);
+      btc_mempool_handle_orphans(mp, tx->hash);
       continue;
     }
 
@@ -1226,7 +1211,6 @@ void
 btc_mempool_remove_block(struct btc_mempool_s *mp,
                          const btc_entry_t *entry,
                          const btc_block_t *block) {
-  uint8_t hash[32];
   int total = 0;
   size_t i;
 
@@ -1236,12 +1220,10 @@ btc_mempool_remove_block(struct btc_mempool_s *mp,
   for (i = 0; i < block->txs.length; i++) {
     const btc_tx_t *tx = block->txs.items[i];
 
-    btc_tx_txid(hash, tx);
-
-    if (btc_hashmap_has(mp->map, hash))
+    if (btc_hashmap_has(mp->map, tx->hash))
       continue;
 
-    total += btc_mempool_insert(mp, tx, hash, -1);
+    total += btc_mempool_insert(mp, tx, -1);
   }
 
   btc_filter_reset(&mp->rejects);

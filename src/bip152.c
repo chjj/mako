@@ -85,7 +85,6 @@ btc_cmpct_key(uint8_t *key, const btc_cmpct_t *blk) {
 
 void
 btc_cmpct_set_block(btc_cmpct_t *z, const btc_block_t *x, int witness) {
-  uint8_t hash[32];
   btc_tx_t *cb;
   size_t i;
 
@@ -102,11 +101,7 @@ btc_cmpct_set_block(btc_cmpct_t *z, const btc_block_t *x, int witness) {
 
   for (i = 1; i < x->txs.length; i++) {
     const btc_tx_t *tx = x->txs.items[i];
-
-    if (witness)
-      btc_tx_wtxid(hash, tx);
-    else
-      btc_tx_txid(hash, tx);
+    const uint8_t *hash = witness ? tx->whash : tx->hash;
 
     btc_array_push(&z->ids, btc_cmpct_sid(z, hash));
   }

@@ -255,14 +255,11 @@ btc_view_fill(btc__view_t *view,
 
 void
 btc_view_add(btc__view_t *view, const btc_tx_t *tx, int32_t height, int spent) {
-  uint8_t hash[32];
   btc_coins_t *coins;
   btc_coin_t *coin;
   size_t i;
 
-  btc_tx_txid(hash, tx);
-
-  coins = btc_view_ensure(view, hash);
+  coins = btc_view_ensure(view, tx->hash);
 
   for (i = 0; i < tx->outputs.length; i++) {
     coin = btc_tx_coin(tx, i, height);

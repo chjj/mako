@@ -156,6 +156,9 @@ BTC_EXTERN void
 btc_tx_wtxid(uint8_t *hash, const btc_tx_t *tx);
 
 BTC_EXTERN void
+btc_tx_refresh(btc_tx_t *tx);
+
+BTC_EXTERN void
 btc_tx_sighash(uint8_t *hash,
                const btc_tx_t *tx,
                size_t index,

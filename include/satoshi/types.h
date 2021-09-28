@@ -124,6 +124,8 @@ typedef struct btc_outvec_s {
 } btc_outvec_t;
 
 typedef struct btc_tx_s {
+  uint8_t hash[32];
+  uint8_t whash[32];
   uint32_t version;
   btc_inpvec_t inputs;
   btc_outvec_t outputs;
@@ -235,8 +237,8 @@ typedef struct btc_filter_s {
 } btc_filter_t;
 
 typedef struct btc_mpentry_s {
-  uint8_t hash[32];
-  uint8_t whash[32];
+  const uint8_t *hash;
+  const uint8_t *whash;
   btc_tx_t tx;
   int32_t height;
   uint32_t size;

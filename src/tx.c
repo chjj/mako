@@ -27,6 +27,8 @@ DEFINE_SERIALIZABLE_OBJECT(btc_tx, SCOPE_EXTERN)
 
 void
 btc_tx_init(btc_tx_t *tx) {
+  btc_hash_init(tx->hash);
+  btc_hash_init(tx->whash);
   tx->version = 1;
   btc_inpvec_init(&tx->inputs);
   btc_outvec_init(&tx->outputs);
@@ -41,6 +43,8 @@ btc_tx_clear(btc_tx_t *tx) {
 
 void
 btc_tx_copy(btc_tx_t *z, const btc_tx_t *x) {
+  btc_hash_copy(z->hash, x->hash);
+  btc_hash_copy(z->whash, x->whash);
   z->version = x->version;
   btc_inpvec_copy(&z->inputs, &x->inputs);
   btc_outvec_copy(&z->outputs, &x->outputs);
@@ -100,6 +104,17 @@ btc_tx_wtxid(uint8_t *hash, const btc_tx_t *tx) {
 
   btc_uint32_update(&ctx, tx->locktime);
   btc_hash256_final(&ctx, hash);
+}
+
+void
+btc_tx_refresh(btc_tx_t *tx) {
+  if (btc_tx_has_witness(tx)) {
+    btc_tx_txid(tx->hash, tx);
+    btc_tx_wtxid(tx->whash, tx);
+  } else {
+    btc_tx_txid(tx->hash, tx);
+    btc_hash_copy(tx->whash, tx->hash);
+  }
 }
 
 static void
@@ -1030,7 +1045,9 @@ btc_tx_write(uint8_t *zp, const btc_tx_t *tx) {
 
 int
 btc_tx_read(btc_tx_t *z, const uint8_t **xp, size_t *xn) {
+  const uint8_t *sp = *xp;
   unsigned int flags = 0;
+  int witness = 0;
   size_t i;
 
   if (!btc_uint32_read(&z->version, xp, xn))
@@ -1055,19 +1072,26 @@ btc_tx_read(btc_tx_t *z, const uint8_t **xp, size_t *xn) {
       if (!btc_stack_read(&z->inputs.items[i]->witness, xp, xn))
         return 0;
     }
+
+    if (!btc_tx_has_witness(z))
+      return 0;
+
+    witness = 1;
   }
 
   if (flags != 0)
     return 0;
 
-  /* We'll never be able to reserialize
-     this to get the regular txid, and
-     there's no way it's valid anyway. */
-  if (z->inputs.length == 0 && z->outputs.length != 0)
-    return 0;
-
   if (!btc_uint32_read(&z->locktime, xp, xn))
     return 0;
+
+  if (witness) {
+    btc_tx_txid(z->hash, z);
+    btc_hash256(z->whash, sp, *xp - sp);
+  } else {
+    btc_hash256(z->hash, sp, *xp - sp);
+    btc_hash_copy(z->whash, z->hash);
+  }
 
   return 1;
 }

@@ -67,7 +67,6 @@ btc_mempool_close(btc_mempool_t *mp);
 BTC_EXTERN int
 btc_mempool_add(btc_mempool_t *mp,
                 const btc_tx_t *tx,
-                const uint8_t *hash,
                 unsigned int id);
 
 BTC_EXTERN void

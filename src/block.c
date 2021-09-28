@@ -63,7 +63,7 @@ btc_block_merkle_root(uint8_t *root, const btc_block_t *blk) {
   CHECK(hashes != NULL);
 
   for (i = 0; i < length; i++)
-    btc_tx_txid(&hashes[i * 32], blk->txs.items[i]);
+    memcpy(&hashes[i * 32], blk->txs.items[i]->hash, 32);
 
   ret = btc_merkle_root(root, hashes, length);
 
@@ -84,7 +84,7 @@ btc_block_witness_root(uint8_t *root, const btc_block_t *blk) {
   memset(hashes, 0, 32);
 
   for (i = 1; i < length; i++)
-    btc_tx_wtxid(&hashes[i * 32], blk->txs.items[i]);
+    memcpy(&hashes[i * 32], blk->txs.items[i]->whash, 32);
 
   ret = btc_merkle_root(root, hashes, length);
 

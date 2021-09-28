@@ -18,6 +18,8 @@
 
 static void
 test_tx_valid_vector(const test_valid_vector_t *vec, size_t index) {
+  uint8_t hash[32];
+  uint8_t whash[32];
   btc_coin_t *coin;
   btc_view_t *view;
   btc_tx_t tx;
@@ -30,6 +32,17 @@ test_tx_valid_vector(const test_valid_vector_t *vec, size_t index) {
   view = btc_view_create();
 
   ASSERT(btc_tx_import(&tx, vec->tx_raw, vec->tx_len));
+
+  btc_tx_txid(hash, &tx);
+  btc_tx_wtxid(whash, &tx);
+
+  ASSERT(btc_hash_equal(tx.hash, hash));
+  ASSERT(btc_hash_equal(tx.whash, whash));
+
+  btc_tx_refresh(&tx);
+
+  ASSERT(btc_hash_equal(tx.hash, hash));
+  ASSERT(btc_hash_equal(tx.whash, whash));
 
   for (i = 0; i < vec->coins_len; i++) {
     coin = btc_coin_create();
@@ -51,6 +64,8 @@ test_tx_valid_vector(const test_valid_vector_t *vec, size_t index) {
 
 static void
 test_tx_invalid_vector(const test_invalid_vector_t *vec, size_t index) {
+  uint8_t hash[32];
+  uint8_t whash[32];
   btc_coin_t *coin;
   btc_view_t *view;
   btc_tx_t tx;
@@ -63,6 +78,17 @@ test_tx_invalid_vector(const test_invalid_vector_t *vec, size_t index) {
   view = btc_view_create();
 
   ASSERT(btc_tx_import(&tx, vec->tx_raw, vec->tx_len));
+
+  btc_tx_txid(hash, &tx);
+  btc_tx_wtxid(whash, &tx);
+
+  ASSERT(btc_hash_equal(tx.hash, hash));
+  ASSERT(btc_hash_equal(tx.whash, whash));
+
+  btc_tx_refresh(&tx);
+
+  ASSERT(btc_hash_equal(tx.hash, hash));
+  ASSERT(btc_hash_equal(tx.whash, whash));
 
   for (i = 0; i < vec->coins_len; i++) {
     coin = btc_coin_create();
