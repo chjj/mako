@@ -36,9 +36,7 @@ name ## _copy(name ## _t *x, const name ## _t *y);          \
                                                             \
 scope name ## _t *                                          \
 name ## _create(void) {                                     \
-  name ## _t *z = (name ## _t *)malloc(sizeof(name ## _t)); \
-                                                            \
-  CHECK(z != NULL);                                         \
+  name ## _t *z = btc_malloc(sizeof(name ## _t));           \
                                                             \
   name ## _init(z);                                         \
                                                             \
@@ -100,12 +98,7 @@ name ## _reset(name ## _t *z) {                                      \
 scope void                                                           \
 name ## _grow(name ## _t *z, size_t zn) {                            \
   if (zn > z->alloc) {                                               \
-    child ## _t **zp =                                               \
-      (child ## _t **)realloc(z->items, zn * sizeof(child ## _t *)); \
-                                                                     \
-    CHECK(zp != NULL);                                               \
-                                                                     \
-    z->items = zp;                                                   \
+    z->items = btc_realloc(z->items, zn * sizeof(child ## _t *));    \
     z->alloc = zn;                                                   \
   }                                                                  \
 }                                                                    \
@@ -184,9 +177,7 @@ name ## _export(uint8_t *zp, const name ## _t *x) {              \
 scope void                                                       \
 name ## _encode(uint8_t **zp, size_t *zn, const name ## _t *x) { \
   *zn = name ## _size(x);                                        \
-  *zp = (uint8_t *)malloc(*zn);                                  \
-                                                                 \
-  CHECK(*zp != NULL);                                            \
+  *zp = (uint8_t *)btc_malloc(*zn);                              \
                                                                  \
   name ## _export(*zp, x);                                       \
 }                                                                \

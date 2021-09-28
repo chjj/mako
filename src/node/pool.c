@@ -257,9 +257,7 @@ parser_on_msg(parser_t *parser, parser_on_msg_cb *handler, void *arg) {
 static uint8_t *
 parser_append(parser_t *parser, const uint8_t *data, size_t length) {
   if (parser->total + length > parser->alloc) {
-    void *ptr = realloc(parser->pending, parser->total + length);
-
-    CHECK(ptr != NULL);
+    void *ptr = btc_realloc(parser->pending, parser->total + length);
 
     parser->pending = (uint8_t *)ptr;
     parser->alloc = parser->total + length;

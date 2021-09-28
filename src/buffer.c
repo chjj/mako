@@ -38,11 +38,7 @@ btc_buffer_clear(btc_buffer_t *z) {
 uint8_t *
 btc_buffer_grow(btc_buffer_t *z, size_t zn) {
   if (zn > z->alloc) {
-    uint8_t *zp = (uint8_t *)realloc(z->data, zn);
-
-    CHECK(zp != NULL);
-
-    z->data = zp;
+    z->data = (uint8_t *)btc_realloc(z->data, zn);
     z->alloc = zn;
   }
 

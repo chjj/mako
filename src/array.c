@@ -41,11 +41,7 @@ btc_array_reset(btc_array_t *z) {
 void
 btc_array_grow(btc_array_t *z, size_t zn) {
   if (zn > z->alloc) {
-    int64_t *zp = (int64_t *)realloc(z->items, zn * sizeof(int64_t));
-
-    CHECK(zp != NULL);
-
-    z->items = zp;
+    z->items = (int64_t *)btc_realloc(z->items, zn * sizeof(int64_t));
     z->alloc = zn;
   }
 }

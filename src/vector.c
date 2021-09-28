@@ -41,11 +41,7 @@ btc_vector_reset(btc_vector_t *z) {
 void
 btc_vector_grow(btc_vector_t *z, size_t zn) {
   if (zn > z->alloc) {
-    void **zp = (void **)realloc(z->items, zn * sizeof(void *));
-
-    CHECK(zp != NULL);
-
-    z->items = zp;
+    z->items = (void **)btc_realloc(z->items, zn * sizeof(void *));
     z->alloc = zn;
   }
 }

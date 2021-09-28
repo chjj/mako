@@ -26,9 +26,7 @@ typedef struct btc_coins_s {
 
 static btc_coins_t *
 btc_coins_create(void) {
-  btc_coins_t *coins = (btc_coins_t *)malloc(sizeof(btc_coins_t));
-
-  CHECK(coins != NULL);
+  btc_coins_t *coins = (btc_coins_t *)btc_malloc(sizeof(btc_coins_t));
 
   coins->map = kh_init(coins);
 
@@ -97,9 +95,7 @@ typedef struct btc_view_s {
 
 btc__view_t *
 btc_view_create(void) {
-  btc__view_t *view = (btc__view_t *)malloc(sizeof(btc__view_t));
-
-  CHECK(view != NULL);
+  btc__view_t *view = (btc__view_t *)btc_malloc(sizeof(btc__view_t));
 
   view->map = kh_init(view);
 

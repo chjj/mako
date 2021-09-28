@@ -57,11 +57,9 @@ btc_block_has_witness(const btc_block_t *blk) {
 int
 btc_block_merkle_root(uint8_t *root, const btc_block_t *blk) {
   size_t length = blk->txs.length;
-  uint8_t *hashes = (uint8_t *)malloc(length * 32);
+  uint8_t *hashes = (uint8_t *)btc_malloc(length * 32);
   size_t i;
   int ret;
-
-  CHECK(hashes != NULL);
 
   for (i = 0; i < length; i++)
     btc_hash_copy(&hashes[i * 32], blk->txs.items[i]->hash);
@@ -76,11 +74,9 @@ btc_block_merkle_root(uint8_t *root, const btc_block_t *blk) {
 int
 btc_block_witness_root(uint8_t *root, const btc_block_t *blk) {
   size_t length = blk->txs.length;
-  uint8_t *hashes = (uint8_t *)malloc(length * 32);
+  uint8_t *hashes = (uint8_t *)btc_malloc(length * 32);
   size_t i;
   int ret;
-
-  CHECK(hashes != NULL);
 
   btc_hash_init(&hashes[0 * 32]);
 

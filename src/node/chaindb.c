@@ -202,9 +202,7 @@ btc_chaindb_init(struct btc_chaindb_s *db, const btc_network_t *network) {
   btc_vector_init(&db->heights);
   btc_vector_init(&db->files);
 
-  db->slab = (uint8_t *)malloc(24 + BTC_MAX_RAW_BLOCK_SIZE);
-
-  CHECK(db->slab != NULL);
+  db->slab = (uint8_t *)btc_malloc(24 + BTC_MAX_RAW_BLOCK_SIZE);
 }
 
 static void
@@ -219,7 +217,7 @@ btc_chaindb_clear(struct btc_chaindb_s *db) {
 struct btc_chaindb_s *
 btc_chaindb_create(const btc_network_t *network) {
   struct btc_chaindb_s *db =
-    (struct btc_chaindb_s *)malloc(sizeof(struct btc_chaindb_s));
+    (struct btc_chaindb_s *)btc_malloc(sizeof(struct btc_chaindb_s));
 
   CHECK(db != NULL);
 
@@ -961,11 +959,8 @@ btc_chaindb_write_undo(struct btc_chaindb_s *db,
   uint8_t raw[37];
   int ret = 0;
 
-  if (len > BTC_MAX_RAW_BLOCK_SIZE) {
-    buf = (uint8_t *)malloc(24 + len);
-
-    CHECK(buf != NULL);
-  }
+  if (len > BTC_MAX_RAW_BLOCK_SIZE)
+    buf = (uint8_t *)btc_malloc(24 + len);
 
   len = btc_undo_export(buf + 24, undo);
 
