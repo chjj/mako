@@ -53,13 +53,13 @@ BTC_EXTERN int
 btc_chaindb_save(btc_chaindb_t *db,
                  btc_entry_t *entry,
                  const btc_block_t *block,
-                 btc_view_t *view);
+                 const btc_view_t *view);
 
 BTC_EXTERN int
 btc_chaindb_reconnect(btc_chaindb_t *db,
                       btc_entry_t *entry,
                       const btc_block_t *block,
-                      btc_view_t *view);
+                      const btc_view_t *view);
 
 BTC_EXTERN btc_view_t *
 btc_chaindb_disconnect(btc_chaindb_t *db,

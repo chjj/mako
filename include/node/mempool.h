@@ -25,7 +25,7 @@ extern "C" {
 typedef btc_hashmapiter_t btc_mpiter_t;
 
 typedef void btc_mempool_tx_cb(const btc_mpentry_t *entry,
-                               btc_view_t *view,
+                               const btc_view_t *view,
                                void *arg);
 
 typedef void btc_mempool_badorphan_cb(const btc_verify_error_t *err,

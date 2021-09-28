@@ -114,7 +114,7 @@ btc_mpentry_copy(btc_mpentry_t *z, const btc_mpentry_t *x) {
 static void
 btc_mpentry_set(btc_mpentry_t *entry,
                 const btc_tx_t *tx,
-                btc_view_t *view,
+                const btc_view_t *view,
                 int32_t height) {
   unsigned int flags = BTC_SCRIPT_STANDARD_VERIFY_FLAGS;
   int sigops = btc_tx_sigops_cost(tx, view, flags);
@@ -411,7 +411,7 @@ btc_mempool_limit_orphans(struct btc_mempool_s *mp) {
 static int
 btc_mempool_should_orphan(struct btc_mempool_s *mp,
                           const btc_tx_t *tx,
-                          btc_view_t *view) {
+                          const btc_view_t *view) {
   size_t i;
 
   (void)mp;
@@ -429,7 +429,7 @@ btc_mempool_should_orphan(struct btc_mempool_s *mp,
 static int
 btc_mempool_check_orphan(struct btc_mempool_s *mp,
                          const btc_tx_t *tx,
-                         btc_view_t *view) {
+                         const btc_view_t *view) {
   size_t i;
 
   for (i = 0; i < tx->inputs.length; i++) {
@@ -476,7 +476,7 @@ btc_mempool_check_orphan(struct btc_mempool_s *mp,
 static void
 btc_mempool_add_orphan(struct btc_mempool_s *mp,
                        const btc_tx_t *tx,
-                       btc_view_t *view,
+                       const btc_view_t *view,
                        unsigned int id) {
   btc_orphan_t *orphan = btc_orphan_create();
   btc_hashset_t *hashes = btc_hashset_create();
@@ -747,7 +747,7 @@ btc_mempool_track_entry(struct btc_mempool_s *mp, btc_mpentry_t *entry) {
 static void
 btc_mempool_add_entry(struct btc_mempool_s *mp,
                       btc_mpentry_t *entry,
-                      btc_view_t *view) {
+                      const btc_view_t *view) {
   btc_mempool_track_entry(mp, entry);
   btc_mempool_update_ancestors(mp, entry, add_fee);
 
@@ -843,7 +843,7 @@ btc_mempool_limit_size(struct btc_mempool_s *mp, const uint8_t *hash) {
 static int
 btc_mempool_verify_inputs(struct btc_mempool_s *mp,
                           const btc_mpentry_t *entry,
-                          btc_view_t *view,
+                          const btc_view_t *view,
                           unsigned int flags) {
   const btc_tx_t *tx = &entry->tx;
 
@@ -872,7 +872,7 @@ btc_mempool_verify_inputs(struct btc_mempool_s *mp,
 static int
 btc_mempool_verify(struct btc_mempool_s *mp,
                    const btc_mpentry_t *entry,
-                   btc_view_t *view) {
+                   const btc_view_t *view) {
   unsigned int lock_flags = BTC_CHAIN_STANDARD_LOCKTIME_FLAGS;
   const btc_deployment_state_t *state = btc_chain_state(mp->chain);
   const btc_entry_t *tip = btc_chain_tip(mp->chain);

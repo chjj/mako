@@ -48,11 +48,11 @@ btc_coins_destroy(btc_coins_t *coins) {
 
   kh_destroy(coins, coins->map);
 
-  free(coins);
+  btc_free(coins);
 }
 
 static btc_coin_t *
-btc_coins_get(btc_coins_t *coins, uint32_t index) {
+btc_coins_get(const btc_coins_t *coins, uint32_t index) {
   khiter_t it = kh_get(coins, coins->map, index);
 
   if (it == kh_end(coins->map))
@@ -123,11 +123,11 @@ btc_view_destroy(btc__view_t *view) {
 
   btc_undo_clear(&view->undo);
 
-  free(view);
+  btc_free(view);
 }
 
 static btc_coins_t *
-btc_view_coins(btc__view_t *view, const uint8_t *hash) {
+btc_view_coins(const btc__view_t *view, const uint8_t *hash) {
   khiter_t it = kh_get(view, view->map, hash);
 
   if (it == kh_end(view->map))
@@ -159,12 +159,12 @@ btc_view_ensure(btc__view_t *view, const uint8_t *hash) {
 }
 
 int
-btc_view_has(btc__view_t *view, const btc_outpoint_t *outpoint) {
+btc_view_has(const btc__view_t *view, const btc_outpoint_t *outpoint) {
   return btc_view_get(view, outpoint) != NULL;
 }
 
 const btc_coin_t *
-btc_view_get(btc__view_t *view, const btc_outpoint_t *outpoint) {
+btc_view_get(const btc__view_t *view, const btc_outpoint_t *outpoint) {
   btc_coins_t *coins = btc_view_coins(view, outpoint->hash);
 
   if (coins == NULL)
@@ -266,7 +266,7 @@ btc_view_add(btc__view_t *view, const btc_tx_t *tx, int32_t height, int spent) {
 }
 
 void
-btc_view_iterate(btc_viewiter_t *iter, btc__view_t *view) {
+btc_view_iterate(btc_viewiter_t *iter, const btc__view_t *view) {
   iter->view = view;
   iter->itv = kh_begin(view->map);
   iter->itc = 0;
@@ -277,7 +277,7 @@ btc_view_iterate(btc_viewiter_t *iter, btc__view_t *view) {
 
 int
 btc_view_next(const btc_coin_t **coin, btc_viewiter_t *iter) {
-  btc__view_t *view = iter->view;
+  const btc__view_t *view = iter->view;
 
   for (;;) {
     if (iter->coins == NULL) {
@@ -312,6 +312,6 @@ btc_view_next(const btc_coin_t **coin, btc_viewiter_t *iter) {
 }
 
 btc_undo_t *
-btc_view_undo(btc__view_t *view) {
-  return &view->undo;
+btc_view_undo(const btc__view_t *view) {
+  return (btc_undo_t *)&view->undo;
 }

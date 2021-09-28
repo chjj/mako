@@ -1134,7 +1134,7 @@ int
 btc_chain_verify_locks(struct btc_chain_s *chain,
                        const btc_entry_t *prev,
                        const btc_tx_t *tx,
-                       btc_view_t *view,
+                       const btc_view_t *view,
                        unsigned int flags) {
   int32_t min_height = -1;
   int64_t min_time = -1;

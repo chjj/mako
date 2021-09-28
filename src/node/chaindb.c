@@ -705,7 +705,7 @@ btc_chaindb_fill(struct btc_chaindb_s *db,
 static int
 btc_chaindb_save_view(struct btc_chaindb_s *db,
                       MDB_txn *txn,
-                      btc_view_t *view) {
+                      const btc_view_t *view) {
   uint8_t *val = db->slab;
   const btc_coin_t *coin;
   btc_viewiter_t iter;
@@ -951,7 +951,7 @@ static int
 btc_chaindb_write_undo(struct btc_chaindb_s *db,
                        MDB_txn *txn,
                        btc_entry_t *entry,
-                       btc_undo_t *undo) {
+                       const btc_undo_t *undo) {
   size_t len = btc_undo_size(undo);
   uint8_t *buf = db->slab;
   MDB_val mkey, mval;
@@ -1072,8 +1072,8 @@ btc_chaindb_connect_block(struct btc_chaindb_s *db,
                           MDB_txn *txn,
                           btc_entry_t *entry,
                           const btc_block_t *block,
-                          btc_view_t *view) {
-  btc_undo_t *undo;
+                          const btc_view_t *view) {
+  const btc_undo_t *undo;
 
   (void)block;
 
@@ -1146,7 +1146,7 @@ btc_chaindb_save_block(struct btc_chaindb_s *db,
                        MDB_txn *txn,
                        btc_entry_t *entry,
                        const btc_block_t *block,
-                       btc_view_t *view) {
+                       const btc_view_t *view) {
   /* Write actual block data. */
   if (entry->block_pos == -1) {
     if (!btc_chaindb_write_block(db, txn, entry, block))
@@ -1163,7 +1163,7 @@ int
 btc_chaindb_save(struct btc_chaindb_s *db,
                  btc_entry_t *entry,
                  const btc_block_t *block,
-                 btc_view_t *view) {
+                 const btc_view_t *view) {
   uint8_t raw[BTC_ENTRY_SIZE];
   MDB_val mkey, mval;
   MDB_txn *txn;
@@ -1259,7 +1259,7 @@ int
 btc_chaindb_reconnect(struct btc_chaindb_s *db,
                       btc_entry_t *entry,
                       const btc_block_t *block,
-                      btc_view_t *view) {
+                      const btc_view_t *view) {
   uint8_t raw[BTC_ENTRY_SIZE];
   MDB_val mkey, mval;
   MDB_txn *txn;

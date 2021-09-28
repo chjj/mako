@@ -46,13 +46,13 @@
 static void
 on_connect(const btc_entry_t *entry,
            const btc_block_t *block,
-           btc_view_t *view,
+           const btc_view_t *view,
            void *arg);
 
 static void
 on_disconnect(const btc_entry_t *entry,
               const btc_block_t *block,
-              btc_view_t *view,
+              const btc_view_t *view,
               void *arg);
 
 
@@ -61,7 +61,7 @@ on_reorganize(const btc_entry_t *old, const btc_entry_t *new_, void *arg);
 
 
 static void
-on_tx(const btc_mpentry_t *entry, btc_view_t *view, void *arg);
+on_tx(const btc_mpentry_t *entry, const btc_view_t *view, void *arg);
 
 /*
  * Node
@@ -200,7 +200,7 @@ btc_node_stop(btc_node_t *node) {
 static void
 on_connect(const btc_entry_t *entry,
            const btc_block_t *block,
-           btc_view_t *view,
+           const btc_view_t *view,
            void *arg) {
   btc_node_t *node = (btc_node_t *)arg;
 
@@ -212,7 +212,7 @@ on_connect(const btc_entry_t *entry,
 static void
 on_disconnect(const btc_entry_t *entry,
               const btc_block_t *block,
-              btc_view_t *view,
+              const btc_view_t *view,
               void *arg) {
   btc_node_t *node = (btc_node_t *)arg;
 
@@ -232,7 +232,7 @@ on_reorganize(const btc_entry_t *old, const btc_entry_t *new_, void *arg) {
 }
 
 static void
-on_tx(const btc_mpentry_t *entry, btc_view_t *view, void *arg) {
+on_tx(const btc_mpentry_t *entry, const btc_view_t *view, void *arg) {
   btc_node_t *node = (btc_node_t *)arg;
 
   (void)node;

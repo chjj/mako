@@ -53,7 +53,7 @@ typedef void btc_chain_block_cb(const btc_block_t *block,
 
 typedef void btc_chain_connect_cb(const btc_entry_t *entry,
                                   const btc_block_t *block,
-                                  btc_view_t *view,
+                                  const btc_view_t *view,
                                   void *arg);
 
 typedef void btc_chain_reorganize_cb(const btc_entry_t *old,
@@ -131,7 +131,7 @@ BTC_EXTERN int
 btc_chain_verify_locks(btc_chain_t *chain,
                        const btc_entry_t *prev,
                        const btc_tx_t *tx,
-                       btc_view_t *view,
+                       const btc_view_t *view,
                        unsigned int flags);
 
 BTC_EXTERN int
