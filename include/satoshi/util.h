@@ -13,6 +13,7 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include "common.h"
 
 /*
@@ -70,20 +71,15 @@ btc_memxor3(void *z, const void *x, const void *y, size_t n);
  * Hash
  */
 
-BTC_EXTERN void
-btc_hash_init(uint8_t *zp);
-
-BTC_EXTERN void
-btc_hash_copy(uint8_t *zp, const uint8_t *xp);
+#define btc_hash_init(zp) memset(zp, 0, 32)
+#define btc_hash_copy(zp, xp) memcpy(zp, xp, 32)
+#define btc_hash_equal(xp, yp) (memcmp(xp, yp, 32) == 0)
 
 BTC_EXTERN uint8_t *
 btc_hash_clone(const uint8_t *xp);
 
 BTC_EXTERN int
 btc_hash_compare(const uint8_t *xp, const uint8_t *yp);
-
-BTC_EXTERN int
-btc_hash_equal(const uint8_t *xp, const uint8_t *yp);
 
 BTC_EXTERN int
 btc_hash_is_null(const uint8_t *xp);

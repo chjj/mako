@@ -136,16 +136,6 @@ nib2char(int ch) {
  * Hash
  */
 
-void
-btc_hash_init(uint8_t *zp) {
-  memset(zp, 0, 32);
-}
-
-void
-btc_hash_copy(uint8_t *zp, const uint8_t *xp) {
-  memcpy(zp, xp, 32);
-}
-
 uint8_t *
 btc_hash_clone(const uint8_t *xp) {
   return (uint8_t *)memcpy(btc_malloc(32), xp, 32);
@@ -161,11 +151,6 @@ btc_hash_compare(const uint8_t *xp, const uint8_t *yp) {
   }
 
   return 0;
-}
-
-int
-btc_hash_equal(const uint8_t *xp, const uint8_t *yp) {
-  return btc_hash_compare(xp, yp) == 0;
 }
 
 int
