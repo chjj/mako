@@ -66,7 +66,7 @@ btc_block_merkle_root(uint8_t *root, const btc_block_t *blk) {
 
   ret = btc_merkle_root(root, hashes, length);
 
-  free(hashes);
+  btc_free(hashes);
 
   return ret;
 }
@@ -85,7 +85,7 @@ btc_block_witness_root(uint8_t *root, const btc_block_t *blk) {
 
   ret = btc_merkle_root(root, hashes, length);
 
-  free(hashes);
+  btc_free(hashes);
 
   return ret;
 }

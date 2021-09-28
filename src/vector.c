@@ -26,7 +26,7 @@ btc_vector_init(btc_vector_t *z) {
 void
 btc_vector_clear(btc_vector_t *z) {
   if (z->alloc > 0)
-    free(z->items);
+    btc_free(z->items);
 
   z->items = NULL;
   z->alloc = 0;

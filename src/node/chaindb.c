@@ -210,7 +210,7 @@ btc_chaindb_clear(struct btc_chaindb_s *db) {
   btc_hashmap_destroy(db->hashes);
   btc_vector_clear(&db->heights);
   btc_vector_clear(&db->files);
-  free(db->slab);
+  btc_free(db->slab);
   memset(db, 0, sizeof(*db));
 }
 
@@ -229,7 +229,7 @@ btc_chaindb_create(const btc_network_t *network) {
 void
 btc_chaindb_destroy(struct btc_chaindb_s *db) {
   btc_chaindb_clear(db);
-  free(db);
+  btc_free(db);
 }
 
 static int
@@ -1003,7 +1003,7 @@ btc_chaindb_write_undo(struct btc_chaindb_s *db,
   ret = 1;
 fail:
   if (buf != db->slab)
-    free(buf);
+    btc_free(buf);
 
   return ret;
 }

@@ -28,7 +28,7 @@ btc_buffer_init(btc_buffer_t *z) {
 void
 btc_buffer_clear(btc_buffer_t *z) {
   if (z->alloc > 0)
-    free(z->data);
+    btc_free(z->data);
 
   z->data = NULL;
   z->alloc = 0;

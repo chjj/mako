@@ -46,7 +46,7 @@ name ## _create(void) {                                     \
 scope void                                                  \
 name ## _destroy(name ## _t *z) {                           \
   name ## _clear(z);                                        \
-  free(z);                                                  \
+  btc_free(z);                                              \
 }                                                           \
                                                             \
 scope name ## _t *                                          \
@@ -78,7 +78,7 @@ name ## _clear(name ## _t *z) {                                      \
     child ## _destroy(z->items[i]);                                  \
                                                                      \
   if (z->alloc > 0)                                                  \
-    free(z->items);                                                  \
+    btc_free(z->items);                                              \
                                                                      \
   z->items = NULL;                                                   \
   z->alloc = 0;                                                      \

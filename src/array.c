@@ -26,7 +26,7 @@ btc_array_init(btc_array_t *z) {
 void
 btc_array_clear(btc_array_t *z) {
   if (z->alloc > 0)
-    free(z->items);
+    btc_free(z->items);
 
   z->items = NULL;
   z->alloc = 0;

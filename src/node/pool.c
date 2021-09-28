@@ -243,7 +243,7 @@ parser_init(parser_t *parser, uint32_t magic) {
 static void
 parser_clear(parser_t *parser) {
   if (parser->alloc > 0)
-    free(parser->pending);
+    btc_free(parser->pending);
 
   parser->pending = NULL;
 }
