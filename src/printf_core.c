@@ -249,9 +249,13 @@ btc_float(char *z, double x, const state_t *st) {
   double frac, iptr;
   int prec = 6;
   char *s = z;
+  state_t t;
 
   if (st != NULL && (st->flags & PRINTF_PRECISION))
     prec = st->prec;
+
+  t.flags = PRINTF_PRECISION;
+  t.prec = prec;
 
   if (x < 0.0) {
     *z++ = '-';
@@ -266,15 +270,7 @@ btc_float(char *z, double x, const state_t *st) {
 
   if (prec != 0) {
     *z++ = '.';
-
-    if (lo != 0) {
-      z += btc_unsigned(z, lo, NULL);
-    } else {
-      while (prec--)
-        *z++ = '0';
-
-      *z = '\0';
-    }
+    z += btc_unsigned(z, lo, &t);
   }
 
   return z - s;
