@@ -52,7 +52,7 @@ btc_address_set_str(btc_address_t *addr,
   uint8_t data[55];
   size_t len;
 
-  btc_address_init(addr);
+  memset(addr->hash, 0, 40);
 
   if (btc_bech32_decode(hrp, &addr->version, addr->hash, &addr->length, str)) {
     if (addr->version == 0) {
@@ -87,6 +87,7 @@ btc_address_set_str(btc_address_t *addr,
     return 0;
 
   addr->version = 0;
+  addr->length = 20;
 
   memcpy(addr->hash, data + 1, 20);
 
@@ -203,8 +204,6 @@ btc_address_get_script(btc_script_t *script, const btc_address_t *addr) {
 
 int
 btc_address_set_program(btc_address_t *addr, const btc_program_t *program) {
-  btc_address_init(addr);
-
   if (program->version == 0) {
     if (program->length != 20 && program->length != 32)
       return 0;
@@ -214,6 +213,7 @@ btc_address_set_program(btc_address_t *addr, const btc_program_t *program) {
   addr->version = program->version;
   addr->length = program->length;
 
+  memset(addr->hash, 0, 40);
   memcpy(addr->hash, program->data, program->length);
 
   return 1;
@@ -226,5 +226,6 @@ btc_address_get_program(btc_program_t *program, const btc_address_t *addr) {
   program->version = addr->version;
   program->length = addr->length;
 
+  memset(program->data, 0, 40);
   memcpy(program->data, addr->hash, addr->length);
 }

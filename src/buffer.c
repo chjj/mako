@@ -35,6 +35,11 @@ btc_buffer_clear(btc_buffer_t *z) {
   z->length = 0;
 }
 
+void
+btc_buffer_reset(btc_buffer_t *z) {
+  z->length = 0;
+}
+
 uint8_t *
 btc_buffer_grow(btc_buffer_t *z, size_t zn) {
   if (zn > z->alloc) {

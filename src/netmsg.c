@@ -844,8 +844,12 @@ btc_unknown_clear(btc_unknown_t *msg) {
 
 void
 btc_unknown_copy(btc_unknown_t *z, const btc_unknown_t *x) {
-  z->data = (uint8_t *)btc_malloc(x->length);
-  memcpy(z->data, x->data, x->length);
+  if (x->length > 0) {
+    z->data = (uint8_t *)btc_realloc(z->data, x->length);
+
+    memcpy(z->data, x->data, x->length);
+  }
+
   z->length = x->length;
 }
 
@@ -861,18 +865,13 @@ btc_unknown_write(uint8_t *zp, const btc_unknown_t *x) {
 
 int
 btc_unknown_read(btc_unknown_t *z, const uint8_t **xp, size_t *xn) {
-  if (z->data != NULL)
-    btc_free(z->data);
-
   if (*xn > 0) {
-    z->data = (uint8_t *)btc_malloc(*xn);
-    z->length = *xn;
+    z->data = (uint8_t *)btc_realloc(z->data, *xn);
 
     memcpy(z->data, *xp, *xn);
-  } else {
-    z->data = NULL;
-    z->length = 0;
   }
+
+  z->length = *xn;
 
   *xp += *xn;
   *xn = 0;

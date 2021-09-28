@@ -52,20 +52,21 @@ btc_bloom_clear(btc_bloom_t *bloom) {
 
 void
 btc_bloom_copy(btc_bloom_t *z, const btc_bloom_t *x) {
-  size_t size = x->size + (x->size == 0);
+  if (x->size > 0) {
+    z->data = (uint8_t *)btc_realloc(z->data, x->size);
 
-  z->data = (uint8_t *)btc_realloc(z->data, size);
+    memcpy(z->data, x->data, x->size);
+  }
+
   z->size = x->size;
   z->n = x->n;
   z->tweak = x->tweak;
   z->update = x->update;
-
-  memcpy(z->data, x->data, x->size);
 }
 
 void
 btc_bloom_reset(btc_bloom_t *bloom) {
-  if (bloom->data != NULL)
+  if (bloom->size > 0)
     memset(bloom->data, 0, bloom->size);
 
   bloom->tweak = btc_random();
@@ -119,6 +120,9 @@ void
 btc_bloom_add(btc_bloom_t *bloom, const uint8_t *val, size_t len) {
   uint32_t i;
 
+  if (bloom->size == 0)
+    return;
+
   for (i = 0; i < bloom->n; i++) {
     size_t index = btc_bloom_index(bloom, val, len, i);
 
@@ -129,6 +133,9 @@ btc_bloom_add(btc_bloom_t *bloom, const uint8_t *val, size_t len) {
 int
 btc_bloom_has(const btc_bloom_t *bloom, const uint8_t *val, size_t len) {
   uint32_t i;
+
+  if (bloom->size == 0)
+    return 0;
 
   for (i = 0; i < bloom->n; i++) {
     size_t index = btc_bloom_index(bloom, val, len, i);
@@ -171,7 +178,8 @@ btc_bloom_read(btc_bloom_t *z, const uint8_t **xp, size_t *xn) {
   if (!btc_size_read(&z->size, xp, xn))
     return 0;
 
-  z->data = (uint8_t *)btc_realloc(z->data, z->size + (z->size == 0));
+  if (z->size > 0)
+    z->data = (uint8_t *)btc_realloc(z->data, z->size);
 
   if (!btc_raw_read(z->data, z->size, xp, xn))
     return 0;
@@ -215,22 +223,23 @@ btc_filter_clear(btc_filter_t *filter) {
 
 void
 btc_filter_copy(btc_filter_t *z, const btc_filter_t *x) {
-  size_t length = x->length + (x->length == 0);
+  if (x->length > 0) {
+    z->data = (uint64_t *)btc_realloc(z->data, x->length * sizeof(uint64_t));
 
-  z->data = (uint64_t *)btc_realloc(z->data, length * sizeof(uint64_t));
+    memcpy(z->data, x->data, x->length * sizeof(uint64_t));
+  }
+
   z->length = x->length;
   z->entries = x->entries;
   z->limit = x->limit;
   z->generation = x->generation;
   z->n = x->n;
   z->tweak = x->tweak;
-
-  memcpy(z->data, x->data, x->length * sizeof(uint64_t));
 }
 
 void
 btc_filter_reset(btc_filter_t *filter) {
-  if (filter->data != NULL)
+  if (filter->length > 0)
     memset(filter->data, 0, filter->length * sizeof(uint64_t));
 
   filter->entries = 0;
@@ -289,6 +298,9 @@ btc_filter_add(btc_filter_t *filter, const uint8_t *val, size_t len) {
   size_t p, pos;
   int i, bit;
 
+  if (filter->length == 0)
+    return;
+
   if (filter->entries == filter->limit) {
     filter->entries = 0;
     filter->generation += 1;
@@ -331,6 +343,9 @@ btc_filter_has(const btc_filter_t *filter, const uint8_t *val, size_t len) {
   uint64_t bits;
   size_t pos;
   int i, bit;
+
+  if (filter->length == 0)
+    return 0;
 
   for (i = 0; i < filter->n; i++) {
     hash = btc_filter_hash(filter, val, len, i);

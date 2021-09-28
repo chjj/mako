@@ -245,6 +245,8 @@ name ## _read(name ## _t *z, const uint8_t **xp, size_t *xn) { \
   child ## _t *item;                                           \
   size_t i, count;                                             \
                                                                \
+  name ## _reset(z);                                           \
+                                                               \
   if (!btc_size_read(&count, xp, xn))                          \
     return 0;                                                  \
                                                                \

@@ -83,8 +83,6 @@ btc_entry_write(uint8_t *zp, const btc_entry_t *x) {
 
 int
 btc_entry_read(btc_entry_t *z, const uint8_t **xp, size_t *xn) {
-  btc_entry_init(z);
-
   if (!btc_header_read(&z->header, xp, xn))
     return 0;
 
@@ -107,6 +105,9 @@ btc_entry_read(btc_entry_t *z, const uint8_t **xp, size_t *xn) {
     return 0;
 
   btc_header_hash(z->hash, &z->header);
+
+  z->prev = NULL;
+  z->next = NULL;
 
   return 1;
 }

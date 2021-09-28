@@ -369,7 +369,7 @@ btc_cmpct_read(btc_cmpct_t *z, const uint8_t **xp, size_t *xn) {
   if (!btc_size_read(&idlen, xp, xn))
     return 0;
 
-  CHECK(z->ids.length == 0);
+  btc_array_reset(&z->ids);
 
   for (i = 0; i < idlen; i++) {
     if (!btc_uint32_read(&lo, xp, xn))
@@ -384,7 +384,7 @@ btc_cmpct_read(btc_cmpct_t *z, const uint8_t **xp, size_t *xn) {
   if (!btc_size_read(&txlen, xp, xn))
     return 0;
 
-  CHECK(z->ptx.length == 0);
+  btc_txvec_reset(&z->ptx);
 
   for (i = 0; i < txlen; i++) {
     if (!btc_size_read(&index, xp, xn))
@@ -493,13 +493,13 @@ btc_getblocktxn_read(btc_getblocktxn_t *z, const uint8_t **xp, size_t *xn) {
   size_t i, count, index;
   size_t offset = 0;
 
-  CHECK(z->indexes.length == 0);
-
   if (!btc_raw_read(z->hash, 32, xp, xn))
     return 0;
 
   if (!btc_size_read(&count, xp, xn))
     return 0;
+
+  btc_array_reset(&z->indexes);
 
   for (i = 0; i < count; i++) {
     if (!btc_size_read(&index, xp, xn))
@@ -556,9 +556,9 @@ btc_blocktxn_set_block(btc_blocktxn_t *res,
   const btc_tx_t *tx;
   size_t i, index;
 
-  CHECK(res->txs.length == 0);
-
   btc_header_hash(res->hash, &blk->header);
+
+  btc_txvec_reset(&res->txs);
 
   for (i = 0; i < req->indexes.length; i++) {
     index = req->indexes.items[i];

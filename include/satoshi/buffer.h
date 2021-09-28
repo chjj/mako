@@ -29,6 +29,9 @@ btc_buffer_init(btc_buffer_t *z);
 BTC_EXTERN void
 btc_buffer_clear(btc_buffer_t *z);
 
+BTC_EXTERN void
+btc_buffer_reset(btc_buffer_t *z);
+
 BTC_EXTERN uint8_t *
 btc_buffer_grow(btc_buffer_t *z, size_t zn);
 
