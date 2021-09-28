@@ -88,8 +88,6 @@ btc_cmpct_set_block(btc_cmpct_t *z, const btc_block_t *x, int witness) {
   btc_tx_t *cb;
   size_t i;
 
-  CHECK(x->txs.length > 0);
-
   btc_header_hash(z->hash, &x->header);
   btc_header_copy(&z->header, &x->header);
 
@@ -97,7 +95,7 @@ btc_cmpct_set_block(btc_cmpct_t *z, const btc_block_t *x, int witness) {
 
   btc_cmpct_key(z->sipkey, z);
 
-  CHECK(z->ids.length == 0);
+  btc_array_reset(&z->ids);
 
   for (i = 1; i < x->txs.length; i++) {
     const btc_tx_t *tx = x->txs.items[i];
@@ -106,12 +104,12 @@ btc_cmpct_set_block(btc_cmpct_t *z, const btc_block_t *x, int witness) {
     btc_array_push(&z->ids, btc_cmpct_sid(z, hash));
   }
 
-  CHECK(z->ptx.length == 0);
+  CHECK(x->txs.length > 0);
 
   cb = btc_tx_clone(x->txs.items[0]);
   cb->_index = 0;
 
-  btc_txvec_clear(&z->ptx);
+  btc_txvec_reset(&z->ptx);
   btc_txvec_push(&z->ptx, cb);
 }
 
@@ -132,8 +130,12 @@ btc_cmpct_setup(btc_cmpct_t *blk) {
   if (total > (BTC_MAX_BLOCK_SIZE - 81) / 60)
     return -1;
 
-  CHECK(blk->avail.length == 0);
-  CHECK(blk->count == 0);
+  for (i = 0; i < blk->avail.length; i++) {
+    if (blk->avail.items[i] != NULL)
+      btc_tx_destroy((btc_tx_t *)blk->avail.items[i]);
+  }
+
+  blk->count = 0;
 
   btc_vector_resize(&blk->avail, total);
 
@@ -155,7 +157,7 @@ btc_cmpct_setup(btc_cmpct_t *blk) {
     blk->count += 1;
   }
 
-  CHECK(btc_longtab_size(blk->id_map) == 0);
+  btc_longtab_reset(blk->id_map);
 
   for (i = 0; i < blk->ids.length; i++) {
     uint64_t id = blk->ids.items[i];
@@ -254,11 +256,12 @@ btc_cmpct_finalize(btc_block_t *z, btc_cmpct_t *x) {
   btc_tx_t *tx;
   size_t i;
 
-  CHECK(z->txs.length == 0);
   CHECK(x->avail.length == total);
   CHECK(x->count == total);
 
   btc_header_copy(&z->header, &x->header);
+
+  btc_txvec_reset(&z->txs);
   btc_txvec_resize(&z->txs, x->avail.length);
 
   for (i = 0; i < x->avail.length; i++) {
@@ -269,6 +272,8 @@ btc_cmpct_finalize(btc_block_t *z, btc_cmpct_t *x) {
     x->avail.items[i] = NULL;
     z->txs.items[i] = tx;
   }
+
+  x->count = 0;
 }
 
 static size_t
@@ -439,9 +444,9 @@ void
 btc_getblocktxn_set_cmpct(btc_getblocktxn_t *z, const btc_cmpct_t *x) {
   size_t i;
 
-  CHECK(z->indexes.length == 0);
-
   btc_header_hash(z->hash, &x->header);
+
+  btc_array_reset(&z->indexes);
 
   for (i = 0; i < x->avail.length; i++) {
     if (x->avail.items[i] == NULL)
@@ -598,8 +603,6 @@ btc_blocktxn_write(uint8_t *zp, const btc_blocktxn_t *x) {
 
 int
 btc_blocktxn_read(btc_blocktxn_t *z, const uint8_t **xp, size_t *xn) {
-  CHECK(z->txs.length == 0);
-
   if (!btc_raw_read(z->hash, 32, xp, xn))
     return 0;
 
