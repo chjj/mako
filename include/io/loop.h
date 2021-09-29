@@ -39,6 +39,9 @@ typedef void btc_loop_write_file_cb(const char *, void *);
  * Socket
  */
 
+BTC_EXTERN void
+btc_socket_destroy(btc_socket_t *socket);
+
 BTC_EXTERN btc_loop_t *
 btc_socket_loop(btc_socket_t *socket);
 

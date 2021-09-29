@@ -2117,6 +2117,8 @@ btc_pool_open(struct btc_pool_s *pool) {
 
   if (!btc_addrman_open(pool->addrman)) {
     btc_socket_close(pool->server);
+    btc_socket_destroy(pool->server);
+    pool->server = NULL;
     return 0;
   }
 
@@ -2391,8 +2393,23 @@ btc_pool_on_tick(struct btc_pool_s *pool) {
 
 static void
 btc_pool_on_socket(struct btc_pool_s *pool, btc_socket_t *socket) {
-  (void)pool;
-  (void)socket;
+  btc_peer_t *peer = btc_peer_create(pool);
+  btc_sockaddr_t sa;
+
+  btc_socket_address(&sa, socket);
+
+  btc_pool_log(pool, "Accepting inbound peer (%S).", &sa);
+
+  if (!btc_peer_accept(peer, socket)) {
+    const char *msg = btc_loop_strerror(pool->loop);
+
+    btc_pool_log(pool, "Connection failed: %s (%S).", msg, &sa);
+    btc_peer_destroy(peer);
+
+    return;
+  }
+
+  btc_peers_add(&pool->peers, peer);
 }
 
 static void

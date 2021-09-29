@@ -413,7 +413,7 @@ btc_socket_create(btc__loop_t *loop) {
   return socket;
 }
 
-static void
+void
 btc_socket_destroy(btc__socket_t *socket) {
   chunk_t *chunk, *next;
 
@@ -980,10 +980,7 @@ btc_loop_destroy(btc__loop_t *loop) {
 
 #if defined(BTC_USE_EPOLL)
   CHECK(loop->fd != -1);
-  CHECK(loop->events != NULL);
-
   close(loop->fd);
-
   free(loop->events);
 #elif defined(BTC_USE_POLL)
   free(loop->pfds);
