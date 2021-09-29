@@ -331,13 +331,22 @@ BTC_EXTERN void
 btc_sockaddr_init(btc_sockaddr_t *addr);
 
 BTC_EXTERN int
+btc_sockaddr_size(const btc_sockaddr_t *x);
+
+BTC_EXTERN int
+btc_sockaddr_family(const btc_sockaddr_t *x);
+
+BTC_EXTERN int
+btc_sockaddr_protocol(const btc_sockaddr_t *x);
+
+BTC_EXTERN int
+btc_sockaddr_is_null(const btc_sockaddr_t *x);
+
+BTC_EXTERN int
 btc_sockaddr_set(btc_sockaddr_t *z, const struct sockaddr *x);
 
 BTC_EXTERN void
 btc_sockaddr_get(struct sockaddr *z, const btc_sockaddr_t *x);
-
-BTC_EXTERN int
-btc_sockaddr_size(const btc_sockaddr_t *x);
 
 BTC_EXTERN int
 btc_sockaddr_import(btc_sockaddr_t *z, const char *xp, int port);

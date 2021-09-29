@@ -241,7 +241,27 @@ safe__realloc(void *ptr, size_t new_size, size_t old_size) {
 
 static int
 set_nonblocking(int fd) {
-  return fcntl(fd, F_SETFL, O_NONBLOCK);
+  int flags = fcntl(fd, F_GETFL);
+
+  if (flags == -1)
+    return -1;
+
+  return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
+
+static int
+set_cloexec(int fd) {
+#if defined(FD_CLOEXEC)
+  int flags = fcntl(fd, F_GETFD);
+
+  if (flags == -1)
+    return -1;
+
+  return fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
+#else
+  (void)fd;
+  return -1;
+#endif
 }
 
 static int
@@ -257,14 +277,8 @@ try_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
 
   fd = accept(sockfd, addr, addrlen);
 
-#ifdef FD_CLOEXEC
-  if (fd != -1) {
-    int rc = fcntl(fd, F_GETFD);
-
-    if (rc != -1)
-      fcntl(fd, F_SETFD, rc | FD_CLOEXEC);
-  }
-#endif
+  if (fd != -1)
+    set_cloexec(fd);
 
   return fd;
 }
@@ -298,14 +312,8 @@ safe_socket(int domain, int type, int protocol) {
 
   fd = socket(domain, type, protocol);
 
-#ifdef FD_CLOEXEC
-  if (fd != -1) {
-    int rc = fcntl(fd, F_GETFD);
-
-    if (rc != -1)
-      fcntl(fd, F_SETFD, rc | FD_CLOEXEC);
-  }
-#endif
+  if (fd != -1)
+    set_cloexec(fd);
 
   return fd;
 }
@@ -514,7 +522,7 @@ btc_socket_listen(btc__socket_t *server, const btc_sockaddr_t *addr, int max) {
   if (!btc_socket_setaddr(server, addr))
     return 0;
 
-  fd = safe_socket(server->addr->sa_family, SOCK_STREAM, 0);
+  fd = safe_socket(btc_sockaddr_protocol(addr), SOCK_STREAM, 0);
 
   if (fd == -1) {
     server->loop->error = errno;
@@ -581,7 +589,7 @@ btc_socket_connect(btc__socket_t *socket, const btc_sockaddr_t *addr) {
   if (!btc_socket_setaddr(socket, addr))
     return 0;
 
-  fd = safe_socket(socket->addr->sa_family, SOCK_STREAM, 0);
+  fd = safe_socket(btc_sockaddr_protocol(addr), SOCK_STREAM, 0);
 
   if (fd == -1) {
     socket->loop->error = errno;
@@ -616,7 +624,7 @@ btc_socket_bind(btc__socket_t *socket, const btc_sockaddr_t *addr) {
   if (!btc_socket_setaddr(socket, addr))
     return 0;
 
-  fd = safe_socket(socket->addr->sa_family, SOCK_DGRAM, 0);
+  fd = safe_socket(btc_sockaddr_protocol(addr), SOCK_DGRAM, 0);
 
   if (fd == -1) {
     socket->loop->error = errno;

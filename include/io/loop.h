@@ -79,6 +79,9 @@ BTC_EXTERN size_t
 btc_socket_buffered(btc_socket_t *socket);
 
 BTC_EXTERN int
+btc_socket_write(btc_socket_t *socket, unsigned char *raw, size_t len);
+
+BTC_EXTERN int
 btc_socket_send(btc_socket_t *socket,
                 unsigned char *raw,
                 size_t len,
@@ -120,15 +123,6 @@ btc_loop_bind(btc_loop_t *loop, const struct btc_sockaddr_s *addr);
 
 BTC_EXTERN btc_socket_t *
 btc_loop_talk(btc_loop_t *loop, int family);
-
-BTC_EXTERN void
-btc_loop_write(btc_loop_t *loop,
-               const char *name,
-               unsigned int mode,
-               const void *data,
-               size_t size,
-               btc_loop_write_file_cb *callback,
-               void *arg);
 
 BTC_EXTERN void
 btc_loop_start(btc_loop_t *loop);
