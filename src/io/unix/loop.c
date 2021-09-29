@@ -516,7 +516,6 @@ btc_socket_setaddr(btc__socket_t *socket, const btc_sockaddr_t *addr) {
 
 static int
 btc_socket_listen(btc__socket_t *server, const btc_sockaddr_t *addr, int max) {
-  int option = 1;
   int fd;
 
   if (!btc_socket_setaddr(server, addr))
@@ -529,7 +528,19 @@ btc_socket_listen(btc__socket_t *server, const btc_sockaddr_t *addr, int max) {
     return 0;
   }
 
-  setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+  {
+    int yes = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+  }
+
+  /* https://stackoverflow.com/questions/1618240 */
+  /* https://datatracker.ietf.org/doc/html/rfc3493#section-5.3 */
+#ifdef IPV6_V6ONLY
+  if (addr->family == 6 && btc_sockaddr_is_null(addr)) {
+    int no = 0;
+    setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &no, sizeof(no));
+  }
+#endif
 
   if (bind(fd, server->addr, server->addrlen) == -1) {
     server->loop->error = errno;
