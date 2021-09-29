@@ -606,7 +606,7 @@ btc_peer_accept(btc_peer_t *peer, btc_socket_t *socket) {
 
 static void
 btc_peer_close(btc_peer_t *peer) {
-  btc_socket_kill(peer->socket);
+  btc_socket_close(peer->socket);
   peer->state = BTC_PEER_DEAD;
 }
 
@@ -2106,7 +2106,7 @@ btc_pool_open(struct btc_pool_s *pool) {
   btc_pool_log(pool, "Listening on %S.", &addr);
 
   if (!btc_addrman_open(pool->addrman)) {
-    btc_socket_kill(server);
+    btc_socket_close(server);
     return 0;
   }
 
@@ -2123,7 +2123,7 @@ btc_pool_open(struct btc_pool_s *pool) {
 
 void
 btc_pool_close(struct btc_pool_s *pool) {
-  btc_socket_kill(pool->server);
+  btc_socket_close(pool->server);
   btc_peers_close(&pool->peers);
   btc_pool_clear_chain(pool);
   btc_addrman_close(pool->addrman);

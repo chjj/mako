@@ -90,9 +90,6 @@ btc_socket_send(btc_socket_t *socket,
 BTC_EXTERN void
 btc_socket_close(btc_socket_t *socket);
 
-BTC_EXTERN void
-btc_socket_kill(btc_socket_t *socket);
-
 /*
  * Loop
  */
