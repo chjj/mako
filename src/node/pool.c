@@ -165,6 +165,7 @@ struct btc_pool_s {
   btc_addrman_t *addrman;
   btc_chain_t *chain;
   btc_mempool_t *mempool;
+  btc_socket_t *server;
   btc_peers_t peers;
   btc_nonces_t nonces;
   btc_hashset_t *block_map;
@@ -1959,6 +1960,7 @@ btc_pool_create(const btc_network_t *network,
   pool->addrman = btc_addrman_create(network);
   pool->chain = chain;
   pool->mempool = mempool;
+  pool->server = NULL;
   btc_peers_init(&pool->peers);
   btc_nonces_init(&pool->nonces);
   pool->block_map = btc_hashset_create();
@@ -2079,20 +2081,49 @@ btc_pool_reset_chain(struct btc_pool_s *pool) {
 
 int
 btc_pool_open(struct btc_pool_s *pool) {
+  btc_socket_t *server;
+  btc_sockaddr_t addr;
+
   btc_pool_log(pool, "Opening pool.");
 
-  if (!btc_addrman_open(pool->addrman))
+  btc_sockaddr_init(&addr);
+
+  addr.family = 4;
+  addr.raw[0] = 127;
+  addr.raw[3] = 1;
+  addr.port = pool->network->port;
+
+  server = btc_loop_listen(pool->loop, &addr, pool->max_inbound);
+
+  if (server == NULL) {
+    const char *msg = btc_loop_strerror(pool->loop);
+
+    btc_pool_log(pool, "Could not listen on %S: %s.", &addr, msg);
+
     return 0;
+  }
+
+  btc_pool_log(pool, "Listening on %S.", &addr);
+
+  if (!btc_addrman_open(pool->addrman)) {
+    btc_socket_kill(server);
+    return 0;
+  }
 
   pool->synced = btc_chain_synced(pool->chain);
 
   btc_pool_reset_chain(pool);
+
+  pool->server = server;
+
+  btc_socket_on_socket(server, on_socket);
 
   return 1;
 }
 
 void
 btc_pool_close(struct btc_pool_s *pool) {
+  btc_socket_kill(pool->server);
   btc_peers_close(&pool->peers);
   btc_pool_clear_chain(pool);
   btc_addrman_close(pool->addrman);

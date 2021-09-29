@@ -18,7 +18,13 @@
 #include <unistd.h>
 #include <io/core.h>
 #include <io/loop.h>
-#include "../../internal.h" /* XXX */
+
+/*
+ * Macros
+ */
+
+#define CHECK(x) do { if (!(x)) abort(); } while (0)
+#define lengthof(x) (sizeof(x) / sizeof((x)[0]))
 
 /*
  * Constants
@@ -31,7 +37,13 @@ enum btc_socket_state {
   BTC_SOCKET_CONNECTING,
   BTC_SOCKET_CONNECTED,
   BTC_SOCKET_DISCONNECTING,
-  BTC_SOCKET_LISTENING
+  BTC_SOCKET_LISTENING,
+  BTC_SOCKET_BOUND
+};
+
+enum btc_socket_flags {
+  BTC_FLAG_READ = 1 << 0,
+  BTC_FLAG_WRITE = 1 << 1
 };
 
 /*
@@ -39,6 +51,8 @@ enum btc_socket_state {
  */
 
 typedef struct chunk_s {
+  struct sockaddr *addr;
+  socklen_t addrlen;
   void *ptr;
   unsigned char *raw;
   size_t len;
@@ -50,21 +64,25 @@ typedef struct btc_socket_s {
   struct sockaddr_storage storage;
   struct sockaddr *addr;
   socklen_t addrlen;
+  int fd;
+  int state;
+  unsigned int flags;
+  size_t index;
   unsigned char buffer[65536];
   chunk_t *head;
   chunk_t *tail;
   size_t total;
   int draining;
-  int state;
-  int fd;
-  size_t index;
   btc_socket_connect_cb *on_socket;
   btc_socket_connect_cb *on_connect;
   btc_socket_connect_cb *on_disconnect;
   btc_socket_error_cb *on_error;
   btc_socket_data_cb *on_data;
   btc_socket_drain_cb *on_drain;
+  btc_socket_message_cb *on_message;
   void *data;
+  void *arg;
+  int error;
 } btc__socket_t;
 
 typedef struct btc_loop_s {
@@ -79,8 +97,26 @@ typedef struct btc_loop_s {
 } btc__loop_t;
 
 /*
+ * Helpers
+ */
+
+static void *
+safe_malloc(size_t size) {
+  void *ptr = malloc(size);
+
+  CHECK(ptr != NULL);
+
+  return ptr;
+}
+
+/*
  * Socket Helpers
  */
+
+static int
+set_nonblocking(int fd) {
+  return fcntl(fd, F_SETFL, O_NONBLOCK);
+}
 
 static int
 try_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
@@ -95,22 +131,14 @@ try_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
 
   fd = accept(sockfd, addr, addrlen);
 
-  if (fd == -1)
-    return -1;
-
 #ifdef FD_CLOEXEC
-  {
+  if (fd != -1) {
     int rc = fcntl(fd, F_GETFD);
 
     if (rc != -1)
       fcntl(fd, F_SETFD, rc | FD_CLOEXEC);
   }
 #endif
-
-  if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
-    close(fd);
-    return -1;
-  }
 
   return fd;
 }
@@ -144,22 +172,14 @@ safe_socket(int domain, int type, int protocol) {
 
   fd = socket(domain, type, protocol);
 
-  if (fd == -1)
-    return -1;
-
 #ifdef FD_CLOEXEC
-  {
+  if (fd != -1) {
     int rc = fcntl(fd, F_GETFD);
 
     if (rc != -1)
       fcntl(fd, F_SETFD, rc | FD_CLOEXEC);
   }
 #endif
-
-  if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
-    close(fd);
-    return -1;
-  }
 
   return fd;
 }
@@ -173,6 +193,52 @@ safe_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
   } while (rc == -1 && errno == EINTR);
 
   return rc;
+}
+
+/*
+ * File Helpers
+ */
+
+static int
+try_open(const char *name, int flags, unsigned int mode) {
+  int fd;
+
+#ifdef O_CLOEXEC
+  if (flags & O_CREAT)
+    fd = open(name, flags | O_CLOEXEC, mode);
+  else
+    fd = open(name, flags | O_CLOEXEC);
+
+  if (fd != -1 || errno != EINVAL)
+    return fd;
+#endif
+
+  if (flags & O_CREAT)
+    fd = open(name, flags, mode);
+  else
+    fd = open(name, flags);
+
+#ifdef FD_CLOEXEC
+  if (fd != -1) {
+    int rc = fcntl(fd, F_GETFD);
+
+    if (rc != -1)
+      fcntl(fd, F_SETFD, rc | FD_CLOEXEC);
+  }
+#endif
+
+  return fd;
+}
+
+static int
+safe_open(const char *name, int flags, unsigned int mode) {
+  int fd;
+
+  do {
+    fd = try_open(name, flags, mode);
+  } while (fd == -1 && errno == EINTR);
+
+  return fd;
 }
 
 /*
@@ -216,27 +282,31 @@ time_msec(void) {
 
 static btc__socket_t *
 btc_socket_create(btc__loop_t *loop) {
-  btc__socket_t *socket = (btc__socket_t *)btc_malloc(sizeof(btc__socket_t));
+  btc__socket_t *socket = (btc__socket_t *)safe_malloc(sizeof(btc__socket_t));
 
   memset(socket, 0, sizeof(*socket));
 
   socket->loop = loop;
   socket->addr = (struct sockaddr *)&socket->storage;
   socket->addrlen = 0;
+  socket->fd = -1;
+  socket->state = BTC_SOCKET_DISCONNECTED;
+  socket->flags = 0;
+  socket->index = 0;
   socket->head = NULL;
   socket->tail = NULL;
   socket->total = 0;
   socket->draining = 0;
-  socket->state = BTC_SOCKET_DISCONNECTED;
-  socket->fd = -1;
-  socket->index = 0;
   socket->on_socket = NULL;
   socket->on_connect = NULL;
   socket->on_disconnect = NULL;
   socket->on_error = NULL;
   socket->on_data = NULL;
   socket->on_drain = NULL;
+  socket->on_message = NULL;
   socket->data = NULL;
+  socket->arg = NULL;
+  socket->error = 0;
 
   return socket;
 }
@@ -248,8 +318,11 @@ btc_socket_destroy(btc__socket_t *socket) {
   for (chunk = socket->head; chunk != NULL; chunk = next) {
     next = chunk->next;
 
-    btc_free(chunk->ptr);
-    btc_free(chunk);
+    if (chunk->addr != NULL)
+      free(chunk->addr);
+
+    free(chunk->ptr);
+    free(chunk);
   }
 
   socket->head = NULL;
@@ -257,7 +330,7 @@ btc_socket_destroy(btc__socket_t *socket) {
   socket->total = 0;
   socket->draining = 0;
 
-  btc_free(socket);
+  free(socket);
 }
 
 btc__loop_t *
@@ -302,6 +375,11 @@ btc_socket_on_drain(btc__socket_t *socket, btc_socket_drain_cb *handler) {
 }
 
 void
+btc_socket_on_message(btc_socket_t *socket, btc_socket_message_cb *handler) {
+  socket->on_message = handler;
+}
+
+void
 btc_socket_set_data(btc__socket_t *socket, void *data) {
   socket->data = data;
 }
@@ -323,19 +401,14 @@ btc_socket_buffered(btc__socket_t *socket) {
 
 static int
 btc_socket_setaddr(btc__socket_t *socket, const btc_sockaddr_t *addr) {
+  if (addr->family != 4 && addr->family != 6)
+    return 0;
+
   btc_sockaddr_get(socket->addr, addr);
 
-  if (socket->addr->sa_family == PF_INET) {
-    socket->addrlen = sizeof(struct sockaddr_in);
-    return 1;
-  }
+  socket->addrlen = btc_sockaddr_size(addr);
 
-  if (socket->addr->sa_family == PF_INET6) {
-    socket->addrlen = sizeof(struct sockaddr_in6);
-    return 1;
-  }
-
-  return 0;
+  return 1;
 }
 
 static int
@@ -369,8 +442,15 @@ btc_socket_listen(btc__socket_t *server, const btc_sockaddr_t *addr, int max) {
     return 0;
   }
 
+  if (set_nonblocking(fd) == -1) {
+    server->loop->error = errno;
+    close(fd);
+    return 0;
+  }
+
   server->fd = fd;
   server->state = BTC_SOCKET_LISTENING;
+  server->flags = BTC_FLAG_READ | BTC_FLAG_WRITE;
 
   return 1;
 }
@@ -390,8 +470,15 @@ btc_socket_accept(btc__socket_t *socket, btc__socket_t *server) {
     return 0;
   }
 
+  if (set_nonblocking(fd) == -1) {
+    socket->loop->error = errno;
+    close(fd);
+    return 0;
+  }
+
   socket->fd = fd;
   socket->state = BTC_SOCKET_CONNECTED;
+  socket->flags = BTC_FLAG_READ | BTC_FLAG_WRITE;
 
   return 1;
 }
@@ -412,6 +499,12 @@ btc_socket_connect(btc__socket_t *socket, const btc_sockaddr_t *addr) {
     return 0;
   }
 
+  if (set_nonblocking(fd) == -1) {
+    socket->loop->error = errno;
+    close(fd);
+    return 0;
+  }
+
   CHECK(safe_connect(fd, socket->addr, socket->addrlen) == -1);
   CHECK(errno != EISCONN);
 
@@ -423,12 +516,108 @@ btc_socket_connect(btc__socket_t *socket, const btc_sockaddr_t *addr) {
 
   socket->fd = fd;
   socket->state = BTC_SOCKET_CONNECTING;
+  socket->flags = BTC_FLAG_READ | BTC_FLAG_WRITE;
 
   return 1;
 }
 
 static int
-btc_socket_flush(btc__socket_t *socket) {
+btc_socket_bind(btc__socket_t *socket, const btc_sockaddr_t *addr) {
+  int fd;
+
+  if (!btc_socket_setaddr(socket, addr)) {
+    socket->loop->error = EAFNOSUPPORT;
+    return 0;
+  }
+
+  fd = safe_socket(socket->addr->sa_family, SOCK_DGRAM, 0);
+
+  if (fd == -1) {
+    socket->loop->error = errno;
+    return 0;
+  }
+
+  if (bind(fd, socket->addr, socket->addrlen) == -1) {
+    socket->loop->error = errno;
+    close(fd);
+    return 0;
+  }
+
+  if (set_nonblocking(fd) == -1) {
+    socket->loop->error = errno;
+    close(fd);
+    return 0;
+  }
+
+  socket->fd = fd;
+  socket->state = BTC_SOCKET_BOUND;
+  socket->flags = BTC_FLAG_READ | BTC_FLAG_WRITE;
+
+  return 1;
+}
+
+static int
+btc_socket_talk(btc__socket_t *socket, int family) {
+  int fd;
+
+  if (family != 4 && family != 6) {
+    socket->loop->error = EAFNOSUPPORT;
+    return 0;
+  }
+
+  fd = safe_socket(family == 4 ? PF_INET : PF_INET6, SOCK_DGRAM, 0);
+
+  if (fd == -1) {
+    socket->loop->error = errno;
+    return 0;
+  }
+
+  if (set_nonblocking(fd) == -1) {
+    socket->loop->error = errno;
+    close(fd);
+    return 0;
+  }
+
+  socket->fd = fd;
+  socket->state = BTC_SOCKET_BOUND;
+  socket->flags = BTC_FLAG_READ | BTC_FLAG_WRITE;
+
+  return 1;
+}
+
+static int
+btc_socket_open(btc__socket_t *socket,
+                const char *name,
+                int flags,
+                unsigned int mode) {
+  int fd = safe_open(name, flags, mode);
+
+  if (fd == -1) {
+    socket->loop->error = errno;
+    return 0;
+  }
+
+  if (set_nonblocking(fd) == -1) {
+    socket->loop->error = errno;
+    close(fd);
+    return 0;
+  }
+
+  socket->fd = fd;
+  socket->state = BTC_SOCKET_CONNECTED;
+
+  if (flags & O_RDWR)
+    socket->flags = BTC_FLAG_READ | BTC_FLAG_WRITE;
+  else if (flags & O_WRONLY)
+    socket->flags = BTC_FLAG_WRITE;
+  else
+    socket->flags = BTC_FLAG_READ;
+
+  return 1;
+}
+
+static int
+btc_socket_flush_write(btc__socket_t *socket) {
   chunk_t *chunk, *next;
   int len;
 
@@ -472,8 +661,8 @@ btc_socket_flush(btc__socket_t *socket) {
       return 0;
     }
 
-    btc_free(chunk->ptr);
-    btc_free(chunk);
+    free(chunk->ptr);
+    free(chunk);
 
     socket->head = next;
   }
@@ -502,8 +691,10 @@ btc_socket_write(btc__socket_t *socket, unsigned char *raw, size_t len) {
     return -1;
   }
 
-  chunk = (chunk_t *)btc_malloc(sizeof(chunk_t));
+  chunk = (chunk_t *)safe_malloc(sizeof(chunk_t));
 
+  chunk->addr = NULL;
+  chunk->addrlen = 0;
   chunk->ptr = raw;
   chunk->raw = raw;
   chunk->len = len;
@@ -523,7 +714,102 @@ btc_socket_write(btc__socket_t *socket, unsigned char *raw, size_t len) {
     return 0;
   }
 
-  return btc_socket_flush(socket);
+  return btc_socket_flush_write(socket);
+}
+
+static int
+btc_socket_flush_send(btc__socket_t *socket) {
+  chunk_t *chunk, *next;
+  int len;
+
+  for (chunk = socket->head; chunk != NULL; chunk = next) {
+    next = chunk->next;
+
+    CHECK(chunk->len <= INT_MAX);
+
+    socket->loop->error = 0;
+
+    for (;;) {
+      len = sendto(socket->fd,
+                   chunk->raw,
+                   chunk->len,
+                   0,
+                   chunk->addr,
+                   chunk->addrlen);
+
+      if (len == -1) {
+        if (errno == EINTR)
+          continue;
+
+        if (errno == EAGAIN)
+          return 0;
+
+        if (errno == EWOULDBLOCK)
+          return 0;
+
+        socket->loop->error = errno;
+      }
+
+      break;
+    }
+
+    socket->total -= chunk->len;
+
+    free(chunk->addr);
+    free(chunk->ptr);
+    free(chunk);
+
+    socket->head = next;
+
+    if (socket->head == NULL)
+      socket->tail = NULL;
+
+    if (socket->loop->error != 0)
+      return -1;
+  }
+
+  CHECK(socket->total == 0);
+
+  socket->head = NULL;
+  socket->tail = NULL;
+  socket->total = 0;
+
+  return 1;
+}
+
+int
+btc_socket_send(btc__socket_t *socket,
+                unsigned char *raw,
+                size_t len,
+                const btc_sockaddr_t *addr) {
+  chunk_t *chunk;
+
+  if (socket->state != BTC_SOCKET_BOUND) {
+    socket->loop->error = EPIPE;
+    return -1;
+  }
+
+  chunk = (chunk_t *)safe_malloc(sizeof(chunk_t));
+
+  chunk->addr = (struct sockaddr *)safe_malloc(sizeof(struct sockaddr_storage));
+  chunk->addrlen = btc_sockaddr_size(addr);
+  chunk->ptr = raw;
+  chunk->raw = raw;
+  chunk->len = len;
+  chunk->next = NULL;
+
+  btc_sockaddr_get(chunk->addr, addr);
+
+  if (socket->head == NULL)
+    socket->head = chunk;
+
+  if (socket->tail != NULL)
+    socket->tail->next = chunk;
+
+  socket->tail = chunk;
+  socket->total += len;
+
+  return btc_socket_flush_send(socket);
 }
 
 void
@@ -533,8 +819,11 @@ btc_socket_close(btc__socket_t *socket) {
   for (chunk = socket->head; chunk != NULL; chunk = next) {
     next = chunk->next;
 
-    btc_free(chunk->ptr);
-    btc_free(chunk);
+    if (chunk->addr != NULL)
+      free(chunk->addr);
+
+    free(chunk->ptr);
+    free(chunk);
   }
 
   socket->head = NULL;
@@ -562,7 +851,7 @@ btc_socket_kill(btc__socket_t *socket) {
 
 btc__loop_t *
 btc_loop_create(void) {
-  btc__loop_t *loop = (btc__loop_t *)btc_malloc(sizeof(btc__loop_t));
+  btc__loop_t *loop = (btc__loop_t *)safe_malloc(sizeof(btc__loop_t));
 
   memset(loop, 0, sizeof(*loop));
 
@@ -578,7 +867,7 @@ void
 btc_loop_destroy(btc__loop_t *loop) {
   CHECK(loop->running == 0);
 
-  btc_free(loop);
+  free(loop);
 }
 
 void
@@ -656,6 +945,117 @@ btc_loop_connect(btc__loop_t *loop, const btc_sockaddr_t *addr) {
   return socket;
 }
 
+btc__socket_t *
+btc_loop_bind(btc__loop_t *loop, const btc_sockaddr_t *addr) {
+  btc__socket_t *socket = btc_socket_create(loop);
+
+  if (!btc_socket_bind(socket, addr)) {
+    btc_socket_destroy(socket);
+    return NULL;
+  }
+
+  btc_loop_register(loop, socket);
+
+  return socket;
+}
+
+btc__socket_t *
+btc_loop_talk(btc__loop_t *loop, int family) {
+  btc__socket_t *socket = btc_socket_create(loop);
+
+  if (!btc_socket_talk(socket, family)) {
+    btc_socket_destroy(socket);
+    return NULL;
+  }
+
+  btc_loop_register(loop, socket);
+
+  return socket;
+}
+
+static btc__socket_t *
+btc_loop_open(btc__loop_t *loop,
+              const char *name,
+              int flags,
+              unsigned int mode) {
+  btc__socket_t *socket = btc_socket_create(loop);
+
+  if (!btc_socket_open(socket, name, flags, mode)) {
+    btc_socket_destroy(socket);
+    return NULL;
+  }
+
+  btc_loop_register(loop, socket);
+
+  return socket;
+}
+
+static void
+write_on_error(btc__socket_t *socket) {
+  socket->error = socket->loop->error;
+  btc_socket_kill(socket);
+}
+
+static void
+write_on_drain(btc__socket_t *socket) {
+  socket->error = 0;
+  btc_socket_kill(socket);
+}
+
+static void
+write_on_disconnect(btc__socket_t *socket) {
+  btc_loop_write_file_cb *callback = (btc_loop_write_file_cb *)socket->data;
+
+  if (socket->error != 0)
+    callback(strerror(socket->error), socket->arg);
+  else
+    callback(NULL, socket->arg);
+}
+
+void
+btc_loop_write(btc__loop_t *loop,
+               const char *name,
+               unsigned int mode,
+               const void *data,
+               size_t size,
+               btc_loop_write_file_cb *callback,
+               void *arg) {
+  /* Write a file asynchronously. This really does
+     not belong here, but it's hard to replicate
+     btc_loop_open on windows. Life is suffering. */
+  int flags = O_WRONLY | O_CREAT | O_TRUNC;
+  btc__socket_t *socket = btc_loop_open(loop, name, flags, mode);
+  int rc;
+
+  if (socket == NULL) {
+    callback(btc_loop_strerror(loop), arg);
+    return;
+  }
+
+  socket->on_disconnect = write_on_disconnect;
+  socket->on_error = write_on_error;
+  socket->on_drain = write_on_drain;
+  socket->data = (void *)callback;
+  socket->arg = arg;
+
+  rc = btc_socket_write(socket, (unsigned char *)data, size);
+
+  if (rc == -1) {
+    /* Error callback is not automatically
+       called by btc_socket_write. Maybe
+       change this in the future? */
+    write_on_error(socket);
+    return;
+  }
+
+  if (rc == 0) {
+    /* Wait for drain. */
+    return;
+  }
+
+  btc_socket_kill(socket);
+}
+
 static void
 handle_read(btc__loop_t *loop, btc__socket_t *socket) {
   switch (socket->state) {
@@ -679,6 +1079,9 @@ handle_read(btc__loop_t *loop, btc__socket_t *socket) {
       size_t size = sizeof(socket->buffer);
       int fd = socket->fd;
       int len;
+
+      if (!(socket->flags & BTC_FLAG_READ))
+        break;
 
       CHECK(size <= INT_MAX);
 
@@ -715,6 +1118,54 @@ handle_read(btc__loop_t *loop, btc__socket_t *socket) {
 
       break;
     }
+
+    case BTC_SOCKET_BOUND: {
+      unsigned char *buf = socket->buffer;
+      size_t size = sizeof(socket->buffer);
+      struct sockaddr_storage storage;
+      struct sockaddr *from = (struct sockaddr *)&storage;
+      int fd = socket->fd;
+      btc_sockaddr_t addr;
+      socklen_t fromlen;
+      int len;
+
+      if (!(socket->flags & BTC_FLAG_READ))
+        break;
+
+      CHECK(size <= INT_MAX);
+
+      while (socket->state == BTC_SOCKET_BOUND) {
+        memset(from, 0, sizeof(storage));
+        fromlen = sizeof(storage);
+
+        len = recvfrom(fd, buf, size, 0, from, &fromlen);
+
+        if (len == -1) {
+          if (errno == EINTR)
+            continue;
+
+          if (errno == EAGAIN)
+            break;
+
+          if (errno == EWOULDBLOCK)
+            break;
+
+          socket->loop->error = errno;
+          socket->on_error(socket);
+
+          break;
+        }
+
+        if ((size_t)len > size)
+          abort();
+
+        btc_sockaddr_set(&addr, from);
+
+        socket->on_message(socket, buf, len, &addr);
+      }
+
+      break;
+    }
   }
 }
 
@@ -744,8 +1195,22 @@ handle_write(btc__loop_t *loop, btc__socket_t *socket) {
     }
 
     case BTC_SOCKET_CONNECTED: {
-      if (btc_socket_flush(socket) == -1)
+      if (!(socket->flags & BTC_FLAG_WRITE))
+        break;
+
+      if (btc_socket_flush_write(socket) == -1)
         socket->on_error(socket);
+
+      break;
+    }
+
+    case BTC_SOCKET_BOUND: {
+      if (!(socket->flags & BTC_FLAG_WRITE))
+        break;
+
+      if (btc_socket_flush_send(socket) == -1)
+        socket->on_error(socket);
+
       break;
     }
   }

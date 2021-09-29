@@ -337,6 +337,9 @@ BTC_EXTERN void
 btc_sockaddr_get(struct sockaddr *z, const btc_sockaddr_t *x);
 
 BTC_EXTERN int
+btc_sockaddr_size(const btc_sockaddr_t *x);
+
+BTC_EXTERN int
 btc_sockaddr_import(btc_sockaddr_t *z, const char *xp, int port);
 
 BTC_EXTERN void

@@ -89,6 +89,17 @@ btc_sockaddr_get(struct sockaddr *z, const btc_sockaddr_t *x) {
 }
 
 int
+btc_sockaddr_size(const btc_sockaddr_t *x) {
+  if (x->family == 4)
+    return sizeof(struct sockaddr_in);
+
+  if (x->family == 6)
+    return sizeof(struct sockaddr_in6);
+
+  return 0;
+}
+
+int
 btc_sockaddr_import(btc_sockaddr_t *z, const char *xp, int port) {
   struct sockaddr_storage storage;
   struct sockaddr *sa = (struct sockaddr *)&storage;
