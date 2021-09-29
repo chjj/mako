@@ -79,9 +79,6 @@ BTC_EXTERN size_t
 btc_socket_buffered(btc_socket_t *socket);
 
 BTC_EXTERN int
-btc_socket_write(btc_socket_t *socket, unsigned char *raw, size_t len);
-
-BTC_EXTERN int
 btc_socket_send(btc_socket_t *socket,
                 unsigned char *raw,
                 size_t len,

@@ -130,11 +130,6 @@ enum btc_socket_state {
   BTC_SOCKET_BOUND
 };
 
-enum btc_socket_flags {
-  BTC_FLAG_READ = 1 << 0,
-  BTC_FLAG_WRITE = 1 << 1
-};
-
 /*
  * Types
  */
@@ -155,7 +150,6 @@ typedef struct btc_socket_s {
   socklen_t addrlen;
   int fd;
   int state;
-  unsigned int flags;
 #ifdef BTC_USE_POLL
   size_t index;
 #endif
@@ -172,8 +166,6 @@ typedef struct btc_socket_s {
   btc_socket_drain_cb *on_drain;
   btc_socket_message_cb *on_message;
   void *data;
-  void *arg;
-  int error;
   struct btc_socket_s *prev;
   struct btc_socket_s *next;
 } btc__socket_t;
@@ -327,52 +319,6 @@ safe_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
   } while (rc == -1 && errno == EINTR);
 
   return rc;
-}
-
-/*
- * File Helpers
- */
-
-static int
-try_open(const char *name, int flags, unsigned int mode) {
-  int fd;
-
-#ifdef O_CLOEXEC
-  if (flags & O_CREAT)
-    fd = open(name, flags | O_CLOEXEC, mode);
-  else
-    fd = open(name, flags | O_CLOEXEC);
-
-  if (fd != -1 || errno != EINVAL)
-    return fd;
-#endif
-
-  if (flags & O_CREAT)
-    fd = open(name, flags, mode);
-  else
-    fd = open(name, flags);
-
-#ifdef FD_CLOEXEC
-  if (fd != -1) {
-    int rc = fcntl(fd, F_GETFD);
-
-    if (rc != -1)
-      fcntl(fd, F_SETFD, rc | FD_CLOEXEC);
-  }
-#endif
-
-  return fd;
-}
-
-static int
-safe_open(const char *name, int flags, unsigned int mode) {
-  int fd;
-
-  do {
-    fd = try_open(name, flags, mode);
-  } while (fd == -1 && errno == EINTR);
-
-  return fd;
 }
 
 /*
@@ -597,7 +543,6 @@ btc_socket_listen(btc__socket_t *server, const btc_sockaddr_t *addr, int max) {
 
   server->fd = fd;
   server->state = BTC_SOCKET_LISTENING;
-  server->flags = BTC_FLAG_READ | BTC_FLAG_WRITE;
 
   return 1;
 }
@@ -625,7 +570,6 @@ btc_socket_accept(btc__socket_t *socket, btc__socket_t *server) {
 
   socket->fd = fd;
   socket->state = BTC_SOCKET_CONNECTED;
-  socket->flags = BTC_FLAG_READ | BTC_FLAG_WRITE;
 
   return 1;
 }
@@ -661,7 +605,6 @@ btc_socket_connect(btc__socket_t *socket, const btc_sockaddr_t *addr) {
 
   socket->fd = fd;
   socket->state = BTC_SOCKET_CONNECTING;
-  socket->flags = BTC_FLAG_READ | BTC_FLAG_WRITE;
 
   return 1;
 }
@@ -694,7 +637,6 @@ btc_socket_bind(btc__socket_t *socket, const btc_sockaddr_t *addr) {
 
   socket->fd = fd;
   socket->state = BTC_SOCKET_BOUND;
-  socket->flags = BTC_FLAG_READ | BTC_FLAG_WRITE;
 
   return 1;
 }
@@ -727,38 +669,6 @@ btc_socket_talk(btc__socket_t *socket, int family) {
 
   socket->fd = fd;
   socket->state = BTC_SOCKET_BOUND;
-  socket->flags = BTC_FLAG_READ | BTC_FLAG_WRITE;
-
-  return 1;
-}
-
-static int
-btc_socket_open(btc__socket_t *socket,
-                const char *name,
-                int flags,
-                unsigned int mode) {
-  int fd = safe_open(name, flags, mode);
-
-  if (fd == -1) {
-    socket->loop->error = errno;
-    return 0;
-  }
-
-  if (set_nonblocking(fd) == -1) {
-    socket->loop->error = errno;
-    close(fd);
-    return 0;
-  }
-
-  socket->fd = fd;
-  socket->state = BTC_SOCKET_CONNECTED;
-
-  if (flags & O_RDWR)
-    socket->flags = BTC_FLAG_READ | BTC_FLAG_WRITE;
-  else if (flags & O_WRONLY)
-    socket->flags = BTC_FLAG_WRITE;
-  else
-    socket->flags = BTC_FLAG_READ;
 
   return 1;
 }
@@ -1252,93 +1162,6 @@ fail:
   return NULL;
 }
 
-static btc__socket_t *
-btc_loop_open(btc__loop_t *loop,
-              const char *name,
-              int flags,
-              unsigned int mode) {
-  btc__socket_t *socket = btc_socket_create(loop);
-
-  if (!btc_socket_open(socket, name, flags, mode))
-    goto fail;
-
-  if (!btc_loop_register(loop, socket)) {
-    close(socket->fd);
-    goto fail;
-  }
-
-  return socket;
-fail:
-  btc_socket_destroy(socket);
-  return NULL;
-}
-
-static void
-write_on_error(btc__socket_t *socket) {
-  socket->error = socket->loop->error;
-  btc_socket_close(socket);
-}
-
-static void
-write_on_drain(btc__socket_t *socket) {
-  socket->error = 0;
-  btc_socket_close(socket);
-}
-
-static void
-write_on_disconnect(btc__socket_t *socket) {
-  btc_loop_write_file_cb *callback = (btc_loop_write_file_cb *)socket->data;
-
-  if (socket->error != 0)
-    callback(strerror(socket->error), socket->arg);
-  else
-    callback(NULL, socket->arg);
-}
-
-void
-btc_loop_write(btc__loop_t *loop,
-               const char *name,
-               unsigned int mode,
-               const void *data,
-               size_t size,
-               btc_loop_write_file_cb *callback,
-               void *arg) {
-  /* Write a file asynchronously. This really does
-     not belong here, but it's hard to replicate
-     btc_loop_open on windows. Life is suffering. */
-  int flags = O_WRONLY | O_CREAT | O_TRUNC;
-  btc__socket_t *socket = btc_loop_open(loop, name, flags, mode);
-  int rc;
-
-  if (socket == NULL) {
-    callback(btc_loop_strerror(loop), arg);
-    return;
-  }
-
-  socket->on_disconnect = write_on_disconnect;
-  socket->on_error = write_on_error;
-  socket->on_drain = write_on_drain;
-  socket->data = (void *)callback;
-  socket->arg = arg;
-
-  rc = btc_socket_write(socket, (unsigned char *)data, size);
-
-  if (rc == -1) {
-    /* Error callback is not automatically
-       called by btc_socket_write. Maybe
-       change this in the future? */
-    write_on_error(socket);
-    return;
-  }
-
-  if (rc == 0) {
-    /* Wait for drain. */
-    return;
-  }
-
-  btc_socket_close(socket);
-}
-
 static void
 handle_read(btc__loop_t *loop, btc__socket_t *socket) {
   switch (socket->state) {
@@ -1366,9 +1189,6 @@ fail:
       size_t size = sizeof(socket->buffer);
       int fd = socket->fd;
       int len;
-
-      if (!(socket->flags & BTC_FLAG_READ))
-        break;
 
       CHECK(size <= INT_MAX);
 
@@ -1415,9 +1235,6 @@ fail:
       btc_sockaddr_t addr;
       socklen_t fromlen;
       int len;
-
-      if (!(socket->flags & BTC_FLAG_READ))
-        break;
 
       CHECK(size <= INT_MAX);
 
@@ -1483,9 +1300,6 @@ handle_write(btc__loop_t *loop, btc__socket_t *socket) {
     }
 
     case BTC_SOCKET_CONNECTED: {
-      if (!(socket->flags & BTC_FLAG_WRITE))
-        break;
-
       if (btc_socket_flush_write(socket) == -1)
         socket->on_error(socket);
 
@@ -1493,9 +1307,6 @@ handle_write(btc__loop_t *loop, btc__socket_t *socket) {
     }
 
     case BTC_SOCKET_BOUND: {
-      if (!(socket->flags & BTC_FLAG_WRITE))
-        break;
-
       if (btc_socket_flush_send(socket) == -1)
         socket->on_error(socket);
 
