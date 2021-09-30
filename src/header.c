@@ -7,9 +7,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <satoshi/crypto/hash.h>
 #include <satoshi/header.h>
 #include <satoshi/util.h>
-#include <satoshi/crypto/hash.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -124,41 +124,38 @@ btc_header_verify(const btc_header_t *hdr) {
 }
 
 int
-btc_header_mine(btc_header_t *hdr,
-                const uint8_t *target,
-                uint64_t limit,
-                int64_t (*adjtime)(void *),
-                void *arg) {
-  uint64_t attempt = 0;
+btc_header_mine(btc_header_t *hdr, uint32_t limit) {
   btc_hash256_t pre, ctx;
+  uint32_t attempt = 0;
+  uint8_t target[32];
   uint8_t hash[32];
+
+  CHECK(btc_compact_export(target, hdr->bits));
 
   memset(&pre, 0, sizeof(pre));
 
-  for (;;) {
-    hdr->time = adjtime(arg);
+  btc_hash256_init(&pre);
 
-    btc_hash256_init(&pre);
+  btc_uint32_update(&pre, hdr->version);
+  btc_raw_update(&pre, hdr->prev_block, 32);
+  btc_raw_update(&pre, hdr->merkle_root, 32);
+  btc_time_update(&pre, hdr->time);
+  btc_uint32_update(&pre, hdr->bits);
 
-    btc_uint32_update(&pre, hdr->version);
-    btc_raw_update(&pre, hdr->prev_block, 32);
-    btc_raw_update(&pre, hdr->merkle_root, 32);
-    btc_time_update(&pre, hdr->time);
-    btc_uint32_update(&pre, hdr->bits);
+  do {
+    ctx = pre;
 
-    do {
-      ctx = pre;
+    btc_uint32_update(&ctx, hdr->nonce);
+    btc_hash256_final(&ctx, hash);
 
-      btc_uint32_update(&ctx, hdr->nonce);
-      btc_hash256_final(&ctx, hash);
+    if (btc_hash_compare(hash, target) <= 0)
+      return 1;
 
-      if (btc_hash_compare(hash, target) <= 0)
-        return 1;
+    hdr->nonce++;
 
-      hdr->nonce++;
+    if (++attempt == limit)
+      return 0;
+  } while (hdr->nonce != 0);
 
-      if (limit > 0 && ++attempt == limit)
-        return 0;
-    } while (hdr->nonce != 0);
-  }
+  return 0;
 }

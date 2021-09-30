@@ -14,7 +14,129 @@ extern "C" {
 #include <stddef.h>
 #include "types.h"
 #include "../satoshi/common.h"
+#include "../satoshi/impl.h"
 #include "../satoshi/types.h"
+
+/*
+ * Types
+ */
+
+typedef struct btc_blockentry_s {
+  btc_tx_t *tx;
+  const uint8_t *hash;
+  const uint8_t *whash;
+  int64_t fee;
+  int64_t rate;
+  size_t weight;
+  int sigops;
+  int64_t desc_rate;
+  int dep_count;
+} btc_blockentry_t;
+
+typedef struct btc_blockproof_s {
+  uint8_t hash[32];
+  uint8_t root[32];
+  uint32_t nonce1;
+  uint32_t nonce2;
+  int64_t time;
+  uint32_t nonce;
+} btc_blockproof_t;
+
+typedef struct btc_tmpl_s {
+  uint32_t version;
+  uint8_t prev_block[32];
+  int64_t time;
+  uint32_t bits;
+  int32_t height;
+  int64_t mtp;
+  unsigned int flags;
+  int32_t interval;
+  size_t weight;
+  int sigops;
+  int64_t fees;
+  uint8_t commitment[32];
+  btc_buffer_t cbflags;
+  btc_address_t address;
+  btc_vector_t txs;
+} btc_tmpl_t;
+
+/*
+ * Block Template
+ */
+
+BTC_DEFINE_OBJECT(btc_tmpl, BTC_EXTERN)
+
+BTC_EXTERN void
+btc_tmpl_init(btc_tmpl_t *bt);
+
+BTC_EXTERN void
+btc_tmpl_clear(btc_tmpl_t *bt);
+
+BTC_EXTERN void
+btc_tmpl_copy(btc_tmpl_t *z, const btc_tmpl_t *x);
+
+BTC_EXTERN int64_t
+btc_tmpl_reward(const btc_tmpl_t *bt);
+
+BTC_EXTERN int
+btc_tmpl_witness(const btc_tmpl_t *bt);
+
+BTC_EXTERN int64_t
+btc_tmpl_locktime(const btc_tmpl_t *bt);
+
+BTC_EXTERN void
+btc_tmpl_refresh(btc_tmpl_t *bt);
+
+BTC_EXTERN btc_tx_t *
+btc_tmpl_coinbase(const btc_tmpl_t *bt, uint32_t nonce1, uint32_t nonce2);
+
+BTC_EXTERN void
+btc_tmpl_compute(uint8_t *root, const btc_tmpl_t *bt, const uint8_t *hash);
+
+BTC_EXTERN void
+btc_tmpl_root(uint8_t *root,
+              const btc_tmpl_t *bt,
+              uint32_t nonce1,
+              uint32_t nonce2);
+
+BTC_EXTERN void
+btc_tmpl_header(btc_header_t *hdr,
+                const btc_tmpl_t *bt,
+                const uint8_t *root,
+                int64_t time,
+                uint32_t nonce);
+
+BTC_EXTERN int
+btc_tmpl_prove(btc_blockproof_t *proof,
+               const btc_tmpl_t *bt,
+               uint32_t nonce1,
+               uint32_t nonce2,
+               int64_t time,
+               uint32_t nonce);
+
+BTC_EXTERN btc_block_t *
+btc_tmpl_commit(const btc_tmpl_t *bt, const btc_blockproof_t *proof);
+
+BTC_EXTERN void
+btc_tmpl_getwork(btc_header_t *hdr,
+                 const btc_tmpl_t *bt,
+                 uint32_t nonce1,
+                 uint32_t nonce2);
+
+BTC_EXTERN btc_block_t *
+btc_tmpl_submitwork(const btc_tmpl_t *bt,
+                    const btc_header_t *hdr,
+                    uint32_t nonce1,
+                    uint32_t nonce2);
+
+BTC_EXTERN btc_block_t *
+btc_tmpl_mine(const btc_tmpl_t *bt);
+
+BTC_EXTERN void
+btc_tmpl_push(btc_tmpl_t *bt, const btc_tx_t *tx, const btc_view_t *view);
+
+BTC_EXTERN int
+btc_tmpl_add(btc_tmpl_t *bt, const btc_tx_t *tx, const btc_view_t *view);
 
 /*
  * Miner
