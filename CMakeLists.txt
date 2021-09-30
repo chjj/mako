@@ -53,6 +53,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/consensus.c
                             src/entry.c
                             src/header.c
+                            src/heap.c
                             src/input.c
                             src/inpvec.c
                             src/internal.c
@@ -206,6 +207,7 @@ set(tests # crypto
           coin
           entry
           header
+          heap
           input
           "list"
           map
