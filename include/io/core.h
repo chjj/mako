@@ -103,6 +103,11 @@ extern "C" {
 #define BTC_INET_ADDRSTRLEN 22
 #define BTC_INET6_ADDRSTRLEN 65
 
+#define BTC_AF_UNSPEC 0
+#define BTC_AF_INET 4
+#define BTC_AF_INET6 6
+#define BTC_AF_UNIX 10
+
 /*
  * Structs
  */
@@ -143,7 +148,8 @@ typedef struct btc_rwlock_s btc_rwlock_t;
 
 typedef struct btc_sockaddr_s {
   int family;
-  uint8_t raw[16];
+  uint8_t raw[32];
+  char path[108];
   int port;
   struct btc_sockaddr_s *next;
 } btc_sockaddr_t;
@@ -331,27 +337,15 @@ BTC_EXTERN void
 btc_sockaddr_init(btc_sockaddr_t *addr);
 
 BTC_EXTERN int
-btc_sockaddr_size(const btc_sockaddr_t *x);
-
-BTC_EXTERN int
-btc_sockaddr_family(const btc_sockaddr_t *x);
-
-BTC_EXTERN int
-btc_sockaddr_protocol(const btc_sockaddr_t *x);
-
-BTC_EXTERN int
-btc_sockaddr_is_null(const btc_sockaddr_t *x);
-
-BTC_EXTERN int
 btc_sockaddr_set(btc_sockaddr_t *z, const struct sockaddr *x);
 
-BTC_EXTERN void
+BTC_EXTERN int
 btc_sockaddr_get(struct sockaddr *z, const btc_sockaddr_t *x);
 
 BTC_EXTERN int
 btc_sockaddr_import(btc_sockaddr_t *z, const char *xp, int port);
 
-BTC_EXTERN void
+BTC_EXTERN int
 btc_sockaddr_export(char *zp, int *port, const btc_sockaddr_t *x);
 
 /*

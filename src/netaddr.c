@@ -87,12 +87,19 @@ enum btc_reachability {
  * Types
  */
 
+/* Must match <io/core.h> exactly. */
 typedef struct btc_sockaddr_s {
   int family;
-  uint8_t raw[16];
+  uint8_t raw[32];
+  char path[108];
   int port;
   struct btc_sockaddr_s *next;
 } btc_sockaddr_t;
+
+#define BTC_AF_UNSPEC 0
+#define BTC_AF_INET 4
+#define BTC_AF_INET6 6
+#define BTC_AF_UNIX 10
 
 /*
  * Helpers
@@ -132,21 +139,6 @@ btc_netaddr_clear(btc_netaddr_t *addr) {
 void
 btc_netaddr_copy(btc_netaddr_t *z, const btc_netaddr_t *x) {
   *z = *x;
-}
-
-void
-btc_netaddr_set(btc_netaddr_t *addr, int family, const uint8_t *ip, int port) {
-  CHECK(family == 4 || family == 6);
-
-  if (family == 4) {
-    memset(addr->raw +  0, 0x00, 10);
-    memset(addr->raw + 10, 0xff, 2);
-    memcpy(addr->raw + 12, ip, 4);
-  } else {
-    memcpy(addr->raw, ip, 16);
-  }
-
-  addr->port = port & 0xffff;
 }
 
 uint32_t
@@ -669,7 +661,18 @@ btc_netaddr_groupkey(uint8_t *out, const btc_netaddr_t *addr) {
 void
 btc_netaddr_set_sockaddr(btc_netaddr_t *z, const btc_sockaddr_t *x) {
   btc_netaddr_init(z);
-  btc_netaddr_set(z, x->family, x->raw, x->port);
+
+  if (x->family == BTC_AF_INET) {
+    memset(z->raw +  0, 0x00, 10);
+    memset(z->raw + 10, 0xff, 2);
+    memcpy(z->raw + 12, x->raw, 4);
+  } else if (x->family == BTC_AF_INET6) {
+    memcpy(z->raw, x->raw, 16);
+  } else {
+    btc_abort(); /* LCOV_EXCL_LINE */
+  }
+
+  z->port = x->port;
 }
 
 void
@@ -677,15 +680,14 @@ btc_netaddr_get_sockaddr(btc_sockaddr_t *z, const btc_netaddr_t *x) {
   memset(z, 0, sizeof(*z));
 
   if (btc_netaddr_is_mapped(x)) {
-    z->family = 4;
+    z->family = BTC_AF_INET;
     memcpy(z->raw, x->raw + 12, 4);
   } else {
-    z->family = 6;
+    z->family = BTC_AF_INET6;
     memcpy(z->raw, x->raw, 16);
   }
 
   z->port = x->port;
-  z->next = NULL;
 }
 
 int

@@ -593,7 +593,7 @@ btc_peer_accept(btc_peer_t *peer, btc_socket_t *socket) {
   peer->nonce = btc_nonces_alloc(&peer->pool->nonces);
 
   btc_socket_set_data(socket, peer);
-  btc_socket_on_connect(socket, on_connect);
+  /* btc_socket_on_connect(socket, on_connect); */
   btc_socket_on_disconnect(socket, on_disconnect);
   btc_socket_on_error(socket, on_error);
   btc_socket_on_data(socket, on_data);
@@ -1520,7 +1520,7 @@ btc_peer_flush_data(btc_peer_t *peer) {
     size = btc_socket_buffered(peer->socket) + nf.length * 36;
     type = item->type;
 
-    if (size >= (10 << 20)) {
+    if (size >= (10 << 20) || peer->state == BTC_PEER_DEAD) {
       /* Wait for the peer to read
          before we pull more data
          out of the database. */
@@ -1870,6 +1870,8 @@ btc_peers_add(btc_peers_t *list, btc_peer_t *peer) {
     list->outbound += 1;
   else
     list->inbound += 1;
+
+  btc_socket_complete(peer->socket);
 }
 
 static void
@@ -2026,7 +2028,7 @@ btc_pool_listen(struct btc_pool_s *pool) {
 
   btc_sockaddr_init(&addr);
 
-  addr.family = 6;
+  addr.family = BTC_AF_INET6;
   addr.port = pool->network->port;
 
   server = btc_loop_listen(pool->loop, &addr, pool->max_inbound);
@@ -2062,6 +2064,7 @@ btc_pool_next_tip(struct btc_pool_s *pool, int32_t height) {
   }
 
   btc_abort(); /* LCOV_EXCL_LINE */
+
   return NULL; /* LCOV_EXCL_LINE */
 }
 

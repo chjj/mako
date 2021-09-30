@@ -33,8 +33,6 @@ typedef void btc_socket_message_cb(btc_socket_t *,
                                    size_t,
                                    const struct btc_sockaddr_s *);
 
-typedef void btc_loop_write_file_cb(const char *, void *);
-
 /*
  * Socket
  */
@@ -70,6 +68,9 @@ BTC_EXTERN void
 btc_socket_on_message(btc_socket_t *socket, btc_socket_message_cb *handler);
 
 BTC_EXTERN void
+btc_socket_complete(btc_socket_t *socket);
+
+BTC_EXTERN void
 btc_socket_set_data(btc_socket_t *socket, void *data);
 
 BTC_EXTERN void *
@@ -82,11 +83,11 @@ BTC_EXTERN size_t
 btc_socket_buffered(btc_socket_t *socket);
 
 BTC_EXTERN int
-btc_socket_write(btc_socket_t *socket, unsigned char *raw, size_t len);
+btc_socket_write(btc_socket_t *socket, void *data, size_t len);
 
 BTC_EXTERN int
 btc_socket_send(btc_socket_t *socket,
-                unsigned char *raw,
+                void *data,
                 size_t len,
                 const struct btc_sockaddr_s *addr);
 
