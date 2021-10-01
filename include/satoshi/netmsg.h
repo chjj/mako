@@ -50,6 +50,9 @@ enum btc_msgtype {
   BTC_MSG_BLOCKTXN,
   BTC_MSG_UNKNOWN,
   /* Internal */
+  BTC_MSG_INV_FULL,
+  BTC_MSG_GETDATA_FULL,
+  BTC_MSG_NOTFOUND_FULL,
   BTC_MSG_BLOCK_BASE,
   BTC_MSG_TX_BASE,
   BTC_MSG_CMPCTBLOCK_BASE,
@@ -125,16 +128,22 @@ typedef struct btc_inv_s {
   size_t length;
 } btc_inv_t;
 
-typedef btc_inv_t btc_getdata_t;
-typedef btc_inv_t btc_notfound_t;
+typedef struct btc_zinvitem_s {
+  uint32_t type;
+  const uint8_t *hash;
+} btc_zinvitem_t;
+
+typedef struct btc_zinv_s {
+  btc_zinvitem_t *items;
+  size_t alloc;
+  size_t length;
+} btc_zinv_t;
 
 typedef struct btc_getblocks_s {
   uint32_t version;
   btc_vector_t locator;
   uint8_t stop[32];
 } btc_getblocks_t;
-
-typedef btc_getblocks_t btc_getheaders_t;
 
 typedef struct btc_headers_s {
   btc_header_t **items;
@@ -307,6 +316,33 @@ BTC_EXTERN void
 btc_inv_push_item(btc_inv_t *inv, uint32_t type, const uint8_t *hash);
 
 /*
+ * Inv (zero copy)
+ */
+
+BTC_DEFINE_OBJECT(btc_zinv, BTC_EXTERN)
+
+BTC_EXTERN void
+btc_zinv_init(btc_zinv_t *z);
+
+BTC_EXTERN void
+btc_zinv_clear(btc_zinv_t *z);
+
+BTC_EXTERN void
+btc_zinv_copy(btc_zinv_t *z, const btc_zinv_t *x);
+
+BTC_EXTERN void
+btc_zinv_reset(btc_zinv_t *z);
+
+BTC_EXTERN void
+btc_zinv_grow(btc_zinv_t *z, size_t zn);
+
+BTC_EXTERN void
+btc_zinv_push(btc_zinv_t *z, uint32_t type, const uint8_t *hash);
+
+BTC_EXTERN btc_invitem_t *
+btc_zinv_get(const btc_zinv_t *z, size_t index);
+
+/*
  * GetData
  */
 
@@ -326,9 +362,6 @@ BTC_DEFINE_SERIALIZABLE_OBJECT(btc_getblocks, BTC_EXTERN)
 
 BTC_EXTERN void
 btc_getblocks_init(btc_getblocks_t *msg);
-
-BTC_EXTERN void
-btc_getblocks_uninit(btc_getblocks_t *msg);
 
 BTC_EXTERN void
 btc_getblocks_clear(btc_getblocks_t *msg);

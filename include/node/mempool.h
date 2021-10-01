@@ -85,6 +85,9 @@ btc_mempool_handle_reorg(btc_mempool_t *mp);
 BTC_EXTERN const btc_verify_error_t *
 btc_mempool_error(btc_mempool_t *mp);
 
+BTC_EXTERN size_t
+btc_mempool_size(btc_mempool_t *mp);
+
 BTC_EXTERN int
 btc_mempool_has(btc_mempool_t *mp, const uint8_t *hash);
 

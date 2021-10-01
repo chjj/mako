@@ -1299,6 +1299,11 @@ btc_mempool_error(struct btc_mempool_s *mp) {
   return &mp->error;
 }
 
+size_t
+btc_mempool_size(struct btc_mempool_s *mp) {
+  return btc_hashmap_size(mp->map);
+}
+
 int
 btc_mempool_has(struct btc_mempool_s *mp, const uint8_t *hash) {
   return btc_hashmap_has(mp->map, hash);

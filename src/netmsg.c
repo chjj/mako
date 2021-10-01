@@ -17,6 +17,7 @@
 #include <satoshi/tx.h>
 #include <satoshi/util.h>
 #include <satoshi/vector.h>
+#include "bio.h"
 #include "impl.h"
 #include "internal.h"
 
@@ -336,7 +337,6 @@ btc_invitem_read(btc_invitem_t *z, const uint8_t **xp, size_t *xn) {
  * Inv
  */
 
-/* TODO: Limit at BTC_NET_MAX_INV. */
 DEFINE_SERIALIZABLE_VECTOR(btc_inv, btc_invitem, SCOPE_EXTERN)
 
 void
@@ -344,6 +344,129 @@ btc_inv_push_item(btc_inv_t *inv, uint32_t type, const uint8_t *hash) {
   btc_invitem_t *item = btc_invitem_create();
   btc_invitem_set(item, type, hash);
   btc_inv_push(inv, item);
+}
+
+/*
+ * Inv (zero copy)
+ */
+
+DEFINE_OBJECT(btc_zinv, SCOPE_EXTERN)
+
+void
+btc_zinv_init(btc_zinv_t *z) {
+  z->items = NULL;
+  z->alloc = 0;
+  z->length = 0;
+}
+
+void
+btc_zinv_clear(btc_zinv_t *z) {
+  if (z->alloc > 0)
+    btc_free(z->items);
+
+  z->items = NULL;
+  z->alloc = 0;
+  z->length = 0;
+}
+
+void
+btc_zinv_copy(btc_zinv_t *z, const btc_zinv_t *x) {
+  size_t i;
+
+  btc_zinv_grow(z, x->length);
+  btc_zinv_reset(z);
+
+  for (i = 0; i < x->length; i++) {
+    z->items[i].type = x->items[i].type;
+    z->items[i].hash = x->items[i].hash;
+  }
+}
+
+void
+btc_zinv_reset(btc_zinv_t *z) {
+  z->length = 0;
+}
+
+void
+btc_zinv_grow(btc_zinv_t *z, size_t zn) {
+  if (zn > z->alloc) {
+    z->items =
+      (btc_zinvitem_t *)btc_realloc(z->items, zn * sizeof(btc_zinvitem_t));
+    z->alloc = zn;
+  }
+}
+
+void
+btc_zinv_push(btc_zinv_t *z, uint32_t type, const uint8_t *hash) {
+  btc_zinvitem_t *item;
+
+  if (z->length == z->alloc)
+    btc_zinv_grow(z, (z->alloc * 3) / 2 + (z->alloc <= 1));
+
+  item = &z->items[z->length++];
+  item->type = type;
+  item->hash = hash;
+}
+
+btc_invitem_t *
+btc_zinv_get(const btc_zinv_t *z, size_t index) {
+  btc_zinvitem_t *item = &z->items[index];
+  btc_invitem_t *ret = btc_invitem_create();
+  btc_invitem_set(ret, item->type, item->hash);
+  return ret;
+}
+
+static size_t
+btc_zinv_size(const btc_zinv_t *x) {
+  return btc_size_size(x->length) + x->length * 36;
+}
+
+static uint8_t *
+btc_zinv_write(uint8_t *zp, const btc_zinv_t *x) {
+  const btc_zinvitem_t *item;
+  size_t i;
+
+  zp = btc_size_write(zp, x->length);
+
+  for (i = 0; i < x->length; i++) {
+    item = &x->items[i];
+
+    zp = btc_uint32_write(zp, item->type);
+    zp = btc_raw_write(zp, item->hash, 32);
+  }
+
+  return zp;
+}
+
+static int
+btc_zinv_read(btc_zinv_t *z, const uint8_t **xp, size_t *xn) {
+  btc_zinvitem_t *item;
+  size_t i, length;
+
+  if (!btc_size_read(&length, xp, xn))
+    return 0;
+
+  if (*xn < length * 36)
+    return 0;
+
+  btc_zinv_grow(z, length);
+
+  /* The parser is currently holding all of `*xp`
+     in memory until btc_parser_parse returns.
+     Zero copy here makes us crazy fast. */
+  for (i = 0; i < length; i++) {
+    item = &z->items[i];
+
+    item->type = read32le(*xp);
+    item->hash = *xp + 4;
+
+    *xp += 36;
+    *xn -= 36;
+  }
+
+  z->length = length;
+
+  return 1;
 }
 
 /*
@@ -372,18 +495,7 @@ btc_getblocks_init(btc_getblocks_t *msg) {
 }
 
 void
-btc_getblocks_uninit(btc_getblocks_t *msg) {
-  /* TODO: Maybe add to uninit and free to vector prototype in impl.h */
-  btc_vector_clear(&msg->locator);
-}
-
-void
 btc_getblocks_clear(btc_getblocks_t *msg) {
-  size_t i;
-
-  for (i = 0; i < msg->locator.length; i++)
-    btc_free(msg->locator.items[i]);
-
   btc_vector_clear(&msg->locator);
 }
 
@@ -412,7 +524,7 @@ btc_getblocks_write(uint8_t *zp, const btc_getblocks_t *x) {
   zp = btc_size_write(zp, x->locator.length);
 
   for (i = 0; i < x->locator.length; i++)
-    zp = btc_raw_write(zp, (uint8_t *)x->locator.items[i], 32);
+    zp = btc_raw_write(zp, (const uint8_t *)x->locator.items[i], 32);
 
   zp = btc_raw_write(zp, x->stop, 32);
 
@@ -421,28 +533,27 @@ btc_getblocks_write(uint8_t *zp, const btc_getblocks_t *x) {
 
 int
 btc_getblocks_read(btc_getblocks_t *z, const uint8_t **xp, size_t *xn) {
-  size_t i, len;
+  size_t i, length;
 
   if (!btc_uint32_read(&z->version, xp, xn))
     return 0;
 
-  if (!btc_size_read(&len, xp, xn))
+  if (!btc_size_read(&length, xp, xn))
     return 0;
 
-  if (len > BTC_NET_MAX_INV)
+  if (length > BTC_NET_MAX_INV)
     return 0;
 
-  CHECK(z->locator.length == 0);
+  if (*xn < length * 32 + 32)
+    return 0;
 
-  for (i = 0; i < len; i++) {
-    uint8_t *hash = (uint8_t *)btc_malloc(32);
+  btc_vector_resize(&z->locator, length);
 
-    if (!btc_raw_read(hash, 32, xp, xn)) {
-      btc_free(hash);
-      return 0;
-    }
+  for (i = 0; i < length; i++) {
+    z->locator.items[i] = (void *)*xp;
 
-    btc_vector_push(&z->locator, hash);
+    *xp += 32;
+    *xn -= 32;
   }
 
   if (!btc_raw_read(z->stop, 32, xp, xn))
@@ -507,7 +618,6 @@ btc_hdr_read(btc_header_t *z, const uint8_t **xp, size_t *xn) {
  * Headers
  */
 
-/* TODO: Limit at 2000. */
 DEFINE_SERIALIZABLE_VECTOR(btc_headers, btc_hdr, SCOPE_EXTERN)
 
 /*
@@ -917,19 +1027,18 @@ btc_msg_clear(btc_msg_t *msg) {
       btc_addrs_clear((btc_addrs_t *)msg->body);
       break;
     case BTC_MSG_INV:
+    case BTC_MSG_GETDATA:
+    case BTC_MSG_NOTFOUND:
+      btc_zinv_clear((btc_zinv_t *)msg->body);
+      break;
+    case BTC_MSG_INV_FULL:
+    case BTC_MSG_GETDATA_FULL:
+    case BTC_MSG_NOTFOUND_FULL:
       btc_inv_clear((btc_inv_t *)msg->body);
       break;
-    case BTC_MSG_GETDATA:
-      btc_inv_clear((btc_getdata_t *)msg->body);
-      break;
-    case BTC_MSG_NOTFOUND:
-      btc_inv_clear((btc_notfound_t *)msg->body);
-      break;
     case BTC_MSG_GETBLOCKS:
-      btc_getblocks_clear((btc_getblocks_t *)msg->body);
-      break;
     case BTC_MSG_GETHEADERS:
-      btc_getblocks_clear((btc_getheaders_t *)msg->body);
+      btc_getblocks_clear((btc_getblocks_t *)msg->body);
       break;
     case BTC_MSG_HEADERS:
       btc_headers_clear((btc_headers_t *)msg->body);
@@ -1020,12 +1129,15 @@ btc_msg_set_type(btc_msg_t *msg, enum btc_msgtype type) {
       cmd = "addr";
       break;
     case BTC_MSG_INV:
+    case BTC_MSG_INV_FULL:
       cmd = "inv";
       break;
     case BTC_MSG_GETDATA:
+    case BTC_MSG_GETDATA_FULL:
       cmd = "getdata";
       break;
     case BTC_MSG_NOTFOUND:
+    case BTC_MSG_NOTFOUND_FULL:
       cmd = "notfound";
       break;
     case BTC_MSG_GETBLOCKS:
@@ -1177,17 +1289,16 @@ btc_msg_alloc(btc_msg_t *msg) {
       msg->body = btc_addrs_create();
       break;
     case BTC_MSG_INV:
-      msg->body = btc_inv_create();
-      break;
     case BTC_MSG_GETDATA:
-      msg->body = btc_inv_create();
-      break;
     case BTC_MSG_NOTFOUND:
+      msg->body = btc_zinv_create();
+      break;
+    case BTC_MSG_INV_FULL:
+    case BTC_MSG_GETDATA_FULL:
+    case BTC_MSG_NOTFOUND_FULL:
       msg->body = btc_inv_create();
       break;
     case BTC_MSG_GETBLOCKS:
-      msg->body = btc_getblocks_create();
-      break;
     case BTC_MSG_GETHEADERS:
       msg->body = btc_getblocks_create();
       break;
@@ -1265,15 +1376,16 @@ btc_msg_size(const btc_msg_t *x) {
     case BTC_MSG_ADDR:
       return btc_addrs_size((btc_addrs_t *)x->body);
     case BTC_MSG_INV:
-      return btc_inv_size((btc_inv_t *)x->body);
     case BTC_MSG_GETDATA:
-      return btc_inv_size((btc_getdata_t *)x->body);
     case BTC_MSG_NOTFOUND:
-      return btc_inv_size((btc_notfound_t *)x->body);
+      return btc_zinv_size((btc_zinv_t *)x->body);
+    case BTC_MSG_INV_FULL:
+    case BTC_MSG_GETDATA_FULL:
+    case BTC_MSG_NOTFOUND_FULL:
+      return btc_inv_size((btc_inv_t *)x->body);
     case BTC_MSG_GETBLOCKS:
-      return btc_getblocks_size((btc_getblocks_t *)x->body);
     case BTC_MSG_GETHEADERS:
-      return btc_getblocks_size((btc_getheaders_t *)x->body);
+      return btc_getblocks_size((btc_getblocks_t *)x->body);
     case BTC_MSG_HEADERS:
       return btc_headers_size((btc_headers_t *)x->body);
     case BTC_MSG_SENDHEADERS:
@@ -1336,15 +1448,16 @@ btc_msg_write(uint8_t *zp, const btc_msg_t *x) {
     case BTC_MSG_ADDR:
       return btc_addrs_write(zp, (btc_addrs_t *)x->body);
     case BTC_MSG_INV:
-      return btc_inv_write(zp, (btc_inv_t *)x->body);
     case BTC_MSG_GETDATA:
-      return btc_inv_write(zp, (btc_getdata_t *)x->body);
     case BTC_MSG_NOTFOUND:
-      return btc_inv_write(zp, (btc_notfound_t *)x->body);
+      return btc_zinv_write(zp, (btc_zinv_t *)x->body);
+    case BTC_MSG_INV_FULL:
+    case BTC_MSG_GETDATA_FULL:
+    case BTC_MSG_NOTFOUND_FULL:
+      return btc_inv_write(zp, (btc_inv_t *)x->body);
     case BTC_MSG_GETBLOCKS:
-      return btc_getblocks_write(zp, (btc_getblocks_t *)x->body);
     case BTC_MSG_GETHEADERS:
-      return btc_getblocks_write(zp, (btc_getheaders_t *)x->body);
+      return btc_getblocks_write(zp, (btc_getblocks_t *)x->body);
     case BTC_MSG_HEADERS:
       return btc_headers_write(zp, (btc_headers_t *)x->body);
     case BTC_MSG_SENDHEADERS:
@@ -1407,15 +1520,16 @@ btc_msg_read(btc_msg_t *z, const uint8_t **xp, size_t *xn) {
     case BTC_MSG_ADDR:
       return btc_addrs_read((btc_addrs_t *)z->body, xp, xn);
     case BTC_MSG_INV:
-      return btc_inv_read((btc_inv_t *)z->body, xp, xn);
     case BTC_MSG_GETDATA:
-      return btc_inv_read((btc_getdata_t *)z->body, xp, xn);
     case BTC_MSG_NOTFOUND:
-      return btc_inv_read((btc_notfound_t *)z->body, xp, xn);
+      return btc_zinv_read((btc_zinv_t *)z->body, xp, xn);
+    case BTC_MSG_INV_FULL:
+    case BTC_MSG_GETDATA_FULL:
+    case BTC_MSG_NOTFOUND_FULL:
+      return btc_inv_read((btc_inv_t *)z->body, xp, xn);
     case BTC_MSG_GETBLOCKS:
-      return btc_getblocks_read((btc_getblocks_t *)z->body, xp, xn);
     case BTC_MSG_GETHEADERS:
-      return btc_getblocks_read((btc_getheaders_t *)z->body, xp, xn);
+      return btc_getblocks_read((btc_getblocks_t *)z->body, xp, xn);
     case BTC_MSG_HEADERS:
       return btc_headers_read((btc_headers_t *)z->body, xp, xn);
     case BTC_MSG_SENDHEADERS:
