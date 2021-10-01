@@ -77,7 +77,9 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/vector.c
                             src/view.c)
 
-list(APPEND io_sources src/io/addrinfo.c
+list(APPEND io_sources src/io/http/http.c
+                       src/io/http/http_parser.c
+                       src/io/addrinfo.c
                        src/io/core.c
                        src/io/sockaddr.c)
 
@@ -247,4 +249,12 @@ foreach(name ${tests})
                                           satoshi_io
                                           satoshi_static)
   add_test(NAME ${name} COMMAND t-${name})
+endforeach()
+
+foreach(name http)
+  add_executable(t-${name} test/t-${name}.c)
+  target_link_libraries(t-${name} PRIVATE satoshi_tests
+                                          satoshi_node
+                                          satoshi_io
+                                          satoshi_static)
 endforeach()

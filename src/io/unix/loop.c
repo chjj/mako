@@ -157,7 +157,7 @@ typedef struct btc_socket_s {
   chunk_t *tail;
   size_t total;
   int draining;
-  btc_socket_connect_cb *on_socket;
+  btc_socket_socket_cb *on_socket;
   btc_socket_connect_cb *on_connect;
   btc_socket_connect_cb *on_disconnect;
   btc_socket_error_cb *on_error;
@@ -501,7 +501,7 @@ btc_socket_address(btc_sockaddr_t *addr, btc__socket_t *socket) {
 }
 
 void
-btc_socket_on_socket(btc__socket_t *socket, btc_socket_connect_cb *handler) {
+btc_socket_on_socket(btc__socket_t *socket, btc_socket_socket_cb *handler) {
   socket->on_socket = handler;
 }
 
@@ -824,6 +824,7 @@ btc_socket_write(btc__socket_t *socket, void *data, size_t len) {
   if (socket->state != BTC_SOCKET_CONNECTING
       && socket->state != BTC_SOCKET_CONNECTED) {
     socket->loop->error = EPIPE;
+    free(data);
     return -1;
   }
 
@@ -1233,7 +1234,7 @@ handle_read(btc__loop_t *loop, btc__socket_t *socket) {
         goto fail;
       }
 
-      socket->on_socket(child);
+      socket->on_socket(socket, child);
 
       break;
 fail:
@@ -1268,16 +1269,13 @@ fail:
           break;
         }
 
-        if (len == 0) {
-          socket->loop->error = ENODATA;
-          socket->on_error(socket);
-          break;
-        }
-
         if ((size_t)len > size)
           abort();
 
         socket->on_data(socket, buf, len);
+
+        if (len == 0)
+          break;
       }
 
       break;

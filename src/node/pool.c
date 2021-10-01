@@ -403,9 +403,8 @@ static void
 btc_peer_on_parse_error(btc_peer_t *peer);
 
 static void
-on_socket(btc_socket_t *socket) {
-  btc_loop_t *loop = btc_socket_loop(socket);
-  struct btc_pool_s *pool = (struct btc_pool_s *)btc_loop_get_data(loop, 0);
+on_socket(btc_socket_t *server, btc_socket_t *socket) {
+  struct btc_pool_s *pool = (struct btc_pool_s *)btc_socket_get_data(server);
 
   btc_pool_on_socket(pool, socket);
 }
@@ -440,8 +439,10 @@ on_error(btc_socket_t *socket) {
 }
 
 static void
-on_data(btc_socket_t *socket, const uint8_t *data, size_t size) {
-  btc_peer_on_data((btc_peer_t *)btc_socket_get_data(socket), data, size);
+on_data(btc_socket_t *socket, const void *data, size_t size) {
+  btc_peer_on_data((btc_peer_t *)btc_socket_get_data(socket),
+                   (const uint8_t *)data,
+                   size);
 }
 
 static void
@@ -1452,6 +1453,11 @@ btc_peer_on_data(btc_peer_t *peer, const uint8_t *data, size_t size) {
   if (peer->state == BTC_PEER_DEAD)
     return;
 
+  if (size == 0) {
+    btc_peer_close(peer);
+    return;
+  }
+
   peer->last_recv = btc_ms();
 
   btc_parser_feed(&peer->parser, data, size);
@@ -2060,6 +2066,9 @@ btc_pool_listen(struct btc_pool_s *pool) {
     return 0;
   }
 
+  /* Note: This also needs on_disconnect.
+           Maybe rename on_disconnect to on_close. */
+  btc_socket_set_data(server, pool);
   btc_socket_on_socket(server, on_socket);
 
   pool->server = server;
