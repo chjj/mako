@@ -22,6 +22,7 @@
 #include <satoshi/crypto/rand.h>
 #include <satoshi/entry.h>
 #include <satoshi/header.h>
+#include <satoshi/heap.h>
 #include <satoshi/map.h>
 #include <satoshi/network.h>
 #include <satoshi/policy.h>
@@ -830,10 +831,117 @@ btc_mempool_remove_double_spends(struct btc_mempool_s *mp, const btc_tx_t *tx) {
 }
 
 static int
-btc_mempool_limit_size(struct btc_mempool_s *mp, const uint8_t *hash) {
-  (void)mp;
-  (void)hash;
-  return 1;
+btc_mempool_has_dependencies(struct btc_mempool_s *mp, const btc_tx_t *tx) {
+  size_t i;
+
+  for (i = 0; i < tx->inputs.length; i++) {
+    const btc_input_t *input = tx->inputs.items[i];
+
+    if (btc_hashmap_has(mp->map, input->prevout.hash))
+      return 1;
+  }
+
+  return 0;
+}
+
+static int
+use_desc(const btc_mpentry_t *a) {
+  int64_t x = a->delta_fee * a->desc_size;
+  int64_t y = a->desc_fee * a->size;
+  return y > x;
+}
+
+static int
+cmp_rate(void *left, void *right) {
+  const btc_mpentry_t *a = (const btc_mpentry_t *)left;
+  const btc_mpentry_t *b = (const btc_mpentry_t *)right;
+
+  int64_t xf = a->delta_fee;
+  int64_t xs = a->size;
+  int64_t yf = b->delta_fee;
+  int64_t ys = b->size;
+  int64_t x, y;
+
+  if (use_desc(a)) {
+    xf = a->desc_fee;
+    xs = a->desc_size;
+  }
+
+  if (use_desc(b)) {
+    yf = b->desc_fee;
+    ys = b->desc_size;
+  }
+
+  x = xf * ys;
+  y = xs * yf;
+
+  if (x == y) {
+    x = a->time;
+    y = b->time;
+  }
+
+  if (x < y)
+    return -1;
+
+  if (x > y)
+    return 1;
+
+  return 0;
+}
+
+static int
+btc_mempool_limit_size(struct btc_mempool_s *mp, const uint8_t *added) {
+  size_t threshold = BTC_MEMPOOL_MAX_SIZE - (BTC_MEMPOOL_MAX_SIZE / 10);
+  btc_hashmapiter_t iter;
+  btc_vector_t queue;
+  int64_t now;
+
+  if (mp->size <= BTC_MEMPOOL_MAX_SIZE)
+    return 0;
+
+  now = btc_now();
+
+  btc_vector_init(&queue);
+
+  btc_hashmap_iterate(&iter, mp->map);
+
+  while (btc_hashmap_next(&iter)) {
+    btc_mpentry_t *entry = iter.val;
+
+    if (btc_mempool_has_dependencies(mp, &entry->tx))
+      continue;
+
+    if (now < entry->time + BTC_MEMPOOL_EXPIRY_TIME) {
+      btc_heap_insert(&queue, entry, cmp_rate);
+      continue;
+    }
+
+    btc_mempool_log(mp, "Removing package %H from mempool (too old).",
+                        entry->hash);
+
+    btc_mempool_evict_entry(mp, entry);
+  }
+
+  if (mp->size <= threshold) {
+    btc_vector_clear(&queue);
+    return !btc_hashmap_has(mp->map, added);
+  }
+
+  while (queue.length > 0) {
+    btc_mpentry_t *entry = btc_heap_shift(&queue, cmp_rate);
+
+    btc_mempool_log(mp, "Removing package %H from mempool (low fee).",
+                        entry->hash);
+
+    btc_mempool_evict_entry(mp, entry);
+
+    if (mp->size <= threshold)
+      break;
+  }
+
+  btc_vector_clear(&queue);
+
+  return !btc_hashmap_has(mp->map, added);
 }
 
 /*
@@ -925,7 +1033,7 @@ btc_mempool_verify(struct btc_mempool_s *mp,
   }
 
   /* Make sure this guy gave a decent fee. */
-  minfee = btc_get_min_fee(entry->size, BTC_MIN_RELAY);
+  minfee = btc_get_min_fee(entry->size, mp->network->min_relay);
 
   if (entry->fee < minfee) {
     return btc_mempool_throw(mp, tx,
@@ -1136,7 +1244,7 @@ btc_mempool_insert(struct btc_mempool_s *mp,
   btc_view_destroy(view);
 
   /* Trim size if we're too big. */
-  if (!btc_mempool_limit_size(mp, tx->hash)) {
+  if (btc_mempool_limit_size(mp, tx->hash)) {
     return btc_mempool_throw(mp, tx,
                              "insufficientfee",
                              "mempool full",
