@@ -832,8 +832,18 @@ btc_socket_write(btc__socket_t *socket, void *data, size_t len) {
   if (socket->state != BTC_SOCKET_CONNECTING
       && socket->state != BTC_SOCKET_CONNECTED) {
     socket->loop->error = EPIPE;
-    free(data);
+
+    if (data != NULL)
+      free(data);
+
     return -1;
+  }
+
+  if (len == 0) {
+    if (data != NULL)
+      free(data);
+
+    return !socket->draining;
   }
 
   chunk = (chunk_t *)safe_malloc(sizeof(chunk_t));

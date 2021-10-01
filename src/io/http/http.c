@@ -336,8 +336,13 @@ http_res_destroy(http_res_t *res) {
 
 static void
 http_res_write(http_res_t *res, const void *data, size_t size) {
-  unsigned char *out = safe_malloc(size + 1);
+  unsigned char *out;
   int rc;
+
+  if (size == 0)
+    return;
+
+  out = safe_malloc(size);
 
   memcpy(out, data, size);
 
