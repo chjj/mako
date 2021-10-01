@@ -61,6 +61,7 @@ enum btc_peer_state {
  */
 
 typedef void btc_parser_on_msg_cb(btc_msg_t *msg, void *arg);
+typedef void btc_parser_on_error_cb(void *arg);
 
 typedef struct btc_parser_s {
   uint32_t magic;
@@ -68,12 +69,14 @@ typedef struct btc_parser_s {
   size_t alloc;
   size_t total;
   size_t waiting;
+  int closed;
   /* Header */
   char cmd[12];
   int has_header;
   uint32_t checksum;
   /* Callback */
   btc_parser_on_msg_cb *on_msg;
+  btc_parser_on_error_cb *on_error;
   void *arg;
 } btc_parser_t;
 
@@ -234,10 +237,12 @@ btc_parser_init(btc_parser_t *parser, uint32_t magic) {
   parser->alloc = 0;
   parser->total = 0;
   parser->waiting = 24;
+  parser->closed = 0;
   parser->cmd[0] = '\0';
   parser->has_header = 0;
   parser->checksum = 0;
   parser->on_msg = NULL;
+  parser->on_error = NULL;
   parser->arg = NULL;
 }
 
@@ -249,16 +254,11 @@ btc_parser_clear(btc_parser_t *parser) {
   parser->pending = NULL;
 }
 
-static void
-btc_parser_on_msg(btc_parser_t *parser,
-                  btc_parser_on_msg_cb *handler,
-                  void *arg) {
-  parser->on_msg = handler;
-  parser->arg = arg;
-}
-
 static uint8_t *
 btc_parser_append(btc_parser_t *parser, const uint8_t *data, size_t length) {
+  if (parser->closed)
+    return parser->pending;
+
   if (parser->total + length > parser->alloc) {
     void *ptr = btc_realloc(parser->pending, parser->total + length);
 
@@ -299,10 +299,8 @@ btc_parser_parse_header(btc_parser_t *parser, const uint8_t *data) {
 
   size = read32le(data + 16);
 
-  if (size > BTC_NET_MAX_MESSAGE) {
-    parser->waiting = 24;
+  if (size > BTC_NET_MAX_MESSAGE)
     return 0;
-  }
 
   parser->waiting = size;
   parser->checksum = read32le(data + 20);
@@ -314,7 +312,7 @@ btc_parser_parse_header(btc_parser_t *parser, const uint8_t *data) {
 static int
 btc_parser_parse(btc_parser_t *parser, const uint8_t *data, size_t length) {
   uint8_t hash[32];
-  btc_msg_t *msg;
+  btc_msg_t msg;
 
   CHECK(length <= BTC_NET_MAX_MESSAGE);
 
@@ -323,45 +321,41 @@ btc_parser_parse(btc_parser_t *parser, const uint8_t *data, size_t length) {
     return btc_parser_parse_header(parser, data);
   }
 
-  btc_hash256(hash, data, length);
-
-  if (read32le(hash) != parser->checksum) {
-    parser->waiting = 24;
-    parser->has_header = 0;
-    return 0;
-  }
-
-  msg = btc_msg_create();
-
-  btc_msg_set_cmd(msg, parser->cmd);
-  btc_msg_alloc(msg);
-
-  if (!btc_msg_import(msg, data, length)) {
-    btc_msg_destroy(msg);
-    parser->waiting = 24;
-    parser->has_header = 0;
-    return 0;
-  }
-
   parser->waiting = 24;
   parser->has_header = 0;
-  parser->on_msg(msg, parser->arg);
+
+  btc_hash256(hash, data, length);
+
+  if (read32le(hash) != parser->checksum)
+    return 0;
+
+  btc_msg_set_cmd(&msg, parser->cmd);
+  btc_msg_alloc(&msg);
+
+  if (!btc_msg_import(&msg, data, length)) {
+    btc_msg_clear(&msg);
+    return 0;
+  }
+
+  parser->on_msg(&msg, parser->arg);
+
+  btc_msg_clear(&msg);
 
   return 1;
 }
 
-static int
+static void
 btc_parser_feed(btc_parser_t *parser, const uint8_t *data, size_t length) {
   uint8_t *ptr = btc_parser_append(parser, data, length);
   size_t len = parser->total;
   size_t wait;
 
-  while (len >= parser->waiting) {
+  while (!parser->closed && len >= parser->waiting) {
     wait = parser->waiting;
 
     if (!btc_parser_parse(parser, ptr, wait)) {
-      parser->total = len;
-      return 0;
+      if (!parser->closed)
+        parser->on_error(parser->arg);
     }
 
     ptr += wait;
@@ -372,8 +366,6 @@ btc_parser_feed(btc_parser_t *parser, const uint8_t *data, size_t length) {
     memmove(parser->pending, ptr, len);
 
   parser->total = len;
-
-  return 1;
 }
 
 /*
@@ -406,6 +398,9 @@ btc_peer_on_drain(btc_peer_t *peer);
 
 static void
 btc_peer_on_msg(btc_peer_t *peer, btc_msg_t *msg);
+
+static void
+btc_peer_on_parse_error(btc_peer_t *peer);
 
 static void
 on_socket(btc_socket_t *socket) {
@@ -459,6 +454,11 @@ on_msg(btc_msg_t *msg, void *arg) {
   btc_peer_on_msg((btc_peer_t *)arg, msg);
 }
 
+static void
+on_parse_error(void *arg) {
+  btc_peer_on_parse_error((btc_peer_t *)arg);
+}
+
 /*
  * Peer
  */
@@ -489,7 +489,10 @@ btc_peer_create(struct btc_pool_s *pool) {
   peer->gh_time = -1;
 
   btc_parser_init(&peer->parser, peer->network->magic);
-  btc_parser_on_msg(&peer->parser, on_msg, peer);
+
+  peer->parser.on_msg = on_msg;
+  peer->parser.on_error = on_parse_error;
+  peer->parser.arg = peer;
 
   btc_inv_init(&peer->inv_queue);
 
@@ -617,6 +620,7 @@ static void
 btc_peer_close(btc_peer_t *peer) {
   btc_socket_close(peer->socket);
   peer->state = BTC_PEER_DEAD;
+  peer->parser.closed = 1;
 }
 
 static void
@@ -1260,12 +1264,12 @@ btc_peer_on_disconnect(btc_peer_t *peer) {
 static void
 btc_pool_on_complete(struct btc_pool_s *pool, btc_peer_t *peer);
 
-static int
+static void
 btc_peer_on_version(btc_peer_t *peer, const btc_version_t *msg) {
   if (peer->state != BTC_PEER_WAIT_VERSION) {
     btc_peer_log(peer, "Peer sent unsolicited version (%N).", &peer->addr);
     btc_peer_close(peer);
-    return 0;
+    return;
   }
 
   peer->version = msg->version;
@@ -1279,7 +1283,7 @@ btc_peer_on_version(btc_peer_t *peer, const btc_version_t *msg) {
     if (btc_nonces_has(&peer->pool->nonces, msg->nonce)) {
       btc_peer_log(peer, "We connected to ourself. Oops (%N).", &peer->addr);
       btc_peer_close(peer);
-      return 0;
+      return;
     }
   }
 
@@ -1287,7 +1291,7 @@ btc_peer_on_version(btc_peer_t *peer, const btc_version_t *msg) {
     btc_peer_log(peer, "Peer does not support required protocol version (%N).",
                        &peer->addr);
     btc_peer_close(peer);
-    return 0;
+    return;
   }
 
   if (peer->outbound) {
@@ -1295,7 +1299,7 @@ btc_peer_on_version(btc_peer_t *peer, const btc_version_t *msg) {
       btc_peer_log(peer, "Peer does not support network services (%N).",
                          &peer->addr);
       btc_peer_close(peer);
-      return 0;
+      return;
     }
 
     if (peer->pool->checkpoints_enabled) {
@@ -1303,7 +1307,7 @@ btc_peer_on_version(btc_peer_t *peer, const btc_version_t *msg) {
         btc_peer_log(peer, "Peer does not support getheaders (%N).",
                            &peer->addr);
         btc_peer_close(peer);
-        return 0;
+        return;
       }
     }
 
@@ -1311,7 +1315,7 @@ btc_peer_on_version(btc_peer_t *peer, const btc_version_t *msg) {
       btc_peer_log(peer, "Peer does not support segregated witness (%N).",
                          &peer->addr);
       btc_peer_close(peer);
-      return 0;
+      return;
     }
 
     if (peer->pool->bip152_enabled) {
@@ -1328,24 +1332,20 @@ btc_peer_on_version(btc_peer_t *peer, const btc_version_t *msg) {
   btc_peer_send_verack(peer);
 
   peer->state = BTC_PEER_WAIT_VERACK;
-
-  return 1;
 }
 
-static int
+static void
 btc_peer_on_verack(btc_peer_t *peer) {
   if (peer->state != BTC_PEER_WAIT_VERACK) {
     btc_peer_log(peer, "Peer sent unsolicited verack (%N).", &peer->addr);
     btc_peer_close(peer);
-    return 0;
+    return;
   }
 
   peer->state = BTC_PEER_CONNECTED;
 
   btc_peer_log(peer, "Version handshake complete (%N).", &peer->addr);
   btc_pool_on_complete(peer->pool, peer);
-
-  return 1;
 }
 
 static void
@@ -1402,16 +1402,14 @@ btc_peer_on_sendheaders(btc_peer_t *peer) {
   peer->prefer_headers = 1;
 }
 
-static int
+static void
 btc_peer_on_feefilter(btc_peer_t *peer, const btc_feefilter_t *msg) {
   if (msg->rate < 0 || msg->rate > BTC_MAX_MONEY) {
     btc_peer_increase_ban(peer, 100);
-    return 0;
+    return;
   }
 
   peer->fee_rate = msg->rate;
-
-  return 1;
 }
 
 static void
@@ -1451,12 +1449,12 @@ btc_peer_on_error(btc_peer_t *peer, const char *msg) {
 
 static void
 btc_peer_on_data(btc_peer_t *peer, const uint8_t *data, size_t size) {
+  if (peer->state == BTC_PEER_DEAD)
+    return;
+
   peer->last_recv = btc_ms();
 
-  if (!btc_parser_feed(&peer->parser, data, size)) {
-    btc_peer_log(peer, "Parse error (%N).", &peer->addr);
-    btc_peer_increase_ban(peer, 10);
-  }
+  btc_parser_feed(&peer->parser, data, size);
 }
 
 static int
@@ -1464,6 +1462,9 @@ btc_peer_flush_data(btc_peer_t *peer);
 
 static void
 btc_peer_on_drain(btc_peer_t *peer) {
+  if (peer->state == BTC_PEER_DEAD)
+    return;
+
   btc_peer_flush_data(peer);
 }
 
@@ -1472,23 +1473,15 @@ btc_pool_on_msg(struct btc_pool_s *pool, btc_peer_t *peer, btc_msg_t *msg);
 
 static void
 btc_peer_on_msg(btc_peer_t *peer, btc_msg_t *msg) {
-  if (peer->state == BTC_PEER_DEAD) {
-    btc_msg_destroy(msg);
+  if (peer->state == BTC_PEER_DEAD)
     return;
-  }
 
   switch (msg->type) {
     case BTC_MSG_VERSION:
-      if (!btc_peer_on_version(peer, (const btc_version_t *)msg->body)) {
-        btc_msg_destroy(msg);
-        return;
-      }
+      btc_peer_on_version(peer, (const btc_version_t *)msg->body);
       break;
     case BTC_MSG_VERACK:
-      if (!btc_peer_on_verack(peer)) {
-        btc_msg_destroy(msg);
-        return;
-      }
+      btc_peer_on_verack(peer);
       break;
     case BTC_MSG_PING:
       btc_peer_on_ping(peer, (const btc_ping_t *)msg->body);
@@ -1500,10 +1493,7 @@ btc_peer_on_msg(btc_peer_t *peer, btc_msg_t *msg) {
       btc_peer_on_sendheaders(peer);
       break;
     case BTC_MSG_FEEFILTER:
-      if (!btc_peer_on_feefilter(peer, (const btc_feefilter_t *)msg->body)) {
-        btc_msg_destroy(msg);
-        return;
-      }
+      btc_peer_on_feefilter(peer, (const btc_feefilter_t *)msg->body);
       break;
     case BTC_MSG_SENDCMPCT:
       btc_peer_on_sendcmpct(peer, (const btc_sendcmpct_t *)msg->body);
@@ -1513,6 +1503,15 @@ btc_peer_on_msg(btc_peer_t *peer, btc_msg_t *msg) {
   }
 
   btc_pool_on_msg(peer->pool, peer, msg);
+}
+
+static void
+btc_peer_on_parse_error(btc_peer_t *peer) {
+  if (peer->state == BTC_PEER_DEAD)
+    return;
+
+  btc_peer_log(peer, "Parse error (%N).", &peer->addr);
+  btc_peer_increase_ban(peer, 10);
 }
 
 static int
@@ -2646,10 +2645,8 @@ btc_pool_on_version(struct btc_pool_s *pool,
 
   btc_nonces_remove(&pool->nonces, peer->nonce);
 
-#if 0
   if (!peer->outbound && btc_netaddr_is_routable(&msg->remote))
     btc_addrman_mark_local(pool->addrman, &msg->remote);
-#endif
 }
 
 static void
@@ -3854,6 +3851,9 @@ btc_pool_on_unknown(struct btc_pool_s *pool,
 
 static void
 btc_pool_on_msg(struct btc_pool_s *pool, btc_peer_t *peer, btc_msg_t *msg) {
+  if (peer->state == BTC_PEER_DEAD)
+    return;
+
   switch (msg->type) {
     case BTC_MSG_VERSION:
       btc_pool_on_version(pool, peer, (const btc_version_t *)msg->body);
@@ -3927,6 +3927,4 @@ btc_pool_on_msg(struct btc_pool_s *pool, btc_peer_t *peer, btc_msg_t *msg) {
     default:
       break;
   }
-
-  btc_msg_destroy(msg);
 }
