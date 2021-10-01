@@ -23,9 +23,10 @@ typedef struct btc_socket_s btc_socket_t;
 
 struct btc_sockaddr_s;
 
-typedef void btc_loop_tick_cb(btc_loop_t *);
+typedef void btc_loop_tick_cb(btc_loop_t *, void *arg);
 typedef void btc_socket_socket_cb(btc_socket_t *, btc_socket_t *);
 typedef void btc_socket_connect_cb(btc_socket_t *);
+typedef void btc_socket_close_cb(btc_socket_t *);
 typedef void btc_socket_error_cb(btc_socket_t *);
 typedef void btc_socket_data_cb(btc_socket_t *, const void *, size_t);
 typedef void btc_socket_drain_cb(btc_socket_t *);
@@ -54,7 +55,7 @@ BTC_EXTERN void
 btc_socket_on_connect(btc_socket_t *socket, btc_socket_connect_cb *handler);
 
 BTC_EXTERN void
-btc_socket_on_disconnect(btc_socket_t *socket, btc_socket_connect_cb *handler);
+btc_socket_on_close(btc_socket_t *socket, btc_socket_close_cb *handler);
 
 BTC_EXTERN void
 btc_socket_on_error(btc_socket_t *socket, btc_socket_error_cb *handler);
@@ -106,13 +107,10 @@ BTC_EXTERN void
 btc_loop_destroy(btc_loop_t *loop);
 
 BTC_EXTERN void
-btc_loop_on_tick(btc_loop_t *loop, btc_loop_tick_cb *handler);
+btc_loop_on_tick(btc_loop_t *loop, btc_loop_tick_cb *handler, void *data);
 
 BTC_EXTERN void
-btc_loop_set_data(btc_loop_t *loop, int name, void *data);
-
-BTC_EXTERN void *
-btc_loop_get_data(btc_loop_t *loop, int name);
+btc_loop_off_tick(btc_loop_t *loop, btc_loop_tick_cb *handler, void *data);
 
 BTC_EXTERN const char *
 btc_loop_strerror(btc_loop_t *loop);

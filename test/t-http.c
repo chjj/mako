@@ -19,7 +19,7 @@ on_request(http_server_t *server, http_req_t *req, http_res_t *res) {
 
   (void)server;
 
-  printf("URL: %s\n", req->url.data);
+  printf("Path: %s\n", req->path.data);
 
   printf("Headers:\n");
 

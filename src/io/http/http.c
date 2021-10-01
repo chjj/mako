@@ -266,14 +266,14 @@ http_head_push_item(http_head_t *z, const char *field, const char *value) {
 static void
 http_req_init(http_req_t *req) {
   req->method = 0;
-  http_string_init(&req->url);
+  http_string_init(&req->path);
   http_head_init(&req->headers);
   http_string_init(&req->body);
 }
 
 static void
 http_req_clear(http_req_t *req) {
-  http_string_clear(&req->url);
+  http_string_clear(&req->path);
   http_head_clear(&req->headers);
   http_string_clear(&req->body);
 }
@@ -458,7 +458,7 @@ http_conn_destroy(http_conn_t *conn) {
 }
 
 static void
-on_disconnect(btc_socket_t *socket) {
+on_close(btc_socket_t *socket) {
   http_conn_t *conn = btc_socket_get_data(socket);
   http_conn_destroy(conn);
 }
@@ -477,13 +477,16 @@ on_data(btc_socket_t *socket, const void *data, size_t size) {
                                        data,
                                        size);
 
-  if (conn->parser.upgrade || nparsed != size)
+  if (conn->parser.upgrade || nparsed != size || size == 0)
     btc_socket_close(socket);
 }
 
 static int
 on_message_begin(struct http_parser *parser) {
   http_conn_t *conn = parser->data;
+
+  if (conn->req != NULL)
+    http_req_destroy(conn->req);
 
   conn->req = http_req_create();
   conn->last_was_value = 0;
@@ -496,7 +499,7 @@ on_url(struct http_parser *parser, const char *at, size_t length) {
   http_conn_t *conn = parser->data;
   http_req_t *req = conn->req;
 
-  http_string_append(&req->url, at, length);
+  http_string_append(&req->path, at, length);
 
   return 0;
 }
@@ -623,7 +626,7 @@ http_conn_accept(http_conn_t *conn, btc_socket_t *socket) {
   conn->socket = socket;
 
   btc_socket_set_data(socket, conn);
-  btc_socket_on_disconnect(socket, on_disconnect);
+  btc_socket_on_close(socket, on_close);
   btc_socket_on_error(socket, on_error);
   btc_socket_on_data(socket, on_data);
 }
@@ -660,10 +663,16 @@ http_server_destroy(http_server_t *server) {
 
 static void
 on_socket(btc_socket_t *parent, btc_socket_t *child) {
-  http_server_t *server = (http_server_t *)btc_socket_get_data(parent);
+  http_server_t *server = btc_socket_get_data(parent);
   http_conn_t *conn = http_conn_create(server);
 
   http_conn_accept(conn, child);
+}
+
+static void
+on_server_close(btc_socket_t *socket) {
+  http_server_t *server = btc_socket_get_data(socket);
+  server->socket = NULL;
 }
 
 int
@@ -673,16 +682,15 @@ http_server_open(http_server_t *server, const btc_sockaddr_t *addr) {
   if (server->socket == NULL)
     return 0;
 
-  /* Note: This also needs on_disconnect.
-           Maybe rename on_disconnect to on_close. */
   btc_socket_set_data(server->socket, server);
   btc_socket_on_socket(server->socket, on_socket);
+  btc_socket_on_close(server->socket, on_server_close);
 
   return 1;
 }
 
 void
 http_server_close(http_server_t *server) {
-  btc_socket_close(server->socket);
-  server->socket = NULL;
+  if (server->socket != NULL)
+    btc_socket_close(server->socket);
 }

@@ -159,7 +159,7 @@ typedef struct btc_socket_s {
   int draining;
   btc_socket_socket_cb *on_socket;
   btc_socket_connect_cb *on_connect;
-  btc_socket_connect_cb *on_disconnect;
+  btc_socket_close_cb *on_close;
   btc_socket_error_cb *on_error;
   btc_socket_data_cb *on_data;
   btc_socket_drain_cb *on_drain;
@@ -168,6 +168,13 @@ typedef struct btc_socket_s {
   struct btc_socket_s *prev;
   struct btc_socket_s *next;
 } btc__socket_t;
+
+typedef struct btc_tick_s {
+  btc_loop_tick_cb *handler;
+  void *data;
+  struct btc_tick_s *prev;
+  struct btc_tick_s *next;
+} btc_tick_t;
 
 typedef struct btc_loop_s {
 #if defined(BTC_USE_EPOLL)
@@ -190,16 +197,18 @@ typedef struct btc_loop_s {
   int nfds;
   btc__socket_t *sockets[FD_SETSIZE];
 #endif
-  struct closed_queue {
+  struct btc_closed_queue {
     btc__socket_t *head;
     btc__socket_t *tail;
     size_t length;
   } closed;
+  struct btc_ticks {
+    btc_tick_t *head;
+    btc_tick_t *tail;
+    size_t length;
+  } ticks;
   int error;
   int running;
-  btc_loop_tick_cb *on_tick[8];
-  size_t on_ticks;
-  void *data[8];
 } btc__loop_t;
 
 /*
@@ -511,9 +520,8 @@ btc_socket_on_connect(btc__socket_t *socket, btc_socket_connect_cb *handler) {
 }
 
 void
-btc_socket_on_disconnect(btc__socket_t *socket,
-                         btc_socket_connect_cb *handler) {
-  socket->on_disconnect = handler;
+btc_socket_on_close(btc__socket_t *socket, btc_socket_close_cb *handler) {
+  socket->on_close = handler;
 }
 
 void
@@ -1024,6 +1032,8 @@ btc_loop_create(void) {
 
 void
 btc_loop_destroy(btc__loop_t *loop) {
+  btc_tick_t *tick, *next;
+
   CHECK(loop->running == 0);
 
 #if defined(BTC_USE_EPOLL)
@@ -1035,25 +1045,37 @@ btc_loop_destroy(btc__loop_t *loop) {
   free(loop->sockets);
 #endif
 
+  for (tick = loop->ticks.head; tick != NULL; tick = next) {
+    next = tick->next;
+    free(tick);
+  }
+
   free(loop);
 }
 
 void
-btc_loop_on_tick(btc__loop_t *loop, btc_loop_tick_cb *handler) {
-  CHECK(loop->on_ticks < lengthof(loop->on_tick));
-  loop->on_tick[loop->on_ticks++] = handler;
+btc_loop_on_tick(btc__loop_t *loop, btc_loop_tick_cb *handler, void *data) {
+  btc_tick_t *tick = (btc_tick_t *)safe_malloc(sizeof(btc_tick_t));
+
+  tick->handler = handler;
+  tick->data = data;
+  tick->prev = NULL;
+  tick->next = NULL;
+
+  btc_list_push(&loop->ticks, tick, btc_tick_t);
 }
 
 void
-btc_loop_set_data(btc__loop_t *loop, int name, void *data) {
-  CHECK((size_t)name < lengthof(loop->data));
-  loop->data[name] = data;
-}
+btc_loop_off_tick(btc__loop_t *loop, btc_loop_tick_cb *handler, void *data) {
+  btc_tick_t *tick;
 
-void *
-btc_loop_get_data(btc__loop_t *loop, int name) {
-  CHECK((size_t)name < lengthof(loop->data));
-  return loop->data[name];
+  for (tick = loop->ticks.head; tick != NULL; tick = tick->next) {
+    if (tick->handler == handler && tick->data == data) {
+      btc_list_remove(&loop->ticks, tick, btc_tick_t);
+      free(tick);
+      break;
+    }
+  }
 }
 
 const char *
@@ -1371,6 +1393,31 @@ handle_write(btc__loop_t *loop, btc__socket_t *socket) {
   }
 }
 
+static void
+handle_ticks(btc__loop_t *loop) {
+  btc_tick_t *tick, *next;
+
+  for (tick = loop->ticks.head; tick != NULL; tick = next) {
+    next = tick->next;
+
+    tick->handler(loop, tick->data);
+  }
+}
+
+static void
+handle_closed(btc__loop_t *loop) {
+  btc__socket_t *socket, *next;
+
+  for (socket = loop->closed.head; socket != NULL; socket = next) {
+    next = socket->next;
+
+    socket->on_close(socket);
+    btc_socket_destroy(socket);
+  }
+
+  btc_list_init(&loop->closed);
+}
+
 #if defined(BTC_USE_EPOLL)
 void
 btc_loop_start(btc__loop_t *loop) {
@@ -1407,16 +1454,8 @@ btc_loop_start(btc__loop_t *loop) {
         handle_write(loop, socket);
     }
 
-    for (i = 0; (size_t)i < loop->on_ticks; i++)
-      loop->on_tick[i](loop);
-
-    for (socket = loop->closed.head; socket != NULL; socket = next) {
-      next = socket->next;
-      socket->on_disconnect(socket);
-      btc_socket_destroy(socket);
-    }
-
-    btc_list_init(&loop->closed);
+    handle_ticks(loop);
+    handle_closed(loop);
 
     if (count == loop->max)
       btc_loop_grow(loop, (count * 3) / 2);
@@ -1428,7 +1467,7 @@ btc_loop_start(btc__loop_t *loop) {
     next = socket->next;
 
     btc_socket_close(socket);
-    socket->on_disconnect(socket);
+    socket->on_close(socket);
     btc_socket_destroy(socket);
   }
 
@@ -1438,7 +1477,7 @@ btc_loop_start(btc__loop_t *loop) {
 #elif defined(BTC_USE_POLL)
 void
 btc_loop_start(btc__loop_t *loop) {
-  btc__socket_t *socket, *next;
+  btc__socket_t *socket;
   long long prev, diff;
   struct pollfd *pfd;
   int count;
@@ -1481,16 +1520,8 @@ btc_loop_start(btc__loop_t *loop) {
       }
     }
 
-    for (i = 0; i < loop->on_ticks; i++)
-      loop->on_tick[i](loop);
-
-    for (socket = loop->closed.head; socket != NULL; socket = next) {
-      next = socket->next;
-      socket->on_disconnect(socket);
-      btc_socket_destroy(socket);
-    }
-
-    btc_list_init(&loop->closed);
+    handle_ticks(loop);
+    handle_closed(loop);
 
     time_sleep(BTC_TICK_RATE - diff);
   }
@@ -1499,7 +1530,7 @@ btc_loop_start(btc__loop_t *loop) {
     socket = loop->sockets[i];
 
     btc_socket_close(socket);
-    socket->on_disconnect(socket);
+    socket->on_close(socket);
     btc_socket_destroy(socket);
   }
 
@@ -1511,12 +1542,10 @@ btc_loop_start(btc__loop_t *loop) {
 #else /* BTC_USE_SELECT */
 void
 btc_loop_start(btc__loop_t *loop) {
-  btc__socket_t *socket, *next;
+  btc__socket_t *socket;
   struct timeval tv, to;
   long long prev, diff;
-  int count;
-  size_t i;
-  int fd;
+  int fd, count;
 
   memset(&tv, 0, sizeof(tv));
 
@@ -1525,10 +1554,10 @@ btc_loop_start(btc__loop_t *loop) {
   loop->running = 1;
 
   while (loop->running) {
-    memcpy(&to, &tv, sizeof(tv));
     memcpy(&loop->rfdi, &loop->rfds, sizeof(loop->rfds));
     memcpy(&loop->wfdi, &loop->wfds, sizeof(loop->wfds));
     memcpy(&loop->efdi, &loop->efds, sizeof(loop->efds));
+    memcpy(&to, &tv, sizeof(tv));
 
     prev = time_msec();
     count = select(loop->nfds, &loop->rfdi, &loop->wfdi, &loop->efdi, &to);
@@ -1559,16 +1588,8 @@ btc_loop_start(btc__loop_t *loop) {
       }
     }
 
-    for (i = 0; i < loop->on_ticks; i++)
-      loop->on_tick[i](loop);
-
-    for (socket = loop->closed.head; socket != NULL; socket = next) {
-      next = socket->next;
-      socket->on_disconnect(socket);
-      btc_socket_destroy(socket);
-    }
-
-    btc_list_init(&loop->closed);
+    handle_ticks(loop);
+    handle_closed(loop);
 
     time_sleep(BTC_TICK_RATE - diff);
   }
@@ -1580,7 +1601,7 @@ btc_loop_start(btc__loop_t *loop) {
       continue;
 
     btc_socket_close(socket);
-    socket->on_disconnect(socket);
+    socket->on_close(socket);
     btc_socket_destroy(socket);
   }
 

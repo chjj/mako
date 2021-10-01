@@ -39,7 +39,7 @@ typedef struct http_head {
 
 typedef struct http_req {
   unsigned int method;
-  http_string_t url;
+  http_string_t path;
   http_head_t headers;
   http_string_t body;
 } http_req_t;
