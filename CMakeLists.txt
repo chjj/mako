@@ -139,6 +139,7 @@ endif()
 list(APPEND satoshi_includes ${PROJECT_SOURCE_DIR}/include)
 list(APPEND satoshi_libs m)
 
+add_subdirectory(deps/json)
 add_subdirectory(deps/lmdb)
 
 add_library(satoshi_static STATIC ${satoshi_sources})
@@ -171,7 +172,7 @@ target_compile_definitions(satoshi_node PUBLIC ${satoshi_defines})
 target_compile_options(satoshi_node PUBLIC ${satoshi_cflags})
 target_include_directories(satoshi_node PUBLIC ${satoshi_includes})
 target_link_options(satoshi_node INTERFACE ${satoshi_ldflags})
-target_link_libraries(satoshi_node PRIVATE lmdb)
+target_link_libraries(satoshi_node PRIVATE json lmdb)
 set_property(TARGET satoshi_node PROPERTY OUTPUT_NAME node)
 
 add_library(satoshi_tests STATIC test/lib/tests.c test/lib/clean.c)
