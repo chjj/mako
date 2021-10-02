@@ -193,7 +193,6 @@ typedef struct btc_loop_s {
 #else
   fd_set rfds, rfdi;
   fd_set wfds, wfdi;
-  fd_set efds, efdi;
   int nfds;
   btc__socket_t *sockets[FD_SETSIZE];
 #endif
@@ -1032,7 +1031,6 @@ btc_loop_create(void) {
 #else
   FD_ZERO(&loop->rfds);
   FD_ZERO(&loop->wfds);
-  FD_ZERO(&loop->efds);
 #endif
 
   btc_loop_grow(loop, 64);
@@ -1142,7 +1140,6 @@ btc_loop_register(btc__loop_t *loop, btc__socket_t *socket) {
 
   FD_SET(socket->fd, &loop->rfds);
   FD_SET(socket->fd, &loop->wfds);
-  FD_SET(socket->fd, &loop->efds);
 
   loop->sockets[socket->fd] = socket;
 
@@ -1174,7 +1171,6 @@ btc_loop_unregister(btc__loop_t *loop, btc__socket_t *socket) {
 #else
   FD_CLR(socket->fd, &loop->rfds);
   FD_CLR(socket->fd, &loop->wfds);
-  FD_CLR(socket->fd, &loop->efds);
 
   loop->sockets[socket->fd] = NULL;
 #endif
@@ -1536,8 +1532,8 @@ btc_loop_start(btc__loop_t *loop) {
     time_sleep(BTC_TICK_RATE - diff);
   }
 
-  for (i = 0; i < loop->length; i++) {
-    socket = loop->sockets[i];
+  while (loop->length > 0) {
+    socket = loop->sockets[0];
 
     btc_socket_close(socket);
     socket->on_close(socket);
@@ -1566,11 +1562,10 @@ btc_loop_start(btc__loop_t *loop) {
   while (loop->running) {
     memcpy(&loop->rfdi, &loop->rfds, sizeof(loop->rfds));
     memcpy(&loop->wfdi, &loop->wfds, sizeof(loop->wfds));
-    memcpy(&loop->efdi, &loop->efds, sizeof(loop->efds));
     memcpy(&to, &tv, sizeof(tv));
 
     prev = time_msec();
-    count = select(loop->nfds, &loop->rfdi, &loop->wfdi, &loop->efdi, &to);
+    count = select(loop->nfds, &loop->rfdi, &loop->wfdi, NULL, &to);
     diff = time_msec() - prev;
 
     if (diff < 0)
@@ -1593,7 +1588,7 @@ btc_loop_start(btc__loop_t *loop) {
         if (FD_ISSET(fd, &loop->rfdi))
           handle_read(loop, socket);
 
-        if (FD_ISSET(fd, &loop->wfdi) | FD_ISSET(fd, &loop->efdi))
+        if (FD_ISSET(fd, &loop->wfdi))
           handle_write(loop, socket);
       }
     }
