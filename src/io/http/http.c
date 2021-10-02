@@ -15,6 +15,15 @@
 #include "http_parser.h"
 
 /*
+ * Constants
+ */
+
+#define HTTP_MAX_BUFFER (20 << 20)
+#define HTTP_MAX_FIELD_SIZE (1 << 10)
+#define HTTP_MAX_HEADERS 100
+#define HTTP_BACKLOG 100
+
+/*
  * Types
  */
 
@@ -25,6 +34,7 @@ typedef struct http_conn_s {
   struct http_parser_settings settings;
   http_req_t *req;
   int last_was_value;
+  size_t total_buffered;
 } http_conn_t;
 
 /*
@@ -354,7 +364,7 @@ http_res_write(http_res_t *res, const void *data, size_t size) {
   }
 
   if (rc == 0) {
-    if (btc_socket_buffered(res->socket) > (10 << 20)) {
+    if (btc_socket_buffered(res->socket) > HTTP_MAX_BUFFER) {
       btc_socket_close(res->socket);
       return;
     }
@@ -462,6 +472,20 @@ http_conn_destroy(http_conn_t *conn) {
   free(conn);
 }
 
+static int
+http_conn_abort(http_conn_t *conn) {
+  if (conn->req != NULL)
+    http_req_destroy(conn->req);
+
+  btc_socket_close(conn->socket);
+
+  conn->req = NULL;
+  conn->last_was_value = 0;
+  conn->total_buffered = 0;
+
+  return 1;
+}
+
 static void
 on_close(btc_socket_t *socket) {
   http_conn_t *conn = btc_socket_get_data(socket);
@@ -495,6 +519,7 @@ on_message_begin(struct http_parser *parser) {
 
   conn->req = http_req_create();
   conn->last_was_value = 0;
+  conn->total_buffered = 0;
 
   return 0;
 }
@@ -505,6 +530,14 @@ on_url(struct http_parser *parser, const char *at, size_t length) {
   http_req_t *req = conn->req;
 
   http_string_append(&req->path, at, length);
+
+  conn->total_buffered += length;
+
+  if (req->path.length > HTTP_MAX_FIELD_SIZE)
+    return http_conn_abort(conn);
+
+  if (conn->total_buffered > HTTP_MAX_BUFFER)
+    return http_conn_abort(conn);
 
   return 0;
 }
@@ -518,15 +551,28 @@ on_header_field(struct http_parser *parser, const char *at, size_t length) {
     http_header_t *hdr = req->headers.items[req->headers.length - 1];
 
     http_string_append(&hdr->field, at, length);
+
+    if (hdr->field.length > HTTP_MAX_FIELD_SIZE)
+      return http_conn_abort(conn);
   } else {
     http_header_t *hdr = http_header_create();
 
     http_string_assign(&hdr->field, at, length);
 
+    if (hdr->field.length > HTTP_MAX_FIELD_SIZE)
+      return http_conn_abort(conn);
+
     http_head_push(&req->headers, hdr);
   }
 
   conn->last_was_value = 0;
+  conn->total_buffered += length;
+
+  if (req->headers.length > HTTP_MAX_HEADERS)
+    return http_conn_abort(conn);
+
+  if (conn->total_buffered > HTTP_MAX_BUFFER)
+    return http_conn_abort(conn);
 
   return 0;
 }
@@ -540,6 +586,13 @@ on_header_value(struct http_parser *parser, const char *at, size_t length) {
   http_string_append(&hdr->value, at, length);
 
   conn->last_was_value = 1;
+  conn->total_buffered += length;
+
+  if (hdr->value.length > HTTP_MAX_FIELD_SIZE)
+    return http_conn_abort(conn);
+
+  if (conn->total_buffered > HTTP_MAX_BUFFER)
+    return http_conn_abort(conn);
 
   return 0;
 }
@@ -568,12 +621,10 @@ on_body(struct http_parser *parser, const char *at, size_t length) {
 
   http_string_append(&req->body, at, length);
 
-  if (req->body.length > (10 << 20)) {
-    http_req_destroy(req);
-    btc_socket_close(conn->socket);
-    conn->req = NULL;
-    return 1;
-  }
+  conn->total_buffered += length;
+
+  if (conn->total_buffered > HTTP_MAX_BUFFER)
+    return http_conn_abort(conn);
 
   return 0;
 }
@@ -586,6 +637,8 @@ on_message_complete(struct http_parser *parser) {
   http_res_t *res = http_res_create(conn->socket);
 
   conn->req = NULL;
+  conn->last_was_value = 0;
+  conn->total_buffered = 0;
 
   if (server->on_request != NULL) {
     if (!server->on_request(server, req, res)) {
@@ -624,6 +677,8 @@ http_conn_init(http_conn_t *conn, http_server_t *server) {
   conn->settings.on_chunk_complete = NULL;
 
   conn->req = NULL;
+  conn->last_was_value = 0;
+  conn->total_buffered = 0;
 }
 
 static void
@@ -682,7 +737,7 @@ on_server_close(btc_socket_t *socket) {
 
 int
 http_server_open(http_server_t *server, const btc_sockaddr_t *addr) {
-  server->socket = btc_loop_listen(server->loop, addr, 1000);
+  server->socket = btc_loop_listen(server->loop, addr, HTTP_BACKLOG);
 
   if (server->socket == NULL)
     return 0;
