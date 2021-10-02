@@ -83,10 +83,11 @@ http_res_send(http_res_t *res,
               const char *body);
 
 BTC_EXTERN void
-http_res_txt(http_res_t *res, unsigned int status, const char *body);
-
-BTC_EXTERN void
-http_res_json(http_res_t *res, unsigned int status, const char *body);
+http_res_send_data(http_res_t *res,
+                   unsigned int status,
+                   const char *type,
+                   void *body,
+                   size_t length);
 
 BTC_EXTERN void
 http_res_error(http_res_t *res, unsigned int status);

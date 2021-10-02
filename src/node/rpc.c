@@ -110,21 +110,19 @@ json_object_get(const json_value *obj, const char *name) {
 }
 
 static void
-http_res_jsonify(http_res_t *res, json_value *value) {
+http_res_send_json(http_res_t *res, json_value *value) {
   /* Note: json_measure includes the null terminator. */
   size_t size = json_measure_ex(value, json_options);
-  char *str = btc_malloc(size + 1);
+  char *body = btc_malloc(size);
+  size_t length;
 
-  json_serialize_ex(str, value, json_options);
+  json_serialize_ex(body, value, json_options);
 
-  size = strlen(str);
+  length = strlen(body);
 
-  str[size++] = '\n';
-  str[size++] = '\0';
+  body[length++] = '\n';
 
-  http_res_send(res, 200, "application/json", str);
-
-  btc_free(str);
+  http_res_send_data(res, 200, "application/json", body, length);
 }
 
 /*
@@ -193,7 +191,7 @@ rpc_res_init(rpc_res_t *res) {
 static void
 rpc_res_error(rpc_res_t *res, int code, const char *msg) {
   if (res->result != NULL)
-    json_value_free(res->result);
+    json_builder_free(res->result);
 
   res->result = NULL;
   res->msg = msg;
@@ -322,6 +320,8 @@ btc_rpc_getinfo(btc_rpc_t *rpc, const json_value *params, rpc_res_t *res) {
 
 static void
 btc_rpc_handle(btc_rpc_t *rpc, const rpc_req_t *req, rpc_res_t *res) {
+  btc_rpc_log(rpc, "Incoming RPC request: %s.", req->method);
+
   if (strcmp(req->method, "getinfo") == 0) {
     btc_rpc_getinfo(rpc, req->params, res);
   } else {
@@ -362,9 +362,9 @@ on_request(http_server_t *server, http_req_t *req, http_res_t *res) {
   obj = rpc_res_encode(&rres, rreq.id);
 
   http_res_header(res, "X-Long-Polling", "/?longpoll=1");
-  http_res_jsonify(res, obj);
+  http_res_send_json(res, obj);
 
-  json_value_free(obj);
+  json_builder_free(obj);
 
   return 1;
 }

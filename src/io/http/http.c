@@ -344,31 +344,37 @@ http_res_destroy(http_res_t *res) {
   free(res);
 }
 
-static void
-http_res_write(http_res_t *res, const void *data, size_t size) {
-  unsigned char *out;
-  int rc;
-
-  if (size == 0)
-    return;
-
-  out = safe_malloc(size);
-
-  memcpy(out, data, size);
-
-  rc = btc_socket_write(res->socket, out, size);
+static int
+http_res_write(http_res_t *res, void *data, size_t size) {
+  int rc = btc_socket_write(res->socket, data, size);
 
   if (rc == -1) {
     btc_socket_close(res->socket);
-    return;
+    return 0;
   }
 
   if (rc == 0) {
-    if (btc_socket_buffered(res->socket) > HTTP_MAX_BUFFER) {
+    if (btc_socket_buffered(res->socket) > HTTP_MAX_BUFFER)
       btc_socket_close(res->socket);
-      return;
-    }
+
+    return 0;
   }
+
+  return 1;
+}
+
+static int
+http_res_put(http_res_t *res, const char *str, size_t len) {
+  void *data;
+
+  if (len == 0)
+    return 1;
+
+  data = safe_malloc(len);
+
+  memcpy(data, str, len);
+
+  return http_res_write(res, data, len);
 }
 
 static void
@@ -379,7 +385,7 @@ http_res_print(http_res_t *res, const char *fmt, ...) {
 
   va_start(ap, fmt);
 
-  http_res_write(res, out, vsprintf(out, fmt, ap));
+  http_res_put(res, out, vsprintf(out, fmt, ap));
 
   va_end(ap);
 }
@@ -405,12 +411,11 @@ http_res_descriptor(unsigned int status) {
   return "Unknown";
 }
 
-void
-http_res_send(http_res_t *res,
-              unsigned int status,
-              const char *type,
-              const char *body) {
-  unsigned long length = strlen(body);
+static void
+http_res_write_head(http_res_t *res,
+                    unsigned int status,
+                    const char *type,
+                    unsigned int length) {
   const char *desc = http_res_descriptor(status);
   size_t i;
 
@@ -427,22 +432,35 @@ http_res_send(http_res_t *res,
   }
 
   http_res_print(res, "\r\n");
+}
+
+void
+http_res_send(http_res_t *res,
+              unsigned int status,
+              const char *type,
+              const char *body) {
+  size_t length = strlen(body);
+
+  http_res_write_head(res, status, type, length);
+  http_res_put(res, body, length);
+}
+
+void
+http_res_send_data(http_res_t *res,
+                   unsigned int status,
+                   const char *type,
+                   void *body,
+                   size_t length) {
+  http_res_write_head(res, status, type, length);
   http_res_write(res, body, length);
 }
 
 void
-http_res_txt(http_res_t *res, unsigned int status, const char *body) {
-  http_res_send(res, status, "text/plain", body);
-}
-
-void
-http_res_json(http_res_t *res, unsigned int status, const char *body) {
-  http_res_send(res, status, "application/json", body);
-}
-
-void
 http_res_error(http_res_t *res, unsigned int status) {
-  const char *body = http_res_descriptor(status);
+  char body[32];
+
+  sprintf(body, "%s\n", http_res_descriptor(status));
+
   http_res_send(res, status, "text/plain", body);
 }
 
