@@ -336,7 +336,7 @@ on_request(http_server_t *server, http_req_t *req, http_res_t *res) {
   rpc_req_t rreq;
   rpc_res_t rres;
 
-  if (req->method != 3 /* HTTP_POST */) {
+  if (req->method != HTTP_METHOD_POST) {
     http_res_error(res, 400);
     return 1;
   }
