@@ -33,10 +33,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdio.h>
-
-#ifdef _MSC_VER
-    #define snprintf _snprintf
-#endif
+#include <stdlib.h>
 
 static const json_serialize_opts default_opts =
 {
@@ -60,7 +57,7 @@ static int builderize (json_value * value)
 {
    if (((json_builder_value *) value)->is_builder_value)
       return 1;
-   
+
    if (value->type == json_object)
    {
       unsigned int i;
@@ -217,7 +214,7 @@ json_value * json_object_push_length (json_value * object,
 
    if (! (name_copy = (json_char *) malloc ((name_length + 1) * sizeof (json_char))))
       return NULL;
-   
+
    memcpy (name_copy, name, name_length * sizeof (json_char));
    name_copy [name_length] = 0;
 
@@ -282,7 +279,7 @@ json_value * json_string_new_length (unsigned int length, const json_char * buf)
 
    if (!copy)
       return NULL;
-   
+
    memcpy (copy, buf, length * sizeof (json_char));
    copy [length] = 0;
 
@@ -298,7 +295,7 @@ json_value * json_string_new_length (unsigned int length, const json_char * buf)
 json_value * json_string_new_nocopy (unsigned int length, json_char * buf)
 {
    json_value * value = (json_value *) calloc (1, sizeof (json_builder_value));
-   
+
    if (!value)
       return NULL;
 
@@ -314,7 +311,7 @@ json_value * json_string_new_nocopy (unsigned int length, json_char * buf)
 json_value * json_integer_new (json_int_t integer)
 {
    json_value * value = (json_value *) calloc (1, sizeof (json_builder_value));
-   
+
    if (!value)
       return NULL;
 
@@ -329,7 +326,7 @@ json_value * json_integer_new (json_int_t integer)
 json_value * json_double_new (double dbl)
 {
    json_value * value = (json_value *) calloc (1, sizeof (json_builder_value));
-   
+
    if (!value)
       return NULL;
 
@@ -344,7 +341,7 @@ json_value * json_double_new (double dbl)
 json_value * json_boolean_new (int b)
 {
    json_value * value = (json_value *) calloc (1, sizeof (json_builder_value));
-   
+
    if (!value)
       return NULL;
 
@@ -359,7 +356,7 @@ json_value * json_boolean_new (int b)
 json_value * json_null_new (void)
 {
    json_value * value = (json_value *) calloc (1, sizeof (json_builder_value));
-   
+
    if (!value)
       return NULL;
 
@@ -541,6 +538,7 @@ size_t json_measure_ex (json_value * value, json_serialize_opts opts)
    size_t indents = 0;
    int flags;
    int bracket_size, comma_size, colon_size;
+   char tmp[32];
 
    flags = get_serialize_flags (opts);
 
@@ -662,7 +660,7 @@ size_t json_measure_ex (json_value * value, json_serialize_opts opts)
 
          case json_double:
 
-            total += snprintf (NULL, 0, "%g", value->u.dbl);
+            total += sprintf (tmp, "%.16g", value->u.dbl);
 
             /* Because sometimes we need to add ".0" if sprintf does not do it
              * for us. Downside is that we allocate more bytes than strictly
@@ -674,7 +672,7 @@ size_t json_measure_ex (json_value * value, json_serialize_opts opts)
 
          case json_boolean:
 
-            total += value->u.boolean ? 
+            total += value->u.boolean ?
                4:  /* `true` */
                5;  /* `false` */
 
@@ -881,7 +879,7 @@ void json_serialize_ex (json_char * buf, json_value * value, json_serialize_opts
 
             ptr = buf;
 
-            buf += sprintf (buf, "%g", value->u.dbl);
+            buf += sprintf (buf, "%.16g", value->u.dbl);
 
             if ((dot = strchr (ptr, ',')))
             {
