@@ -395,28 +395,12 @@ http_res_header(http_res_t *res, const char *field, const char *value) {
   http_head_push_item(&res->headers, field, value);
 }
 
-static const char *
-http_res_descriptor(unsigned int status) {
-  switch (status) {
-    case 200: return "OK";
-    case 301: return "Moved Permanently";
-    case 302: return "Found";
-    case 304: return "Not Modified";
-    case 400: return "Bad Request";
-    case 401: return "Unauthorized";
-    case 403: return "Forbidden";
-    case 404: return "Not Found";
-    case 500: return "Internal Server Error";
-  }
-  return "Unknown";
-}
-
 static void
 http_res_write_head(http_res_t *res,
                     unsigned int status,
                     const char *type,
                     unsigned int length) {
-  const char *desc = http_res_descriptor(status);
+  const char *desc = http_status_str(status);
   size_t i;
 
   http_res_print(res, "HTTP/1.1 %u %s\r\n", status, desc);
@@ -457,9 +441,9 @@ http_res_send_data(http_res_t *res,
 
 void
 http_res_error(http_res_t *res, unsigned int status) {
-  char body[32];
+  char body[33];
 
-  sprintf(body, "%s\n", http_res_descriptor(status));
+  sprintf(body, "%s\n", http_status_str(status));
 
   http_res_send(res, status, "text/plain", body);
 }
