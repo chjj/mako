@@ -1487,7 +1487,6 @@ btc_loop_start(btc__loop_t *loop) {
   long long prev, diff;
   struct pollfd *pfd;
   int count;
-  size_t i;
 
   loop->running = 1;
 
