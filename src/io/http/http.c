@@ -35,8 +35,6 @@ typedef struct http_conn_s {
   http_req_t *req;
   int last_was_value;
   size_t total_buffered;
-  http_response_cb *respond;
-  void *data;
 } http_conn_t;
 
 /*
@@ -455,7 +453,7 @@ http_res_error(http_res_t *res, unsigned int status) {
  */
 
 static void
-http_conn_init(http_conn_t *conn, enum http_parser_type type);
+http_conn_init(http_conn_t *conn, http_server_t *server);
 
 static void
 http_conn_clear(http_conn_t *conn) {
@@ -464,9 +462,9 @@ http_conn_clear(http_conn_t *conn) {
 }
 
 static http_conn_t *
-http_conn_create(enum http_parser_type type) {
+http_conn_create(http_server_t *server) {
   http_conn_t *conn = safe_malloc(sizeof(http_conn_t));
-  http_conn_init(conn, type);
+  http_conn_init(conn, server);
   return conn;
 }
 
@@ -493,12 +491,6 @@ http_conn_abort(http_conn_t *conn) {
 static void
 on_close(btc_socket_t *socket) {
   http_conn_t *conn = btc_socket_get_data(socket);
-
-  if (conn->respond != NULL) {
-    conn->respond(NULL, conn->data);
-    conn->respond = NULL;
-  }
-
   http_conn_destroy(conn);
 }
 
@@ -613,7 +605,6 @@ on_headers_complete(struct http_parser *parser) {
   http_req_t *req = conn->req;
   size_t i;
 
-  req->status = parser->status_code; /* client only */
   req->method = parser->method;
 
   for (i = 0; i < req->headers.length; i++) {
@@ -666,33 +657,12 @@ on_message_complete(struct http_parser *parser) {
   return 0;
 }
 
-static int
-on_message_client(struct http_parser *parser) {
-  http_conn_t *conn = parser->data;
-  http_req_t *req = conn->req;
-
-  conn->req = NULL;
-  conn->last_was_value = 0;
-  conn->total_buffered = 0;
-
-  if (conn->respond != NULL) {
-    conn->respond(req, conn->data);
-    conn->respond = NULL;
-  }
-
-  http_req_destroy(req);
-
-  btc_socket_close(conn->socket);
-
-  return 0;
-}
-
 static void
-http_conn_init(http_conn_t *conn, enum http_parser_type type) {
-  conn->server = NULL;
+http_conn_init(http_conn_t *conn, http_server_t *server) {
+  conn->server = server;
   conn->socket = NULL;
 
-  http_parser_init(&conn->parser, type);
+  http_parser_init(&conn->parser, HTTP_REQUEST);
   http_parser_settings_init(&conn->settings);
 
   conn->parser.data = conn;
@@ -704,20 +674,13 @@ http_conn_init(http_conn_t *conn, enum http_parser_type type) {
   conn->settings.on_header_value = on_header_value;
   conn->settings.on_headers_complete = on_headers_complete;
   conn->settings.on_body = on_body;
-
-  if (type == HTTP_RESPONSE)
-    conn->settings.on_message_complete = on_message_client;
-  else
-    conn->settings.on_message_complete = on_message_complete;
-
+  conn->settings.on_message_complete = on_message_complete;
   conn->settings.on_chunk_header = NULL;
   conn->settings.on_chunk_complete = NULL;
 
   conn->req = NULL;
   conn->last_was_value = 0;
   conn->total_buffered = 0;
-  conn->respond = NULL;
-  conn->data = NULL;
 }
 
 static void
@@ -763,9 +726,7 @@ http_server_destroy(http_server_t *server) {
 static void
 on_socket(btc_socket_t *parent, btc_socket_t *child) {
   http_server_t *server = btc_socket_get_data(parent);
-  http_conn_t *conn = http_conn_create(HTTP_REQUEST);
-
-  conn->server = server;
+  http_conn_t *conn = http_conn_create(server);
 
   http_conn_accept(conn, child);
 }
@@ -794,115 +755,4 @@ void
 http_server_close(http_server_t *server) {
   if (server->socket != NULL)
     btc_socket_close(server->socket);
-}
-
-/*
- * Client
- */
-
-void
-http_options_init(http_options_t *options) {
-  options->method = HTTP_GET;
-  options->hostname = "127.0.0.1";
-  options->port = 80;
-  options->path = "/";
-  options->headers = NULL;
-  options->agent = "libio 0.0";
-  options->accept = "*/*";
-  options->type = NULL;
-  options->body = NULL;
-}
-
-int
-http_request(btc_loop_t *loop,
-             const http_options_t *options,
-             http_response_cb *callback,
-             void *data) {
-  unsigned long length = 0;
-  btc_sockaddr_t addr;
-  btc_socket_t *socket;
-  http_conn_t *conn;
-  http_res_t res;
-  const char *method;
-  size_t i;
-
-  if (!btc_sockaddr_import(&addr, options->hostname, options->port)) {
-    btc_sockaddr_t *r, *p;
-
-    if (!btc_getaddrinfo(&r, options->hostname))
-      return 0;
-
-    for (p = r; p != NULL; p = p->next) {
-      if (p->family == BTC_AF_INET)
-        break;
-    }
-
-    if (p == NULL) {
-      btc_freeaddrinfo(r);
-      return 0;
-    }
-
-    addr = *p;
-    addr.port = options->port;
-
-    btc_freeaddrinfo(r);
-  }
-
-  socket = btc_loop_connect(loop, &addr);
-
-  if (socket == NULL)
-    return 0;
-
-  conn = http_conn_create(HTTP_RESPONSE);
-
-  conn->respond = callback;
-  conn->data = data;
-
-  http_conn_accept(conn, socket);
-
-  res.socket = socket;
-
-  method = http_method_str(options->method);
-
-  http_res_print(&res, "%s %s HTTP/1.1\r\n", method, options->path);
-
-  if (options->port != 80)
-    http_res_print(&res, "Host: %s:%u\r\n", options->hostname, options->port);
-  else
-    http_res_print(&res, "Host: %s\r\n", options->hostname);
-
-  if (options->agent != NULL)
-    http_res_print(&res, "User-Agent: %s\r\n", options->agent);
-
-  if (options->accept != NULL)
-    http_res_print(&res, "Accept: %s\r\n", options->accept);
-
-  if (options->method != HTTP_GET) {
-    if (options->body != NULL)
-      length = strlen(options->body);
-
-    if (options->type != NULL)
-      http_res_print(&res, "Content-Type: %s\r\n", options->type);
-
-    if (length != 0)
-      http_res_print(&res, "Content-Length: %lu\r\n", length);
-  }
-
-  if (options->headers != NULL) {
-    for (i = 0; options->headers[i] != NULL; i += 2) {
-      const char *field = options->headers[i + 0];
-      const char *value = options->headers[i + 1];
-
-      http_res_print(&res, "%s: %s\r\n", field, value);
-    }
-  }
-
-  http_res_print(&res, "\r\n");
-
-  if (length != 0)
-    http_res_put(&res, options->body, length);
-
-  btc_socket_complete(socket);
-
-  return 1;
 }
