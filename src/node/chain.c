@@ -214,7 +214,18 @@ btc_chain_log(struct btc_chain_s *chain, const char *fmt, ...) {
 
 static void
 btc_chain_get_deployment_state(struct btc_chain_s *chain,
-                               btc_deployment_state_t *state);
+                               btc_deployment_state_t *state) {
+  const btc_entry_t *tip = chain->tip;
+  const btc_entry_t *prev = tip->prev;
+
+  if (prev == NULL) {
+    CHECK(tip->height == 0);
+    btc_deployment_state_init(state);
+    return;
+  }
+
+  btc_chain_get_deployments(chain, state, tip->header.time, prev);
+}
 
 static void
 btc_chain_maybe_sync(struct btc_chain_s *chain) {
@@ -724,7 +735,7 @@ btc_chain_is_active(struct btc_chain_s *chain,
   return btc_chain_get_state(chain, prev, deployment) == BTC_CHAIN_ACTIVE;
 }
 
-static void
+void
 btc_chain_get_deployments(struct btc_chain_s *chain,
                           btc_deployment_state_t *state,
                           int64_t time,
@@ -808,21 +819,6 @@ btc_chain_get_deployments(struct btc_chain_s *chain,
         state->bip148 = 1;
     }
   }
-}
-
-static void
-btc_chain_get_deployment_state(struct btc_chain_s *chain,
-                               btc_deployment_state_t *state) {
-  const btc_entry_t *tip = chain->tip;
-  const btc_entry_t *prev = tip->prev;
-
-  if (prev == NULL) {
-    CHECK(tip->height == 0);
-    btc_deployment_state_init(state);
-    return;
-  }
-
-  btc_chain_get_deployments(chain, state, tip->header.time, prev);
 }
 
 static int
@@ -1998,4 +1994,27 @@ btc_chain_find_locator(struct btc_chain_s *chain, const btc_vector_t *locator) {
   }
 
   return btc_chaindb_head(chain->db);
+}
+
+uint32_t
+btc_chain_compute_version(struct btc_chain_s *chain, const btc_entry_t *prev) {
+  const btc_network_t *network = chain->network;
+  const btc_deployment_t *deploy;
+  uint32_t version = 0;
+  int state;
+  size_t i;
+
+  for (i = 0; i < network->deployments.length; i++) {
+    deploy = &network->deployments.items[i];
+    state = btc_chain_get_state(chain, prev, deploy);
+
+    if (state == BTC_CHAIN_LOCKED_IN
+        || (state == BTC_CHAIN_STARTED && deploy->force)) {
+      version |= (UINT32_C(1) << deploy->bit);
+    }
+  }
+
+  version |= BTC_VERSION_TOP_BITS;
+
+  return version;
 }

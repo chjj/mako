@@ -121,6 +121,12 @@ btc_chain_get_target(btc_chain_t *chain,
 BTC_EXTERN uint32_t
 btc_chain_get_current_target(btc_chain_t *chain);
 
+BTC_EXTERN void
+btc_chain_get_deployments(btc_chain_t *chain,
+                          btc_deployment_state_t *state,
+                          int64_t time,
+                          const btc_entry_t *prev);
+
 BTC_EXTERN int
 btc_chain_verify_final(btc_chain_t *chain,
                        const btc_entry_t *prev,
@@ -197,6 +203,9 @@ btc_chain_get_locator(btc_chain_t *chain,
 
 BTC_EXTERN const btc_entry_t *
 btc_chain_find_locator(btc_chain_t *chain, const btc_vector_t *locator);
+
+BTC_EXTERN uint32_t
+btc_chain_compute_version(struct btc_chain_s *chain, const btc_entry_t *prev);
 
 #ifdef __cplusplus
 }

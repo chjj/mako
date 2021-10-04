@@ -48,6 +48,7 @@
  */
 
 static const uint8_t zero_nonce[32] = {0};
+static const uint8_t default_flags[] = "mined by libsatoshi";
 
 /*
  * Block Entry
@@ -127,11 +128,9 @@ DEFINE_OBJECT(btc_tmpl, SCOPE_EXTERN)
 
 void
 btc_tmpl_init(btc_tmpl_t *bt) {
-  static unsigned char cbflags[] = "mined by libsatoshi";
-
   memset(bt, 0, sizeof(*bt));
 
-  bt->version = 4;
+  bt->version = BTC_VERSION_TOP_BITS;
   bt->time = btc_now();
   bt->bits = 0x207fffff;
   bt->mtp = bt->time - 10 * 60;
@@ -141,11 +140,10 @@ btc_tmpl_init(btc_tmpl_t *bt) {
   bt->sigops = 400;
 
   btc_buffer_init(&bt->cbflags);
-  btc_buffer_set(&bt->cbflags, cbflags, sizeof(cbflags) - 1);
-
   btc_address_init(&bt->address);
-
   btc_vector_init(&bt->txs);
+
+  btc_buffer_set(&bt->cbflags, default_flags, sizeof(default_flags) - 1);
 }
 
 void
@@ -408,7 +406,6 @@ btc_tmpl_submitwork(const btc_tmpl_t *bt,
                     uint32_t nonce1,
                     uint32_t nonce2) {
   btc_block_t *block;
-  const btc_tx_t *tx;
   uint8_t root[32];
   btc_tx_t *cb;
   size_t i;
@@ -446,9 +443,9 @@ btc_tmpl_submitwork(const btc_tmpl_t *bt,
   btc_txvec_push(&block->txs, cb);
 
   for (i = 0; i < bt->txs.length; i++) {
-    tx = ((const btc_blockentry_t *)bt->txs.items[i])->tx;
+    const btc_blockentry_t *item = bt->txs.items[i];
 
-    btc_txvec_push(&block->txs, btc_tx_clone(tx));
+    btc_txvec_push(&block->txs, btc_tx_clone(item->tx));
   }
 
   return block;
@@ -508,16 +505,16 @@ btc_tmpl_add(btc_tmpl_t *bt, const btc_tx_t *tx, const btc_view_t *view) {
       goto fail;
   }
 
+  if (!(bt->flags & BTC_SCRIPT_VERIFY_WITNESS)) {
+    if (btc_tx_has_witness(tx))
+      goto fail;
+  }
+
   if (bt->weight + item->weight > BTC_MAX_BLOCK_WEIGHT)
     goto fail;
 
   if (bt->sigops + item->sigops > BTC_MAX_BLOCK_SIGOPS_COST)
     goto fail;
-
-  if (!(bt->flags & BTC_SCRIPT_VERIFY_WITNESS)) {
-    if (btc_tx_has_witness(tx))
-      goto fail;
-  }
 
   bt->weight += item->weight;
   bt->sigops += item->sigops;
@@ -542,6 +539,8 @@ struct btc_miner_s {
   const btc_timedata_t *timedata;
   btc_chain_t *chain;
   btc_mempool_t *mempool;
+  btc_buffer_t cbflags;
+  btc_vector_t addrs;
 };
 
 struct btc_miner_s *
@@ -561,11 +560,24 @@ btc_miner_create(const btc_network_t *network,
   miner->chain = chain;
   miner->mempool = mempool;
 
+  btc_buffer_init(&miner->cbflags);
+  btc_vector_init(&miner->addrs);
+
+  btc_buffer_set(&miner->cbflags, default_flags, sizeof(default_flags) - 1);
+
   return miner;
 }
 
 void
 btc_miner_destroy(struct btc_miner_s *miner) {
+  size_t i;
+
+  for (i = 0; i < miner->addrs.length; i++)
+    btc_address_destroy(miner->addrs.items[i]);
+
+  btc_vector_clear(&miner->addrs);
+  btc_buffer_clear(&miner->cbflags);
+
   btc_free(miner);
 }
 
@@ -596,4 +608,197 @@ btc_miner_open(struct btc_miner_s *miner) {
 void
 btc_miner_close(struct btc_miner_s *miner) {
   (void)miner;
+}
+
+void
+btc_miner_add_address(struct btc_miner_s *miner, const btc_address_t *addr) {
+  btc_vector_push(&miner->addrs, btc_address_clone(addr));
+}
+
+void
+btc_miner_get_address(btc_address_t *addr, struct btc_miner_s *miner) {
+  if (miner->addrs.length == 0) {
+    btc_address_init(addr);
+  } else {
+    size_t i = btc_uniform(miner->addrs.length);
+
+    btc_address_copy(addr, miner->addrs.items[i]);
+  }
+}
+
+void
+btc_miner_set_data(struct btc_miner_s *miner,
+                   const uint8_t *flags,
+                   size_t length) {
+  CHECK(length <= 70);
+
+  btc_buffer_set(&miner->cbflags, flags, length);
+}
+
+void
+btc_miner_set_flags(struct btc_miner_s *miner, const char *flags) {
+  btc_miner_set_data(miner, (uint8_t *)flags, strlen(flags));
+}
+
+void
+btc_miner_update_time(struct btc_miner_s *miner, btc_tmpl_t *bt) {
+  int64_t now = btc_timedata_now(miner->timedata);
+
+  if (now < bt->mtp + 1)
+    now = bt->mtp + 1;
+
+  bt->time = now;
+}
+
+static int
+cmp_rate(void *ap, void *bp) {
+  btc_blockentry_t *a = ap;
+  btc_blockentry_t *b = bp;
+  int64_t x = a->rate;
+  int64_t y = b->rate;
+
+  if (a->desc_rate > a->rate)
+    x = a->desc_rate;
+
+  if (b->desc_rate > b->rate)
+    y = b->desc_rate;
+
+  if (y < x)
+    return -1;
+
+  if (y > x)
+    return 1;
+
+  return 0;
+}
+
+static void
+btc_miner_assemble(struct btc_miner_s *miner, btc_tmpl_t *bt) {
+  btc_hashmap_t *depmap = btc_hashmap_create();
+  int64_t locktime = btc_tmpl_locktime(bt);
+  const btc_mpentry_t *entry;
+  btc_vector_t queue;
+  btc_mpiter_t iter;
+  size_t i;
+
+  btc_vector_init(&queue);
+
+  btc_mempool_iterate(&iter, miner->mempool);
+
+  while (btc_mempool_next(&entry, &iter)) {
+    btc_blockentry_t *item = btc_blockentry_create();
+
+    btc_blockentry_set_mpentry(item, entry);
+
+    for (i = 0; i < item->tx->inputs.length; i++) {
+      const btc_input_t *input = item->tx->inputs.items[i];
+      const uint8_t *hash = input->prevout.hash;
+
+      if (!btc_mempool_has(miner->mempool, hash))
+        continue;
+
+      item->dep_count += 1;
+
+      if (!btc_hashmap_has(depmap, hash))
+        btc_hashmap_put(depmap, hash, btc_vector_create());
+
+      btc_vector_push(btc_hashmap_get(depmap, hash), item);
+    }
+
+    if (item->dep_count > 0)
+      continue;
+
+    btc_heap_insert(&queue, item, cmp_rate);
+  }
+
+  while (queue.length > 0) {
+    const btc_blockentry_t *item = btc_heap_shift(&queue, cmp_rate);
+    btc_vector_t *deps;
+
+    if (!btc_tx_is_final(item->tx, bt->height, locktime))
+      continue;
+
+    if (!(bt->flags & BTC_SCRIPT_VERIFY_WITNESS)) {
+      if (btc_tx_has_witness(item->tx))
+        continue;
+    }
+
+    if (bt->weight + item->weight > BTC_MAX_POLICY_BLOCK_WEIGHT)
+      continue;
+
+    if (bt->sigops + item->sigops > BTC_MAX_BLOCK_SIGOPS_COST)
+      continue;
+
+    bt->weight += item->weight;
+    bt->sigops += item->sigops;
+    bt->fees += item->fee;
+
+    btc_vector_push(&bt->txs, item);
+
+    deps = btc_hashmap_get(depmap, item->hash);
+
+    if (deps == NULL)
+      continue;
+
+    for (i = 0; i < deps->length; i++) {
+      btc_blockentry_t *child = deps->items[i];
+
+      if (--child->dep_count == 0)
+        btc_heap_insert(&queue, child, cmp_rate);
+    }
+  }
+
+  btc_tmpl_refresh(bt);
+
+  btc_hashmap_iterate(&iter, depmap);
+
+  while (btc_hashmap_next(&iter))
+    btc_vector_destroy(iter.val);
+
+  btc_hashmap_destroy(depmap);
+  btc_vector_clear(&queue);
+}
+
+btc_tmpl_t *
+btc_miner_template(struct btc_miner_s *miner) {
+  const btc_entry_t *tip = btc_chain_tip(miner->chain);
+  uint32_t version = btc_chain_compute_version(miner->chain, tip);
+  int64_t mtp = btc_entry_median_time(tip);
+  int64_t time = btc_timedata_now(miner->timedata);
+  btc_tmpl_t *bt = btc_tmpl_create();
+  btc_deployment_state_t state;
+  uint32_t bits;
+
+  if (time < mtp + 1)
+    time = mtp + 1;
+
+  btc_chain_get_deployments(miner->chain, &state, time, tip);
+
+  bits = btc_chain_get_target(miner->chain, time, tip);
+
+  bt->version = version;
+  btc_hash_copy(bt->prev_block, tip->hash);
+  bt->time = time;
+  bt->bits = bits;
+  bt->height = tip->height + 1;
+  bt->mtp = mtp;
+  bt->flags = state.flags;
+  bt->interval = miner->network->halving_interval;
+  bt->weight = 4000; /* reserved */
+  bt->sigops = 400; /* reserved */
+
+  btc_buffer_copy(&bt->cbflags, &miner->cbflags);
+  btc_miner_get_address(&bt->address, miner);
+
+  if (miner->mempool != NULL)
+    btc_miner_assemble(miner, bt);
+
+  btc_miner_log(miner,
+    "Created block tmpl (height=%d, weight=%zu, fees=%v, txs=%zu).",
+    bt->height,
+    bt->weight,
+    bt->fees,
+    bt->txs.length + 1);
+
+  return bt;
 }

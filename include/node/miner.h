@@ -163,6 +163,24 @@ btc_miner_open(btc_miner_t *miner);
 BTC_EXTERN void
 btc_miner_close(btc_miner_t *miner);
 
+BTC_EXTERN void
+btc_miner_add_address(btc_miner_t *miner, const btc_address_t *addr);
+
+BTC_EXTERN void
+btc_miner_get_address(btc_address_t *addr, btc_miner_t *miner);
+
+BTC_EXTERN void
+btc_miner_set_data(btc_miner_t *miner, const uint8_t *flags, size_t length);
+
+BTC_EXTERN void
+btc_miner_set_flags(btc_miner_t *miner, const char *flags);
+
+BTC_EXTERN void
+btc_miner_update_time(btc_miner_t *miner, btc_tmpl_t *bt);
+
+BTC_EXTERN btc_tmpl_t *
+btc_miner_template(btc_miner_t *miner);
+
 #ifdef __cplusplus
 }
 #endif
