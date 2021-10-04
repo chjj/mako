@@ -77,8 +77,8 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/vector.c
                             src/view.c)
 
-list(APPEND io_sources src/io/http/http.c
-                       src/io/http/http_parser.c
+list(APPEND io_sources src/io/http/http_parser.c
+                       src/io/http/http_server.c
                        src/io/addrinfo.c
                        src/io/core.c
                        src/io/sockaddr.c)
