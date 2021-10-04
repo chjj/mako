@@ -42,10 +42,8 @@ int main(void) {
   btc_sockaddr_import(&addr, "127.0.0.1", 8080);
 
   server->on_request = on_request;
-  server->data = NULL;
 
-  if (!http_server_open(server, &addr))
-    return 1;
+  ASSERT(http_server_open(server, &addr));
 
   btc_loop_start(loop);
 

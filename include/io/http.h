@@ -93,23 +93,41 @@ typedef struct http_req {
   http_string_t body;
 } http_req_t;
 
-typedef struct http_res_s {
+typedef struct http_res {
   btc_socket_t *socket;
   http_head_t headers;
 } http_res_t;
 
-struct http_server_s;
+struct http_server;
 
-typedef int http_server_request_cb(struct http_server_s *,
+typedef int http_server_request_cb(struct http_server *,
                                    http_req_t *,
                                    http_res_t *);
 
-typedef struct http_server_s {
+typedef struct http_server {
   btc_loop_t *loop;
   btc_socket_t *socket;
   http_server_request_cb *on_request;
   void *data;
 } http_server_t;
+
+typedef struct http_options {
+  unsigned int method;
+  const char *path;
+  const char **headers;
+  const char *agent;
+  const char *accept;
+  const char *type;
+  const char *body;
+} http_options_t;
+
+typedef struct http_msg {
+  unsigned int status;
+  http_head_t headers;
+  http_string_t body;
+} http_msg_t;
+
+typedef struct http_client http_client_t;
 
 /*
  * Request
@@ -156,6 +174,48 @@ http_server_open(http_server_t *server, const btc_sockaddr_t *addr);
 
 BTC_EXTERN void
 http_server_close(http_server_t *server);
+
+/*
+ * Options
+ */
+
+BTC_EXTERN void
+http_options_init(http_options_t *options);
+
+/*
+ * Message
+ */
+
+BTC_EXTERN void
+http_msg_init(http_msg_t *msg);
+
+BTC_EXTERN void
+http_msg_clear(http_msg_t *msg);
+
+BTC_EXTERN http_msg_t *
+http_msg_create(void);
+
+BTC_EXTERN void
+http_msg_destroy(http_msg_t *msg);
+
+/*
+ * Client
+ */
+
+BTC_EXTERN http_client_t *
+http_client_create(void);
+
+BTC_EXTERN void
+http_client_destroy(http_client_t *client);
+
+BTC_EXTERN int
+http_client_open(http_client_t *client, const char *hostname, int port);
+
+BTC_EXTERN void
+http_client_close(http_client_t *client);
+
+BTC_EXTERN http_msg_t *
+http_client_request(http_client_t *client, const http_options_t *options);
 
 #ifdef __cplusplus
 }
