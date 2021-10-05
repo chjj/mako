@@ -18,7 +18,7 @@ void
 btc_hash256_update(struct btc_sha256_s *ctx, const void *data, size_t len);
 
 #define SCOPE_STATIC BTC_UNUSED static
-#define SCOPE_EXTERN
+#define SCOPE_EXTERN struct btc_empty_struct;
 
 /*
  * Object
@@ -620,7 +620,7 @@ btc_size_read(size_t *zp, const uint8_t **xp, size_t *xn) {
 
 BTC_UNUSED static void
 btc_size_update(struct btc_sha256_s *ctx, size_t x) {
-  return btc_varint_update(ctx, x);
+  btc_varint_update(ctx, x);
 }
 
 BTC_UNUSED static size_t

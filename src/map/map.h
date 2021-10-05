@@ -14,7 +14,7 @@
 #include "../internal.h"
 
 #define MAP_STATIC BTC_UNUSED static
-#define MAP_EXTERN
+#define MAP_EXTERN struct btc_empty_struct;
 
 #define kh_inline BTC_INLINE
 #define kh_unused BTC_UNUSED

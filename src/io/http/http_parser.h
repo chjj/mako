@@ -143,6 +143,7 @@ enum http_status
 #define XX(num, name, string) HTTP_STATUS_##name = num,
   HTTP_STATUS_MAP(XX)
 #undef XX
+  HTTP_STATUS__END = 512
   };
 
 
@@ -196,6 +197,7 @@ enum http_method
 #define XX(num, name, string) HTTP_##name = num,
   HTTP_METHOD_MAP(XX)
 #undef XX
+  HTTP_METHOD__END = 34
   };
 
 
@@ -271,6 +273,7 @@ enum flags
 #define HTTP_ERRNO_GEN(n, s) HPE_##n,
 enum http_errno {
   HTTP_ERRNO_MAP(HTTP_ERRNO_GEN)
+  HPE__END
 };
 #undef HTTP_ERRNO_GEN
 

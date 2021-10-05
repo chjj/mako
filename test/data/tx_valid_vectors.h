@@ -837,6 +837,7 @@ static const uint8_t test_valid_tx_14[] = {
 };
 
 static const test_valid_coins_t test_valid_coins_14[] = {
+  {{{0},0},NULL,0}
 };
 
 static const uint8_t test_valid_tx_15[] = {
@@ -864,6 +865,7 @@ static const uint8_t test_valid_tx_15[] = {
 };
 
 static const test_valid_coins_t test_valid_coins_15[] = {
+  {{{0},0},NULL,0}
 };
 
 static const uint8_t test_valid_tx_16[] = {

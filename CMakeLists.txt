@@ -16,6 +16,9 @@ set(satoshi_libs)
 set(io_sources)
 set(node_sources)
 
+set(CMAKE_C_STANDARD 90)
+set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_C_STANDARD_REQUIRED OFF)
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 
 list(APPEND satoshi_sources src/crypto/chacha20.c
@@ -116,6 +119,7 @@ else()
   if(NOT MINGW)
     list(APPEND satoshi_defines BTC_TLS=__thread)
   endif()
+  list(APPEND satoshi_defines _GNU_SOURCE)
 endif()
 
 if(NOT CMAKE_CROSSCOMPILING)
@@ -131,10 +135,13 @@ if(MSVC)
   list(APPEND satoshi_cflags /wd4244
                              /wd4267)
 else()
-  list(APPEND satoshi_cflags -Wall
+  list(APPEND satoshi_cflags -pedantic
+                             -Wall
                              -Wextra
                              -Wcast-align
                              -Wno-implicit-fallthrough
+                             -Wno-long-long
+                             -Wno-overlength-strings
                              -Wshadow)
 endif()
 
