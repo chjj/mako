@@ -368,7 +368,6 @@ btc_tmpl_commit(const btc_tmpl_t *bt, const btc_blockproof_t *proof) {
   btc_tx_t *cb = btc_tmpl_coinbase(bt, proof->nonce1, proof->nonce2);
   btc_block_t *block = btc_block_create();
   btc_header_t *hdr = &block->header;
-  const btc_tx_t *tx;
   size_t i;
 
   hdr->version = bt->version;
@@ -381,9 +380,9 @@ btc_tmpl_commit(const btc_tmpl_t *bt, const btc_blockproof_t *proof) {
   btc_txvec_push(&block->txs, cb);
 
   for (i = 0; i < bt->txs.length; i++) {
-    tx = ((const btc_blockentry_t *)bt->txs.items[i])->tx;
+    const btc_blockentry_t *item = bt->txs.items[i];
 
-    btc_txvec_push(&block->txs, btc_tx_clone(tx));
+    btc_txvec_push(&block->txs, btc_tx_clone(item->tx));
   }
 
   return block;
