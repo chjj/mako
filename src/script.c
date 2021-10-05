@@ -2764,6 +2764,31 @@ btc_writer_push_data(btc_writer_t *z, const uint8_t *data, size_t length) {
 }
 
 void
+btc_writer_push_smi(btc_writer_t *z, int64_t value) {
+  if (value == -1)
+    btc_writer_push_op(z, BTC_OP_1NEGATE);
+  else if (value == 0)
+    btc_writer_push_op(z, BTC_OP_0);
+  else if (value <= 16)
+    btc_writer_push_op(z, BTC_OP_RESERVED + value);
+  else
+    btc_abort(); /* LCOV_EXCL_LINE */
+}
+
+void
+btc_writer_push_int(btc_writer_t *z, int64_t value, uint8_t *scratch) {
+  size_t len;
+
+  if (value >= -1 && value <= 16) {
+    btc_writer_push_smi(z, value);
+  } else {
+    len = btc_scriptnum_export(scratch, value);
+
+    btc_writer_push_data(z, scratch, len);
+  }
+}
+
+void
 btc_writer_compile(btc_script_t *z, const btc_writer_t *x) {
   size_t zn = 0;
   uint8_t *zp;

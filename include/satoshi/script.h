@@ -556,6 +556,12 @@ BTC_EXTERN void
 btc_writer_push_data(btc_writer_t *z, const uint8_t *data, size_t length);
 
 BTC_EXTERN void
+btc_writer_push_smi(btc_writer_t *z, int64_t value);
+
+BTC_EXTERN void
+btc_writer_push_int(btc_writer_t *z, int64_t value, uint8_t *scratch);
+
+BTC_EXTERN void
 btc_writer_compile(btc_script_t *z, const btc_writer_t *x);
 
 #ifdef __cplusplus

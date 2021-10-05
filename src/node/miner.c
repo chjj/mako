@@ -224,7 +224,6 @@ btc_tmpl_coinbase(const btc_tmpl_t *bt, uint32_t nonce1, uint32_t nonce2) {
   uint8_t height_raw[9];
   uint8_t nonce_raw[4];
   uint8_t extra_raw[8];
-  size_t len;
 
   btc_writer_init(&writer);
 
@@ -232,15 +231,7 @@ btc_tmpl_coinbase(const btc_tmpl_t *bt, uint32_t nonce1, uint32_t nonce2) {
   input = btc_input_create();
 
   /* Height (required in v2+ blocks) */
-  if (bt->height == 0) {
-    btc_writer_push_op(&writer, 0);
-  } else if (bt->height >= 1 && bt->height <= 16) {
-    btc_writer_push_op(&writer, 0x50 + bt->height);
-  } else {
-    len = btc_scriptnum_export(height_raw, bt->height);
-
-    btc_writer_push_data(&writer, height_raw, len);
-  }
+  btc_writer_push_int(&writer, bt->height, height_raw);
 
   /* Coinbase flags. */
   CHECK(bt->cbflags.length <= 70);
