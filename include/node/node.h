@@ -21,7 +21,7 @@ extern "C" {
  */
 
 BTC_EXTERN btc_node_t *
-btc_node_create(const struct btc_network_s *network);
+btc_node_create(const btc_network_t *network);
 
 BTC_EXTERN void
 btc_node_destroy(btc_node_t *node);

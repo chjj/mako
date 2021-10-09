@@ -30,7 +30,7 @@
  * Types
  */
 
-typedef struct http_client {
+struct http_client {
   char hostname[1024];
   int port;
   int fd;
@@ -40,7 +40,7 @@ typedef struct http_client {
   int last_was_value;
   size_t total_buffered;
   int done;
-} client_t;
+};
 
 /*
  * Options
@@ -92,23 +92,23 @@ http_msg_destroy(http_msg_t *msg) {
  */
 
 static void
-http_client_init(client_t *client);
+http_client_init(http_client_t *client);
 
 static void
-http_client_clear(client_t *client) {
+http_client_clear(http_client_t *client) {
   if (client->msg != NULL)
     http_msg_destroy(client->msg);
 }
 
-client_t *
+http_client_t *
 http_client_create(void) {
-  client_t *client = http_malloc(sizeof(client_t));
+  http_client_t *client = http_malloc(sizeof(http_client_t));
   http_client_init(client);
   return client;
 }
 
 void
-http_client_destroy(client_t *client) {
+http_client_destroy(http_client_t *client) {
   http_client_clear(client);
   free(client);
 }
@@ -180,7 +180,7 @@ http_connect(const struct sockaddr *addr) {
 }
 
 int
-http_client_open(client_t *client, const char *hostname, int port) {
+http_client_open(http_client_t *client, const char *hostname, int port) {
   struct sockaddr_storage storage;
   struct sockaddr *addr = (struct sockaddr *)&storage;
   size_t len = strlen(hostname);
@@ -206,7 +206,7 @@ http_client_open(client_t *client, const char *hostname, int port) {
 }
 
 void
-http_client_close(client_t *client) {
+http_client_close(http_client_t *client) {
   close(client->fd);
   client->hostname[0] = '\0';
   client->port = 0;
@@ -214,7 +214,7 @@ http_client_close(client_t *client) {
 }
 
 static void
-http_client_reset(client_t *client) {
+http_client_reset(http_client_t *client) {
   if (client->msg != NULL)
     http_msg_destroy(client->msg);
 
@@ -225,14 +225,14 @@ http_client_reset(client_t *client) {
 }
 
 static int
-http_client_abort(client_t *client) {
+http_client_abort(http_client_t *client) {
   http_client_reset(client);
   return 1;
 }
 
 static int
 on_message_begin(struct http_parser *parser) {
-  client_t *client = parser->data;
+  http_client_t *client = parser->data;
 
   http_client_reset(client);
 
@@ -243,7 +243,7 @@ on_message_begin(struct http_parser *parser) {
 
 static int
 on_header_field(struct http_parser *parser, const char *at, size_t length) {
-  client_t *client = parser->data;
+  http_client_t *client = parser->data;
   http_msg_t *msg = client->msg;
 
   if (msg->headers.length > 0 && client->last_was_value == 0) {
@@ -278,7 +278,7 @@ on_header_field(struct http_parser *parser, const char *at, size_t length) {
 
 static int
 on_header_value(struct http_parser *parser, const char *at, size_t length) {
-  client_t *client = parser->data;
+  http_client_t *client = parser->data;
   http_msg_t *msg = client->msg;
   http_header_t *hdr = msg->headers.items[msg->headers.length - 1];
 
@@ -298,7 +298,7 @@ on_header_value(struct http_parser *parser, const char *at, size_t length) {
 
 static int
 on_headers_complete(struct http_parser *parser) {
-  client_t *client = parser->data;
+  http_client_t *client = parser->data;
   http_msg_t *msg = client->msg;
   size_t i;
 
@@ -315,7 +315,7 @@ on_headers_complete(struct http_parser *parser) {
 
 static int
 on_body(struct http_parser *parser, const char *at, size_t length) {
-  client_t *client = parser->data;
+  http_client_t *client = parser->data;
   http_msg_t *msg = client->msg;
 
   http_string_append(&msg->body, at, length);
@@ -330,7 +330,7 @@ on_body(struct http_parser *parser, const char *at, size_t length) {
 
 static int
 on_message_complete(struct http_parser *parser) {
-  client_t *client = parser->data;
+  http_client_t *client = parser->data;
 
   client->done = 1;
 
@@ -338,7 +338,7 @@ on_message_complete(struct http_parser *parser) {
 }
 
 static void
-http_client_init(client_t *client) {
+http_client_init(http_client_t *client) {
   client->hostname[0] = '\0';
   client->port = 0;
   client->fd = -1;
@@ -366,7 +366,7 @@ http_client_init(client_t *client) {
 }
 
 static int
-http_client_write(client_t *client, const char *buf, size_t len) {
+http_client_write(http_client_t *client, const char *buf, size_t len) {
   int nwrite;
 
   while (len > 0) {
@@ -401,7 +401,7 @@ http_client_print(http_client_t *client, const char *fmt, ...) {
 }
 
 static int
-http_client_write_head(client_t *client, const http_options_t *opt) {
+http_client_write_head(http_client_t *client, const http_options_t *opt) {
   const char *method = http_method_str(opt->method);
 
   if (!http_client_print(client, "%s %s HTTP/1.1\r\n", method, opt->path))
@@ -458,7 +458,7 @@ http_client_write_head(client_t *client, const http_options_t *opt) {
 }
 
 static int
-http_client_parse(client_t *client, const void *data, size_t size) {
+http_client_parse(http_client_t *client, const void *data, size_t size) {
   size_t nparsed = http_parser_execute(&client->parser,
                                        &client->settings,
                                        data,
@@ -468,7 +468,7 @@ http_client_parse(client_t *client, const void *data, size_t size) {
 }
 
 http_msg_t *
-http_client_request(client_t *client, const http_options_t *options) {
+http_client_request(http_client_t *client, const http_options_t *options) {
   http_msg_t *msg = NULL;
   char buf[8192];
   int nread;

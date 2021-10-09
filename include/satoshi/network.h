@@ -20,7 +20,7 @@ extern "C" {
  * Constants
  */
 
-enum btc_network {
+enum btc_network_type {
   BTC_NETWORK_MAINNET,
   BTC_NETWORK_TESTNET,
   BTC_NETWORK_REGTEST,
@@ -47,11 +47,11 @@ typedef struct btc_deployment_s {
   int force;
 } btc_deployment_t;
 
-typedef struct btc_network_s {
+struct btc_network_s {
   /**
    * Network type.
    */
-  enum btc_network type;
+  enum btc_network_type type;
 
   /**
    * Symbolic network name.
@@ -282,7 +282,7 @@ typedef struct btc_network_s {
    * Whether to request mempool on sync.
    */
   int request_mempool;
-} btc_network_t;
+};
 
 /*
  * Helpers

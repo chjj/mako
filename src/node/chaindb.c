@@ -179,7 +179,7 @@ struct btc_chaindb_s {
 };
 
 static void
-btc_chaindb_path(struct btc_chaindb_s *db, char *path, int type, int id) {
+btc_chaindb_path(btc_chaindb_t *db, char *path, int type, int id) {
   const char *str = (type == 0 ? "blk" : "rev");
 
 #if defined(_WIN32)
@@ -190,7 +190,7 @@ btc_chaindb_path(struct btc_chaindb_s *db, char *path, int type, int id) {
 }
 
 static void
-btc_chaindb_init(struct btc_chaindb_s *db, const btc_network_t *network) {
+btc_chaindb_init(btc_chaindb_t *db, const btc_network_t *network) {
   memset(db, 0, sizeof(*db));
 
   db->network = network;
@@ -206,7 +206,7 @@ btc_chaindb_init(struct btc_chaindb_s *db, const btc_network_t *network) {
 }
 
 static void
-btc_chaindb_clear(struct btc_chaindb_s *db) {
+btc_chaindb_clear(btc_chaindb_t *db) {
   btc_hashmap_destroy(db->hashes);
   btc_vector_clear(&db->heights);
   btc_vector_clear(&db->files);
@@ -214,10 +214,9 @@ btc_chaindb_clear(struct btc_chaindb_s *db) {
   memset(db, 0, sizeof(*db));
 }
 
-struct btc_chaindb_s *
+btc_chaindb_t *
 btc_chaindb_create(const btc_network_t *network) {
-  struct btc_chaindb_s *db =
-    (struct btc_chaindb_s *)btc_malloc(sizeof(struct btc_chaindb_s));
+  btc_chaindb_t *db = (btc_chaindb_t *)btc_malloc(sizeof(btc_chaindb_t));
 
   CHECK(db != NULL);
 
@@ -227,13 +226,13 @@ btc_chaindb_create(const btc_network_t *network) {
 }
 
 void
-btc_chaindb_destroy(struct btc_chaindb_s *db) {
+btc_chaindb_destroy(btc_chaindb_t *db) {
   btc_chaindb_clear(db);
   btc_free(db);
 }
 
 static int
-btc_chaindb_load_prefix(struct btc_chaindb_s *db, const char *prefix) {
+btc_chaindb_load_prefix(btc_chaindb_t *db, const char *prefix) {
   size_t len = btc_path_resolve(db->prefix, prefix);
   char path[BTC_PATH_MAX + 1];
 
@@ -257,7 +256,7 @@ btc_chaindb_load_prefix(struct btc_chaindb_s *db, const char *prefix) {
 }
 
 static int
-btc_chaindb_load_database(struct btc_chaindb_s *db, size_t map_size) {
+btc_chaindb_load_database(btc_chaindb_t *db, size_t map_size) {
   char path[BTC_PATH_MAX + 1];
   unsigned int flags;
   MDB_txn *txn;
@@ -368,7 +367,7 @@ btc_chaindb_load_database(struct btc_chaindb_s *db, size_t map_size) {
 }
 
 static void
-btc_chaindb_unload_database(struct btc_chaindb_s *db) {
+btc_chaindb_unload_database(btc_chaindb_t *db) {
   mdb_dbi_close(db->env, db->db_meta);
   mdb_dbi_close(db->env, db->db_coin);
   mdb_dbi_close(db->env, db->db_index);
@@ -378,7 +377,7 @@ btc_chaindb_unload_database(struct btc_chaindb_s *db) {
 }
 
 static int
-btc_chaindb_load_files(struct btc_chaindb_s *db) {
+btc_chaindb_load_files(btc_chaindb_t *db) {
   char path[BTC_PATH_MAX + 1];
   btc_chainfile_t *file;
   MDB_val mkey, mval;
@@ -456,7 +455,7 @@ btc_chaindb_load_files(struct btc_chaindb_s *db) {
 }
 
 static void
-btc_chaindb_unload_files(struct btc_chaindb_s *db) {
+btc_chaindb_unload_files(btc_chaindb_t *db) {
   btc_chainfile_t *file;
 
   btc_fs_fsync(db->block.fd);
@@ -472,7 +471,7 @@ btc_chaindb_unload_files(struct btc_chaindb_s *db) {
 }
 
 static int
-btc_chaindb_init_index(struct btc_chaindb_s *db) {
+btc_chaindb_init_index(btc_chaindb_t *db) {
   btc_view_t *view = btc_view_create();
   btc_entry_t *entry = btc_entry_create();
   btc_block_t block;
@@ -492,7 +491,7 @@ btc_chaindb_init_index(struct btc_chaindb_s *db) {
 }
 
 static int
-btc_chaindb_load_index(struct btc_chaindb_s *db) {
+btc_chaindb_load_index(btc_chaindb_t *db) {
   btc_entry_t *entry, *tip;
   btc_entry_t *gen = NULL;
   btc_hashmapiter_t iter;
@@ -589,7 +588,7 @@ btc_chaindb_load_index(struct btc_chaindb_s *db) {
 }
 
 static void
-btc_chaindb_unload_index(struct btc_chaindb_s *db) {
+btc_chaindb_unload_index(btc_chaindb_t *db) {
   btc_hashmapiter_t iter;
 
   btc_hashmap_iterate(&iter, db->hashes);
@@ -605,7 +604,7 @@ btc_chaindb_unload_index(struct btc_chaindb_s *db) {
 }
 
 int
-btc_chaindb_open(struct btc_chaindb_s *db,
+btc_chaindb_open(btc_chaindb_t *db,
                  const char *prefix,
                  size_t map_size) {
   if (!btc_chaindb_load_prefix(db, prefix))
@@ -624,7 +623,7 @@ btc_chaindb_open(struct btc_chaindb_s *db,
 }
 
 void
-btc_chaindb_close(struct btc_chaindb_s *db) {
+btc_chaindb_close(btc_chaindb_t *db) {
   btc_chaindb_unload_index(db);
   btc_chaindb_unload_files(db);
   btc_chaindb_unload_database(db);
@@ -632,7 +631,7 @@ btc_chaindb_close(struct btc_chaindb_s *db) {
 
 static btc_coin_t *
 read_coin(const btc_outpoint_t *prevout, void *arg1, void *arg2) {
-  struct btc_chaindb_s *db = (struct btc_chaindb_s *)arg1;
+  btc_chaindb_t *db = (btc_chaindb_t *)arg1;
   MDB_txn *txn = (MDB_txn *)arg2;
   MDB_val mkey, mval;
   btc_coin_t *coin;
@@ -661,7 +660,7 @@ read_coin(const btc_outpoint_t *prevout, void *arg1, void *arg2) {
 }
 
 int
-btc_chaindb_spend(struct btc_chaindb_s *db,
+btc_chaindb_spend(btc_chaindb_t *db,
                   btc_view_t *view,
                   const btc_tx_t *tx) {
   MDB_txn *txn;
@@ -682,7 +681,7 @@ btc_chaindb_spend(struct btc_chaindb_s *db,
 }
 
 int
-btc_chaindb_fill(struct btc_chaindb_s *db,
+btc_chaindb_fill(btc_chaindb_t *db,
                  btc_view_t *view,
                  const btc_tx_t *tx) {
   MDB_txn *txn;
@@ -703,7 +702,7 @@ btc_chaindb_fill(struct btc_chaindb_s *db,
 }
 
 static int
-btc_chaindb_save_view(struct btc_chaindb_s *db,
+btc_chaindb_save_view(btc_chaindb_t *db,
                       MDB_txn *txn,
                       const btc_view_t *view) {
   uint8_t *val = db->slab;
@@ -741,7 +740,7 @@ btc_chaindb_save_view(struct btc_chaindb_s *db,
 }
 
 static int
-btc_chaindb_read(struct btc_chaindb_s *db,
+btc_chaindb_read(btc_chaindb_t *db,
                  uint8_t **raw,
                  size_t *len,
                  const btc_chainfile_t *file,
@@ -793,7 +792,7 @@ fail:
 }
 
 static btc_block_t *
-btc_chaindb_read_block(struct btc_chaindb_s *db, const btc_entry_t *entry) {
+btc_chaindb_read_block(btc_chaindb_t *db, const btc_entry_t *entry) {
   btc_block_t *block;
   uint8_t *buf;
   size_t len;
@@ -814,7 +813,7 @@ btc_chaindb_read_block(struct btc_chaindb_s *db, const btc_entry_t *entry) {
 }
 
 static btc_undo_t *
-btc_chaindb_read_undo(struct btc_chaindb_s *db, const btc_entry_t *entry) {
+btc_chaindb_read_undo(btc_chaindb_t *db, const btc_entry_t *entry) {
   btc_undo_t *undo;
   uint8_t *buf;
   size_t len;
@@ -846,7 +845,7 @@ should_sync(const btc_entry_t *entry) {
 }
 
 static int
-btc_chaindb_alloc(struct btc_chaindb_s *db,
+btc_chaindb_alloc(btc_chaindb_t *db,
                   MDB_txn *txn,
                   btc_chainfile_t *file,
                   size_t len) {
@@ -895,7 +894,7 @@ btc_chaindb_alloc(struct btc_chaindb_s *db,
 }
 
 static int
-btc_chaindb_write_block(struct btc_chaindb_s *db,
+btc_chaindb_write_block(btc_chaindb_t *db,
                         MDB_txn *txn,
                         btc_entry_t *entry,
                         const btc_block_t *block) {
@@ -948,7 +947,7 @@ btc_chaindb_write_block(struct btc_chaindb_s *db,
 }
 
 static int
-btc_chaindb_write_undo(struct btc_chaindb_s *db,
+btc_chaindb_write_undo(btc_chaindb_t *db,
                        MDB_txn *txn,
                        btc_entry_t *entry,
                        const btc_undo_t *undo) {
@@ -1009,7 +1008,7 @@ fail:
 }
 
 static int
-btc_chaindb_prune_files(struct btc_chaindb_s *db,
+btc_chaindb_prune_files(btc_chaindb_t *db,
                         MDB_txn *txn,
                         const btc_entry_t *entry) {
   char path[BTC_PATH_MAX + 1];
@@ -1068,7 +1067,7 @@ btc_chaindb_prune_files(struct btc_chaindb_s *db,
 }
 
 static int
-btc_chaindb_connect_block(struct btc_chaindb_s *db,
+btc_chaindb_connect_block(btc_chaindb_t *db,
                           MDB_txn *txn,
                           btc_entry_t *entry,
                           const btc_block_t *block,
@@ -1098,7 +1097,7 @@ btc_chaindb_connect_block(struct btc_chaindb_s *db,
 }
 
 static btc_view_t *
-btc_chaindb_disconnect_block(struct btc_chaindb_s *db,
+btc_chaindb_disconnect_block(btc_chaindb_t *db,
                              MDB_txn *txn,
                              const btc_entry_t *entry,
                              const btc_block_t *block) {
@@ -1142,7 +1141,7 @@ btc_chaindb_disconnect_block(struct btc_chaindb_s *db,
 }
 
 static int
-btc_chaindb_save_block(struct btc_chaindb_s *db,
+btc_chaindb_save_block(btc_chaindb_t *db,
                        MDB_txn *txn,
                        btc_entry_t *entry,
                        const btc_block_t *block,
@@ -1160,7 +1159,7 @@ btc_chaindb_save_block(struct btc_chaindb_s *db,
 }
 
 int
-btc_chaindb_save(struct btc_chaindb_s *db,
+btc_chaindb_save(btc_chaindb_t *db,
                  btc_entry_t *entry,
                  const btc_block_t *block,
                  const btc_view_t *view) {
@@ -1256,7 +1255,7 @@ fail:
 }
 
 int
-btc_chaindb_reconnect(struct btc_chaindb_s *db,
+btc_chaindb_reconnect(btc_chaindb_t *db,
                       btc_entry_t *entry,
                       const btc_block_t *block,
                       const btc_view_t *view) {
@@ -1318,7 +1317,7 @@ fail:
 }
 
 btc_view_t *
-btc_chaindb_disconnect(struct btc_chaindb_s *db,
+btc_chaindb_disconnect(btc_chaindb_t *db,
                        btc_entry_t *entry,
                        const btc_block_t *block) {
   MDB_val mkey, mval;
@@ -1380,27 +1379,27 @@ fail:
 }
 
 const btc_entry_t *
-btc_chaindb_head(struct btc_chaindb_s *db) {
+btc_chaindb_head(btc_chaindb_t *db) {
   return db->head;
 }
 
 const btc_entry_t *
-btc_chaindb_tail(struct btc_chaindb_s *db) {
+btc_chaindb_tail(btc_chaindb_t *db) {
   return db->tail;
 }
 
 int32_t
-btc_chaindb_height(struct btc_chaindb_s *db) {
+btc_chaindb_height(btc_chaindb_t *db) {
   return db->tail->height;
 }
 
 const btc_entry_t *
-btc_chaindb_by_hash(struct btc_chaindb_s *db, const uint8_t *hash) {
+btc_chaindb_by_hash(btc_chaindb_t *db, const uint8_t *hash) {
   return btc_hashmap_get(db->hashes, hash);
 }
 
 const btc_entry_t *
-btc_chaindb_by_height(struct btc_chaindb_s *db, int32_t height) {
+btc_chaindb_by_height(btc_chaindb_t *db, int32_t height) {
   if ((size_t)height >= db->heights.length)
     return NULL;
 
@@ -1408,7 +1407,7 @@ btc_chaindb_by_height(struct btc_chaindb_s *db, int32_t height) {
 }
 
 int
-btc_chaindb_is_main(struct btc_chaindb_s *db, const btc_entry_t *entry) {
+btc_chaindb_is_main(btc_chaindb_t *db, const btc_entry_t *entry) {
   if ((size_t)entry->height >= db->heights.length)
     return 0;
 
@@ -1416,7 +1415,7 @@ btc_chaindb_is_main(struct btc_chaindb_s *db, const btc_entry_t *entry) {
 }
 
 int
-btc_chaindb_has_coins(struct btc_chaindb_s *db, const btc_tx_t *tx) {
+btc_chaindb_has_coins(btc_chaindb_t *db, const btc_tx_t *tx) {
   MDB_val mkey, mval;
   uint8_t key[36];
   MDB_txn *txn;
@@ -1449,12 +1448,12 @@ btc_chaindb_has_coins(struct btc_chaindb_s *db, const btc_tx_t *tx) {
 }
 
 btc_block_t *
-btc_chaindb_get_block(struct btc_chaindb_s *db, const btc_entry_t *entry) {
+btc_chaindb_get_block(btc_chaindb_t *db, const btc_entry_t *entry) {
   return btc_chaindb_read_block(db, entry);
 }
 
 int
-btc_chaindb_get_raw_block(struct btc_chaindb_s *db,
+btc_chaindb_get_raw_block(btc_chaindb_t *db,
                           uint8_t **data,
                           size_t *length,
                           const btc_entry_t *entry) {

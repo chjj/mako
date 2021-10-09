@@ -16,7 +16,6 @@
 
 #define BTC_DEFINE_MAP_TYPES(name, key_t, val_t) \
                                                  \
-struct kh_##name##_s;                            \
 typedef struct kh_##name##_s name##_t;           \
                                                  \
 typedef struct name##iter_s {                    \
@@ -204,10 +203,7 @@ typedef struct btc_verify_error_s {
   int malleated;
 } btc_verify_error_t;
 
-struct btc_view_s;
-struct btc_sha256_s;
-struct btc_network_s;
-
+typedef struct btc_network_s btc_network_t;
 typedef struct btc_view_s btc_view_t;
 typedef struct btc_sha256_s btc__hash256_t;
 

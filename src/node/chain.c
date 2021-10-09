@@ -110,10 +110,9 @@ struct btc_chain_s {
   int bip148_enabled;
 };
 
-struct btc_chain_s *
+btc_chain_t *
 btc_chain_create(const btc_network_t *network) {
-  struct btc_chain_s *chain =
-    (struct btc_chain_s *)btc_malloc(sizeof(struct btc_chain_s));
+  btc_chain_t *chain = (btc_chain_t *)btc_malloc(sizeof(btc_chain_t));
 
   memset(chain, 0, sizeof(*chain));
 
@@ -133,7 +132,7 @@ btc_chain_create(const btc_network_t *network) {
 }
 
 void
-btc_chain_destroy(struct btc_chain_s *chain) {
+btc_chain_destroy(btc_chain_t *chain) {
   btc_hashsetiter_t setiter;
   btc_hashmapiter_t mapiter;
 
@@ -157,55 +156,55 @@ btc_chain_destroy(struct btc_chain_s *chain) {
 }
 
 void
-btc_chain_set_logger(struct btc_chain_s *chain, btc_logger_t *logger) {
+btc_chain_set_logger(btc_chain_t *chain, btc_logger_t *logger) {
   chain->logger = logger;
 }
 
 void
-btc_chain_set_timedata(struct btc_chain_s *chain, const btc_timedata_t *td) {
+btc_chain_set_timedata(btc_chain_t *chain, const btc_timedata_t *td) {
   chain->timedata = td;
 }
 
 void
-btc_chain_on_block(struct btc_chain_s *chain, btc_chain_block_cb *handler) {
+btc_chain_on_block(btc_chain_t *chain, btc_chain_block_cb *handler) {
   chain->on_block = handler;
 }
 
 void
-btc_chain_on_connect(struct btc_chain_s *chain, btc_chain_connect_cb *handler) {
+btc_chain_on_connect(btc_chain_t *chain, btc_chain_connect_cb *handler) {
   chain->on_connect = handler;
 }
 
 void
-btc_chain_on_disconnect(struct btc_chain_s *chain,
+btc_chain_on_disconnect(btc_chain_t *chain,
                         btc_chain_connect_cb *handler) {
   chain->on_disconnect = handler;
 }
 
 void
-btc_chain_on_reorganize(struct btc_chain_s *chain,
+btc_chain_on_reorganize(btc_chain_t *chain,
                         btc_chain_reorganize_cb *handler) {
   chain->on_reorganize = handler;
 }
 
 void
-btc_chain_on_badorphan(struct btc_chain_s *chain,
+btc_chain_on_badorphan(btc_chain_t *chain,
                        btc_chain_badorphan_cb *handler) {
   chain->on_badorphan = handler;
 }
 
 void
-btc_chain_set_context(struct btc_chain_s *chain, void *arg) {
+btc_chain_set_context(btc_chain_t *chain, void *arg) {
   chain->arg = arg;
 }
 
 void
-btc_chain_set_checkpoints(struct btc_chain_s *chain, int value) {
+btc_chain_set_checkpoints(btc_chain_t *chain, int value) {
   chain->checkpoints_enabled = value;
 }
 
 static void
-btc_chain_log(struct btc_chain_s *chain, const char *fmt, ...) {
+btc_chain_log(btc_chain_t *chain, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   btc_logger_write(chain->logger, "chain", fmt, ap);
@@ -213,7 +212,7 @@ btc_chain_log(struct btc_chain_s *chain, const char *fmt, ...) {
 }
 
 static void
-btc_chain_get_deployment_state(struct btc_chain_s *chain,
+btc_chain_get_deployment_state(btc_chain_t *chain,
                                btc_deployment_state_t *state) {
   const btc_entry_t *tip = chain->tip;
   const btc_entry_t *prev = tip->prev;
@@ -228,7 +227,7 @@ btc_chain_get_deployment_state(struct btc_chain_s *chain,
 }
 
 static void
-btc_chain_maybe_sync(struct btc_chain_s *chain) {
+btc_chain_maybe_sync(btc_chain_t *chain) {
   const btc_network_t *network = chain->network;
   int64_t now;
 
@@ -254,7 +253,7 @@ btc_chain_maybe_sync(struct btc_chain_s *chain) {
 }
 
 int
-btc_chain_open(struct btc_chain_s *chain, const char *prefix, size_t map_size) {
+btc_chain_open(btc_chain_t *chain, const char *prefix, size_t map_size) {
   btc_chain_log(chain, "Chain is loading.");
 
   if (chain->checkpoints_enabled)
@@ -277,12 +276,12 @@ btc_chain_open(struct btc_chain_s *chain, const char *prefix, size_t map_size) {
 }
 
 void
-btc_chain_close(struct btc_chain_s *chain) {
+btc_chain_close(btc_chain_t *chain) {
   btc_chaindb_close(chain->db);
 }
 
 static void
-btc_chain_add_orphan(struct btc_chain_s *chain, btc_orphan_t *orphan) {
+btc_chain_add_orphan(btc_chain_t *chain, btc_orphan_t *orphan) {
   btc_header_t *hdr = &orphan->block->header;
 
   CHECK(btc_hashmap_put(chain->orphan_map, orphan->hash, orphan));
@@ -290,7 +289,7 @@ btc_chain_add_orphan(struct btc_chain_s *chain, btc_orphan_t *orphan) {
 }
 
 static void
-btc_chain_remove_orphan(struct btc_chain_s *chain, const btc_orphan_t *orphan) {
+btc_chain_remove_orphan(btc_chain_t *chain, const btc_orphan_t *orphan) {
   const btc_header_t *hdr = &orphan->block->header;
 
   CHECK(btc_hashmap_del(chain->orphan_map, orphan->hash));
@@ -298,12 +297,12 @@ btc_chain_remove_orphan(struct btc_chain_s *chain, const btc_orphan_t *orphan) {
 }
 
 int
-btc_chain_has_orphan(struct btc_chain_s *chain, const uint8_t *hash) {
+btc_chain_has_orphan(btc_chain_t *chain, const uint8_t *hash) {
   return btc_hashmap_has(chain->orphan_map, hash);
 }
 
 static void
-btc_chain_limit_orphans(struct btc_chain_s *chain) {
+btc_chain_limit_orphans(btc_chain_t *chain) {
   btc_hashmapiter_t iter;
   btc_orphan_t *oldest = NULL;
   btc_orphan_t *orphan;
@@ -340,7 +339,7 @@ btc_chain_limit_orphans(struct btc_chain_s *chain) {
 }
 
 static void
-btc_chain_purge_orphans(struct btc_chain_s *chain) {
+btc_chain_purge_orphans(btc_chain_t *chain) {
   size_t count = btc_hashmap_size(chain->orphan_map);
   btc_hashmapiter_t iter;
 
@@ -359,7 +358,7 @@ btc_chain_purge_orphans(struct btc_chain_s *chain) {
 }
 
 static btc_orphan_t *
-btc_chain_resolve_orphan(struct btc_chain_s *chain, const uint8_t *hash) {
+btc_chain_resolve_orphan(btc_chain_t *chain, const uint8_t *hash) {
   btc_orphan_t *orphan = btc_hashmap_get(chain->orphan_prev, hash);
 
   if (orphan == NULL)
@@ -371,7 +370,7 @@ btc_chain_resolve_orphan(struct btc_chain_s *chain, const uint8_t *hash) {
 }
 
 static void
-btc_chain_store_orphan(struct btc_chain_s *chain,
+btc_chain_store_orphan(btc_chain_t *chain,
                        const btc_block_t *block,
                        unsigned int flags,
                        unsigned int id) {
@@ -410,12 +409,12 @@ btc_chain_store_orphan(struct btc_chain_s *chain,
 }
 
 static int
-btc_chain_has_next_orphan(struct btc_chain_s *chain, const uint8_t *hash) {
+btc_chain_has_next_orphan(btc_chain_t *chain, const uint8_t *hash) {
   return btc_hashmap_has(chain->orphan_prev, hash);
 }
 
 static void
-btc_chain_set_invalid(struct btc_chain_s *chain, const uint8_t *hash) {
+btc_chain_set_invalid(btc_chain_t *chain, const uint8_t *hash) {
   uint8_t *key = btc_hash_clone(hash);
 
   if (!btc_hashset_put(chain->invalid, key))
@@ -423,7 +422,7 @@ btc_chain_set_invalid(struct btc_chain_s *chain, const uint8_t *hash) {
 }
 
 BTC_UNUSED static void
-btc_chain_remove_invalid(struct btc_chain_s *chain, const uint8_t *hash) {
+btc_chain_remove_invalid(btc_chain_t *chain, const uint8_t *hash) {
   uint8_t *key = btc_hashset_del(chain->invalid, hash);
 
   if (key != NULL)
@@ -431,12 +430,12 @@ btc_chain_remove_invalid(struct btc_chain_s *chain, const uint8_t *hash) {
 }
 
 int
-btc_chain_has_invalid(struct btc_chain_s *chain, const uint8_t *hash) {
+btc_chain_has_invalid(btc_chain_t *chain, const uint8_t *hash) {
   return btc_hashset_has(chain->invalid, hash);
 }
 
 static int
-btc_chain_is_invalid(struct btc_chain_s *chain, const btc_block_t *block) {
+btc_chain_is_invalid(btc_chain_t *chain, const btc_block_t *block) {
   const btc_header_t *hdr = &block->header;
   uint8_t hash[32];
 
@@ -454,7 +453,7 @@ btc_chain_is_invalid(struct btc_chain_s *chain, const btc_block_t *block) {
 }
 
 static int
-btc_chain_verify_checkpoint(struct btc_chain_s *chain,
+btc_chain_verify_checkpoint(btc_chain_t *chain,
                             const btc_entry_t *prev,
                             const uint8_t *hash) {
   const btc_network_t *network = chain->network;
@@ -491,7 +490,7 @@ btc_chain_verify_checkpoint(struct btc_chain_s *chain,
 }
 
 static int
-btc_chain_is_historical(struct btc_chain_s *chain, const btc_entry_t *prev) {
+btc_chain_is_historical(btc_chain_t *chain, const btc_entry_t *prev) {
   if (chain->checkpoints_enabled) {
     if (prev->height + 1 <= chain->network->last_checkpoint)
       return 1;
@@ -501,7 +500,7 @@ btc_chain_is_historical(struct btc_chain_s *chain, const btc_entry_t *prev) {
 }
 
 static const btc_entry_t *
-btc_chain_get_ancestor(struct btc_chain_s *chain,
+btc_chain_get_ancestor(btc_chain_t *chain,
                        const btc_entry_t *entry,
                        int32_t height) {
   if (height < 0)
@@ -519,7 +518,7 @@ btc_chain_get_ancestor(struct btc_chain_s *chain,
 }
 
 static uint32_t
-btc_chain_retarget(struct btc_chain_s *chain,
+btc_chain_retarget(btc_chain_t *chain,
                    const btc_entry_t *prev,
                    const btc_entry_t *first) {
   const btc_network_t *net = chain->network;
@@ -561,7 +560,7 @@ btc_chain_retarget(struct btc_chain_s *chain,
 }
 
 uint32_t
-btc_chain_get_target(struct btc_chain_s *chain,
+btc_chain_get_target(btc_chain_t *chain,
                      int64_t time,
                      const btc_entry_t *prev) {
   const btc_network_t *net = chain->network;
@@ -603,13 +602,13 @@ btc_chain_get_target(struct btc_chain_s *chain,
 }
 
 uint32_t
-btc_chain_get_current_target(struct btc_chain_s *chain) {
+btc_chain_get_current_target(btc_chain_t *chain) {
   int64_t time = btc_timedata_now(chain->timedata);
   return btc_chain_get_target(chain, time, chain->tip);
 }
 
 static int
-btc_chain_get_state(struct btc_chain_s *chain,
+btc_chain_get_state(btc_chain_t *chain,
                     const btc_entry_t *prev,
                     const btc_deployment_t *deployment) {
   int32_t threshold = chain->network->activation_threshold;
@@ -729,14 +728,14 @@ btc_chain_get_state(struct btc_chain_s *chain,
 }
 
 static int
-btc_chain_is_active(struct btc_chain_s *chain,
+btc_chain_is_active(btc_chain_t *chain,
                     const btc_entry_t *prev,
                     const btc_deployment_t *deployment) {
   return btc_chain_get_state(chain, prev, deployment) == BTC_CHAIN_ACTIVE;
 }
 
 void
-btc_chain_get_deployments(struct btc_chain_s *chain,
+btc_chain_get_deployments(btc_chain_t *chain,
                           btc_deployment_state_t *state,
                           int64_t time,
                           const btc_entry_t *prev) {
@@ -822,7 +821,7 @@ btc_chain_get_deployments(struct btc_chain_s *chain,
 }
 
 static int
-btc_chain_throw(struct btc_chain_s *chain,
+btc_chain_throw(btc_chain_t *chain,
                 const btc_header_t *header,
                 const char *code,
                 const char *reason,
@@ -845,7 +844,7 @@ btc_chain_throw(struct btc_chain_s *chain,
 }
 
 static int
-btc_chain_verify(struct btc_chain_s *chain,
+btc_chain_verify(btc_chain_t *chain,
                  btc_deployment_state_t *state,
                  const btc_block_t *block,
                  const btc_entry_t *prev,
@@ -1043,7 +1042,7 @@ btc_chain_verify(struct btc_chain_s *chain,
 }
 
 static int
-btc_chain_verify_duplicates(struct btc_chain_s *chain,
+btc_chain_verify_duplicates(btc_chain_t *chain,
                             const btc_block_t *block,
                             const btc_entry_t *prev) {
   /**
@@ -1086,7 +1085,7 @@ btc_chain_verify_duplicates(struct btc_chain_s *chain,
 }
 
 static btc_view_t *
-btc_chain_update_inputs(struct btc_chain_s *chain,
+btc_chain_update_inputs(btc_chain_t *chain,
                         const btc_block_t *block,
                         const btc_entry_t *prev) {
   const btc_tx_t *cb = block->txs.items[0];
@@ -1108,7 +1107,7 @@ btc_chain_update_inputs(struct btc_chain_s *chain,
 }
 
 int
-btc_chain_verify_final(struct btc_chain_s *chain,
+btc_chain_verify_final(btc_chain_t *chain,
                        const btc_entry_t *prev,
                        const btc_tx_t *tx,
                        unsigned int flags) {
@@ -1127,7 +1126,7 @@ btc_chain_verify_final(struct btc_chain_s *chain,
 }
 
 int
-btc_chain_verify_locks(struct btc_chain_s *chain,
+btc_chain_verify_locks(btc_chain_t *chain,
                        const btc_entry_t *prev,
                        const btc_tx_t *tx,
                        const btc_view_t *view,
@@ -1194,7 +1193,7 @@ btc_chain_verify_locks(struct btc_chain_s *chain,
 }
 
 static btc_view_t *
-btc_chain_verify_inputs(struct btc_chain_s *chain,
+btc_chain_verify_inputs(btc_chain_t *chain,
                         const btc_block_t *block,
                         const btc_entry_t *prev,
                         const btc_deployment_state_t *state) {
@@ -1308,7 +1307,7 @@ fail:
 }
 
 static btc_view_t *
-btc_chain_verify_context(struct btc_chain_s *chain,
+btc_chain_verify_context(btc_chain_t *chain,
                          btc_deployment_state_t *state,
                          const btc_block_t *block,
                          const btc_entry_t *prev,
@@ -1334,7 +1333,7 @@ btc_chain_verify_context(struct btc_chain_s *chain,
 }
 
 static int
-btc_chain_reconnect(struct btc_chain_s *chain, btc_entry_t *entry) {
+btc_chain_reconnect(btc_chain_t *chain, btc_entry_t *entry) {
   const btc_header_t *hdr = &entry->header;
   unsigned int flags = BTC_CHAIN_VERIFY_NONE;
   btc_deployment_state_t state;
@@ -1390,7 +1389,7 @@ fail:
 }
 
 static int
-btc_chain_disconnect(struct btc_chain_s *chain, btc_entry_t *entry) {
+btc_chain_disconnect(btc_chain_t *chain, btc_entry_t *entry) {
   const btc_header_t *hdr = &entry->header;
   btc_entry_t *prev;
   btc_block_t *block;
@@ -1430,7 +1429,7 @@ btc_chain_disconnect(struct btc_chain_s *chain, btc_entry_t *entry) {
 }
 
 static void
-btc_chain_unreorganize(struct btc_chain_s *chain,
+btc_chain_unreorganize(btc_chain_t *chain,
                        const btc_entry_t *fork,
                        btc_entry_t *last) {
   btc_entry_t *tip = chain->tip;
@@ -1503,7 +1502,7 @@ find_fork(const btc_entry_t *fork, const btc_entry_t *longer) {
 }
 
 static const btc_entry_t *
-btc_chain_reorganize(struct btc_chain_s *chain, btc_entry_t *competitor) {
+btc_chain_reorganize(btc_chain_t *chain, btc_entry_t *competitor) {
   btc_entry_t *tip = chain->tip;
   btc_vector_t disconnect, connect;
   const btc_entry_t *fork;
@@ -1577,7 +1576,7 @@ done:
 }
 
 static int
-btc_chain_save_alternate(struct btc_chain_s *chain,
+btc_chain_save_alternate(btc_chain_t *chain,
                          btc_entry_t *entry,
                          const btc_block_t *block,
                          unsigned int flags) {
@@ -1624,7 +1623,7 @@ btc_chain_save_alternate(struct btc_chain_s *chain,
 }
 
 static int
-btc_chain_set_best_chain(struct btc_chain_s *chain,
+btc_chain_set_best_chain(btc_chain_t *chain,
                          btc_entry_t *entry,
                          const btc_block_t *block,
                          unsigned int flags) {
@@ -1693,7 +1692,7 @@ btc_chain_set_best_chain(struct btc_chain_s *chain,
 }
 
 static const btc_entry_t *
-btc_chain_connect(struct btc_chain_s *chain,
+btc_chain_connect(btc_chain_t *chain,
                   const btc_entry_t *prev,
                   const btc_block_t *block,
                   unsigned int flags) {
@@ -1739,7 +1738,7 @@ btc_chain_connect(struct btc_chain_s *chain,
 }
 
 static void
-btc_chain_handle_orphans(struct btc_chain_s *chain, const btc_entry_t *entry) {
+btc_chain_handle_orphans(btc_chain_t *chain, const btc_entry_t *entry) {
   btc_orphan_t *orphan = btc_chain_resolve_orphan(chain, entry->hash);
 
   while (orphan != NULL) {
@@ -1767,7 +1766,7 @@ btc_chain_handle_orphans(struct btc_chain_s *chain, const btc_entry_t *entry) {
 }
 
 int
-btc_chain_add(struct btc_chain_s *chain,
+btc_chain_add(btc_chain_t *chain,
               const btc_block_t *block,
               unsigned int flags,
               unsigned int id) {
@@ -1833,27 +1832,27 @@ btc_chain_add(struct btc_chain_s *chain,
 }
 
 const btc_entry_t *
-btc_chain_tip(struct btc_chain_s *chain) {
+btc_chain_tip(btc_chain_t *chain) {
   return chain->tip;
 }
 
 int32_t
-btc_chain_height(struct btc_chain_s *chain) {
+btc_chain_height(btc_chain_t *chain) {
   return chain->height;
 }
 
 const btc_deployment_state_t *
-btc_chain_state(struct btc_chain_s *chain) {
+btc_chain_state(btc_chain_t *chain) {
   return &chain->state;
 }
 
 const btc_verify_error_t *
-btc_chain_error(struct btc_chain_s *chain) {
+btc_chain_error(btc_chain_t *chain) {
   return &chain->error;
 }
 
 double
-btc_chain_progress(struct btc_chain_s *chain) {
+btc_chain_progress(btc_chain_t *chain) {
   int64_t now = btc_timedata_now(chain->timedata);
   int64_t start = chain->network->genesis.header.time;
   int64_t current = chain->tip->header.time - start;
@@ -1872,49 +1871,49 @@ btc_chain_progress(struct btc_chain_s *chain) {
 }
 
 int
-btc_chain_synced(struct btc_chain_s *chain) {
+btc_chain_synced(btc_chain_t *chain) {
   return chain->synced;
 }
 
 int
-btc_chain_has_hash(struct btc_chain_s *chain, const uint8_t *hash) {
+btc_chain_has_hash(btc_chain_t *chain, const uint8_t *hash) {
   return btc_chaindb_by_hash(chain->db, hash) != NULL;
 }
 
 const btc_entry_t *
-btc_chain_by_hash(struct btc_chain_s *chain, const uint8_t *hash) {
+btc_chain_by_hash(btc_chain_t *chain, const uint8_t *hash) {
   return btc_chaindb_by_hash(chain->db, hash);
 }
 
 const btc_entry_t *
-btc_chain_by_height(struct btc_chain_s *chain, int32_t height) {
+btc_chain_by_height(btc_chain_t *chain, int32_t height) {
   return btc_chaindb_by_height(chain->db, height);
 }
 
 int
-btc_chain_is_main(struct btc_chain_s *chain, const btc_entry_t *entry) {
+btc_chain_is_main(btc_chain_t *chain, const btc_entry_t *entry) {
   return btc_chaindb_is_main(chain->db, entry);
 }
 
 int
-btc_chain_has_coins(struct btc_chain_s *chain, const btc_tx_t *tx) {
+btc_chain_has_coins(btc_chain_t *chain, const btc_tx_t *tx) {
   return btc_chaindb_has_coins(chain->db, tx);
 }
 
 int
-btc_chain_get_coins(struct btc_chain_s *chain,
+btc_chain_get_coins(btc_chain_t *chain,
                     btc_view_t *view,
                     const btc_tx_t *tx) {
   return btc_chaindb_fill(chain->db, view, tx);
 }
 
 btc_block_t *
-btc_chain_get_block(struct btc_chain_s *chain, const btc_entry_t *entry) {
+btc_chain_get_block(btc_chain_t *chain, const btc_entry_t *entry) {
   return btc_chaindb_get_block(chain->db, entry);
 }
 
 int
-btc_chain_get_raw_block(struct btc_chain_s *chain,
+btc_chain_get_raw_block(btc_chain_t *chain,
                         uint8_t **data,
                         size_t *length,
                         const btc_entry_t *entry) {
@@ -1922,7 +1921,7 @@ btc_chain_get_raw_block(struct btc_chain_s *chain,
 }
 
 const uint8_t *
-btc_chain_get_orphan_root(struct btc_chain_s *chain, const uint8_t *hash) {
+btc_chain_get_orphan_root(btc_chain_t *chain, const uint8_t *hash) {
   const uint8_t *root = NULL;
   btc_orphan_t *orphan;
 
@@ -1940,7 +1939,7 @@ btc_chain_get_orphan_root(struct btc_chain_s *chain, const uint8_t *hash) {
 }
 
 void
-btc_chain_get_locator(struct btc_chain_s *chain,
+btc_chain_get_locator(btc_chain_t *chain,
                       btc_vector_t *hashes,
                       const uint8_t *start) {
   const btc_entry_t *entry = chain->tip;
@@ -1977,7 +1976,7 @@ btc_chain_get_locator(struct btc_chain_s *chain,
 }
 
 const btc_entry_t *
-btc_chain_find_locator(struct btc_chain_s *chain, const btc_vector_t *locator) {
+btc_chain_find_locator(btc_chain_t *chain, const btc_vector_t *locator) {
   const btc_entry_t *entry;
   const uint8_t *hash;
   size_t i;
@@ -1997,7 +1996,7 @@ btc_chain_find_locator(struct btc_chain_s *chain, const btc_vector_t *locator) {
 }
 
 uint32_t
-btc_chain_compute_version(struct btc_chain_s *chain, const btc_entry_t *prev) {
+btc_chain_compute_version(btc_chain_t *chain, const btc_entry_t *prev) {
   const btc_network_t *network = chain->network;
   const btc_deployment_t *deploy;
   uint32_t version = 0;

@@ -247,10 +247,10 @@ struct btc_rpc_s {
 static int
 on_request(http_server_t *server, http_req_t *req, http_res_t *res);
 
-struct btc_rpc_s *
+btc_rpc_t *
 btc_rpc_create(btc_node_t *node) {
-  struct btc_rpc_s *rpc =
-    (struct btc_rpc_s *)btc_malloc(sizeof(struct btc_rpc_s));
+  btc_rpc_t *rpc =
+    (btc_rpc_t *)btc_malloc(sizeof(btc_rpc_t));
 
   memset(rpc, 0, sizeof(*rpc));
 
@@ -272,13 +272,13 @@ btc_rpc_create(btc_node_t *node) {
 }
 
 void
-btc_rpc_destroy(struct btc_rpc_s *rpc) {
+btc_rpc_destroy(btc_rpc_t *rpc) {
   http_server_destroy(rpc->http);
   btc_free(rpc);
 }
 
 static void
-btc_rpc_log(struct btc_rpc_s *rpc, const char *fmt, ...) {
+btc_rpc_log(btc_rpc_t *rpc, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   btc_logger_write(rpc->logger, "rpc", fmt, ap);
@@ -286,7 +286,7 @@ btc_rpc_log(struct btc_rpc_s *rpc, const char *fmt, ...) {
 }
 
 int
-btc_rpc_open(struct btc_rpc_s *rpc) {
+btc_rpc_open(btc_rpc_t *rpc) {
   btc_sockaddr_t addr;
 
   CHECK(btc_sockaddr_import(&addr, "127.0.0.1", rpc->network->rpc_port));
@@ -302,7 +302,7 @@ btc_rpc_open(struct btc_rpc_s *rpc) {
 }
 
 void
-btc_rpc_close(struct btc_rpc_s *rpc) {
+btc_rpc_close(btc_rpc_t *rpc) {
   http_server_close(rpc->http);
 }
 

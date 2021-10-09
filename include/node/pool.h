@@ -17,7 +17,7 @@ extern "C" {
 #include "../satoshi/types.h"
 
 BTC_EXTERN btc_pool_t *
-btc_pool_create(const struct btc_network_s *network,
+btc_pool_create(const btc_network_t *network,
                 btc_loop_t *loop,
                 btc_chain_t *chain,
                 btc_mempool_t *mempool);

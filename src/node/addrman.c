@@ -172,10 +172,9 @@ struct btc_addrman_s {
   int flushing;
 };
 
-struct btc_addrman_s *
+btc_addrman_t *
 btc_addrman_create(const btc_network_t *network) {
-  struct btc_addrman_s *man =
-    (struct btc_addrman_s *)btc_malloc(sizeof(struct btc_addrman_s));
+  btc_addrman_t *man = (btc_addrman_t *)btc_malloc(sizeof(btc_addrman_t));
   int i;
 
   memset(man, 0, sizeof(*man));
@@ -209,7 +208,7 @@ btc_addrman_create(const btc_network_t *network) {
 }
 
 void
-btc_addrman_destroy(struct btc_addrman_s *man) {
+btc_addrman_destroy(btc_addrman_t *man) {
   btc_addrmapiter_t iter;
   size_t i;
 
@@ -243,17 +242,17 @@ btc_addrman_destroy(struct btc_addrman_s *man) {
 }
 
 void
-btc_addrman_set_logger(struct btc_addrman_s *man, btc_logger_t *logger) {
+btc_addrman_set_logger(btc_addrman_t *man, btc_logger_t *logger) {
   man->logger = logger;
 }
 
 void
-btc_addrman_set_timedata(struct btc_addrman_s *man, const btc_timedata_t *td) {
+btc_addrman_set_timedata(btc_addrman_t *man, const btc_timedata_t *td) {
   man->timedata = td;
 }
 
 static void
-btc_addrman_log(struct btc_addrman_s *man, const char *fmt, ...) {
+btc_addrman_log(btc_addrman_t *man, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   btc_logger_write(man->logger, "addrman", fmt, ap);
@@ -261,7 +260,7 @@ btc_addrman_log(struct btc_addrman_s *man, const char *fmt, ...) {
 }
 
 int
-btc_addrman_open(struct btc_addrman_s *man) {
+btc_addrman_open(btc_addrman_t *man) {
   const btc_network_t *network = man->network;
   int64_t now = btc_now();
   btc_sockaddr_t *res, *p;
@@ -306,32 +305,32 @@ btc_addrman_open(struct btc_addrman_s *man) {
 }
 
 void
-btc_addrman_close(struct btc_addrman_s *man) {
+btc_addrman_close(btc_addrman_t *man) {
   (void)man;
 }
 
 void
-btc_addrman_flush(struct btc_addrman_s *man) {
+btc_addrman_flush(btc_addrman_t *man) {
   (void)man;
 }
 
 size_t
-btc_addrman_size(struct btc_addrman_s *man) {
+btc_addrman_size(btc_addrman_t *man) {
   return man->total_fresh + man->total_used;
 }
 
 int
-btc_addrman_is_full(struct btc_addrman_s *man) {
+btc_addrman_is_full(btc_addrman_t *man) {
   return man->total_fresh >= MAX_FRESH_BUCKETS * MAX_ENTRIES;
 }
 
 void
-btc_addrman_reset(struct btc_addrman_s *man) {
+btc_addrman_reset(btc_addrman_t *man) {
   (void)man;
 }
 
 void
-btc_addrman_ban(struct btc_addrman_s *man, const btc_netaddr_t *addr) {
+btc_addrman_ban(btc_addrman_t *man, const btc_netaddr_t *addr) {
   btc_netaddr_t *entry = btc_netaddr_clone(addr);
 
   entry->port = 0;
@@ -342,7 +341,7 @@ btc_addrman_ban(struct btc_addrman_s *man, const btc_netaddr_t *addr) {
 }
 
 void
-btc_addrman_unban(struct btc_addrman_s *man, const btc_netaddr_t *addr) {
+btc_addrman_unban(btc_addrman_t *man, const btc_netaddr_t *addr) {
   btc_netaddr_t key = *addr;
 
   key.port = 0;
@@ -351,7 +350,7 @@ btc_addrman_unban(struct btc_addrman_s *man, const btc_netaddr_t *addr) {
 }
 
 int
-btc_addrman_is_banned(struct btc_addrman_s *man, const btc_netaddr_t *addr) {
+btc_addrman_is_banned(btc_addrman_t *man, const btc_netaddr_t *addr) {
   btc_netaddr_t key = *addr;
   btc_netaddr_t *entry;
 
@@ -372,7 +371,7 @@ btc_addrman_is_banned(struct btc_addrman_s *man, const btc_netaddr_t *addr) {
 }
 
 void
-btc_addrman_clear_banned(struct btc_addrman_s *man) {
+btc_addrman_clear_banned(btc_addrman_t *man) {
   btc_addrmapiter_t iter;
 
   btc_addrmap_iterate(&iter, man->banned);
@@ -384,7 +383,7 @@ btc_addrman_clear_banned(struct btc_addrman_s *man) {
 }
 
 const btc_addrent_t *
-btc_addrman_get(struct btc_addrman_s *man) {
+btc_addrman_get(btc_addrman_t *man) {
   btc_vector_t *buckets = NULL;
   btc_addrent_t *entry;
   double factor, num;
@@ -450,7 +449,7 @@ btc_addrman_get(struct btc_addrman_s *man) {
 }
 
 static btc_addrmap_t *
-fresh_bucket(struct btc_addrman_s *man, const btc_addrent_t *entry) {
+fresh_bucket(btc_addrman_t *man, const btc_addrent_t *entry) {
   uint32_t hash32, hash, index;
   uint8_t hash1[32];
   uint8_t hash2[32];
@@ -478,7 +477,7 @@ fresh_bucket(struct btc_addrman_s *man, const btc_addrent_t *entry) {
 }
 
 static btc_bucket_t *
-used_bucket(struct btc_addrman_s *man, const btc_addrent_t *entry) {
+used_bucket(btc_addrman_t *man, const btc_addrent_t *entry) {
   uint32_t hash32, hash, index;
   uint8_t hash1[32];
   uint8_t hash2[32];
@@ -506,7 +505,7 @@ used_bucket(struct btc_addrman_s *man, const btc_addrent_t *entry) {
 }
 
 static int
-is_stale(struct btc_addrman_s *man, const btc_addrent_t *entry) {
+is_stale(btc_addrman_t *man, const btc_addrent_t *entry) {
   int64_t now = btc_timedata_now(man->timedata);
 
   if (entry->last_attempt != 0 && entry->last_attempt >= now - 60)
@@ -533,7 +532,7 @@ is_stale(struct btc_addrman_s *man, const btc_addrent_t *entry) {
 }
 
 static void
-evict_fresh(struct btc_addrman_s *man, btc_addrmap_t *bucket) {
+evict_fresh(btc_addrman_t *man, btc_addrmap_t *bucket) {
   btc_addrent_t *old = NULL;
   btc_addrmapiter_t iter;
   btc_addrent_t *entry;
@@ -577,7 +576,7 @@ evict_fresh(struct btc_addrman_s *man, btc_addrmap_t *bucket) {
 }
 
 static btc_addrent_t *
-evict_used(struct btc_addrman_s *man, btc_bucket_t *bucket) {
+evict_used(btc_addrman_t *man, btc_bucket_t *bucket) {
   btc_addrent_t *old = bucket->head;
   btc_addrent_t *entry;
 
@@ -592,7 +591,7 @@ evict_used(struct btc_addrman_s *man, btc_bucket_t *bucket) {
 }
 
 int
-btc_addrman_add(struct btc_addrman_s *man,
+btc_addrman_add(btc_addrman_t *man,
                 const btc_netaddr_t *addr,
                 const btc_netaddr_t *src) {
   int64_t now = btc_timedata_now(man->timedata);
@@ -687,7 +686,7 @@ btc_addrman_add(struct btc_addrman_s *man,
 }
 
 int
-btc_addrman_remove(struct btc_addrman_s *man, const btc_netaddr_t *addr) {
+btc_addrman_remove(btc_addrman_t *man, const btc_netaddr_t *addr) {
   btc_addrent_t *entry = btc_addrmap_get(man->map, addr);
   size_t i;
 
@@ -738,8 +737,7 @@ btc_addrman_remove(struct btc_addrman_s *man, const btc_netaddr_t *addr) {
 }
 
 void
-btc_addrman_mark_attempt(struct btc_addrman_s *man,
-                         const btc_netaddr_t *addr) {
+btc_addrman_mark_attempt(btc_addrman_t *man, const btc_netaddr_t *addr) {
   btc_addrent_t *entry = btc_addrmap_get(man->map, addr);
 
   if (entry == NULL)
@@ -750,8 +748,7 @@ btc_addrman_mark_attempt(struct btc_addrman_s *man,
 }
 
 void
-btc_addrman_mark_success(struct btc_addrman_s *man,
-                         const btc_netaddr_t *addr) {
+btc_addrman_mark_success(btc_addrman_t *man, const btc_netaddr_t *addr) {
   btc_addrent_t *entry = btc_addrmap_get(man->map, addr);
   int64_t now;
 
@@ -765,7 +762,7 @@ btc_addrman_mark_success(struct btc_addrman_s *man,
 }
 
 void
-btc_addrman_mark_ack(struct btc_addrman_s *man,
+btc_addrman_mark_ack(btc_addrman_t *man,
                      const btc_netaddr_t *addr,
                      uint64_t services) {
   btc_addrent_t *entry = btc_addrmap_get(man->map, addr);
@@ -838,14 +835,12 @@ btc_addrman_mark_ack(struct btc_addrman_s *man,
 }
 
 int
-btc_addrman_has_local(struct btc_addrman_s *man,
-                      const btc_netaddr_t *src) {
+btc_addrman_has_local(btc_addrman_t *man, const btc_netaddr_t *src) {
   return btc_addrmap_has(man->local, src);
 }
 
 const btc_netaddr_t *
-btc_addrman_get_local(struct btc_addrman_s *man,
-                      const btc_netaddr_t *src) {
+btc_addrman_get_local(btc_addrman_t *man, const btc_netaddr_t *src) {
   btc_netaddr_t *best_dst = NULL;
   btc_addrmapiter_t iter;
   int best_reach = -1;
@@ -889,7 +884,7 @@ btc_addrman_get_local(struct btc_addrman_s *man,
 }
 
 int
-btc_addrman_add_local(struct btc_addrman_s *man,
+btc_addrman_add_local(btc_addrman_t *man,
                       const btc_netaddr_t *addr,
                       int score) {
   btc_local_t *local;
@@ -913,8 +908,7 @@ btc_addrman_add_local(struct btc_addrman_s *man,
 }
 
 int
-btc_addrman_mark_local(struct btc_addrman_s *man,
-                       const btc_netaddr_t *addr) {
+btc_addrman_mark_local(btc_addrman_t *man, const btc_netaddr_t *addr) {
   btc_local_t *local = btc_addrmap_get(man->local, addr);
 
   if (local == NULL)
@@ -926,7 +920,7 @@ btc_addrman_mark_local(struct btc_addrman_s *man,
 }
 
 void
-btc_addrman_iterate(btc_addriter_t *iter, struct btc_addrman_s *man) {
+btc_addrman_iterate(btc_addriter_t *iter, btc_addrman_t *man) {
   btc_addrmap_iterate(iter, man->map);
 }
 

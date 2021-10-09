@@ -227,10 +227,9 @@ struct btc_mempool_s {
   void *arg;
 };
 
-struct btc_mempool_s *
+btc_mempool_t *
 btc_mempool_create(const btc_network_t *network, btc_chain_t *chain) {
-  struct btc_mempool_s *mp =
-    (struct btc_mempool_s *)btc_malloc(sizeof(struct btc_mempool_s));
+  btc_mempool_t *mp = (btc_mempool_t *)btc_malloc(sizeof(btc_mempool_t));
 
   memset(mp, 0, sizeof(*mp));
 
@@ -248,7 +247,7 @@ btc_mempool_create(const btc_network_t *network, btc_chain_t *chain) {
 }
 
 void
-btc_mempool_destroy(struct btc_mempool_s *mp) {
+btc_mempool_destroy(btc_mempool_t *mp) {
   btc_hashmapiter_t iter;
 
   btc_hashmap_iterate(&iter, mp->map);
@@ -276,33 +275,33 @@ btc_mempool_destroy(struct btc_mempool_s *mp) {
 }
 
 void
-btc_mempool_set_logger(struct btc_mempool_s *mp, btc_logger_t *logger) {
+btc_mempool_set_logger(btc_mempool_t *mp, btc_logger_t *logger) {
   mp->logger = logger;
 }
 
 void
-btc_mempool_set_timedata(struct btc_mempool_s *mp, const btc_timedata_t *td) {
+btc_mempool_set_timedata(btc_mempool_t *mp, const btc_timedata_t *td) {
   mp->timedata = td;
 }
 
 void
-btc_mempool_on_tx(struct btc_mempool_s *mp, btc_mempool_tx_cb *handler) {
+btc_mempool_on_tx(btc_mempool_t *mp, btc_mempool_tx_cb *handler) {
   mp->on_tx = handler;
 }
 
 void
-btc_mempool_on_badorphan(struct btc_mempool_s *mp,
+btc_mempool_on_badorphan(btc_mempool_t *mp,
                          btc_mempool_badorphan_cb *handler) {
   mp->on_badorphan = handler;
 }
 
 void
-btc_mempool_set_context(struct btc_mempool_s *mp, void *arg) {
+btc_mempool_set_context(btc_mempool_t *mp, void *arg) {
   mp->arg = arg;
 }
 
 static void
-btc_mempool_log(struct btc_mempool_s *mp, const char *fmt, ...) {
+btc_mempool_log(btc_mempool_t *mp, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   btc_logger_write(mp->logger, "mempool", fmt, ap);
@@ -310,18 +309,18 @@ btc_mempool_log(struct btc_mempool_s *mp, const char *fmt, ...) {
 }
 
 int
-btc_mempool_open(struct btc_mempool_s *mp) {
+btc_mempool_open(btc_mempool_t *mp) {
   btc_mempool_log(mp, "Opening mempool.");
   return 1;
 }
 
 void
-btc_mempool_close(struct btc_mempool_s *mp) {
+btc_mempool_close(btc_mempool_t *mp) {
   btc_mempool_log(mp, "Closing mempool.");
 }
 
 static int
-btc_mempool_throw(struct btc_mempool_s *mp,
+btc_mempool_throw(btc_mempool_t *mp,
                   const btc_tx_t *tx,
                   const char *code,
                   const char *reason,
@@ -346,7 +345,7 @@ btc_mempool_throw(struct btc_mempool_s *mp,
  */
 
 static int
-btc_mempool_remove_orphan(struct btc_mempool_s *mp, const uint8_t *hash) {
+btc_mempool_remove_orphan(btc_mempool_t *mp, const uint8_t *hash) {
   btc_orphan_t *orphan = btc_hashmap_get(mp->orphans, hash);
   const btc_tx_t *tx;
   size_t i;
@@ -379,7 +378,7 @@ btc_mempool_remove_orphan(struct btc_mempool_s *mp, const uint8_t *hash) {
 }
 
 static int
-btc_mempool_limit_orphans(struct btc_mempool_s *mp) {
+btc_mempool_limit_orphans(btc_mempool_t *mp) {
   btc_hashmapiter_t iter;
   const uint8_t *hash;
   size_t index;
@@ -410,7 +409,7 @@ btc_mempool_limit_orphans(struct btc_mempool_s *mp) {
 }
 
 static int
-btc_mempool_should_orphan(struct btc_mempool_s *mp,
+btc_mempool_should_orphan(btc_mempool_t *mp,
                           const btc_tx_t *tx,
                           const btc_view_t *view) {
   size_t i;
@@ -428,7 +427,7 @@ btc_mempool_should_orphan(struct btc_mempool_s *mp,
 }
 
 static int
-btc_mempool_check_orphan(struct btc_mempool_s *mp,
+btc_mempool_check_orphan(btc_mempool_t *mp,
                          const btc_tx_t *tx,
                          const btc_view_t *view) {
   size_t i;
@@ -475,7 +474,7 @@ btc_mempool_check_orphan(struct btc_mempool_s *mp,
 }
 
 static void
-btc_mempool_add_orphan(struct btc_mempool_s *mp,
+btc_mempool_add_orphan(btc_mempool_t *mp,
                        const btc_tx_t *tx,
                        const btc_view_t *view,
                        unsigned int id) {
@@ -519,7 +518,7 @@ btc_mempool_add_orphan(struct btc_mempool_s *mp,
 }
 
 static btc_vector_t *
-btc_mempool_resolve_orphans(struct btc_mempool_s *mp, const uint8_t *parent) {
+btc_mempool_resolve_orphans(btc_mempool_t *mp, const uint8_t *parent) {
   btc_hashset_t *set = btc_hashmap_get(mp->waiting, parent);
   btc_vector_t *resolved;
   btc_hashsetiter_t iter;
@@ -552,7 +551,7 @@ btc_mempool_resolve_orphans(struct btc_mempool_s *mp, const uint8_t *parent) {
 }
 
 static void
-btc_mempool_handle_orphans(struct btc_mempool_s *mp, const uint8_t *parent) {
+btc_mempool_handle_orphans(btc_mempool_t *mp, const uint8_t *parent) {
   btc_vector_t *resolved = btc_mempool_resolve_orphans(mp, parent);
   uint8_t hash[32];
   size_t i;
@@ -594,7 +593,7 @@ btc_mempool_handle_orphans(struct btc_mempool_s *mp, const uint8_t *parent) {
  */
 
 static btc_view_t *
-btc_mempool_view(struct btc_mempool_s *mp, const btc_tx_t *tx) {
+btc_mempool_view(btc_mempool_t *mp, const btc_tx_t *tx) {
   btc_view_t *view = btc_view_create();
   size_t i;
 
@@ -650,7 +649,7 @@ postprioritise(btc_mpentry_t *parent, const btc_mpentry_t *child) {
 }
 
 static size_t
-traverse_ancestors(struct btc_mempool_s *mp,
+traverse_ancestors(btc_mempool_t *mp,
                    const btc_mpentry_t *entry,
                    btc_hashset_t *set,
                    const btc_mpentry_t *child,
@@ -688,7 +687,7 @@ traverse_ancestors(struct btc_mempool_s *mp,
 }
 
 static size_t
-btc_mempool_update_ancestors(struct btc_mempool_s *mp,
+btc_mempool_update_ancestors(btc_mempool_t *mp,
                              const btc_mpentry_t *entry,
                              void (*map)(btc_mpentry_t *,
                                          const btc_mpentry_t *)) {
@@ -701,13 +700,13 @@ btc_mempool_update_ancestors(struct btc_mempool_s *mp,
 }
 
 static size_t
-btc_mempool_count_ancestors(struct btc_mempool_s *mp,
+btc_mempool_count_ancestors(btc_mempool_t *mp,
                             const btc_mpentry_t *entry) {
   return btc_mempool_update_ancestors(mp, entry, NULL);
 }
 
 static int
-btc_mempool_exists(struct btc_mempool_s *mp, const uint8_t *hash) {
+btc_mempool_exists(btc_mempool_t *mp, const uint8_t *hash) {
   if (btc_hashmap_has(mp->orphans, hash))
     return 1;
 
@@ -715,7 +714,7 @@ btc_mempool_exists(struct btc_mempool_s *mp, const uint8_t *hash) {
 }
 
 static int
-btc_mempool_is_double_spend(struct btc_mempool_s *mp, const btc_tx_t *tx) {
+btc_mempool_is_double_spend(btc_mempool_t *mp, const btc_tx_t *tx) {
   size_t i;
 
   for (i = 0; i < tx->inputs.length; i++) {
@@ -729,7 +728,7 @@ btc_mempool_is_double_spend(struct btc_mempool_s *mp, const btc_tx_t *tx) {
 }
 
 static void
-btc_mempool_track_entry(struct btc_mempool_s *mp, btc_mpentry_t *entry) {
+btc_mempool_track_entry(btc_mempool_t *mp, btc_mpentry_t *entry) {
   const btc_tx_t *tx = &entry->tx;
   size_t i;
 
@@ -746,7 +745,7 @@ btc_mempool_track_entry(struct btc_mempool_s *mp, btc_mpentry_t *entry) {
 }
 
 static void
-btc_mempool_add_entry(struct btc_mempool_s *mp,
+btc_mempool_add_entry(btc_mempool_t *mp,
                       btc_mpentry_t *entry,
                       const btc_view_t *view) {
   btc_mempool_track_entry(mp, entry);
@@ -762,7 +761,7 @@ btc_mempool_add_entry(struct btc_mempool_s *mp,
 }
 
 static void
-btc_mempool_untrack_entry(struct btc_mempool_s *mp,
+btc_mempool_untrack_entry(btc_mempool_t *mp,
                           const btc_mpentry_t *entry) {
   const btc_tx_t *tx = &entry->tx;
   size_t i;
@@ -780,13 +779,13 @@ btc_mempool_untrack_entry(struct btc_mempool_s *mp,
 }
 
 static void
-btc_mempool_remove_entry(struct btc_mempool_s *mp, btc_mpentry_t *entry) {
+btc_mempool_remove_entry(btc_mempool_t *mp, btc_mpentry_t *entry) {
   btc_mempool_untrack_entry(mp, entry);
   btc_mpentry_destroy(entry);
 }
 
 static void
-btc_mempool_remove_spenders(struct btc_mempool_s *mp,
+btc_mempool_remove_spenders(btc_mempool_t *mp,
                             const btc_mpentry_t *entry) {
   btc_mpentry_t *spender;
   btc_outpoint_t prevout;
@@ -806,14 +805,14 @@ btc_mempool_remove_spenders(struct btc_mempool_s *mp,
 }
 
 static void
-btc_mempool_evict_entry(struct btc_mempool_s *mp, btc_mpentry_t *entry) {
+btc_mempool_evict_entry(btc_mempool_t *mp, btc_mpentry_t *entry) {
   btc_mempool_remove_spenders(mp, entry);
   btc_mempool_update_ancestors(mp, entry, remove_fee);
   btc_mempool_remove_entry(mp, entry);
 }
 
 static void
-btc_mempool_remove_double_spends(struct btc_mempool_s *mp, const btc_tx_t *tx) {
+btc_mempool_remove_double_spends(btc_mempool_t *mp, const btc_tx_t *tx) {
   size_t i;
 
   for (i = 0; i < tx->inputs.length; i++) {
@@ -831,7 +830,7 @@ btc_mempool_remove_double_spends(struct btc_mempool_s *mp, const btc_tx_t *tx) {
 }
 
 static int
-btc_mempool_has_dependencies(struct btc_mempool_s *mp, const btc_tx_t *tx) {
+btc_mempool_has_dependencies(btc_mempool_t *mp, const btc_tx_t *tx) {
   size_t i;
 
   for (i = 0; i < tx->inputs.length; i++) {
@@ -890,7 +889,7 @@ cmp_rate(void *left, void *right) {
 }
 
 static int
-btc_mempool_limit_size(struct btc_mempool_s *mp, const uint8_t *added) {
+btc_mempool_limit_size(btc_mempool_t *mp, const uint8_t *added) {
   size_t threshold = BTC_MEMPOOL_MAX_SIZE - (BTC_MEMPOOL_MAX_SIZE / 10);
   btc_hashmapiter_t iter;
   btc_vector_t queue;
@@ -949,7 +948,7 @@ btc_mempool_limit_size(struct btc_mempool_s *mp, const uint8_t *added) {
  */
 
 static int
-btc_mempool_verify_inputs(struct btc_mempool_s *mp,
+btc_mempool_verify_inputs(btc_mempool_t *mp,
                           const btc_mpentry_t *entry,
                           const btc_view_t *view,
                           unsigned int flags) {
@@ -978,7 +977,7 @@ btc_mempool_verify_inputs(struct btc_mempool_s *mp,
 }
 
 static int
-btc_mempool_verify(struct btc_mempool_s *mp,
+btc_mempool_verify(btc_mempool_t *mp,
                    const btc_mpentry_t *entry,
                    const btc_view_t *view) {
   unsigned int lock_flags = BTC_CHAIN_STANDARD_LOCKTIME_FLAGS;
@@ -1108,7 +1107,7 @@ btc_mempool_verify(struct btc_mempool_s *mp,
 }
 
 static int
-btc_mempool_insert(struct btc_mempool_s *mp,
+btc_mempool_insert(btc_mempool_t *mp,
                    const btc_tx_t *tx,
                    unsigned int id) {
   const btc_deployment_state_t *state = btc_chain_state(mp->chain);
@@ -1256,7 +1255,7 @@ btc_mempool_insert(struct btc_mempool_s *mp,
 }
 
 int
-btc_mempool_add(struct btc_mempool_s *mp,
+btc_mempool_add(btc_mempool_t *mp,
                 const btc_tx_t *tx,
                 unsigned int id) {
   if (!btc_mempool_insert(mp, tx, id)) {
@@ -1276,7 +1275,7 @@ btc_mempool_add(struct btc_mempool_s *mp,
  */
 
 void
-btc_mempool_add_block(struct btc_mempool_s *mp,
+btc_mempool_add_block(btc_mempool_t *mp,
                       const btc_entry_t *entry,
                       const btc_block_t *block) {
   int total = 0;
@@ -1316,7 +1315,7 @@ btc_mempool_add_block(struct btc_mempool_s *mp,
 }
 
 void
-btc_mempool_remove_block(struct btc_mempool_s *mp,
+btc_mempool_remove_block(btc_mempool_t *mp,
                          const btc_entry_t *entry,
                          const btc_block_t *block) {
   int total = 0;
@@ -1343,7 +1342,7 @@ btc_mempool_remove_block(struct btc_mempool_s *mp,
 }
 
 void
-btc_mempool_handle_reorg(struct btc_mempool_s *mp) {
+btc_mempool_handle_reorg(btc_mempool_t *mp) {
   unsigned int flags = BTC_CHAIN_STANDARD_LOCKTIME_FLAGS;
   const btc_entry_t *tip = btc_chain_tip(mp->chain);
   int64_t mtp = btc_entry_median_time(tip);
@@ -1403,37 +1402,37 @@ btc_mempool_handle_reorg(struct btc_mempool_s *mp) {
  */
 
 const btc_verify_error_t *
-btc_mempool_error(struct btc_mempool_s *mp) {
+btc_mempool_error(btc_mempool_t *mp) {
   return &mp->error;
 }
 
 size_t
-btc_mempool_size(struct btc_mempool_s *mp) {
+btc_mempool_size(btc_mempool_t *mp) {
   return btc_hashmap_size(mp->map);
 }
 
 int
-btc_mempool_has(struct btc_mempool_s *mp, const uint8_t *hash) {
+btc_mempool_has(btc_mempool_t *mp, const uint8_t *hash) {
   return btc_hashmap_has(mp->map, hash);
 }
 
 const btc_mpentry_t *
-btc_mempool_get(struct btc_mempool_s *mp, const uint8_t *hash) {
+btc_mempool_get(btc_mempool_t *mp, const uint8_t *hash) {
   return btc_hashmap_get(mp->map, hash);
 }
 
 int
-btc_mempool_has_orphan(struct btc_mempool_s *mp, const uint8_t *hash) {
+btc_mempool_has_orphan(btc_mempool_t *mp, const uint8_t *hash) {
   return btc_hashmap_has(mp->orphans, hash);
 }
 
 int
-btc_mempool_has_reject(struct btc_mempool_s *mp, const uint8_t *hash) {
+btc_mempool_has_reject(btc_mempool_t *mp, const uint8_t *hash) {
   return btc_filter_has(&mp->rejects, hash, 32);
 }
 
 btc_vector_t *
-btc_mempool_missing(struct btc_mempool_s *mp, const btc_tx_t *tx) {
+btc_mempool_missing(btc_mempool_t *mp, const btc_tx_t *tx) {
   btc_vector_t *missing = btc_vector_create();
   size_t i;
 
@@ -1448,7 +1447,7 @@ btc_mempool_missing(struct btc_mempool_s *mp, const btc_tx_t *tx) {
 }
 
 void
-btc_mempool_iterate(btc_mpiter_t *iter, struct btc_mempool_s *mp) {
+btc_mempool_iterate(btc_mpiter_t *iter, btc_mempool_t *mp) {
   btc_hashmap_iterate(iter, mp->map);
 }
 

@@ -26,7 +26,7 @@ typedef struct btc_chaindb_s btc_chaindb_t;
  */
 
 BTC_EXTERN btc_chaindb_t *
-btc_chaindb_create(const struct btc_network_s *network);
+btc_chaindb_create(const btc_network_t *network);
 
 BTC_EXTERN void
 btc_chaindb_destroy(btc_chaindb_t *db);

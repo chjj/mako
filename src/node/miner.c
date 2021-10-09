@@ -533,13 +533,13 @@ struct btc_miner_s {
   btc_vector_t addrs;
 };
 
-struct btc_miner_s *
+btc_miner_t *
 btc_miner_create(const btc_network_t *network,
                  btc_loop_t *loop,
                  btc_chain_t *chain,
                  btc_mempool_t *mempool) {
-  struct btc_miner_s *miner =
-    (struct btc_miner_s *)btc_malloc(sizeof(struct btc_miner_s));
+  btc_miner_t *miner =
+    (btc_miner_t *)btc_malloc(sizeof(btc_miner_t));
 
   memset(miner, 0, sizeof(*miner));
 
@@ -559,7 +559,7 @@ btc_miner_create(const btc_network_t *network,
 }
 
 void
-btc_miner_destroy(struct btc_miner_s *miner) {
+btc_miner_destroy(btc_miner_t *miner) {
   size_t i;
 
   for (i = 0; i < miner->addrs.length; i++)
@@ -572,17 +572,17 @@ btc_miner_destroy(struct btc_miner_s *miner) {
 }
 
 void
-btc_miner_set_logger(struct btc_miner_s *miner, btc_logger_t *logger) {
+btc_miner_set_logger(btc_miner_t *miner, btc_logger_t *logger) {
   miner->logger = logger;
 }
 
 void
-btc_miner_set_timedata(struct btc_miner_s *miner, const btc_timedata_t *td) {
+btc_miner_set_timedata(btc_miner_t *miner, const btc_timedata_t *td) {
   miner->timedata = td;
 }
 
 static void
-btc_miner_log(struct btc_miner_s *miner, const char *fmt, ...) {
+btc_miner_log(btc_miner_t *miner, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   btc_logger_write(miner->logger, "miner", fmt, ap);
@@ -590,23 +590,23 @@ btc_miner_log(struct btc_miner_s *miner, const char *fmt, ...) {
 }
 
 int
-btc_miner_open(struct btc_miner_s *miner) {
+btc_miner_open(btc_miner_t *miner) {
   btc_miner_log(miner, "Opening miner.");
   return 1;
 }
 
 void
-btc_miner_close(struct btc_miner_s *miner) {
+btc_miner_close(btc_miner_t *miner) {
   (void)miner;
 }
 
 void
-btc_miner_add_address(struct btc_miner_s *miner, const btc_address_t *addr) {
+btc_miner_add_address(btc_miner_t *miner, const btc_address_t *addr) {
   btc_vector_push(&miner->addrs, btc_address_clone(addr));
 }
 
 void
-btc_miner_get_address(btc_address_t *addr, struct btc_miner_s *miner) {
+btc_miner_get_address(btc_address_t *addr, btc_miner_t *miner) {
   if (miner->addrs.length == 0) {
     btc_address_init(addr);
   } else {
@@ -617,7 +617,7 @@ btc_miner_get_address(btc_address_t *addr, struct btc_miner_s *miner) {
 }
 
 void
-btc_miner_set_data(struct btc_miner_s *miner,
+btc_miner_set_data(btc_miner_t *miner,
                    const uint8_t *flags,
                    size_t length) {
   CHECK(length <= 70);
@@ -626,12 +626,12 @@ btc_miner_set_data(struct btc_miner_s *miner,
 }
 
 void
-btc_miner_set_flags(struct btc_miner_s *miner, const char *flags) {
+btc_miner_set_flags(btc_miner_t *miner, const char *flags) {
   btc_miner_set_data(miner, (uint8_t *)flags, strlen(flags));
 }
 
 void
-btc_miner_update_time(struct btc_miner_s *miner, btc_tmpl_t *bt) {
+btc_miner_update_time(btc_miner_t *miner, btc_tmpl_t *bt) {
   int64_t now = btc_timedata_now(miner->timedata);
 
   if (now < bt->mtp + 1)
@@ -663,7 +663,7 @@ cmp_rate(void *ap, void *bp) {
 }
 
 static void
-btc_miner_assemble(struct btc_miner_s *miner, btc_tmpl_t *bt) {
+btc_miner_assemble(btc_miner_t *miner, btc_tmpl_t *bt) {
   btc_hashmap_t *depmap = btc_hashmap_create();
   int64_t locktime = btc_tmpl_locktime(bt);
   const btc_mpentry_t *entry;
@@ -750,7 +750,7 @@ btc_miner_assemble(struct btc_miner_s *miner, btc_tmpl_t *bt) {
 }
 
 btc_tmpl_t *
-btc_miner_template(struct btc_miner_s *miner) {
+btc_miner_template(btc_miner_t *miner) {
   const btc_entry_t *tip = btc_chain_tip(miner->chain);
   uint32_t version = btc_chain_compute_version(miner->chain, tip);
   int64_t mtp = btc_entry_median_time(tip);

@@ -54,7 +54,7 @@ typedef btc_addrmapiter_t btc_addriter_t;
  */
 
 BTC_EXTERN btc_addrman_t *
-btc_addrman_create(const struct btc_network_s *network);
+btc_addrman_create(const btc_network_t *network);
 
 BTC_EXTERN void
 btc_addrman_destroy(btc_addrman_t *man);

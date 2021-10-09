@@ -20,29 +20,29 @@
  * Structs
  */
 
-typedef struct btc_mutex_s {
+struct btc_mutex_s {
 #if defined(HAVE_PTHREAD)
   pthread_mutex_t handle;
 #else
   void *unused;
 #endif
-} btc__mutex_t;
+};
 
-typedef struct btc_rwlock_s {
+struct btc_rwlock_s {
 #if defined(HAVE_PTHREAD)
   pthread_rwlock_t handle;
 #else
   void *unused;
 #endif
-} btc__rwlock_t;
+};
 
 /*
  * Mutex
  */
 
-btc__mutex_t *
+btc_mutex_t *
 btc_mutex_create(void) {
-  btc__mutex_t *mtx = (btc__mutex_t *)malloc(sizeof(btc__mutex_t));
+  btc_mutex_t *mtx = (btc_mutex_t *)malloc(sizeof(btc_mutex_t));
 
   if (mtx == NULL) {
     abort();
@@ -58,7 +58,7 @@ btc_mutex_create(void) {
 }
 
 void
-btc_mutex_destroy(btc__mutex_t *mtx) {
+btc_mutex_destroy(btc_mutex_t *mtx) {
 #ifdef HAVE_PTHREAD
   if (pthread_mutex_destroy(&mtx->handle) != 0)
     abort();
@@ -68,7 +68,7 @@ btc_mutex_destroy(btc__mutex_t *mtx) {
 }
 
 void
-btc_mutex_lock(btc__mutex_t *mtx) {
+btc_mutex_lock(btc_mutex_t *mtx) {
   (void)mtx;
 #ifdef HAVE_PTHREAD
   if (pthread_mutex_lock(&mtx->handle) != 0)
@@ -77,7 +77,7 @@ btc_mutex_lock(btc__mutex_t *mtx) {
 }
 
 void
-btc_mutex_unlock(btc__mutex_t *mtx) {
+btc_mutex_unlock(btc_mutex_t *mtx) {
   (void)mtx;
 #ifdef HAVE_PTHREAD
   if (pthread_mutex_unlock(&mtx->handle) != 0)
@@ -89,9 +89,9 @@ btc_mutex_unlock(btc__mutex_t *mtx) {
  * Read-Write Lock
  */
 
-btc__rwlock_t *
+btc_rwlock_t *
 btc_rwlock_create(void) {
-  btc__rwlock_t *mtx = (btc__rwlock_t *)malloc(sizeof(btc__rwlock_t));
+  btc_rwlock_t *mtx = (btc_rwlock_t *)malloc(sizeof(btc_rwlock_t));
 
   if (mtx == NULL) {
     abort();
@@ -107,7 +107,7 @@ btc_rwlock_create(void) {
 }
 
 void
-btc_rwlock_destroy(btc__rwlock_t *mtx) {
+btc_rwlock_destroy(btc_rwlock_t *mtx) {
 #ifdef HAVE_PTHREAD
   if (pthread_rwlock_destroy(&mtx->handle) != 0)
     abort();
@@ -117,7 +117,7 @@ btc_rwlock_destroy(btc__rwlock_t *mtx) {
 }
 
 void
-btc_rwlock_wrlock(btc__rwlock_t *mtx) {
+btc_rwlock_wrlock(btc_rwlock_t *mtx) {
   (void)mtx;
 #ifdef HAVE_PTHREAD
   if (pthread_rwlock_wrlock(&mtx->handle) != 0)
@@ -126,7 +126,7 @@ btc_rwlock_wrlock(btc__rwlock_t *mtx) {
 }
 
 void
-btc_rwlock_wrunlock(btc__rwlock_t *mtx) {
+btc_rwlock_wrunlock(btc_rwlock_t *mtx) {
   (void)mtx;
 #ifdef HAVE_PTHREAD
   if (pthread_rwlock_unlock(&mtx->handle) != 0)
@@ -135,7 +135,7 @@ btc_rwlock_wrunlock(btc__rwlock_t *mtx) {
 }
 
 void
-btc_rwlock_rdlock(btc__rwlock_t *mtx) {
+btc_rwlock_rdlock(btc_rwlock_t *mtx) {
   (void)mtx;
 #ifdef HAVE_PTHREAD
   if (pthread_rwlock_rdlock(&mtx->handle) != 0)
@@ -144,7 +144,7 @@ btc_rwlock_rdlock(btc__rwlock_t *mtx) {
 }
 
 void
-btc_rwlock_rdunlock(btc__rwlock_t *mtx) {
+btc_rwlock_rdunlock(btc_rwlock_t *mtx) {
   (void)mtx;
 #ifdef HAVE_PTHREAD
   if (pthread_rwlock_unlock(&mtx->handle) != 0)

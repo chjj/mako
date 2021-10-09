@@ -69,7 +69,7 @@ typedef void btc_chain_badorphan_cb(const btc_verify_error_t *err,
  */
 
 BTC_EXTERN btc_chain_t *
-btc_chain_create(const struct btc_network_s *network);
+btc_chain_create(const btc_network_t *network);
 
 BTC_EXTERN void
 btc_chain_destroy(btc_chain_t *chain);

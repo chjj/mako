@@ -37,7 +37,7 @@ typedef void btc_mempool_badorphan_cb(const btc_verify_error_t *err,
  */
 
 BTC_EXTERN btc_mempool_t *
-btc_mempool_create(const struct btc_network_s *network, btc_chain_t *chain);
+btc_mempool_create(const btc_network_t *network, btc_chain_t *chain);
 
 BTC_EXTERN void
 btc_mempool_destroy(btc_mempool_t *mp);

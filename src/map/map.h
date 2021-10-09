@@ -30,7 +30,6 @@
 
 #define DEFINE_MAP_TYPES(name, key_t, val_t) \
                                              \
-struct kh_##name##_s;                        \
 typedef struct kh_##name##_s name##_t;       \
                                              \
 typedef struct name##iter_s {                \
