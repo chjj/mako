@@ -39,7 +39,7 @@ btc_sockaddr_set(btc_sockaddr_t *z, const struct sockaddr *x) {
   btc_sockaddr_init(z);
 
   if (x->sa_family == AF_INET) {
-    const struct sockaddr_in *sai = (const struct sockaddr_in *)x;
+    const struct sockaddr_in *sai = (const struct sockaddr_in *)(void *)x;
 
     z->family = BTC_AF_INET;
 
@@ -51,7 +51,7 @@ btc_sockaddr_set(btc_sockaddr_t *z, const struct sockaddr *x) {
   }
 
   if (x->sa_family == AF_INET6) {
-    const struct sockaddr_in6 *sai = (const struct sockaddr_in6 *)x;
+    const struct sockaddr_in6 *sai = (const struct sockaddr_in6 *)(void *)x;
 
     z->family = BTC_AF_INET6;
 
@@ -64,7 +64,7 @@ btc_sockaddr_set(btc_sockaddr_t *z, const struct sockaddr *x) {
 
 #ifndef _WIN32
   if (x->sa_family == AF_UNIX) {
-    const struct sockaddr_un *un = (const struct sockaddr_un *)x;
+    const struct sockaddr_un *un = (const struct sockaddr_un *)(void *)x;
     size_t len = strlen(un->sun_path);
 
     z->family = BTC_AF_UNIX;
@@ -85,10 +85,10 @@ btc_sockaddr_set(btc_sockaddr_t *z, const struct sockaddr *x) {
 
 int
 btc_sockaddr_get(struct sockaddr *z, const btc_sockaddr_t *x) {
-  memset(z, 0, sizeof(struct sockaddr_storage));
+  memset((void *)z, 0, sizeof(struct sockaddr_storage));
 
   if (x->family == BTC_AF_INET) {
-    struct sockaddr_in *sai = (struct sockaddr_in *)z;
+    struct sockaddr_in *sai = (struct sockaddr_in *)(void *)z;
 
     sai->sin_family = AF_INET;
 
@@ -100,7 +100,7 @@ btc_sockaddr_get(struct sockaddr *z, const btc_sockaddr_t *x) {
   }
 
   if (x->family == BTC_AF_INET6) {
-    struct sockaddr_in6 *sai = (struct sockaddr_in6 *)z;
+    struct sockaddr_in6 *sai = (struct sockaddr_in6 *)(void *)z;
 
     sai->sin6_family = AF_INET6;
 
@@ -113,7 +113,7 @@ btc_sockaddr_get(struct sockaddr *z, const btc_sockaddr_t *x) {
 
 #ifndef _WIN32
   if (x->family == BTC_AF_UNIX) {
-    struct sockaddr_un *un = (struct sockaddr_un *)z;
+    struct sockaddr_un *un = (struct sockaddr_un *)(void *)z;
     size_t len = strlen(x->path);
 
     un->sun_family = AF_UNIX;
