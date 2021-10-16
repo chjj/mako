@@ -72,6 +72,25 @@ btc_buffer_copy(btc_buffer_t *z, const btc_buffer_t *x) {
   btc_buffer_set(z, x->data, x->length);
 }
 
+void
+btc_buffer_roset(btc_buffer_t *z, const uint8_t *xp, size_t xn) {
+  z->data = (uint8_t *)xp;
+  z->length = xn;
+  z->alloc = 0;
+}
+
+void
+btc_buffer_rocopy(btc_buffer_t *z, const btc_buffer_t *x) {
+  btc_buffer_roset(z, x->data, x->length);
+}
+
+btc_buffer_t *
+btc_buffer_roclone(const btc_buffer_t *x) {
+  btc_buffer_t *z = btc_buffer_create();
+  btc_buffer_rocopy(z, x);
+  return z;
+}
+
 int
 btc_buffer_equal(const btc_buffer_t *x, const btc_buffer_t *y) {
   if (x->length != y->length)

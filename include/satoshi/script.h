@@ -380,6 +380,15 @@ btc_script_set(btc_script_t *z, const uint8_t *xp, size_t xn);
 BTC_EXTERN void
 btc_script_copy(btc_script_t *z, const btc_script_t *x);
 
+BTC_EXTERN void
+btc_script_roset(btc_script_t *z, const uint8_t *xp, size_t xn);
+
+BTC_EXTERN void
+btc_script_rocopy(btc_script_t *z, const btc_script_t *x);
+
+BTC_EXTERN btc_script_t *
+btc_script_roclone(const btc_script_t *x);
+
 BTC_EXTERN int
 btc_script_equal(const btc_script_t *x, const btc_script_t *y);
 
@@ -556,10 +565,13 @@ BTC_EXTERN void
 btc_writer_push_data(btc_writer_t *z, const uint8_t *data, size_t length);
 
 BTC_EXTERN void
-btc_writer_push_smi(btc_writer_t *z, int64_t value);
+btc_writer_push_smi(btc_writer_t *z, int value);
 
 BTC_EXTERN void
-btc_writer_push_int(btc_writer_t *z, int64_t value, uint8_t *scratch);
+btc_writer_push_num(btc_writer_t *z, int64_t value, uint8_t *scratch);
+
+BTC_EXTERN void
+btc_writer_push_int(btc_writer_t *z, int value, uint8_t *scratch);
 
 BTC_EXTERN void
 btc_writer_compile(btc_script_t *z, const btc_writer_t *x);
