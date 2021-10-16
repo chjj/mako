@@ -216,8 +216,13 @@ btc_nonces_alloc(btc_nonces_t *list) {
   for (;;) {
     uint64_t nonce = btc_nonce();
 
-    if (btc_longset_put(list->set, nonce))
-      return nonce;
+    if (UNLIKELY(nonce == 0))
+      continue;
+
+    if (!btc_longset_put(list->set, nonce))
+      continue;
+
+    return nonce;
   }
 }
 
@@ -275,35 +280,28 @@ btc_parser_append(btc_parser_t *parser, const uint8_t *data, size_t length) {
 }
 
 static int
-btc_parser_parse_header(btc_parser_t *parser, const uint8_t *data) {
-  size_t i, size;
+btc_parser_parse_header(btc_parser_t *parser, const uint8_t **xp, size_t *xn) {
+  uint32_t magic, size;
 
-  if (read32le(data) != parser->magic)
+  if (!btc_uint32_read(&magic, xp, xn))
     return 0;
 
-  for (i = 0; data[i + 4] != 0 && i < 12; i++);
-
-  if (i == 12)
+  if (magic != parser->magic)
     return 0;
 
-  memcpy(parser->cmd, data + 4, i + 1);
+  if (!btc_nullstr_read(parser->cmd, sizeof(parser->cmd), xp, xn))
+    return 0;
 
-  size = i;
-
-  for (i = 0; i < size; i++) {
-    int ch = parser->cmd[i];
-
-    if (ch < 32 || ch > 126)
-      return 0;
-  }
-
-  size = read32le(data + 16);
+  if (!btc_uint32_read(&size, xp, xn))
+    return 0;
 
   if (size > BTC_NET_MAX_MESSAGE)
     return 0;
 
+  if (!btc_uint32_read(&parser->checksum, xp, xn))
+    return 0;
+
   parser->waiting = size;
-  parser->checksum = read32le(data + 20);
   parser->has_header = 1;
 
   return 1;
@@ -311,22 +309,17 @@ btc_parser_parse_header(btc_parser_t *parser, const uint8_t *data) {
 
 static int
 btc_parser_parse(btc_parser_t *parser, const uint8_t *data, size_t length) {
-  uint8_t hash[32];
   btc_msg_t msg;
 
   CHECK(length <= BTC_NET_MAX_MESSAGE);
 
-  if (!parser->has_header) {
-    CHECK(length == 24);
-    return btc_parser_parse_header(parser, data);
-  }
+  if (!parser->has_header)
+    return btc_parser_parse_header(parser, &data, &length);
 
   parser->waiting = 24;
   parser->has_header = 0;
 
-  btc_hash256(hash, data, length);
-
-  if (read32le(hash) != parser->checksum)
+  if (btc_checksum(data, length) != parser->checksum)
     return 0;
 
   btc_msg_set_cmd(&msg, parser->cmd);
@@ -348,18 +341,18 @@ static void
 btc_parser_feed(btc_parser_t *parser, const uint8_t *data, size_t length) {
   uint8_t *ptr = btc_parser_append(parser, data, length);
   size_t len = parser->total;
-  size_t wait;
+  size_t size;
 
   while (!parser->closed && len >= parser->waiting) {
-    wait = parser->waiting;
+    size = parser->waiting;
 
-    if (!btc_parser_parse(parser, ptr, wait)) {
+    if (!btc_parser_parse(parser, ptr, size)) {
       if (!parser->closed)
         parser->on_error(parser->arg);
     }
 
-    ptr += wait;
-    len -= wait;
+    ptr += size;
+    len -= size;
   }
 
   if (len > 0 && ptr != parser->pending)
@@ -403,10 +396,8 @@ static void
 btc_peer_on_parse_error(btc_peer_t *peer);
 
 static void
-on_socket(btc_socket_t *server, btc_socket_t *socket) {
-  btc_pool_t *pool = (btc_pool_t *)btc_socket_get_data(server);
-
-  btc_pool_on_socket(pool, socket);
+on_server_socket(btc_socket_t *server, btc_socket_t *socket) {
+  btc_pool_on_socket((btc_pool_t *)btc_socket_get_data(server), socket);
 }
 
 static void
@@ -669,31 +660,26 @@ btc_peer_write(btc_peer_t *peer, uint8_t *data, size_t length) {
 
 static int
 btc_peer_send(btc_peer_t *peer, const btc_msg_t *msg) {
-  size_t cmdlen = strlen(msg->cmd);
   size_t bodylen = btc_msg_size(msg);
   size_t length = 24 + bodylen;
   uint8_t *data = (uint8_t *)btc_malloc(length);
   uint8_t *body = data + 24;
-  uint8_t hash[32];
-  size_t i;
+  uint8_t *zp = data;
 
+  /* Payload. */
   btc_msg_export(body, msg);
-  btc_hash256(hash, body, bodylen);
 
   /* Magic value. */
-  btc_uint32_write(data, peer->network->magic);
+  zp = btc_uint32_write(zp, peer->network->magic);
 
   /* Command. */
-  memcpy(data + 4, msg->cmd, cmdlen);
-
-  for (i = 4 + cmdlen; i < 16; i++)
-    data[i] = 0;
+  zp = btc_nullstr_write(zp, 12, msg->cmd);
 
   /* Payload length. */
-  btc_uint32_write(data + 16, bodylen);
+  zp = btc_uint32_write(zp, bodylen);
 
   /* Checksum. */
-  memcpy(data + 20, hash, 4);
+  btc_uint32_write(zp, btc_checksum(body, bodylen));
 
   return btc_peer_write(peer, data, length);
 }
@@ -1985,8 +1971,7 @@ btc_pool_create(const btc_network_t *network,
                 btc_loop_t *loop,
                 btc_chain_t *chain,
                 btc_mempool_t *mempool) {
-  btc_pool_t *pool =
-    (btc_pool_t *)btc_malloc(sizeof(btc_pool_t));
+  btc_pool_t *pool = (btc_pool_t *)btc_malloc(sizeof(btc_pool_t));
 
   memset(pool, 0, sizeof(*pool));
 
@@ -2077,7 +2062,7 @@ btc_pool_listen(btc_pool_t *pool) {
   }
 
   btc_socket_set_data(server, pool);
-  btc_socket_on_socket(server, on_socket);
+  btc_socket_on_socket(server, on_server_socket);
   btc_socket_on_close(server, on_server_close);
 
   pool->server = server;
@@ -2152,13 +2137,11 @@ int
 btc_pool_open(btc_pool_t *pool) {
   btc_pool_log(pool, "Opening pool.");
 
-  if (!btc_pool_listen(pool))
+  if (!btc_addrman_open(pool->addrman))
     return 0;
 
-  if (!btc_addrman_open(pool->addrman)) {
-    btc_socket_close(pool->server);
-    btc_socket_destroy(pool->server);
-    pool->server = NULL;
+  if (!btc_pool_listen(pool)) {
+    btc_addrman_close(pool->addrman);
     return 0;
   }
 
@@ -3626,7 +3609,6 @@ btc_pool_on_mempool(btc_pool_t *pool, btc_peer_t *peer) {
 
   btc_mempool_iterate(&iter, pool->mempool);
 
-  /* Maybe store invitem on the entry? */
   while (btc_mempool_next(&entry, &iter)) {
     btc_zinv_push(&items, BTC_INV_TX, entry->hash);
 

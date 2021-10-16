@@ -48,6 +48,9 @@ btc_hash256_final(btc_hash256_t *ctx, uint8_t *out);
 BTC_EXTERN void
 btc_hash256(uint8_t *out, const void *data, size_t size);
 
+BTC_EXTERN uint32_t
+btc_checksum(const void *data, size_t size);
+
 /*
  * RIPEMD160
  */

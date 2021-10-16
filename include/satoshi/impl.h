@@ -59,7 +59,7 @@ scope void                                         \
 name ## _resize(name ## _t *z, size_t zn);         \
                                                    \
 scope void                                         \
-name ## _copy(name ## _t *x, const name ## _t *y);
+name ## _copy(name ## _t *z, const name ## _t *x);
 
 /*
  * Serializable (abstract)

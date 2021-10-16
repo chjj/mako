@@ -538,8 +538,7 @@ btc_miner_create(const btc_network_t *network,
                  btc_loop_t *loop,
                  btc_chain_t *chain,
                  btc_mempool_t *mempool) {
-  btc_miner_t *miner =
-    (btc_miner_t *)btc_malloc(sizeof(btc_miner_t));
+  btc_miner_t *miner = (btc_miner_t *)btc_malloc(sizeof(btc_miner_t));
 
   memset(miner, 0, sizeof(*miner));
 

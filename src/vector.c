@@ -68,18 +68,16 @@ btc_vector_top(const btc_vector_t *z) {
 
 void
 btc_vector_resize(btc_vector_t *z, size_t zn) {
-  if (z->length < zn)
-    btc_vector_grow(z, zn);
-
+  btc_vector_grow(z, zn);
   z->length = zn;
 }
 
 void
-btc_vector_copy(btc_vector_t *x, const btc_vector_t *y) {
+btc_vector_copy(btc_vector_t *z, const btc_vector_t *x) {
   size_t i;
 
-  btc_vector_resize(x, y->length);
+  btc_vector_resize(z, x->length);
 
-  for (i = 0; i < y->length; i++)
-    x->items[i] = y->items[i];
+  for (i = 0; i < x->length; i++)
+    z->items[i] = x->items[i];
 }

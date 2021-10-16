@@ -68,18 +68,16 @@ btc_array_top(const btc_array_t *z) {
 
 void
 btc_array_resize(btc_array_t *z, size_t zn) {
-  if (z->length < zn)
-    btc_array_grow(z, zn);
-
+  btc_array_grow(z, zn);
   z->length = zn;
 }
 
 void
-btc_array_copy(btc_array_t *x, const btc_array_t *y) {
+btc_array_copy(btc_array_t *z, const btc_array_t *x) {
   size_t i;
 
-  btc_array_resize(x, y->length);
+  btc_array_resize(z, x->length);
 
-  for (i = 0; i < y->length; i++)
-    x->items[i] = y->items[i];
+  for (i = 0; i < x->length; i++)
+    z->items[i] = x->items[i];
 }

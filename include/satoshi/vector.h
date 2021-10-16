@@ -47,7 +47,7 @@ BTC_EXTERN void
 btc_vector_resize(btc_vector_t *z, size_t zn);
 
 BTC_EXTERN void
-btc_vector_copy(btc_vector_t *x, const btc_vector_t *y);
+btc_vector_copy(btc_vector_t *z, const btc_vector_t *x);
 
 #ifdef __cplusplus
 }

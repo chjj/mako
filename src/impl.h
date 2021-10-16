@@ -140,13 +140,13 @@ name ## _resize(name ## _t *z, size_t zn) {                          \
 }                                                                    \
                                                                      \
 scope void                                                           \
-name ## _copy(name ## _t *x, const name ## _t *y) {                  \
+name ## _copy(name ## _t *z, const name ## _t *x) {                  \
   size_t i;                                                          \
                                                                      \
-  name ## _reset(x);                                                 \
+  name ## _reset(z);                                                 \
                                                                      \
-  for (i = 0; i < y->length; i++)                                    \
-    name ## _push(x, child ## _clone(y->items[i]));                  \
+  for (i = 0; i < x->length; i++)                                    \
+    name ## _push(z, child ## _clone(x->items[i]));                  \
 }
 
 /*
@@ -734,6 +734,55 @@ btc_string_update(struct btc_sha256_s *ctx, const char *xp) {
 
   btc_size_update(ctx, len);
   btc_hash256_update(ctx, xp, len);
+}
+
+BTC_UNUSED static uint8_t *
+btc_nullstr_write(uint8_t *zp, size_t zn, const char *xp) {
+  size_t xn = strlen(xp);
+
+  CHECK(xn + 1 <= zn);
+
+  memcpy(zp, xp, xn);
+
+  while (xn < zn)
+    zp[xn++] = 0;
+
+  return zp + zn;
+}
+
+BTC_UNUSED static int
+btc_nullstr_read(char *zp, size_t zn, const uint8_t **xp, size_t *xn) {
+  size_t i;
+
+  if (*xn < zn)
+    return 0;
+
+  for (i = 0; i < zn; i++) {
+    int ch = (*xp)[i];
+
+    if (ch == 0)
+      break;
+
+    if (ch < 32 || ch > 126)
+      return 0;
+  }
+
+  if (i == zn)
+    return 0;
+
+  for (; i < zn; i++) {
+    int ch = (*xp)[i];
+
+    if (ch != 0)
+      return 0;
+  }
+
+  memcpy(zp, *xp, zn);
+
+  *xp += zn;
+  *xn -= zn;
+
+  return 1;
 }
 
 #endif /* BTC_IMPL_INTERNAL_H */

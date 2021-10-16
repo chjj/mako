@@ -47,7 +47,7 @@ BTC_EXTERN void
 btc_array_resize(btc_array_t *z, size_t zn);
 
 BTC_EXTERN void
-btc_array_copy(btc_array_t *x, const btc_array_t *y);
+btc_array_copy(btc_array_t *z, const btc_array_t *x);
 
 #ifdef __cplusplus
 }

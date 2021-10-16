@@ -217,11 +217,7 @@ btc_chaindb_clear(btc_chaindb_t *db) {
 btc_chaindb_t *
 btc_chaindb_create(const btc_network_t *network) {
   btc_chaindb_t *db = (btc_chaindb_t *)btc_malloc(sizeof(btc_chaindb_t));
-
-  CHECK(db != NULL);
-
   btc_chaindb_init(db, network);
-
   return db;
 }
 

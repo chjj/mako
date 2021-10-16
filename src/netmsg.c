@@ -374,12 +374,13 @@ btc_zinv_copy(btc_zinv_t *z, const btc_zinv_t *x) {
   size_t i;
 
   btc_zinv_grow(z, x->length);
-  btc_zinv_reset(z);
 
   for (i = 0; i < x->length; i++) {
     z->items[i].type = x->items[i].type;
     z->items[i].hash = x->items[i].hash;
   }
+
+  z->length = x->length;
 }
 
 void
@@ -1364,69 +1365,69 @@ size_t
 btc_msg_size(const btc_msg_t *x) {
   switch (x->type) {
     case BTC_MSG_VERSION:
-      return btc_version_size((btc_version_t *)x->body);
+      return btc_version_size((const btc_version_t *)x->body);
     case BTC_MSG_VERACK:
       return 0;
     case BTC_MSG_PING:
-      return btc_ping_size((btc_ping_t *)x->body);
+      return btc_ping_size((const btc_ping_t *)x->body);
     case BTC_MSG_PONG:
-      return btc_pong_size((btc_pong_t *)x->body);
+      return btc_pong_size((const btc_pong_t *)x->body);
     case BTC_MSG_GETADDR:
       return 0;
     case BTC_MSG_ADDR:
-      return btc_addrs_size((btc_addrs_t *)x->body);
+      return btc_addrs_size((const btc_addrs_t *)x->body);
     case BTC_MSG_INV:
     case BTC_MSG_GETDATA:
     case BTC_MSG_NOTFOUND:
-      return btc_zinv_size((btc_zinv_t *)x->body);
+      return btc_zinv_size((const btc_zinv_t *)x->body);
     case BTC_MSG_INV_FULL:
     case BTC_MSG_GETDATA_FULL:
     case BTC_MSG_NOTFOUND_FULL:
-      return btc_inv_size((btc_inv_t *)x->body);
+      return btc_inv_size((const btc_inv_t *)x->body);
     case BTC_MSG_GETBLOCKS:
     case BTC_MSG_GETHEADERS:
-      return btc_getblocks_size((btc_getblocks_t *)x->body);
+      return btc_getblocks_size((const btc_getblocks_t *)x->body);
     case BTC_MSG_HEADERS:
-      return btc_headers_size((btc_headers_t *)x->body);
+      return btc_headers_size((const btc_headers_t *)x->body);
     case BTC_MSG_SENDHEADERS:
       return 0;
     case BTC_MSG_BLOCK:
-      return btc_block_size((btc_block_t *)x->body);
+      return btc_block_size((const btc_block_t *)x->body);
     case BTC_MSG_BLOCK_BASE:
-      return btc_block_base_size((btc_block_t *)x->body);
+      return btc_block_base_size((const btc_block_t *)x->body);
     case BTC_MSG_TX:
-      return btc_tx_size((btc_tx_t *)x->body);
+      return btc_tx_size((const btc_tx_t *)x->body);
     case BTC_MSG_TX_BASE:
-      return btc_tx_base_size((btc_tx_t *)x->body);
+      return btc_tx_base_size((const btc_tx_t *)x->body);
     case BTC_MSG_REJECT:
-      return btc_reject_size((btc_reject_t *)x->body);
+      return btc_reject_size((const btc_reject_t *)x->body);
     case BTC_MSG_MEMPOOL:
       return 0;
     case BTC_MSG_FILTERLOAD:
-      return btc_bloom_size((btc_bloom_t *)x->body);
+      return btc_bloom_size((const btc_bloom_t *)x->body);
     case BTC_MSG_FILTERADD:
-      return btc_filteradd_size((btc_filteradd_t *)x->body);
+      return btc_filteradd_size((const btc_filteradd_t *)x->body);
     case BTC_MSG_FILTERCLEAR:
       return 0;
     case BTC_MSG_MERKLEBLOCK:
-      /* return btc_merkleblock_size((btc_merkleblock_t *)x->body); */
+      /* return btc_merkleblock_size((const btc_merkleblock_t *)x->body); */
       return 0;
     case BTC_MSG_FEEFILTER:
-      return btc_feefilter_size((btc_feefilter_t *)x->body);
+      return btc_feefilter_size((const btc_feefilter_t *)x->body);
     case BTC_MSG_SENDCMPCT:
-      return btc_sendcmpct_size((btc_sendcmpct_t *)x->body);
+      return btc_sendcmpct_size((const btc_sendcmpct_t *)x->body);
     case BTC_MSG_CMPCTBLOCK:
-      return btc_cmpct_size((btc_cmpct_t *)x->body);
+      return btc_cmpct_size((const btc_cmpct_t *)x->body);
     case BTC_MSG_CMPCTBLOCK_BASE:
-      return btc_cmpct_base_size((btc_cmpct_t *)x->body);
+      return btc_cmpct_base_size((const btc_cmpct_t *)x->body);
     case BTC_MSG_GETBLOCKTXN:
-      return btc_getblocktxn_size((btc_getblocktxn_t *)x->body);
+      return btc_getblocktxn_size((const btc_getblocktxn_t *)x->body);
     case BTC_MSG_BLOCKTXN:
-      return btc_blocktxn_size((btc_blocktxn_t *)x->body);
+      return btc_blocktxn_size((const btc_blocktxn_t *)x->body);
     case BTC_MSG_BLOCKTXN_BASE:
-      return btc_blocktxn_base_size((btc_blocktxn_t *)x->body);
+      return btc_blocktxn_base_size((const btc_blocktxn_t *)x->body);
     case BTC_MSG_UNKNOWN:
-      return btc_unknown_size((btc_unknown_t *)x->body);
+      return btc_unknown_size((const btc_unknown_t *)x->body);
     default:
       return 0;
   }
@@ -1436,69 +1437,69 @@ uint8_t *
 btc_msg_write(uint8_t *zp, const btc_msg_t *x) {
   switch (x->type) {
     case BTC_MSG_VERSION:
-      return btc_version_write(zp, (btc_version_t *)x->body);
+      return btc_version_write(zp, (const btc_version_t *)x->body);
     case BTC_MSG_VERACK:
       return zp;
     case BTC_MSG_PING:
-      return btc_ping_write(zp, (btc_ping_t *)x->body);
+      return btc_ping_write(zp, (const btc_ping_t *)x->body);
     case BTC_MSG_PONG:
-      return btc_pong_write(zp, (btc_pong_t *)x->body);
+      return btc_pong_write(zp, (const btc_pong_t *)x->body);
     case BTC_MSG_GETADDR:
       return zp;
     case BTC_MSG_ADDR:
-      return btc_addrs_write(zp, (btc_addrs_t *)x->body);
+      return btc_addrs_write(zp, (const btc_addrs_t *)x->body);
     case BTC_MSG_INV:
     case BTC_MSG_GETDATA:
     case BTC_MSG_NOTFOUND:
-      return btc_zinv_write(zp, (btc_zinv_t *)x->body);
+      return btc_zinv_write(zp, (const btc_zinv_t *)x->body);
     case BTC_MSG_INV_FULL:
     case BTC_MSG_GETDATA_FULL:
     case BTC_MSG_NOTFOUND_FULL:
-      return btc_inv_write(zp, (btc_inv_t *)x->body);
+      return btc_inv_write(zp, (const btc_inv_t *)x->body);
     case BTC_MSG_GETBLOCKS:
     case BTC_MSG_GETHEADERS:
-      return btc_getblocks_write(zp, (btc_getblocks_t *)x->body);
+      return btc_getblocks_write(zp, (const btc_getblocks_t *)x->body);
     case BTC_MSG_HEADERS:
-      return btc_headers_write(zp, (btc_headers_t *)x->body);
+      return btc_headers_write(zp, (const btc_headers_t *)x->body);
     case BTC_MSG_SENDHEADERS:
       return zp;
     case BTC_MSG_BLOCK:
-      return btc_block_write(zp, (btc_block_t *)x->body);
+      return btc_block_write(zp, (const btc_block_t *)x->body);
     case BTC_MSG_BLOCK_BASE:
-      return btc_block_base_write(zp, (btc_block_t *)x->body);
+      return btc_block_base_write(zp, (const btc_block_t *)x->body);
     case BTC_MSG_TX:
-      return btc_tx_write(zp, (btc_tx_t *)x->body);
+      return btc_tx_write(zp, (const btc_tx_t *)x->body);
     case BTC_MSG_TX_BASE:
-      return btc_tx_base_write(zp, (btc_tx_t *)x->body);
+      return btc_tx_base_write(zp, (const btc_tx_t *)x->body);
     case BTC_MSG_REJECT:
-      return btc_reject_write(zp, (btc_reject_t *)x->body);
+      return btc_reject_write(zp, (const btc_reject_t *)x->body);
     case BTC_MSG_MEMPOOL:
       return zp;
     case BTC_MSG_FILTERLOAD:
-      return btc_bloom_write(zp, (btc_bloom_t *)x->body);
+      return btc_bloom_write(zp, (const btc_bloom_t *)x->body);
     case BTC_MSG_FILTERADD:
-      return btc_filteradd_write(zp, (btc_filteradd_t *)x->body);
+      return btc_filteradd_write(zp, (const btc_filteradd_t *)x->body);
     case BTC_MSG_FILTERCLEAR:
       return zp;
     case BTC_MSG_MERKLEBLOCK:
-      /* return btc_merkleblock_write(zp, (btc_merkleblock_t *)x->body); */
+      /* return btc_merkleblock_write(zp, (const btc_merkleblock_t *)x->body); */
       return zp;
     case BTC_MSG_FEEFILTER:
-      return btc_feefilter_write(zp, (btc_feefilter_t *)x->body);
+      return btc_feefilter_write(zp, (const btc_feefilter_t *)x->body);
     case BTC_MSG_SENDCMPCT:
-      return btc_sendcmpct_write(zp, (btc_sendcmpct_t *)x->body);
+      return btc_sendcmpct_write(zp, (const btc_sendcmpct_t *)x->body);
     case BTC_MSG_CMPCTBLOCK:
-      return btc_cmpct_write(zp, (btc_cmpct_t *)x->body);
+      return btc_cmpct_write(zp, (const btc_cmpct_t *)x->body);
     case BTC_MSG_CMPCTBLOCK_BASE:
-      return btc_cmpct_base_write(zp, (btc_cmpct_t *)x->body);
+      return btc_cmpct_base_write(zp, (const btc_cmpct_t *)x->body);
     case BTC_MSG_GETBLOCKTXN:
-      return btc_getblocktxn_write(zp, (btc_getblocktxn_t *)x->body);
+      return btc_getblocktxn_write(zp, (const btc_getblocktxn_t *)x->body);
     case BTC_MSG_BLOCKTXN:
-      return btc_blocktxn_write(zp, (btc_blocktxn_t *)x->body);
+      return btc_blocktxn_write(zp, (const btc_blocktxn_t *)x->body);
     case BTC_MSG_BLOCKTXN_BASE:
-      return btc_blocktxn_base_write(zp, (btc_blocktxn_t *)x->body);
+      return btc_blocktxn_base_write(zp, (const btc_blocktxn_t *)x->body);
     case BTC_MSG_UNKNOWN:
-      return btc_unknown_write(zp, (btc_unknown_t *)x->body);
+      return btc_unknown_write(zp, (const btc_unknown_t *)x->body);
     default:
       return zp;
   }
