@@ -1412,6 +1412,30 @@ btc_script_remove_separators(btc_script_t *z, const btc_script_t *x) {
 }
 
 static int
+btc_script_equal_push(const btc_script_t *x, const btc_buffer_t *y) {
+  /**
+   * Ensures `x` is equivalent to a single pushdata of `y`.
+   *
+   * This function avoids allocations and is used for ensuring
+   * that a nested segwit+p2sh input script was not malleated.
+   */
+  uint8_t raw[5 + BTC_MAX_SCRIPT_PUSH];
+  btc_script_t expect;
+  btc_opcode_t op;
+  size_t len;
+
+  btc_opcode_set_push(&op, y->data, y->length);
+
+  CHECK(btc_opcode_size(&op) <= sizeof(raw));
+
+  len = btc_opcode_export(raw, &op);
+
+  btc_script_roset(&expect, raw, len);
+
+  return btc_script_equal(x, &expect);
+}
+
+static int
 is_signature_encoding(const btc_buffer_t *sig) {
   /* Format: 0x30 [total-length] 0x02 [R-length] [R] 0x02 [S-length] [S] [sighash]
    * * total-length: 1-byte length descriptor of everything that follows,
@@ -1865,8 +1889,8 @@ btc_script_execute(const btc_script_t *script,
         v1 = btc_stack_get(stack, -2);
         v2 = btc_stack_get(stack, -1);
 
-        btc_stack_push(stack, btc_buffer_clone(v1)); /* no alloc */
-        btc_stack_push(stack, btc_buffer_clone(v2)); /* no alloc */
+        btc_stack_push(stack, btc_buffer_clone(v1));
+        btc_stack_push(stack, btc_buffer_clone(v2));
 
         break;
       }
@@ -1880,9 +1904,9 @@ btc_script_execute(const btc_script_t *script,
         v2 = btc_stack_get(stack, -2);
         v3 = btc_stack_get(stack, -1);
 
-        btc_stack_push(stack, btc_buffer_clone(v1)); /* no alloc */
-        btc_stack_push(stack, btc_buffer_clone(v2)); /* no alloc */
-        btc_stack_push(stack, btc_buffer_clone(v3)); /* no alloc */
+        btc_stack_push(stack, btc_buffer_clone(v1));
+        btc_stack_push(stack, btc_buffer_clone(v2));
+        btc_stack_push(stack, btc_buffer_clone(v3));
 
         break;
       }
@@ -1895,8 +1919,8 @@ btc_script_execute(const btc_script_t *script,
         v1 = btc_stack_get(stack, -4);
         v2 = btc_stack_get(stack, -3);
 
-        btc_stack_push(stack, btc_buffer_clone(v1)); /* no alloc */
-        btc_stack_push(stack, btc_buffer_clone(v2)); /* no alloc */
+        btc_stack_push(stack, btc_buffer_clone(v1));
+        btc_stack_push(stack, btc_buffer_clone(v2));
 
         break;
       }
@@ -1933,7 +1957,7 @@ btc_script_execute(const btc_script_t *script,
         if (btc_stack_get_bool(stack, -1)) {
           val = btc_stack_get(stack, -1);
 
-          btc_stack_push(stack, btc_buffer_clone(val)); /* no alloc */
+          btc_stack_push(stack, btc_buffer_clone(val));
         }
 
         break;
@@ -1958,7 +1982,7 @@ btc_script_execute(const btc_script_t *script,
 
         val = btc_stack_get(stack, -1);
 
-        btc_stack_push(stack, btc_buffer_clone(val)); /* no alloc */
+        btc_stack_push(stack, btc_buffer_clone(val));
 
         break;
       }
@@ -1982,7 +2006,7 @@ btc_script_execute(const btc_script_t *script,
 
         val = btc_stack_get(stack, -2);
 
-        btc_stack_push(stack, btc_buffer_clone(val)); /* no alloc */
+        btc_stack_push(stack, btc_buffer_clone(val));
 
         break;
       }
@@ -2036,7 +2060,7 @@ btc_script_execute(const btc_script_t *script,
 
         val = btc_stack_get(stack, -1);
 
-        btc_stack_insert(stack, -2, btc_buffer_clone(val)); /* no alloc */
+        btc_stack_insert(stack, -2, btc_buffer_clone(val));
 
         break;
       }
@@ -2607,7 +2631,6 @@ btc_script_verify(const btc_script_t *input,
   int err = BTC_SCRIPT_ERR_OK;
   btc_script_t *redeem = NULL;
   btc_stack_t stack, copy;
-  btc_opcode_t op1, op2;
   int had_witness;
 
   /* Setup a stack. */
@@ -2689,15 +2712,7 @@ btc_script_verify(const btc_script_t *input,
       had_witness = 1;
 
       /* Input script must be exactly one push of the redeem script. */
-      if (!btc_opcode_import(&op1, input->data, input->length))
-        THROW(BTC_SCRIPT_ERR_WITNESS_MALLEATED_P2SH);
-
-      if (btc_opcode_size(&op1) != input->length)
-        THROW(BTC_SCRIPT_ERR_WITNESS_MALLEATED_P2SH);
-
-      btc_opcode_set_push(&op2, redeem->data, redeem->length);
-
-      if (!btc_opcode_equal(&op1, &op2))
+      if (!btc_script_equal_push(input, redeem))
         THROW(BTC_SCRIPT_ERR_WITNESS_MALLEATED_P2SH);
 
       /* Verify the program in the redeem script. */
