@@ -12,6 +12,7 @@ extern "C" {
 #endif
 
 #include <stddef.h>
+#include <stdint.h>
 #include "common.h"
 #include "types.h"
 #include "vector.h"
@@ -20,7 +21,7 @@ extern "C" {
  * Types
  */
 
-typedef int btc_heapcmp_f(void *x, void *y);
+typedef int64_t btc_heapcmp_f(void *x, void *y);
 
 /*
  * Heap

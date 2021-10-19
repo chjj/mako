@@ -639,7 +639,7 @@ btc_miner_update_time(btc_miner_t *miner, btc_tmpl_t *bt) {
   bt->time = now;
 }
 
-static int
+static int64_t
 cmp_rate(void *ap, void *bp) {
   btc_blockentry_t *a = ap;
   btc_blockentry_t *b = bp;
@@ -652,13 +652,7 @@ cmp_rate(void *ap, void *bp) {
   if (b->desc_rate > b->rate)
     y = b->desc_rate;
 
-  if (y < x)
-    return -1;
-
-  if (y > x)
-    return 1;
-
-  return 0;
+  return y - x;
 }
 
 static void

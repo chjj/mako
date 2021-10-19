@@ -850,7 +850,7 @@ use_desc(const btc_mpentry_t *a) {
   return y > x;
 }
 
-static int
+static int64_t
 cmp_rate(void *left, void *right) {
   const btc_mpentry_t *a = (const btc_mpentry_t *)left;
   const btc_mpentry_t *b = (const btc_mpentry_t *)right;
@@ -879,13 +879,7 @@ cmp_rate(void *left, void *right) {
     y = b->time;
   }
 
-  if (x < y)
-    return -1;
-
-  if (x > y)
-    return 1;
-
-  return 0;
+  return x - y;
 }
 
 static int
