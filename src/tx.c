@@ -1153,6 +1153,92 @@ btc_tx_has_standard_witness(const btc_tx_t *tx, const btc_view_t *view) {
   return 1;
 }
 
+#if 0
+int
+btc_script_matches(const btc_script_t *script, const btc_bloom_t *filter) {
+  btc_reader_t reader;
+  btc_opcode_t op;
+
+  btc_reader_init(&reader, script);
+
+  while (btc_reader_next(&op, &reader)) {
+    if (op.length == 0)
+      continue;
+
+    if (btc_bloom_has(filter, op.data, op.length))
+      return 1;
+  }
+
+  return 0;
+}
+
+int
+btc_tx_matches(const btc_tx_t *tx, const btc_bloom_t *filter) {
+  /**
+   * Test a transaction against a bloom filter using
+   * the BIP37 matching algorithm. Note that this may
+   * update the filter depending on what the `update`
+   * value is.
+   *
+   * See: https://github.com/bitcoin/bips/blob/master/bip-0037.mediawiki
+   */
+  const btc_output_t *output;
+  const btc_input_t *input;
+  uint8_t raw[36];
+  int found = 0;
+  size_t i;
+
+  btc_raw_write(raw, tx->hash, 32);
+
+  /* 1. Test the tx hash. */
+  if (btc_bloom_has(filter, tx->hash, 32))
+    found = 1;
+
+  /* 2. Test data elements in output scripts
+        (may need to update filter on match). */
+  for (i = 0; i < tx->outputs.length; i++) {
+    output = tx->outputs.items[i];
+
+    /* Test the output script. */
+    if (btc_script_matches(&output->script, filter)) {
+      if (filter->update == BTC_BLOOM_ALL) {
+        btc_uint32_write(raw + 32, i);
+        btc_bloom_add(filter, raw, 36);
+      } else if (filter->update == BTC_BLOOM_PUBKEY_ONLY) {
+        if (btc_script_is_p2pk(&output->script)
+            || btc_script_is_multisig(&output->script)) {
+          btc_uint32_write(raw + 32, i);
+          btc_bloom_add(filter, raw, 36);
+        }
+      }
+      found = 1;
+    }
+  }
+
+  if (found)
+    return found;
+
+  /* 3. Test prev_out structure. */
+  /* 4. Test data elements in input scripts. */
+  for (i = 0; i < tx->inputs.length; i++) {
+    input = tx->inputs.items[i];
+
+    btc_outpoint_write(raw, &input->prevout);
+
+    /* Test the COutPoint structure. */
+    if (btc_bloom_has(filter, raw, 36))
+      return 1;
+
+    /* Test the input script. */
+    if (btc_script_matches(&input->script, filter))
+      return 1;
+  }
+
+  /* 5. No match. */
+  return 0;
+}
+#endif
+
 size_t
 btc_tx_base_size(const btc_tx_t *tx) {
   size_t size = 0;

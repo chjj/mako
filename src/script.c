@@ -409,8 +409,6 @@ btc_opcode_size(const btc_opcode_t *x) {
 
 uint8_t *
 btc_opcode_write(uint8_t *zp, const btc_opcode_t *x) {
-  CHECK(x->value != -1);
-
   if (x->value > BTC_OP_PUSHDATA4) {
     zp = btc_uint8_write(zp, x->value);
     return zp;
@@ -446,7 +444,9 @@ int
 btc_opcode_read(btc_opcode_t *z, const uint8_t **xp, size_t *xn) {
   uint8_t value;
 
-  btc_opcode_init(z);
+  z->value = BTC_OP_INVALIDOPCODE;
+  z->data = NULL;
+  z->length = 0;
 
   if (!btc_uint8_read(&value, xp, xn))
     return 0;
@@ -455,8 +455,6 @@ btc_opcode_read(btc_opcode_t *z, const uint8_t **xp, size_t *xn) {
     z->value = value;
     return 1;
   }
-
-  z->value = -1;
 
   switch (value) {
     case BTC_OP_PUSHDATA1: {
@@ -645,39 +643,22 @@ btc_script_get_p2pk(uint8_t *pub, size_t *len, const btc_script_t *script) {
 
   btc_reader_init(&reader, script);
 
-  while (btc_reader_next(&op, &reader)) {
-    switch (reader.ip) {
-      case 0: {
-        if (op.length != 33 && op.length != 65)
-          return 0;
-
-        if (pub != NULL)
-          memcpy(pub, op.data, op.length);
-
-        if (len != NULL)
-          *len = op.length;
-
-        break;
-      }
-      case 1: {
-        if (op.value != BTC_OP_CHECKSIG)
-          return 0;
-
-        break;
-      }
-      default: {
-        return 0;
-      }
-    }
-  }
-
-  if (reader.ip != 1)
+  if (!btc_reader_next(&op, &reader))
     return 0;
 
-  if (op.value == -1)
+  if (op.length != 33 && op.length != 65)
     return 0;
 
-  return 1;
+  if (pub != NULL)
+    memcpy(pub, op.data, op.length);
+
+  if (len != NULL)
+    *len = op.length;
+
+  if (btc_reader_op(&reader) != BTC_OP_CHECKSIG)
+    return 0;
+
+  return reader.length == 0;
 }
 
 int
@@ -708,44 +689,28 @@ btc_script_get_p2pkh(uint8_t *hash, const btc_script_t *script) {
 
   btc_reader_init(&reader, script);
 
-  while (btc_reader_next(&op, &reader)) {
-    switch (reader.ip) {
-      case 0:
-        if (op.value != BTC_OP_DUP)
-          return 0;
-        break;
-      case 1:
-        if (op.value != BTC_OP_HASH160)
-          return 0;
-        break;
-      case 2:
-        if (op.length != 20)
-          return 0;
-
-        if (hash != NULL)
-          memcpy(hash, op.data, 20);
-
-        break;
-      case 3:
-        if (op.value != BTC_OP_EQUALVERIFY)
-          return 0;
-        break;
-      case 4:
-        if (op.value != BTC_OP_CHECKSIG)
-          return 0;
-        break;
-      default:
-        return 0;
-    }
-  }
-
-  if (reader.ip != 4)
+  if (btc_reader_op(&reader) != BTC_OP_DUP)
     return 0;
 
-  if (op.value == -1)
+  if (btc_reader_op(&reader) != BTC_OP_HASH160)
     return 0;
 
-  return 1;
+  if (!btc_reader_next(&op, &reader))
+    return 0;
+
+  if (op.length != 20)
+    return 0;
+
+  if (hash != NULL)
+    memcpy(hash, op.data, 20);
+
+  if (btc_reader_op(&reader) != BTC_OP_EQUALVERIFY)
+    return 0;
+
+  if (btc_reader_op(&reader) != BTC_OP_CHECKSIG)
+    return 0;
+
+  return reader.length == 0;
 }
 
 int
@@ -777,81 +742,59 @@ int
 btc_script_get_multisig(btc_multisig_t *multi, const btc_script_t *script) {
   btc_reader_t reader;
   btc_opcode_t op;
-  int state = 0;
-  int total = 0;
+  int i = 0;
   int m = 0;
   int n = 0;
 
   btc_reader_init(&reader, script);
 
-  while (btc_reader_next(&op, &reader)) {
-    switch (state) {
-      case 0: {
-        if (op.value < BTC_OP_1 || op.value > BTC_OP_16)
-          return 0;
+  if (!btc_reader_next(&op, &reader))
+    return 0;
 
-        m = op.value - 0x50;
+  if (op.value < BTC_OP_1 || op.value > BTC_OP_16)
+    return 0;
 
-        if (multi != NULL)
-          multi->m = m;
+  m = op.value - 0x50;
 
-        state = 1;
+  for (;;) {
+    if (!btc_reader_next(&op, &reader))
+      return 0;
 
-        break;
-      }
-      case 1: {
-        if (op.value >= BTC_OP_1 && op.value >= BTC_OP_16) {
-          n = op.value - 0x50;
+    if (op.value >= BTC_OP_1 && op.value <= BTC_OP_16) {
+      n = op.value - 0x50;
 
-          if (multi != NULL)
-            multi->n = n;
-
-          if (m > n)
-            return 0;
-
-          if (n != total)
-            return 0;
-
-          state = 2;
-        } else {
-          if (op.length != 33 && op.length != 65)
-            return 0;
-
-          if (total == 16)
-            return 0;
-
-          if (multi != NULL)
-            multi->keys[total] = op.data;
-
-          if (multi != NULL)
-            multi->lengths[total] = op.length;
-
-          total += 1;
-        }
-
-        break;
-      }
-      case 2: {
-        if (op.value != BTC_OP_CHECKMULTISIG)
-          return 0;
-
-        state = 3;
-
-        break;
-      }
-      case 3: {
+      if (m > n)
         return 0;
-      }
+
+      if (n != i)
+        return 0;
+
+      break;
     }
+
+    if (op.length != 33 && op.length != 65)
+      return 0;
+
+    if ((size_t)i == lengthof(multi->keys))
+      return 0;
+
+    if (multi != NULL) {
+      multi->keys[i] = op.data;
+      multi->lengths[i] = op.length;
+    }
+
+    i++;
   }
 
-  if (state != 3)
+  if (multi != NULL) {
+    multi->m = m;
+    multi->n = n;
+  }
+
+  if (btc_reader_op(&reader) != BTC_OP_CHECKMULTISIG)
     return 0;
 
-  if (op.value == -1)
-    return 0;
-
-  return 1;
+  return reader.length == 0;
 }
 
 int
@@ -893,88 +836,58 @@ btc_script_is_nulldata(const btc_script_t *script) {
 
   btc_reader_init(&reader, script);
 
-  while (btc_reader_next(&op, &reader)) {
-    switch (reader.ip) {
-      case 0: {
-        if (op.value != BTC_OP_RETURN)
-          return 0;
+  if (btc_reader_op(&reader) != BTC_OP_RETURN)
+    return 0;
 
-        break;
-      }
-      default: {
-        if (op.value > BTC_OP_16)
-          return 0;
+  while (reader.length > 0) {
+    if (!btc_reader_next(&op, &reader))
+      return 0;
 
-        break;
-      }
-    }
+    if (op.value > BTC_OP_16)
+      return 0;
   }
-
-  if (reader.ip < 0)
-    return 0;
-
-  if (op.value == -1)
-    return 0;
 
   return 1;
 }
 
 void
-btc_script_set_nulldata(btc_script_t *script, uint8_t *data, size_t len) {
-  size_t n = 0;
+btc_script_set_nulldata(btc_script_t *script, const uint8_t *data, size_t len) {
+  btc_opcode_t op;
 
-  btc_script_grow(script, 3 + len);
+  btc_opcode_set_push(&op, data, len);
 
-  script->data[n++] = BTC_OP_RETURN;
+  btc_script_resize(script, 1 + btc_opcode_size(&op));
 
-  if (len <= 0x4b) {
-    script->data[n++] = len;
-  } else {
-    script->data[n++] = BTC_OP_PUSHDATA1;
-    script->data[n++] = len;
-  }
+  script->data[0] = BTC_OP_RETURN;
 
-  memcpy(script->data + n, data, len);
-
-  script->length = n + len;
+  btc_opcode_export(script->data + 1, &op);
 }
 
 int
-btc_script_get_nulldata(uint8_t *data,
+btc_script_get_nulldata(const uint8_t **data,
                         size_t *len,
                         const btc_script_t *script) {
-  if (script->length < 2)
+  btc_reader_t reader;
+  btc_opcode_t op;
+
+  btc_reader_init(&reader, script);
+
+  if (btc_reader_op(&reader) != BTC_OP_RETURN)
     return 0;
 
-  if (script->data[0] != BTC_OP_RETURN)
+  if (!btc_reader_next(&op, &reader))
     return 0;
 
-  if (script->data[1] <= 0x4b) {
-    if (2 + (size_t)script->data[1] != script->length)
-      return 0;
-
-    memcpy(data, script->data + 2, script->data[1]);
-
-    *len = script->data[1];
-
-    return 1;
-  }
-
-  if (script->length < 3)
+  if (op.value > BTC_OP_PUSHDATA4)
     return 0;
 
-  if (script->data[1] == BTC_OP_PUSHDATA1) {
-    if (3 + (size_t)script->data[2] != script->length)
-      return 0;
+  if (data != NULL)
+    *data = op.data;
 
-    memcpy(data, script->data + 3, script->data[2]);
+  if (len != NULL)
+    *len = op.length;
 
-    *len = script->data[2];
-
-    return 1;
-  }
-
-  return 0;
+  return reader.length == 0;
 }
 
 int
@@ -1160,13 +1073,13 @@ btc_script_is_push_only(const btc_script_t *script) {
 
   btc_reader_init(&reader, script);
 
-  while (btc_reader_next(&op, &reader)) {
+  while (reader.length > 0) {
+    if (!btc_reader_next(&op, &reader))
+      return 0;
+
     if (op.value > BTC_OP_16)
       return 0;
   }
-
-  if (op.value == -1)
-    return 0;
 
   return 1;
 }
@@ -1213,39 +1126,37 @@ btc_script_get_redeem(btc_script_t *redeem, const btc_script_t *script) {
 
   memset(&op, 0, sizeof(op));
 
+  btc_opcode_init(&last);
   btc_reader_init(&reader, script);
 
-  while (btc_reader_next(&op, &reader)) {
+  while (reader.length > 0) {
+    if (!btc_reader_next(&op, &reader))
+      return 0;
+
     if (op.value > BTC_OP_16)
       return 0;
 
     last = op;
   }
 
-  if (reader.ip < 0)
-    return 0;
+  btc_script_roset(redeem, last.data, last.length);
 
-  if (op.value == -1)
-    return 0;
-
-  if (last.length > 0) {
-    btc_script_roset(redeem, last.data, last.length);
-    return 1;
-  }
-
-  return 0;
+  return 1;
 }
 
 int
 btc_script_sigops(const btc_script_t *script, int accurate) {
+  int last = BTC_OP_INVALIDOPCODE;
   btc_reader_t reader;
   btc_opcode_t op;
-  int lastop = -1;
   int total = 0;
 
   btc_reader_init(&reader, script);
 
-  while (btc_reader_next(&op, &reader)) {
+  while (reader.length > 0) {
+    if (!btc_reader_next(&op, &reader))
+      break;
+
     switch (op.value) {
       case BTC_OP_CHECKSIG:
       case BTC_OP_CHECKSIGVERIFY:
@@ -1253,14 +1164,14 @@ btc_script_sigops(const btc_script_t *script, int accurate) {
         break;
       case BTC_OP_CHECKMULTISIG:
       case BTC_OP_CHECKMULTISIGVERIFY:
-        if (accurate && lastop >= BTC_OP_1 && lastop <= BTC_OP_16)
-          total += lastop - 0x50;
+        if (accurate && last >= BTC_OP_1 && last <= BTC_OP_16)
+          total += last - 0x50;
         else
           total += BTC_MAX_MULTISIG_PUBKEYS;
         break;
     }
 
-    lastop = op.value;
+    last = op.value;
   }
 
   return total;
@@ -1308,31 +1219,6 @@ btc_script_witness_sigops(const btc_script_t *script,
   }
 
   return 0;
-}
-
-void
-btc_script_get_subscript(btc_script_t *z, const btc_script_t *x, int index) {
-  btc_reader_t reader;
-  btc_writer_t writer;
-  btc_opcode_t op;
-
-  if (index == 0) {
-    btc_script_copy(z, x);
-    return;
-  }
-
-  btc_reader_init(&reader, x);
-  btc_writer_init(&writer);
-
-  while (btc_reader_next(&op, &reader)) {
-    if (reader.ip < index)
-      continue;
-
-    btc_writer_push(&writer, btc_opcode_clone(&op));
-  }
-
-  btc_writer_compile(z, &writer);
-  btc_writer_clear(&writer);
 }
 
 int
@@ -1668,7 +1554,6 @@ btc_script_execute(const btc_script_t *script,
                    int version,
                    btc_tx_cache_t *cache) {
   int err = BTC_SCRIPT_ERR_OK;
-  int lastsep = 0;
   int opcount = 0;
   int negate = 0;
   int minimal = 0;
@@ -1676,6 +1561,7 @@ btc_script_execute(const btc_script_t *script,
   btc_array_t state;
   btc_stack_t alt;
   btc_reader_t reader;
+  btc_reader_t begin;
   btc_script_t subscript;
   btc_opcode_t op;
 
@@ -1689,8 +1575,12 @@ btc_script_execute(const btc_script_t *script,
   btc_stack_init(&alt);
   btc_script_init(&subscript);
   btc_reader_init(&reader, script);
+  btc_reader_init(&begin, script);
 
-  while (btc_reader_next(&op, &reader)) {
+  while (reader.length > 0) {
+    if (!btc_reader_next(&op, &reader))
+      THROW(BTC_SCRIPT_ERR_BAD_OPCODE);
+
     if (op.length > BTC_MAX_SCRIPT_PUSH)
       THROW(BTC_SCRIPT_ERR_PUSH_SIZE);
 
@@ -2362,7 +2252,8 @@ btc_script_execute(const btc_script_t *script,
         break;
       }
       case BTC_OP_CODESEPARATOR: {
-        lastsep = reader.ip + 1;
+        begin.data = reader.data;
+        begin.length = reader.length;
         break;
       }
       case BTC_OP_CHECKSIG:
@@ -2380,7 +2271,7 @@ btc_script_execute(const btc_script_t *script,
         sig = btc_stack_get(stack, -2);
         key = btc_stack_get(stack, -1);
 
-        btc_script_get_subscript(&subscript, script, lastsep);
+        btc_script_set(&subscript, begin.data, begin.length);
 
         if (version == 0)
           btc_script_find_and_delete(&subscript, sig);
@@ -2468,7 +2359,7 @@ btc_script_execute(const btc_script_t *script,
         if (stack->length < (size_t)i)
           THROW(BTC_SCRIPT_ERR_INVALID_STACK_OPERATION);
 
-        btc_script_get_subscript(&subscript, script, lastsep);
+        btc_script_set(&subscript, begin.data, begin.length);
 
         for (j = 0; j < m; j++) {
           sig = btc_stack_get(stack, -isig - j);
@@ -2550,9 +2441,6 @@ btc_script_execute(const btc_script_t *script,
     if (stack->length + alt.length > BTC_MAX_SCRIPT_STACK)
       THROW(BTC_SCRIPT_ERR_STACK_SIZE);
   }
-
-  if (op.value == -1)
-    THROW(BTC_SCRIPT_ERR_BAD_OPCODE);
 
   if (state.length != 0)
     THROW(BTC_SCRIPT_ERR_UNBALANCED_CONDITIONAL);
@@ -2782,14 +2670,18 @@ void
 btc_reader_init(btc_reader_t *z, const btc_script_t *x) {
   z->data = x->data;
   z->length = x->length;
-  z->ip = -1;
 }
 
 int
 btc_reader_next(btc_opcode_t *z, btc_reader_t *x) {
-  int ret = btc_opcode_read(z, &x->data, &x->length);
-  x->ip += ret;
-  return ret;
+  return btc_opcode_read(z, &x->data, &x->length);
+}
+
+int
+btc_reader_op(btc_reader_t *x) {
+  btc_opcode_t op;
+  btc_reader_next(&op, x);
+  return op.value;
 }
 
 /*

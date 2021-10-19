@@ -450,10 +450,10 @@ BTC_EXTERN int
 btc_script_is_nulldata(const btc_script_t *script);
 
 BTC_EXTERN void
-btc_script_set_nulldata(btc_script_t *script, uint8_t *data, size_t len);
+btc_script_set_nulldata(btc_script_t *script, const uint8_t *data, size_t len);
 
 BTC_EXTERN int
-btc_script_get_nulldata(uint8_t *data,
+btc_script_get_nulldata(const uint8_t **data,
                         size_t *len,
                         const btc_script_t *script);
 
@@ -522,9 +522,6 @@ btc_script_witness_sigops(const btc_script_t *script,
                           const btc_script_t *input,
                           const btc_stack_t *witness);
 
-BTC_EXTERN void
-btc_script_get_subscript(btc_script_t *z, const btc_script_t *x, int index);
-
 BTC_EXTERN int
 btc_script_find_and_delete(btc_script_t *z, const btc_buffer_t *sig);
 
@@ -560,6 +557,9 @@ btc_reader_init(btc_reader_t *z, const btc_script_t *x);
 
 BTC_EXTERN int
 btc_reader_next(btc_opcode_t *z, btc_reader_t *x);
+
+BTC_EXTERN int
+btc_reader_op(btc_reader_t *x);
 
 /*
  * Writer

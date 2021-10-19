@@ -29,7 +29,6 @@ test_sighash_vector(const test_sighash_vector_t *vec, size_t index) {
 
   btc_script_set(&script, vec->script_raw, vec->script_len);
 
-  btc_script_get_subscript(&script, &script, 0);
   btc_script_remove_separators(&script, &script);
 
   btc_tx_sighash(msg, &tx, vec->index, &script, 0, vec->type, 0, NULL);

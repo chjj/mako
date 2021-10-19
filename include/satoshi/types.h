@@ -71,7 +71,6 @@ typedef btc_buffer_t btc_script_t;
 typedef struct btc_reader_s {
   const uint8_t *data;
   size_t length;
-  int ip;
 } btc_reader_t;
 
 typedef struct btc_writer_s {
