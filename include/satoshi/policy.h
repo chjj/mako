@@ -125,6 +125,12 @@ extern "C" {
 #define BTC_MEMPOOL_MAX_SIZE (100 * 1000000)
 
 /**
+ * Default threshold mempool size in bytes.
+ */
+
+#define BTC_MEMPOOL_THRESHOLD (BTC_MEMPOOL_MAX_SIZE - BTC_MEMPOOL_MAX_SIZE / 10)
+
+/**
  * Time at which transactions
  * fall out of the mempool.
  */

@@ -887,12 +887,9 @@ btc_script_get_p2sh(uint8_t *hash, const btc_script_t *script) {
 }
 
 int
-btc_script_is_nulldata(const btc_script_t *script, int minimal) {
+btc_script_is_nulldata(const btc_script_t *script) {
   btc_reader_t reader;
   btc_opcode_t op;
-
-  if (minimal && script->length > BTC_MAX_OP_RETURN_BYTES)
-    return 0;
 
   btc_reader_init(&reader, script);
 
@@ -906,9 +903,6 @@ btc_script_is_nulldata(const btc_script_t *script, int minimal) {
       }
       default: {
         if (op.value > BTC_OP_16)
-          return 0;
-
-        if (minimal && !btc_opcode_is_minimal(&op))
           return 0;
 
         break;
@@ -1121,6 +1115,37 @@ btc_script_set_p2wsh(btc_script_t *script, const uint8_t *hash) {
 }
 
 int
+btc_script_is_unknown(const btc_script_t *script) {
+  return !btc_script_is_p2pk(script)
+      && !btc_script_is_p2pkh(script)
+      && !btc_script_is_p2sh(script)
+      && !btc_script_is_p2wpkh(script)
+      && !btc_script_is_p2wsh(script)
+      && !btc_script_is_multisig(script)
+      && !btc_script_is_nulldata(script);
+}
+
+int
+btc_script_is_standard(const btc_script_t *script) {
+  btc_multisig_t multi;
+
+  if (btc_script_get_multisig(&multi, script)) {
+    if (multi.n < 1 || multi.n > 3)
+      return 0;
+
+    if (multi.m < 1 || multi.m > multi.n)
+      return 0;
+
+    return 1;
+  }
+
+  if (btc_script_is_nulldata(script))
+    return script->length <= BTC_MAX_OP_RETURN_BYTES;
+
+  return !btc_script_is_unknown(script);
+}
+
+int
 btc_script_is_unspendable(const btc_script_t *script) {
   if (script->length > BTC_MAX_SCRIPT_SIZE)
     return 1;
@@ -1181,7 +1206,7 @@ btc_script_get_height(const btc_script_t *script) {
   return num;
 }
 
-static int
+int
 btc_script_get_redeem(btc_script_t *redeem, const btc_script_t *script) {
   btc_opcode_t op, last;
   btc_reader_t reader;

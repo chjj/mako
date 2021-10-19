@@ -447,7 +447,7 @@ BTC_EXTERN int
 btc_script_get_p2sh(uint8_t *hash, const btc_script_t *script);
 
 BTC_EXTERN int
-btc_script_is_nulldata(const btc_script_t *script, int minimal);
+btc_script_is_nulldata(const btc_script_t *script);
 
 BTC_EXTERN void
 btc_script_set_nulldata(btc_script_t *script, uint8_t *data, size_t len);
@@ -494,6 +494,12 @@ BTC_EXTERN void
 btc_script_set_p2wsh(btc_script_t *script, const uint8_t *hash);
 
 BTC_EXTERN int
+btc_script_is_unknown(const btc_script_t *script);
+
+BTC_EXTERN int
+btc_script_is_standard(const btc_script_t *script);
+
+BTC_EXTERN int
 btc_script_is_unspendable(const btc_script_t *script);
 
 BTC_EXTERN int
@@ -501,6 +507,9 @@ btc_script_is_push_only(const btc_script_t *script);
 
 BTC_EXTERN int32_t
 btc_script_get_height(const btc_script_t *script);
+
+BTC_EXTERN int
+btc_script_get_redeem(btc_script_t *redeem, const btc_script_t *script);
 
 BTC_EXTERN int
 btc_script_sigops(const btc_script_t *script, int accurate);

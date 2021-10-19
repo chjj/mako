@@ -246,6 +246,15 @@ btc_tx_check_inputs(btc_verify_error_t *err,
                     const btc_view_t *view,
                     int32_t height);
 
+BTC_EXTERN int
+btc_tx_check_standard(btc_verify_error_t *err, const btc_tx_t *tx);
+
+BTC_EXTERN int
+btc_tx_has_standard_inputs(const btc_tx_t *tx, const btc_view_t *view);
+
+BTC_EXTERN int
+btc_tx_has_standard_witness(const btc_tx_t *tx, const btc_view_t *view);
+
 BTC_EXTERN size_t
 btc_tx_base_size(const btc_tx_t *tx);
 

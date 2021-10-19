@@ -890,7 +890,6 @@ cmp_rate(void *left, void *right) {
 
 static int
 btc_mempool_limit_size(btc_mempool_t *mp, const uint8_t *added) {
-  size_t threshold = BTC_MEMPOOL_MAX_SIZE - (BTC_MEMPOOL_MAX_SIZE / 10);
   btc_hashmapiter_t iter;
   btc_vector_t queue;
   int64_t now;
@@ -921,7 +920,7 @@ btc_mempool_limit_size(btc_mempool_t *mp, const uint8_t *added) {
     btc_mempool_evict_entry(mp, entry);
   }
 
-  if (mp->size <= threshold) {
+  if (mp->size <= BTC_MEMPOOL_THRESHOLD) {
     btc_vector_clear(&queue);
     return !btc_hashmap_has(mp->map, added);
   }
@@ -934,7 +933,7 @@ btc_mempool_limit_size(btc_mempool_t *mp, const uint8_t *added) {
 
     btc_mempool_evict_entry(mp, entry);
 
-    if (mp->size <= threshold)
+    if (mp->size <= BTC_MEMPOOL_THRESHOLD)
       break;
   }
 
@@ -998,29 +997,26 @@ btc_mempool_verify(btc_mempool_t *mp,
                              0);
   }
 
-#if 0
-  /* Check input standardness. */
-  if (!btc_tx_has_standard_inputs(tx, view)) {
-    return btc_mempool_throw(mp, tx,
-                             "nonstandard",
-                             "bad-txns-nonstandard-inputs",
-                             0,
-                             0);
-  }
-
-  /* Check witness standardness. */
-  if (state->flags & BTC_SCRIPT_VERIFY_WITNESS) {
-    if (!btc_tx_has_standard_witness(tx, view)) {
+  /* Check input and witness standardness. */
+  if (mp->network->require_standard) {
+    if (!btc_tx_has_standard_inputs(tx, view)) {
       return btc_mempool_throw(mp, tx,
                                "nonstandard",
-                               "bad-witness-nonstandard",
+                               "bad-txns-nonstandard-inputs",
                                0,
-                               1);
+                               0);
+    }
+
+    if (state->flags & BTC_SCRIPT_VERIFY_WITNESS) {
+      if (!btc_tx_has_standard_witness(tx, view)) {
+        return btc_mempool_throw(mp, tx,
+                                 "nonstandard",
+                                 "bad-witness-nonstandard",
+                                 0,
+                                 1);
+      }
     }
   }
-#else
-  (void)state;
-#endif
 
   /* Annoying process known as sigops counting. */
   if (entry->sigops > BTC_MAX_TX_SIGOPS_COST) {
@@ -1037,7 +1033,7 @@ btc_mempool_verify(btc_mempool_t *mp,
   if (entry->fee < minfee) {
     return btc_mempool_throw(mp, tx,
                              "insufficientfee",
-                             "insufficient priority",
+                             "insufficient fee",
                              0,
                              0);
   }
@@ -1107,9 +1103,7 @@ btc_mempool_verify(btc_mempool_t *mp,
 }
 
 static int
-btc_mempool_insert(btc_mempool_t *mp,
-                   const btc_tx_t *tx,
-                   unsigned int id) {
+btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   const btc_deployment_state_t *state = btc_chain_state(mp->chain);
   unsigned int lock_flags = BTC_CHAIN_STANDARD_LOCKTIME_FLAGS;
   const btc_entry_t *tip = btc_chain_tip(mp->chain);
@@ -1137,13 +1131,15 @@ btc_mempool_insert(btc_mempool_t *mp,
   }
 
   /* Do not allow CSV until it's activated. */
-  if (!(state->flags & BTC_SCRIPT_VERIFY_CHECKSEQUENCEVERIFY)) {
-    if (tx->version >= 2) {
-      return btc_mempool_throw(mp, tx,
-                               "nonstandard",
-                               "premature-version2-tx",
-                               0,
-                               0);
+  if (mp->network->require_standard) {
+    if (!(state->flags & BTC_SCRIPT_VERIFY_CHECKSEQUENCEVERIFY)) {
+      if (tx->version >= 2) {
+        return btc_mempool_throw(mp, tx,
+                                 "nonstandard",
+                                 "premature-version2-tx",
+                                 0,
+                                 0);
+      }
     }
   }
 
@@ -1158,16 +1154,16 @@ btc_mempool_insert(btc_mempool_t *mp,
     }
   }
 
-#if 0
   /* Non-contextual standardness checks. */
-  if (!btc_tx_check_standard(&err, tx)) {
-    return btc_mempool_throw(mp, tx,
-                             "invalid",
-                             err.reason,
-                             err.score,
-                             0);
+  if (mp->network->require_standard) {
+    if (!btc_tx_check_standard(&err, tx)) {
+      return btc_mempool_throw(mp, tx,
+                               "invalid",
+                               err.reason,
+                               err.score,
+                               0);
+    }
   }
-#endif
 
   /* Verify transaction finality. */
   if (!btc_chain_verify_final(mp->chain, tip, tx, lock_flags)) {
@@ -1255,9 +1251,7 @@ btc_mempool_insert(btc_mempool_t *mp,
 }
 
 int
-btc_mempool_add(btc_mempool_t *mp,
-                const btc_tx_t *tx,
-                unsigned int id) {
+btc_mempool_add(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   if (!btc_mempool_insert(mp, tx, id)) {
     const btc_verify_error_t *err = &mp->error;
 

@@ -935,7 +935,7 @@ btc_tx_check_inputs(btc_verify_error_t *err,
       THROW("bad-txns-inputvalues-outofrange", 100, -1);
   }
 
-  /* Overflows already checked in `isSane()`. */
+  /* Overflows already checked in `btc_tx_check_sanity`. */
   value = btc_tx_output_value(tx);
 
   if (total < value)
@@ -952,7 +952,206 @@ btc_tx_check_inputs(btc_verify_error_t *err,
   return fee;
 }
 
+int
+btc_tx_check_standard(btc_verify_error_t *err, const btc_tx_t *tx) {
+  const btc_input_t *input;
+  const btc_output_t *output;
+  int nulldata = 0;
+  size_t i;
+
+  if (tx->version < 1 || tx->version > BTC_MAX_TX_VERSION)
+    THROW("version", 0, 0);
+
+  if (btc_tx_weight(tx) > BTC_MAX_TX_WEIGHT)
+    THROW("tx-size", 0, 0);
+
+  for (i = 0; i < tx->inputs.length; i++) {
+    input = tx->inputs.items[i];
+
+    if (input->script.length > 1650)
+      THROW("scriptsig-size", 0, 0);
+
+    if (!btc_script_is_push_only(&input->script))
+      THROW("scriptsig-not-pushonly", 0, 0);
+  }
+
+  for (i = 0; i < tx->outputs.length; i++) {
+    output = tx->outputs.items[i];
+
+    if (!btc_script_is_standard(&output->script))
+      THROW("scriptpubkey", 0, 0);
+
+    if (btc_script_is_nulldata(&output->script)) {
+      nulldata++;
+      continue;
+    }
+
+#if !BTC_BARE_MULTISIG
+    if (btc_script_is_multisig(&output->script))
+      THROW("bare-multisig", 0, 0);
+#endif
+
+    if (btc_output_is_dust(output, BTC_MIN_RELAY))
+      THROW("dust", 0, 0);
+  }
+
+  if (nulldata > 1)
+    THROW("multi-op-return", 0, 0);
+
+  return 1;
+}
+
 #undef THROW
+
+int
+btc_tx_has_standard_inputs(const btc_tx_t *tx, const btc_view_t *view) {
+  const btc_input_t *input;
+  const btc_coin_t *coin;
+  btc_script_t redeem;
+  size_t i;
+
+  if (btc_tx_is_coinbase(tx))
+    return 1;
+
+  for (i = 0; i < tx->inputs.length; i++) {
+    input = tx->inputs.items[i];
+    coin = btc_view_get(view, &input->prevout);
+
+    if (coin == NULL)
+      return 0;
+
+    if (btc_script_is_p2pkh(&coin->output.script))
+      continue;
+
+    if (btc_script_is_p2sh(&coin->output.script)) {
+      if (!btc_script_get_redeem(&redeem, &input->script))
+        return 0;
+
+      if (btc_script_sigops(&redeem, 1) > BTC_MAX_P2SH_SIGOPS)
+        return 0;
+
+      continue;
+    }
+
+    if (btc_script_is_unknown(&coin->output.script))
+      return 0;
+  }
+
+  return 1;
+}
+
+int
+btc_tx_has_standard_witness(const btc_tx_t *tx, const btc_view_t *view) {
+  const btc_input_t *input;
+  const btc_stack_t *witness;
+  const btc_coin_t *coin;
+  const btc_script_t *redeem;
+  btc_multisig_t multi;
+  btc_script_t prev;
+  size_t i, j;
+
+  if (btc_tx_is_coinbase(tx))
+    return 1;
+
+  for (i = 0; i < tx->inputs.length; i++) {
+    input = tx->inputs.items[i];
+    witness = &input->witness;
+
+    if (witness->length == 0)
+      continue;
+
+    coin = btc_view_get(view, &input->prevout);
+
+    if (coin == NULL)
+      return 0;
+
+    btc_script_rocopy(&prev, &coin->output.script);
+
+    if (btc_script_is_p2sh(&prev)) {
+      if (!btc_script_get_redeem(&prev, &input->script))
+        return 0;
+    }
+
+    if (!btc_script_is_program(&prev))
+      return 0;
+
+    if (btc_script_is_p2wpkh(&prev)) {
+      if (witness->length != 2)
+        return 0;
+
+      if (witness->items[0]->length > 73)
+        return 0;
+
+      if (witness->items[1]->length > 65)
+        return 0;
+
+      continue;
+    }
+
+    if (btc_script_is_p2wsh(&prev)) {
+      if (witness->length - 1 > BTC_MAX_P2WSH_STACK)
+        return 0;
+
+      for (j = 0; j < witness->length - 1; j++) {
+        if (witness->items[j]->length > BTC_MAX_P2WSH_PUSH)
+          return 0;
+      }
+
+      redeem = btc_stack_top(witness);
+
+      if (redeem->length > BTC_MAX_P2WSH_SIZE)
+        return 0;
+
+      if (btc_script_is_p2pk(redeem)) {
+        if (witness->length - 1 != 1)
+          return 0;
+
+        if (witness->items[0]->length > 73)
+          return 0;
+
+        continue;
+      }
+
+      if (btc_script_is_p2pkh(redeem)) {
+        if (witness->length - 1 != 2)
+          return 0;
+
+        if (witness->items[0]->length > 73)
+          return 0;
+
+        if (witness->items[1]->length > 65)
+          return 0;
+
+        continue;
+      }
+
+      if (btc_script_get_multisig(&multi, redeem)) {
+        if (witness->length - 1 != (size_t)multi.m + 1)
+          return 0;
+
+        if (witness->items[0]->length != 0)
+          return 0;
+
+        for (j = 1; j < witness->length - 1; j++) {
+          if (witness->items[j]->length > 73)
+            return 0;
+        }
+
+        continue;
+      }
+    }
+
+    if (witness->length > BTC_MAX_P2WSH_STACK)
+      return 0;
+
+    for (j = 0; j < witness->length; j++) {
+      if (witness->items[j]->length > BTC_MAX_P2WSH_PUSH)
+        return 0;
+    }
+  }
+
+  return 1;
+}
 
 size_t
 btc_tx_base_size(const btc_tx_t *tx) {
