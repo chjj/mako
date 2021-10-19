@@ -2414,8 +2414,6 @@ btc_script_execute(const btc_script_t *script,
         if (!btc_stack_get_int(&n, stack, -i, minimal, 4))
           THROW(BTC_SCRIPT_ERR_UNKNOWN_ERROR);
 
-        okey = n + 2;
-
         if (n < 0 || n > BTC_MAX_MULTISIG_PUBKEYS)
           THROW(BTC_SCRIPT_ERR_PUBKEY_COUNT);
 
@@ -2426,6 +2424,7 @@ btc_script_execute(const btc_script_t *script,
 
         i += 1;
         ikey = i;
+        okey = n + 2;
         i += n;
 
         if (stack->length < (size_t)i)
