@@ -1334,7 +1334,7 @@ btc_mempool_handle_reorg(btc_mempool_t *mp) {
   unsigned int flags = BTC_CHAIN_STANDARD_LOCKTIME_FLAGS;
   const btc_entry_t *tip = btc_chain_tip(mp->chain);
   int64_t mtp = btc_entry_median_time(tip);
-  int32_t height = tip->height;
+  int32_t height = tip->height + 1;
   btc_hashmapiter_t iter;
 
   btc_hashmap_iterate(&iter, mp->map);
