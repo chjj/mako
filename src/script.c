@@ -16,6 +16,7 @@
 #include <satoshi/policy.h>
 #include <satoshi/script.h>
 #include <satoshi/tx.h>
+#include <satoshi/vector.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -2668,7 +2669,25 @@ btc_reader_op(btc_reader_t *z) {
  * Writer
  */
 
-DEFINE_VECTOR(btc_writer, btc_opcode, SCOPE_EXTERN)
+void
+btc_writer_init(btc_writer_t *z) {
+  btc_vector_init(z);
+}
+
+void
+btc_writer_clear(btc_writer_t *z) {
+  size_t i;
+
+  for (i = 0; i < z->length; i++)
+    btc_opcode_destroy(z->items[i]);
+
+  btc_vector_clear(z);
+}
+
+void
+btc_writer_push(btc_writer_t *z, btc_opcode_t *x) {
+  btc_vector_push(z, x);
+}
 
 void
 btc_writer_push_op(btc_writer_t *z, int value) {

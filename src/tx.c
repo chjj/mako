@@ -962,7 +962,7 @@ btc_tx_check_standard(btc_verify_error_t *err, const btc_tx_t *tx) {
   if (tx->version < 1 || tx->version > BTC_MAX_TX_VERSION)
     THROW("version", 0, 0);
 
-  if (btc_tx_weight(tx) > BTC_MAX_TX_WEIGHT)
+  if (btc_tx_weight(tx) >= BTC_MAX_TX_WEIGHT)
     THROW("tx-size", 0, 0);
 
   for (i = 0; i < tx->inputs.length; i++) {
@@ -1188,14 +1188,14 @@ btc_tx_matches(const btc_tx_t *tx, const btc_bloom_t *filter) {
   int found = 0;
   size_t i;
 
-  btc_raw_write(raw, tx->hash, 32);
-
   /* 1. Test the tx hash. */
   if (btc_bloom_has(filter, tx->hash, 32))
     found = 1;
 
   /* 2. Test data elements in output scripts
         (may need to update filter on match). */
+  btc_raw_write(raw, tx->hash, 32);
+
   for (i = 0; i < tx->outputs.length; i++) {
     output = tx->outputs.items[i];
 

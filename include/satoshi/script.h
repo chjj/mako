@@ -565,7 +565,14 @@ btc_reader_op(btc_reader_t *z);
  * Writer
  */
 
-BTC_DEFINE_VECTOR(btc_writer, btc_opcode, BTC_EXTERN)
+BTC_EXTERN void
+btc_writer_init(btc_writer_t *z);
+
+BTC_EXTERN void
+btc_writer_clear(btc_writer_t *z);
+
+BTC_EXTERN void
+btc_writer_push(btc_writer_t *z, btc_opcode_t *x);
 
 BTC_EXTERN void
 btc_writer_push_op(btc_writer_t *z, int value);

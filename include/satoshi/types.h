@@ -73,11 +73,7 @@ typedef struct btc_reader_s {
   size_t length;
 } btc_reader_t;
 
-typedef struct btc_writer_s {
-  btc_opcode_t **items;
-  size_t alloc;
-  size_t length;
-} btc_writer_t;
+typedef btc_vector_t btc_writer_t;
 
 typedef struct btc_outpoint_s {
   uint8_t hash[32];
