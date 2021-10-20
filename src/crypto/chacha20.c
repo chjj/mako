@@ -76,7 +76,6 @@ btc_chacha20_init(btc_chacha20_t *ctx,
 
 static void
 chacha20_block(btc_chacha20_t *ctx, uint32_t *stream) {
-  static const unsigned long endian_check = 1;
   int i;
 
   for (i = 0; i < 16; i++)
@@ -96,10 +95,10 @@ chacha20_block(btc_chacha20_t *ctx, uint32_t *stream) {
   for (i = 0; i < 16; i++)
     stream[i] += ctx->state[i];
 
-  if (*((const unsigned char *)&endian_check) == 0) {
-    for (i = 0; i < 16; i++)
-      stream[i] = btc_bswap32(stream[i]);
-  }
+#ifdef BTC_BIGENDIAN
+  for (i = 0; i < 16; i++)
+    stream[i] = btc_bswap32(stream[i]);
+#endif
 
   ctx->state[12] += 1;
   ctx->state[13] += (ctx->state[12] < 1);

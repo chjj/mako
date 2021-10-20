@@ -385,7 +385,7 @@ btc_addrman_clear_banned(btc_addrman_t *man) {
 const btc_addrent_t *
 btc_addrman_get(btc_addrman_t *man) {
   btc_vector_t *buckets = NULL;
-  btc_addrent_t *entry;
+  btc_addrent_t *entry = NULL;
   double factor, num;
   size_t i, index;
   int64_t now;

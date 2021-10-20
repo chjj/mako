@@ -146,7 +146,7 @@ btc_netaddr_hash(const btc_netaddr_t *x) {
   uint8_t tmp[18];
 
   btc_raw_write(tmp, x->raw, 16);
-  btc_uint32_write(tmp + 16, x->port);
+  btc_uint16_write(tmp + 16, x->port);
 
   return btc_murmur3_sum(tmp, 18, 0xfba4c795);
 }
@@ -693,8 +693,8 @@ btc_netaddr_get_sockaddr(btc_sockaddr_t *z, const btc_netaddr_t *x) {
 int
 btc_netaddr_set_str(btc_netaddr_t *z, const char *xp) {
   char tmp[BTC_ADDRSTRLEN + 1];
-  const char *p = NULL;
-  char *t = tmp;
+  const char *pp = NULL;
+  const char *tp = xp;
   int port = 0;
   int len = 0;
   int sq = -1;
@@ -704,8 +704,8 @@ btc_netaddr_set_str(btc_netaddr_t *z, const char *xp) {
 
   btc_netaddr_init(z);
 
-  while (*t) {
-    int ch = *t++;
+  while (*tp) {
+    int ch = *tp++;
 
     if (ch == ']')
       sq = len;
@@ -737,7 +737,7 @@ btc_netaddr_set_str(btc_netaddr_t *z, const char *xp) {
       if (xp[sq + 1] != ':')
         return 0;
 
-      p = xp + sq + 2;
+      pp = xp + sq + 2;
     }
 
     family = 6;
@@ -746,7 +746,7 @@ btc_netaddr_set_str(btc_netaddr_t *z, const char *xp) {
 
     family = 6;
   } else if (co != -1) {
-    p = xp + co + 1;
+    pp = xp + co + 1;
 
     memcpy(tmp, xp, co);
 
@@ -759,11 +759,11 @@ btc_netaddr_set_str(btc_netaddr_t *z, const char *xp) {
     family = 4;
   }
 
-  if (p != NULL) {
+  if (pp != NULL) {
     len = 0;
 
-    while (*p) {
-      int ch = *p++;
+    while (*pp) {
+      int ch = *pp++;
 
       if (ch < '0' || ch > '9')
         return 0;

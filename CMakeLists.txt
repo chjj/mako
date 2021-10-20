@@ -146,6 +146,7 @@ else()
                              -Wall
                              -Wextra
                              -Wcast-align
+                             -Wno-format-overflow
                              -Wno-implicit-fallthrough
                              -Wno-long-long
                              -Wno-overlength-strings

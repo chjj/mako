@@ -379,8 +379,8 @@ btc_mempool_remove_orphan(btc_mempool_t *mp, const uint8_t *hash) {
 
 static int
 btc_mempool_limit_orphans(btc_mempool_t *mp) {
+  const uint8_t *hash = NULL;
   btc_hashmapiter_t iter;
-  const uint8_t *hash;
   size_t index;
 
   if (btc_hashmap_size(mp->orphans) < BTC_MEMPOOL_MAX_ORPHANS)
