@@ -458,7 +458,7 @@ btc_zinv_read(btc_zinv_t *z, const uint8_t **xp, size_t *xn) {
   for (i = 0; i < length; i++) {
     item = &z->items[i];
 
-    item->type = read32le(*xp);
+    item->type = btc_read32le(*xp);
     item->hash = *xp + 4;
 
     *xp += 36;

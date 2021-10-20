@@ -462,7 +462,7 @@ fresh_bucket(btc_addrman_t *man, const btc_addrent_t *entry) {
   btc_hash256_update(&ctx, btc_netaddr_groupkey(tmp, &entry->src), 6);
   btc_hash256_final(&ctx, hash1);
 
-  hash32 = read32le(hash1) % 64;
+  hash32 = btc_read32le(hash1) % 64;
 
   btc_hash256_init(&ctx);
   btc_hash256_update(&ctx, man->key, 32);
@@ -470,7 +470,7 @@ fresh_bucket(btc_addrman_t *man, const btc_addrent_t *entry) {
   btc_hash256_update(&ctx, &hash32, sizeof(hash32));
   btc_hash256_final(&ctx, hash2);
 
-  hash = read32le(hash2);
+  hash = btc_read32le(hash2);
   index = hash % man->fresh.length;
 
   return man->fresh.items[index];
@@ -490,7 +490,7 @@ used_bucket(btc_addrman_t *man, const btc_addrent_t *entry) {
   btc_hash256_update(&ctx, &entry->addr.port, sizeof(entry->addr.port));
   btc_hash256_final(&ctx, hash1);
 
-  hash32 = read32le(hash1) % 8;
+  hash32 = btc_read32le(hash1) % 8;
 
   btc_hash256_init(&ctx);
   btc_hash256_update(&ctx, man->key, 32);
@@ -498,7 +498,7 @@ used_bucket(btc_addrman_t *man, const btc_addrent_t *entry) {
   btc_hash256_update(&ctx, &hash32, sizeof(hash32));
   btc_hash256_final(&ctx, hash2);
 
-  hash = read32le(hash2);
+  hash = btc_read32le(hash2);
   index = hash % man->used.length;
 
   return man->used.items[index];

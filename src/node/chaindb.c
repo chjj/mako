@@ -763,7 +763,7 @@ btc_chaindb_read(btc_chaindb_t *db,
   if (!btc_fs_pread(fd, tmp, 4, pos + 16))
     goto fail;
 
-  size = 24 + read32le(tmp);
+  size = 24 + btc_read32le(tmp);
   data = (uint8_t *)malloc(size);
 
   if (data == NULL)

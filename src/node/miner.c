@@ -243,8 +243,8 @@ btc_tmpl_coinbase(const btc_tmpl_t *bt, uint32_t nonce1, uint32_t nonce2) {
   btc_writer_push_data(&writer, nonce_raw, 4);
 
   /* Extra nonce: incremented when the nonce overflows. */
-  write32be(extra_raw + 0, nonce1);
-  write32be(extra_raw + 4, nonce2);
+  btc_write32be(extra_raw + 0, nonce1);
+  btc_write32be(extra_raw + 4, nonce2);
   btc_writer_push_data(&writer, extra_raw, 8);
 
   /* Compile. */

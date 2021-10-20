@@ -39,7 +39,7 @@ ripemd160_transform(btc_ripemd160_t *ctx, const uint8_t *chunk) {
   int i;
 
   for (i = 0; i < 16; i++)
-    W[i] = read32le(chunk + i * 4);
+    W[i] = btc_read32le(chunk + i * 4);
 
   A = ctx->state[0];
   B = ctx->state[1];
@@ -328,12 +328,12 @@ btc_ripemd160_final(btc_ripemd160_t *ctx, uint8_t *out) {
   while (pos < 56)
     ctx->block[pos++] = 0x00;
 
-  write64le(ctx->block + 56, ctx->size << 3);
+  btc_write64le(ctx->block + 56, ctx->size << 3);
 
   ripemd160_transform(ctx, ctx->block);
 
   for (i = 0; i < 5; i++)
-    write32le(out + i * 4, ctx->state[i]);
+    btc_write32le(out + i * 4, ctx->state[i]);
 }
 
 void

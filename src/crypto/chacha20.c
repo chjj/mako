@@ -42,29 +42,29 @@ btc_chacha20_init(btc_chacha20_t *ctx,
   ctx->state[1] = key_len < 32 ? 0x3120646e : 0x3320646e;
   ctx->state[2] = key_len < 32 ? 0x79622d36 : 0x79622d32;
   ctx->state[3] = 0x6b206574;
-  ctx->state[4] = read32le(key + 0);
-  ctx->state[5] = read32le(key + 4);
-  ctx->state[6] = read32le(key + 8);
-  ctx->state[7] = read32le(key + 12);
-  ctx->state[8] = read32le(key + 16 % key_len);
-  ctx->state[9] = read32le(key + 20 % key_len);
-  ctx->state[10] = read32le(key + 24 % key_len);
-  ctx->state[11] = read32le(key + 28 % key_len);
+  ctx->state[4] = btc_read32le(key + 0);
+  ctx->state[5] = btc_read32le(key + 4);
+  ctx->state[6] = btc_read32le(key + 8);
+  ctx->state[7] = btc_read32le(key + 12);
+  ctx->state[8] = btc_read32le(key + 16 % key_len);
+  ctx->state[9] = btc_read32le(key + 20 % key_len);
+  ctx->state[10] = btc_read32le(key + 24 % key_len);
+  ctx->state[11] = btc_read32le(key + 28 % key_len);
   ctx->state[12] = counter;
 
   if (nonce_len == 8) {
     ctx->state[13] = counter >> 32;
-    ctx->state[14] = read32le(nonce + 0);
-    ctx->state[15] = read32le(nonce + 4);
+    ctx->state[14] = btc_read32le(nonce + 0);
+    ctx->state[15] = btc_read32le(nonce + 4);
   } else if (nonce_len == 12) {
-    ctx->state[13] = read32le(nonce + 0);
-    ctx->state[14] = read32le(nonce + 4);
-    ctx->state[15] = read32le(nonce + 8);
+    ctx->state[13] = btc_read32le(nonce + 0);
+    ctx->state[14] = btc_read32le(nonce + 4);
+    ctx->state[15] = btc_read32le(nonce + 8);
   } else if (nonce_len == 16) {
-    ctx->state[12] = read32le(nonce + 0);
-    ctx->state[13] = read32le(nonce + 4);
-    ctx->state[14] = read32le(nonce + 8);
-    ctx->state[15] = read32le(nonce + 12);
+    ctx->state[12] = btc_read32le(nonce + 0);
+    ctx->state[13] = btc_read32le(nonce + 4);
+    ctx->state[14] = btc_read32le(nonce + 8);
+    ctx->state[15] = btc_read32le(nonce + 12);
   } else {
     btc_abort(); /* LCOV_EXCL_LINE */
   }

@@ -26,7 +26,7 @@ btc_murmur3_sum(const uint8_t *data, size_t len, uint32_t seed) {
   size_t left = len;
 
   while (left >= 4) {
-    k1 = read32le(data);
+    k1 = btc_read32le(data);
 
     k1 *= c1;
     k1 = ROTL32(k1, 15);

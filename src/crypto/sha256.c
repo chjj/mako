@@ -95,7 +95,7 @@ sha256_transform(btc_sha256_t *ctx, const uint8_t *chunk) {
  */
 #define R(a, b, c, d, e, f, g, h, i, k) do { \
   if (i < 16) /* Optimized out. */           \
-    w = read32be(chunk + i * 4);             \
+    w = btc_read32be(chunk + i * 4);         \
   else                                       \
     w = WORD(i);                             \
                                              \
@@ -239,12 +239,12 @@ btc_sha256_final(btc_sha256_t *ctx, uint8_t *out) {
   while (pos < 56)
     ctx->block[pos++] = 0x00;
 
-  write64be(ctx->block + 56, ctx->size << 3);
+  btc_write64be(ctx->block + 56, ctx->size << 3);
 
   sha256_transform(ctx, ctx->block);
 
   for (i = 0; i < 8; i++)
-    write32be(out + i * 4, ctx->state[i]);
+    btc_write32be(out + i * 4, ctx->state[i]);
 }
 
 void

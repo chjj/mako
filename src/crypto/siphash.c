@@ -53,8 +53,8 @@
 
 uint64_t
 btc_siphash_sum(const uint8_t *data, size_t size, const uint8_t *key) {
-  uint64_t k0 = read64le(key + 0);
-  uint64_t k1 = read64le(key + 8);
+  uint64_t k0 = btc_read64le(key + 0);
+  uint64_t k1 = btc_read64le(key + 8);
   uint64_t v0 = k0 ^ UINT64_C(0x736f6d6570736575);
   uint64_t v1 = k1 ^ UINT64_C(0x646f72616e646f6d);
   uint64_t v2 = k0 ^ UINT64_C(0x6c7967656e657261);
@@ -64,7 +64,7 @@ btc_siphash_sum(const uint8_t *data, size_t size, const uint8_t *key) {
   uint64_t w;
 
   while (size >= 8) {
-    w = read64le(data);
+    w = btc_read64le(data);
 
     v3 ^= w;
     SIPROUND;

@@ -36,5 +36,5 @@ uint32_t
 btc_checksum(const void *data, size_t size) {
   uint8_t hash[32];
   btc_hash256(hash, data, size);
-  return read32le(hash);
+  return btc_read32le(hash);
 }
