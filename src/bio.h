@@ -9,6 +9,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include "internal.h"
 
 /*
@@ -16,55 +17,85 @@
  */
 
 static BTC_INLINE uint16_t
-read16le(const uint8_t *src) {
-  return ((uint16_t)src[1] << 8)
-       | ((uint16_t)src[0] << 0);
+read16le(const uint8_t *xp) {
+#if defined(BTC_BIGENDIAN)
+  return ((uint16_t)xp[0] << 0)
+       | ((uint16_t)xp[1] << 8);
+#else
+  uint16_t z;
+  memcpy(&z, xp, sizeof(z));
+  return z;
+#endif
 }
 
 static BTC_INLINE void
-write16le(uint8_t *dst, uint16_t w) {
-  dst[1] = w >> 8;
-  dst[0] = w >> 0;
+write16le(uint8_t *zp, uint16_t x) {
+#if defined(BTC_BIGENDIAN)
+  zp[0] = (x >> 0);
+  zp[1] = (x >> 8);
+#else
+  memcpy(zp, &x, sizeof(x));
+#endif
 }
 
 static BTC_INLINE uint32_t
-read32le(const uint8_t *src) {
-  return ((uint32_t)src[3] << 24)
-       | ((uint32_t)src[2] << 16)
-       | ((uint32_t)src[1] <<  8)
-       | ((uint32_t)src[0] <<  0);
+read32le(const uint8_t *xp) {
+#if defined(BTC_BIGENDIAN)
+  return ((uint32_t)xp[0] <<  0)
+       | ((uint32_t)xp[1] <<  8)
+       | ((uint32_t)xp[2] << 16)
+       | ((uint32_t)xp[3] << 24);
+#else
+  uint32_t z;
+  memcpy(&z, xp, sizeof(z));
+  return z;
+#endif
 }
 
 static BTC_INLINE void
-write32le(uint8_t *dst, uint32_t w) {
-  dst[3] = w >> 24;
-  dst[2] = w >> 16;
-  dst[1] = w >>  8;
-  dst[0] = w >>  0;
+write32le(uint8_t *zp, uint32_t x) {
+#if defined(BTC_BIGENDIAN)
+  zp[0] = (x >>  0);
+  zp[1] = (x >>  8);
+  zp[2] = (x >> 16);
+  zp[3] = (x >> 24);
+#else
+  memcpy(zp, &x, sizeof(x));
+#endif
 }
 
 static BTC_INLINE uint64_t
-read64le(const uint8_t *src) {
-  return ((uint64_t)src[7] << 56)
-       | ((uint64_t)src[6] << 48)
-       | ((uint64_t)src[5] << 40)
-       | ((uint64_t)src[4] << 32)
-       | ((uint64_t)src[3] << 24)
-       | ((uint64_t)src[2] << 16)
-       | ((uint64_t)src[1] <<  8)
-       | ((uint64_t)src[0] <<  0);
+read64le(const uint8_t *xp) {
+#if defined(BTC_BIGENDIAN)
+  return ((uint64_t)xp[0] <<  0)
+       | ((uint64_t)xp[1] <<  8)
+       | ((uint64_t)xp[2] << 16)
+       | ((uint64_t)xp[3] << 24)
+       | ((uint64_t)xp[4] << 32)
+       | ((uint64_t)xp[5] << 40)
+       | ((uint64_t)xp[6] << 48)
+       | ((uint64_t)xp[7] << 56);
+#else
+  uint64_t z;
+  memcpy(&z, xp, sizeof(z));
+  return z;
+#endif
 }
 
 static BTC_INLINE void
-write64le(uint8_t *dst, uint64_t w) {
-  dst[7] = w >> 56;
-  dst[6] = w >> 48;
-  dst[5] = w >> 40;
-  dst[4] = w >> 32;
-  dst[3] = w >> 24;
-  dst[2] = w >> 16;
-  dst[1] = w >>  8;
-  dst[0] = w >>  0;
+write64le(uint8_t *zp, uint64_t x) {
+#if defined(BTC_BIGENDIAN)
+  zp[0] = (x >>  0);
+  zp[1] = (x >>  8);
+  zp[2] = (x >> 16);
+  zp[3] = (x >> 24);
+  zp[4] = (x >> 32);
+  zp[5] = (x >> 40);
+  zp[6] = (x >> 48);
+  zp[7] = (x >> 56);
+#else
+  memcpy(zp, &x, sizeof(x));
+#endif
 }
 
 /*
@@ -72,55 +103,85 @@ write64le(uint8_t *dst, uint64_t w) {
  */
 
 static BTC_INLINE uint16_t
-read16be(const uint8_t *src) {
-  return ((uint16_t)src[0] << 8)
-       | ((uint16_t)src[1] << 0);
+read16be(const uint8_t *xp) {
+#if defined(BTC_BIGENDIAN)
+  uint16_t z;
+  memcpy(&z, xp, sizeof(z));
+  return z;
+#else
+  return ((uint16_t)xp[0] << 8)
+       | ((uint16_t)xp[1] << 0);
+#endif
 }
 
 static BTC_INLINE void
-write16be(uint8_t *dst, uint16_t w) {
-  dst[0] = w >> 8;
-  dst[1] = w >> 0;
+write16be(uint8_t *zp, uint16_t x) {
+#if defined(BTC_BIGENDIAN)
+  memcpy(zp, &x, sizeof(x));
+#else
+  zp[0] = (x >> 8);
+  zp[1] = (x >> 0);
+#endif
 }
 
 static BTC_INLINE uint32_t
-read32be(const uint8_t *src) {
-  return ((uint32_t)src[0] << 24)
-       | ((uint32_t)src[1] << 16)
-       | ((uint32_t)src[2] <<  8)
-       | ((uint32_t)src[3] <<  0);
+read32be(const uint8_t *xp) {
+#if defined(BTC_BIGENDIAN)
+  uint32_t z;
+  memcpy(&z, xp, sizeof(z));
+  return z;
+#else
+  return ((uint32_t)xp[0] << 24)
+       | ((uint32_t)xp[1] << 16)
+       | ((uint32_t)xp[2] <<  8)
+       | ((uint32_t)xp[3] <<  0);
+#endif
 }
 
 static BTC_INLINE void
-write32be(uint8_t *dst, uint32_t w) {
-  dst[0] = w >> 24;
-  dst[1] = w >> 16;
-  dst[2] = w >>  8;
-  dst[3] = w >>  0;
+write32be(uint8_t *zp, uint32_t x) {
+#if defined(BTC_BIGENDIAN)
+  memcpy(zp, &x, sizeof(x));
+#else
+  zp[0] = (x >> 24);
+  zp[1] = (x >> 16);
+  zp[2] = (x >>  8);
+  zp[3] = (x >>  0);
+#endif
 }
 
 static BTC_INLINE uint64_t
-read64be(const uint8_t *src) {
-  return ((uint64_t)src[0] << 56)
-       | ((uint64_t)src[1] << 48)
-       | ((uint64_t)src[2] << 40)
-       | ((uint64_t)src[3] << 32)
-       | ((uint64_t)src[4] << 24)
-       | ((uint64_t)src[5] << 16)
-       | ((uint64_t)src[6] <<  8)
-       | ((uint64_t)src[7] <<  0);
+read64be(const uint8_t *xp) {
+#if defined(BTC_BIGENDIAN)
+  uint64_t z;
+  memcpy(&z, xp, sizeof(z));
+  return z;
+#else
+  return ((uint64_t)xp[0] << 56)
+       | ((uint64_t)xp[1] << 48)
+       | ((uint64_t)xp[2] << 40)
+       | ((uint64_t)xp[3] << 32)
+       | ((uint64_t)xp[4] << 24)
+       | ((uint64_t)xp[5] << 16)
+       | ((uint64_t)xp[6] <<  8)
+       | ((uint64_t)xp[7] <<  0);
+#endif
 }
 
 static BTC_INLINE void
-write64be(uint8_t *dst, uint64_t w) {
-  dst[0] = w >> 56;
-  dst[1] = w >> 48;
-  dst[2] = w >> 40;
-  dst[3] = w >> 32;
-  dst[4] = w >> 24;
-  dst[5] = w >> 16;
-  dst[6] = w >>  8;
-  dst[7] = w >>  0;
+write64be(uint8_t *zp, uint64_t x) {
+#if defined(BTC_BIGENDIAN)
+  memcpy(zp, &x, sizeof(x));
+#else
+  zp[0] = (x >> 56);
+  zp[1] = (x >> 48);
+  zp[2] = (x >> 40);
+  zp[3] = (x >> 32);
+  zp[4] = (x >> 24);
+  zp[5] = (x >> 16);
+  zp[6] = (x >>  8);
+  zp[7] = (x >>  0);
+#endif
 }
 
 /*

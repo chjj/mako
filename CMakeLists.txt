@@ -6,6 +6,7 @@ cmake_minimum_required(VERSION 3.4)
 project(satoshi LANGUAGES C)
 
 include(CTest)
+include(TestBigEndian)
 
 set(satoshi_sources)
 set(satoshi_defines)
@@ -120,6 +121,12 @@ else()
     list(APPEND satoshi_defines BTC_TLS=__thread)
   endif()
   list(APPEND satoshi_defines _GNU_SOURCE)
+endif()
+
+test_big_endian(BTC_BIGENDIAN)
+
+if(BTC_BIGENDIAN)
+  list(APPEND satoshi_defines BTC_BIGENDIAN)
 endif()
 
 if(NOT CMAKE_CROSSCOMPILING)

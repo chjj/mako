@@ -20,11 +20,8 @@ extern "C" {
  * Hash160
  */
 
-BTC_EXTERN void
-btc_hash160_init(btc_hash160_t *ctx);
-
-BTC_EXTERN void
-btc_hash160_update(btc_hash160_t *ctx, const void *data, size_t len);
+#define btc_hash160_init btc_sha256_init
+#define btc_hash160_update btc_sha256_update
 
 BTC_EXTERN void
 btc_hash160_final(btc_hash160_t *ctx, uint8_t *out);
@@ -36,11 +33,8 @@ btc_hash160(uint8_t *out, const void *data, size_t size);
  * Hash256
  */
 
-BTC_EXTERN void
-btc_hash256_init(btc_hash256_t *ctx);
-
-BTC_EXTERN void
-btc_hash256_update(btc_hash256_t *ctx, const void *data, size_t len);
+#define btc_hash256_init btc_sha256_init
+#define btc_hash256_update btc_sha256_update
 
 BTC_EXTERN void
 btc_hash256_final(btc_hash256_t *ctx, uint8_t *out);

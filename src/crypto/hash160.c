@@ -17,16 +17,6 @@
  */
 
 void
-btc_hash160_init(btc_hash160_t *ctx) {
-  btc_sha256_init(ctx);
-}
-
-void
-btc_hash160_update(btc_hash160_t *ctx, const void *data, size_t len) {
-  btc_sha256_update(ctx, data, len);
-}
-
-void
 btc_hash160_final(btc_hash160_t *ctx, uint8_t *out) {
   btc_ripemd160_t rmd;
   uint8_t tmp[32];
