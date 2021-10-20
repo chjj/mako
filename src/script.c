@@ -420,28 +420,24 @@ btc_opcode_write(uint8_t *zp, const btc_opcode_t *x) {
     return zp;
   }
 
+  zp = btc_uint8_write(zp, x->value);
+
   switch (x->value) {
     case BTC_OP_PUSHDATA1:
-      zp = btc_uint8_write(zp, x->value);
       zp = btc_uint8_write(zp, x->length);
-      zp = btc_raw_write(zp, x->data, x->length);
       break;
     case BTC_OP_PUSHDATA2:
-      zp = btc_uint8_write(zp, x->value);
       zp = btc_uint16_write(zp, x->length);
-      zp = btc_raw_write(zp, x->data, x->length);
       break;
     case BTC_OP_PUSHDATA4:
-      zp = btc_uint8_write(zp, x->value);
       zp = btc_uint32_write(zp, x->length);
-      zp = btc_raw_write(zp, x->data, x->length);
       break;
     default:
       CHECK((size_t)x->value == x->length);
-      zp = btc_uint8_write(zp, x->value);
-      zp = btc_raw_write(zp, x->data, x->length);
       break;
   }
+
+  zp = btc_raw_write(zp, x->data, x->length);
 
   return zp;
 }
@@ -449,6 +445,7 @@ btc_opcode_write(uint8_t *zp, const btc_opcode_t *x) {
 int
 btc_opcode_read(btc_opcode_t *z, const uint8_t **xp, size_t *xn) {
   uint8_t value;
+  size_t length;
 
   z->value = BTC_OP_INVALIDOPCODE;
   z->data = NULL;
@@ -464,76 +461,53 @@ btc_opcode_read(btc_opcode_t *z, const uint8_t **xp, size_t *xn) {
 
   switch (value) {
     case BTC_OP_PUSHDATA1: {
-      uint8_t length;
+      uint8_t len8;
 
-      if (!btc_uint8_read(&length, xp, xn))
+      if (!btc_uint8_read(&len8, xp, xn))
         return 0;
 
-      if (*xn < length)
-        return 0;
-
-      z->value = value;
-      z->data = *xp;
-      z->length = length;
-
-      *xp += length;
-      *xn -= length;
+      length = len8;
 
       break;
     }
 
     case BTC_OP_PUSHDATA2: {
-      uint16_t length;
+      uint16_t len16;
 
-      if (!btc_uint16_read(&length, xp, xn))
+      if (!btc_uint16_read(&len16, xp, xn))
         return 0;
 
-      if (*xn < length)
-        return 0;
-
-      z->value = value;
-      z->data = *xp;
-      z->length = length;
-
-      *xp += length;
-      *xn -= length;
+      length = len16;
 
       break;
     }
 
     case BTC_OP_PUSHDATA4: {
-      uint32_t length;
+      uint32_t len32;
 
-      if (!btc_uint32_read(&length, xp, xn))
+      if (!btc_uint32_read(&len32, xp, xn))
         return 0;
 
-      if (*xn < length)
-        return 0;
-
-      z->value = value;
-      z->data = *xp;
-      z->length = length;
-
-      *xp += length;
-      *xn -= length;
+      length = len32;
 
       break;
     }
 
     default: {
-      if (*xn < value)
-        return 0;
-
-      z->value = value;
-      z->data = *xp;
-      z->length = value;
-
-      *xp += value;
-      *xn -= value;
-
+      length = value;
       break;
     }
   }
+
+  if (*xn < length)
+    return 0;
+
+  z->value = value;
+  z->data = *xp;
+  z->length = length;
+
+  *xp += length;
+  *xn -= length;
 
   return 1;
 }
@@ -2684,9 +2658,9 @@ btc_reader_next(btc_opcode_t *z, btc_reader_t *x) {
 }
 
 int
-btc_reader_op(btc_reader_t *x) {
+btc_reader_op(btc_reader_t *z) {
   btc_opcode_t op;
-  btc_reader_next(&op, x);
+  btc_reader_next(&op, z);
   return op.value;
 }
 

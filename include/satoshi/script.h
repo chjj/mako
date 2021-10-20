@@ -559,7 +559,7 @@ BTC_EXTERN int
 btc_reader_next(btc_opcode_t *z, btc_reader_t *x);
 
 BTC_EXTERN int
-btc_reader_op(btc_reader_t *x);
+btc_reader_op(btc_reader_t *z);
 
 /*
  * Writer
