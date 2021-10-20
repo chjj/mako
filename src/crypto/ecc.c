@@ -882,7 +882,7 @@ fe_neg(fe_t z, const fe_t x) {
   fiat_secp256k1_carry(z, z);
 }
 
-static BTC_INLINE void
+BTC_UNUSED static BTC_INLINE void
 fe_neg_nc(fe_t z, const fe_t x) {
   fiat_secp256k1_opp(z, x);
 }
