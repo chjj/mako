@@ -312,9 +312,6 @@ BTC_EXTERN void
 btc_stack_push_num(btc_stack_t *stack, int64_t num);
 
 BTC_EXTERN void
-btc_stack_push_int(btc_stack_t *stack, int num);
-
-BTC_EXTERN void
 btc_stack_push_bool(btc_stack_t *stack, int value);
 
 /*
@@ -346,6 +343,9 @@ btc_opcode_is_branch(const btc_opcode_t *x);
 
 BTC_EXTERN void
 btc_opcode_set_push(btc_opcode_t *z, const uint8_t *data, size_t length);
+
+BTC_EXTERN void
+btc_opcode_set_num(btc_opcode_t *z, int64_t value, uint8_t *scratch);
 
 BTC_EXTERN size_t
 btc_opcode_size(const btc_opcode_t *x);
@@ -574,13 +574,7 @@ BTC_EXTERN void
 btc_writer_push_data(btc_writer_t *z, const uint8_t *data, size_t length);
 
 BTC_EXTERN void
-btc_writer_push_smi(btc_writer_t *z, int value);
-
-BTC_EXTERN void
 btc_writer_push_num(btc_writer_t *z, int64_t value, uint8_t *scratch);
-
-BTC_EXTERN void
-btc_writer_push_int(btc_writer_t *z, int value, uint8_t *scratch);
 
 BTC_EXTERN void
 btc_writer_compile(btc_script_t *z, const btc_writer_t *x);

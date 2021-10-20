@@ -231,7 +231,7 @@ btc_tmpl_coinbase(const btc_tmpl_t *bt, uint32_t nonce1, uint32_t nonce2) {
   input = btc_input_create();
 
   /* Height (required in v2+ blocks) */
-  btc_writer_push_int(&writer, bt->height, height_raw);
+  btc_writer_push_num(&writer, bt->height, height_raw);
 
   /* Coinbase flags. */
   CHECK(bt->cbflags.length <= 70);

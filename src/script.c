@@ -191,11 +191,6 @@ btc_stack_push_num(btc_stack_t *stack, int64_t num) {
 }
 
 void
-btc_stack_push_int(btc_stack_t *stack, int num) {
-  btc_stack_push_num(stack, num);
-}
-
-void
 btc_stack_push_bool(btc_stack_t *stack, int value) {
   static const uint8_t one[1] = {1};
   btc_buffer_t *item = btc_buffer_create();
@@ -388,6 +383,17 @@ btc_opcode_set_push(btc_opcode_t *z, const uint8_t *data, size_t length) {
 
   z->data = data;
   z->length = length;
+}
+
+void
+btc_opcode_set_num(btc_opcode_t *z, int64_t value, uint8_t *scratch) {
+  if (value >= -1 && value <= 16) {
+    z->value = value == 0 ? BTC_OP_0 : value + 0x50;
+    z->data = NULL;
+    z->length = 0;
+  } else {
+    btc_opcode_set_push(z, scratch, btc_scriptnum_export(scratch, value));
+  }
 }
 
 size_t
@@ -1610,7 +1616,7 @@ btc_script_execute(const btc_script_t *script,
 
     switch (op.value) {
       case BTC_OP_1NEGATE: {
-        btc_stack_push_int(stack, -1);
+        btc_stack_push_num(stack, -1);
         break;
       }
       case BTC_OP_1:
@@ -1629,7 +1635,7 @@ btc_script_execute(const btc_script_t *script,
       case BTC_OP_14:
       case BTC_OP_15:
       case BTC_OP_16: {
-        btc_stack_push_int(stack, op.value - 0x50);
+        btc_stack_push_num(stack, op.value - 0x50);
         break;
       }
       case BTC_OP_NOP: {
@@ -1878,7 +1884,7 @@ btc_script_execute(const btc_script_t *script,
         break;
       }
       case BTC_OP_DEPTH: {
-        btc_stack_push_int(stack, stack->length);
+        btc_stack_push_num(stack, stack->length);
         break;
       }
       case BTC_OP_DROP: {
@@ -1987,7 +1993,7 @@ btc_script_execute(const btc_script_t *script,
 
         val = btc_stack_get(stack, -1);
 
-        btc_stack_push_int(stack, val->length);
+        btc_stack_push_num(stack, val->length);
 
         break;
       }
@@ -2709,33 +2715,12 @@ btc_writer_push_data(btc_writer_t *z, const uint8_t *data, size_t length) {
 }
 
 void
-btc_writer_push_smi(btc_writer_t *z, int value) {
-  if (value == -1)
-    btc_writer_push_op(z, BTC_OP_1NEGATE);
-  else if (value == 0)
-    btc_writer_push_op(z, BTC_OP_0);
-  else if (value <= 16)
-    btc_writer_push_op(z, BTC_OP_RESERVED + value);
-  else
-    btc_abort(); /* LCOV_EXCL_LINE */
-}
-
-void
 btc_writer_push_num(btc_writer_t *z, int64_t value, uint8_t *scratch) {
-  size_t len;
+  btc_opcode_t *op = btc_opcode_create();
 
-  if (value >= -1 && value <= 16) {
-    btc_writer_push_smi(z, value);
-  } else {
-    len = btc_scriptnum_export(scratch, value);
+  btc_opcode_set_num(op, value, scratch);
 
-    btc_writer_push_data(z, scratch, len);
-  }
-}
-
-void
-btc_writer_push_int(btc_writer_t *z, int value, uint8_t *scratch) {
-  btc_writer_push_num(z, value, scratch);
+  btc_writer_push(z, op);
 }
 
 void
