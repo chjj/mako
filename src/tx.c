@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <satoshi/bloom.h>
 #include <satoshi/coins.h>
 #include <satoshi/consensus.h>
 #include <satoshi/crypto/ecc.h>
@@ -962,7 +963,7 @@ btc_tx_check_standard(btc_verify_error_t *err, const btc_tx_t *tx) {
   if (tx->version < 1 || tx->version > BTC_MAX_TX_VERSION)
     THROW("version", 0, 0);
 
-  if (btc_tx_weight(tx) >= BTC_MAX_TX_WEIGHT)
+  if (btc_tx_weight(tx) > BTC_MAX_TX_WEIGHT)
     THROW("tx-size", 0, 0);
 
   for (i = 0; i < tx->inputs.length; i++) {
@@ -1046,8 +1047,8 @@ btc_tx_has_standard_witness(const btc_tx_t *tx, const btc_view_t *view) {
   const btc_stack_t *witness;
   const btc_coin_t *coin;
   const btc_script_t *redeem;
-  btc_multisig_t multi;
   btc_script_t prev;
+  unsigned int m;
   size_t i, j;
 
   if (btc_tx_is_coinbase(tx))
@@ -1125,8 +1126,8 @@ btc_tx_has_standard_witness(const btc_tx_t *tx, const btc_view_t *view) {
         continue;
       }
 
-      if (btc_script_get_multisig(&multi, redeem)) {
-        if (witness->length - 1 != (size_t)multi.m + 1)
+      if (btc_script_get_multisig(&m, NULL, NULL, redeem)) {
+        if (witness->length - 1 != m + 1)
           return 0;
 
         if (witness->items[0]->length != 0)
@@ -1153,8 +1154,7 @@ btc_tx_has_standard_witness(const btc_tx_t *tx, const btc_view_t *view) {
   return 1;
 }
 
-#if 0
-int
+static int
 btc_script_matches(const btc_script_t *script, const btc_bloom_t *filter) {
   btc_reader_t reader;
   btc_opcode_t op;
@@ -1173,7 +1173,7 @@ btc_script_matches(const btc_script_t *script, const btc_bloom_t *filter) {
 }
 
 int
-btc_tx_matches(const btc_tx_t *tx, const btc_bloom_t *filter) {
+btc_tx_matches(const btc_tx_t *tx, btc_bloom_t *filter) {
   /**
    * Test a transaction against a bloom filter using
    * the BIP37 matching algorithm. Note that this may
@@ -1223,9 +1223,9 @@ btc_tx_matches(const btc_tx_t *tx, const btc_bloom_t *filter) {
   for (i = 0; i < tx->inputs.length; i++) {
     input = tx->inputs.items[i];
 
+    /* Test the COutPoint structure. */
     btc_outpoint_write(raw, &input->prevout);
 
-    /* Test the COutPoint structure. */
     if (btc_bloom_has(filter, raw, 36))
       return 1;
 
@@ -1237,7 +1237,6 @@ btc_tx_matches(const btc_tx_t *tx, const btc_bloom_t *filter) {
   /* 5. No match. */
   return 0;
 }
-#endif
 
 size_t
 btc_tx_base_size(const btc_tx_t *tx) {

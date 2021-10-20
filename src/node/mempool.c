@@ -461,7 +461,7 @@ btc_mempool_check_orphan(btc_mempool_t *mp,
   }
 
   /* Weight limit for orphans. */
-  if (btc_tx_weight(tx) >= BTC_MAX_TX_WEIGHT) {
+  if (btc_tx_weight(tx) > BTC_MAX_TX_WEIGHT) {
     btc_mempool_log(mp, "Ignoring large orphan %H.", tx->hash);
     return btc_mempool_throw(mp, tx,
                              "invalid",

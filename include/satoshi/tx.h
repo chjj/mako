@@ -255,6 +255,9 @@ btc_tx_has_standard_inputs(const btc_tx_t *tx, const btc_view_t *view);
 BTC_EXTERN int
 btc_tx_has_standard_witness(const btc_tx_t *tx, const btc_view_t *view);
 
+BTC_EXTERN int
+btc_tx_matches(const btc_tx_t *tx, btc_bloom_t *filter);
+
 BTC_EXTERN size_t
 btc_tx_base_size(const btc_tx_t *tx);
 

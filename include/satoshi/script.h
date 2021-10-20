@@ -267,6 +267,13 @@ enum btc_opcode {
 };
 
 /*
+ * Small Integer
+ */
+
+#define btc_smi_encode(x) ((x) == 0 ? BTC_OP_0 : ((x) + (BTC_OP_1 - 1)))
+#define btc_smi_decode(x) ((x) == BTC_OP_0 ? 0 : ((x) - (BTC_OP_1 - 1)))
+
+/*
  * Script Number
  */
 
@@ -432,10 +439,19 @@ BTC_EXTERN int
 btc_script_is_multisig(const btc_script_t *script);
 
 BTC_EXTERN void
-btc_script_set_multisig(btc_script_t *script, const btc_multisig_t *multi);
+btc_script_set_multisig(btc_script_t *script,
+                        unsigned int m,
+                        const btc_multikey_t *keys,
+                        unsigned int n);
 
 BTC_EXTERN int
-btc_script_get_multisig(btc_multisig_t *multi, const btc_script_t *script);
+btc_script_get_multisig(unsigned int *m,
+                        btc_multikey_t *keys,
+                        unsigned int *n,
+                        const btc_script_t *script);
+
+BTC_EXTERN void
+btc_multikey_sort(btc_multikey_t *keys, unsigned int n);
 
 BTC_EXTERN int
 btc_script_is_p2sh(const btc_script_t *script);
