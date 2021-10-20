@@ -92,7 +92,7 @@ extern "C" {
 #define BTC_NSEC(ts) \
   ((uint64_t)(ts)->tv_sec * 1000000000 + (uint64_t)(ts)->tv_nsec)
 
-#define BTC_PATH_MAX 1024
+#define BTC_PATH_MAX 1023
 
 #if defined(_WIN32)
 #  define BTC_PATH_SEP '\\'

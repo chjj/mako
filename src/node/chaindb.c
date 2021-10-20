@@ -18,6 +18,7 @@
 #include <satoshi/consensus.h>
 #include <satoshi/crypto/hash.h>
 #include <satoshi/entry.h>
+#include <satoshi/list.h>
 #include <satoshi/map.h>
 #include <satoshi/network.h>
 #include <satoshi/tx.h>
@@ -54,6 +55,8 @@ typedef struct btc_chainfile_s {
   int64_t max_time;
   int32_t min_height;
   int32_t max_height;
+  struct btc_chainfile_s *prev;
+  struct btc_chainfile_s *next;
 } btc_chainfile_t;
 
 DEFINE_SERIALIZABLE_OBJECT(btc_chainfile, SCOPE_STATIC)
@@ -69,6 +72,8 @@ btc_chainfile_init(btc_chainfile_t *z) {
   z->max_time = -1;
   z->min_height = -1;
   z->max_height = -1;
+  z->prev = NULL;
+  z->next = NULL;
 }
 
 static void
@@ -87,6 +92,8 @@ btc_chainfile_copy(btc_chainfile_t *z, const btc_chainfile_t *x) {
   z->max_time = x->max_time;
   z->min_height = x->min_height;
   z->max_height = x->max_height;
+  z->prev = NULL;
+  z->next = NULL;
 }
 
 static size_t
@@ -160,7 +167,7 @@ btc_chainfile_update(btc_chainfile_t *z, const btc_entry_t *entry) {
 
 struct btc_chaindb_s {
   const btc_network_t *network;
-  char prefix[BTC_PATH_MAX + 1];
+  char prefix[BTC_PATH_MAX - 26 + 1];
   int pruning_enabled;
   MDB_env *env;
   MDB_dbi db_meta;
@@ -172,7 +179,11 @@ struct btc_chaindb_s {
   btc_vector_t heights;
   btc_entry_t *head;
   btc_entry_t *tail;
-  btc_vector_t files;
+  struct btc_chainfiles_s {
+    btc_chainfile_t *head;
+    btc_chainfile_t *tail;
+    size_t length;
+  } files;
   btc_chainfile_t block;
   btc_chainfile_t undo;
   uint8_t *slab;
@@ -200,7 +211,6 @@ btc_chaindb_init(btc_chaindb_t *db, const btc_network_t *network) {
   db->hashes = btc_hashmap_create();
 
   btc_vector_init(&db->heights);
-  btc_vector_init(&db->files);
 
   db->slab = (uint8_t *)btc_malloc(24 + BTC_MAX_RAW_BLOCK_SIZE);
 }
@@ -209,7 +219,6 @@ static void
 btc_chaindb_clear(btc_chaindb_t *db) {
   btc_hashmap_destroy(db->hashes);
   btc_vector_clear(&db->heights);
-  btc_vector_clear(&db->files);
   btc_free(db->slab);
   memset(db, 0, sizeof(*db));
 }
@@ -229,11 +238,13 @@ btc_chaindb_destroy(btc_chaindb_t *db) {
 
 static int
 btc_chaindb_load_prefix(btc_chaindb_t *db, const char *prefix) {
-  size_t len = btc_path_resolve(db->prefix, prefix);
   char path[BTC_PATH_MAX + 1];
+  size_t len = btc_path_resolve(path, prefix);
 
-  if (len < 1 || len > BTC_PATH_MAX - 20)
+  if (len < 1 || len > sizeof(db->prefix) - 1)
     return 0;
+
+  memcpy(db->prefix, path, len + 1);
 
   if (!btc_fs_mkdirp(db->prefix, 0755))
     return 0;
@@ -423,7 +434,7 @@ btc_chaindb_load_files(btc_chaindb_t *db) {
 
     CHECK(btc_chainfile_import(file, mval.mv_data, mval.mv_size));
 
-    btc_vector_push(&db->files, file);
+    btc_list_push(&db->files, file, btc_chainfile_t);
 
     rc = mdb_cursor_get(cur, &mkey, &mval, MDB_NEXT);
   }
@@ -452,7 +463,7 @@ btc_chaindb_load_files(btc_chaindb_t *db) {
 
 static void
 btc_chaindb_unload_files(btc_chaindb_t *db) {
-  btc_chainfile_t *file;
+  btc_chainfile_t *file, *next;
 
   btc_fs_fsync(db->block.fd);
   btc_fs_fsync(db->undo.fd);
@@ -460,10 +471,12 @@ btc_chaindb_unload_files(btc_chaindb_t *db) {
   btc_fs_close(db->block.fd);
   btc_fs_close(db->undo.fd);
 
-  while (db->files.length > 0) {
-    file = (btc_chainfile_t *)btc_vector_pop(&db->files);
+  for (file = db->files.head; file != NULL; file = next) {
+    next = file->next;
     btc_chainfile_destroy(file);
   }
+
+  btc_list_reset(&db->files);
 }
 
 static int
@@ -875,7 +888,8 @@ btc_chaindb_alloc(btc_chaindb_t *db,
   btc_fs_fsync(file->fd);
   btc_fs_close(file->fd);
 
-  btc_vector_push(&db->files, btc_chainfile_clone(file));
+  btc_list_push(&db->files, btc_chainfile_clone(file),
+                            btc_chainfile_t);
 
   file->fd = fd;
   file->id++;
@@ -1007,12 +1021,11 @@ static int
 btc_chaindb_prune_files(btc_chaindb_t *db,
                         MDB_txn *txn,
                         const btc_entry_t *entry) {
+  btc_chainfile_t *file, *next;
   char path[BTC_PATH_MAX + 1];
-  btc_chainfile_t *file;
   int32_t target;
   uint8_t key[5];
   MDB_val mkey;
-  size_t i;
 
   if (!db->pruning_enabled)
     return 1;
@@ -1025,9 +1038,7 @@ btc_chaindb_prune_files(btc_chaindb_t *db,
   if (target <= db->network->block.prune_after_height)
     return 1;
 
-  for (i = 0; i < db->files.length; i++) {
-    file = (btc_chainfile_t *)db->files.items[i];
-
+  for (file = db->files.head; file != NULL; file = file->next) {
     if (file->max_height >= target)
       continue;
 
@@ -1041,8 +1052,8 @@ btc_chaindb_prune_files(btc_chaindb_t *db,
       return 0;
   }
 
-  for (i = 0; i < db->files.length; i++) {
-    file = (btc_chainfile_t *)db->files.items[i];
+  for (file = db->files.head; file != NULL; file = next) {
+    next = file->next;
 
     if (file->max_height >= target)
       continue;
@@ -1051,10 +1062,7 @@ btc_chaindb_prune_files(btc_chaindb_t *db,
 
     btc_fs_unlink(path);
 
-    if (i != db->files.length - 1)
-      db->files.items[i--] = btc_vector_pop(&db->files);
-    else
-      btc_vector_pop(&db->files);
+    btc_list_remove(&db->files, file, btc_chainfile_t);
 
     btc_chainfile_destroy(file);
   }
