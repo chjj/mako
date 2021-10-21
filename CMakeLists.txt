@@ -54,6 +54,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/buffer.c
                             src/coin.c
                             src/compact.c
+                            src/compress.c
                             src/consensus.c
                             src/entry.c
                             src/header.c

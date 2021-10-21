@@ -193,9 +193,11 @@ btc_stack_push_num(btc_stack_t *stack, int64_t num) {
 
 void
 btc_stack_push_bool(btc_stack_t *stack, int value) {
-  static const uint8_t one[1] = {1};
   btc_buffer_t *item = btc_buffer_create();
-  btc_buffer_set(item, one, value != 0);
+
+  if (value)
+    btc_buffer_resize(item, 1)[0] = 1;
+
   btc_stack_push(stack, item);
 }
 
@@ -203,7 +205,10 @@ static void
 btc_stack_push_robool(btc_stack_t *stack, int value) {
   static const uint8_t one[1] = {1};
   btc_buffer_t *item = btc_buffer_create();
-  btc_buffer_roset(item, one, value != 0);
+
+  if (value)
+    btc_buffer_roset(item, one, 1);
+
   btc_stack_push(stack, item);
 }
 

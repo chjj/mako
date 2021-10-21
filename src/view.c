@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <satoshi/coins.h>
+#include <satoshi/script.h>
 #include <satoshi/tx.h>
 #include "impl.h"
 #include "internal.h"
@@ -251,6 +252,7 @@ btc_view_fill(btc_view_t *view,
 
 void
 btc_view_add(btc_view_t *view, const btc_tx_t *tx, int32_t height, int spent) {
+  const btc_output_t *output;
   btc_coins_t *coins;
   btc_coin_t *coin;
   size_t i;
@@ -258,6 +260,11 @@ btc_view_add(btc_view_t *view, const btc_tx_t *tx, int32_t height, int spent) {
   coins = btc_view_ensure(view, tx->hash);
 
   for (i = 0; i < tx->outputs.length; i++) {
+    output = tx->outputs.items[i];
+
+    if (btc_script_is_unspendable(&output->script))
+      continue;
+
     coin = btc_tx_coin(tx, i, height);
     coin->spent = spent;
 

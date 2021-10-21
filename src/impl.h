@@ -576,7 +576,7 @@ btc_double_update(btc_hash256_t *ctx, double x) {
 }
 
 BTC_UNUSED static size_t
-btc_varint_size(uint64_t x) {
+btc_compact_size(uint64_t x) {
   if (x < 0xfd)
     return 1;
 
@@ -590,7 +590,7 @@ btc_varint_size(uint64_t x) {
 }
 
 BTC_UNUSED static uint8_t *
-btc_varint_write(uint8_t *zp, uint64_t x) {
+btc_compact_write(uint8_t *zp, uint64_t x) {
   if (x < 0xfd)
     return btc_uint8_write(zp, x);
 
@@ -609,7 +609,7 @@ btc_varint_write(uint8_t *zp, uint64_t x) {
 }
 
 BTC_UNUSED static int
-btc_varint_read(uint64_t *zp, const uint8_t **xp, size_t *xn) {
+btc_compact_read(uint64_t *zp, const uint8_t **xp, size_t *xn) {
   uint8_t type;
 
   if (!btc_uint8_read(&type, xp, xn))
@@ -664,10 +664,10 @@ btc_varint_read(uint64_t *zp, const uint8_t **xp, size_t *xn) {
 }
 
 BTC_UNUSED static void
-btc_varint_update(btc_hash256_t *ctx, uint64_t x) {
+btc_compact_update(btc_hash256_t *ctx, uint64_t x) {
 #if defined(BTC_BIGENDIAN)
   uint8_t tmp[9];
-  uint8_t *end = btc_varint_write(tmp, x);
+  uint8_t *end = btc_compact_write(tmp, x);
 
   btc_hash256_update(ctx, tmp, end - tmp);
 #else
@@ -688,19 +688,19 @@ btc_varint_update(btc_hash256_t *ctx, uint64_t x) {
 
 BTC_UNUSED static size_t
 btc_size_size(size_t x) {
-  return btc_varint_size(x);
+  return btc_compact_size(x);
 }
 
 BTC_UNUSED static uint8_t *
 btc_size_write(uint8_t *zp, size_t x) {
-  return btc_varint_write(zp, x);
+  return btc_compact_write(zp, x);
 }
 
 BTC_UNUSED static int
 btc_size_read(size_t *zp, const uint8_t **xp, size_t *xn) {
   uint64_t z;
 
-  if (!btc_varint_read(&z, xp, xn))
+  if (!btc_compact_read(&z, xp, xn))
     return 0;
 
   if (z > 0x02000000)
@@ -713,7 +713,73 @@ btc_size_read(size_t *zp, const uint8_t **xp, size_t *xn) {
 
 BTC_UNUSED static void
 btc_size_update(btc_hash256_t *ctx, size_t x) {
-  btc_varint_update(ctx, x);
+  btc_compact_update(ctx, x);
+}
+
+BTC_UNUSED static size_t
+btc_varint_size(uint64_t x) {
+  int n = 0;
+
+  for (;;) {
+    n++;
+
+    if (x <= 0x7f)
+      break;
+
+    x = (x >> 7) - 1;
+  }
+
+  return n;
+}
+
+BTC_UNUSED static uint8_t *
+btc_varint_write(uint8_t *zp, uint64_t x) {
+  uint8_t tmp[(sizeof(x) * 8 + 6) / 7];
+  int i = 0;
+
+  for (;;) {
+    tmp[i] = (x & 0x7f) | (i ? 0x80 : 0x00);
+
+    if (x <= 0x7f)
+      break;
+
+    x = (x >> 7) - 1;
+    i++;
+  }
+
+  do {
+    *zp++ = tmp[i];
+  } while (i--);
+
+  return zp;
+}
+
+BTC_UNUSED static int
+btc_varint_read(uint64_t *zp, const uint8_t **xp, size_t *xn) {
+  uint64_t z = 0;
+  uint8_t ch;
+
+  for (;;) {
+    if (!btc_uint8_read(&ch, xp, xn))
+      return 0;
+
+    if (z > (UINT64_MAX >> 7))
+      return 0;
+
+    z = (z << 7) | (ch & 0x7f);
+
+    if ((ch & 0x80) == 0)
+      break;
+
+    if (z == UINT64_MAX)
+      return 0;
+
+    z++;
+  }
+
+  *zp = z;
+
+  return 1;
 }
 
 BTC_UNUSED static size_t
@@ -763,6 +829,19 @@ btc_raw_read(uint8_t *zp, size_t zn,
     *xp += zn;
     *xn -= zn;
   }
+
+  return 1;
+}
+
+BTC_UNUSED static int
+btc_zraw_read(const uint8_t **zp, size_t zn,
+              const uint8_t **xp, size_t *xn) {
+  if (*xn < zn)
+    return 0;
+
+  *zp = *xp;
+  *xp += zn;
+  *xn -= zn;
 
   return 1;
 }

@@ -116,6 +116,15 @@ btc_output_is_dust(const btc_output_t *x, int64_t rate);
 BTC_EXTERN void
 btc_output_update(btc__hash256_t *ctx, const btc_output_t *x);
 
+BTC_EXTERN size_t
+btc_output_deflate(const btc_output_t *x);
+
+BTC_EXTERN uint8_t *
+btc_output_compress(uint8_t *zp, const btc_output_t *x);
+
+BTC_EXTERN int
+btc_output_decompress(btc_output_t *z, const uint8_t **xp, size_t *xn);
+
 /*
  * Input Vector
  */

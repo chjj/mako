@@ -564,6 +564,15 @@ btc_script_verify(const btc_script_t *input,
                   unsigned int flags,
                   btc_tx_cache_t *cache);
 
+BTC_EXTERN size_t
+btc_script_deflate(const btc_script_t *x);
+
+BTC_EXTERN uint8_t *
+btc_script_compress(uint8_t *zp, const btc_script_t *x);
+
+BTC_EXTERN int
+btc_script_decompress(btc_script_t *z, const uint8_t **xp, size_t *xn);
+
 /*
  * Reader
  */

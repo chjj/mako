@@ -43,45 +43,52 @@ btc_coin_copy(btc_coin_t *z, const btc_coin_t *x) {
 
 size_t
 btc_coin_size(const btc_coin_t *x) {
+  uint32_t flags = (uint32_t)x->height * 2 + x->coinbase;
   size_t size = 0;
 
   size += btc_varint_size(x->version);
-  size += 4;
-  size += 1;
-  size += btc_output_size(&x->output);
+  size += btc_varint_size(flags);
+  size += btc_output_deflate(&x->output);
 
   return size;
 }
 
 uint8_t *
 btc_coin_write(uint8_t *zp, const btc_coin_t *x) {
+  uint32_t flags = (uint32_t)x->height * 2 + x->coinbase;
+
   zp = btc_varint_write(zp, x->version);
-  zp = btc_int32_write(zp, x->height);
-  zp = btc_uint8_write(zp, x->coinbase);
-  zp = btc_output_write(zp, &x->output);
+  zp = btc_varint_write(zp, flags);
+  zp = btc_output_compress(zp, &x->output);
+
   return zp;
 }
 
 int
 btc_coin_read(btc_coin_t *z, const uint8_t **xp, size_t *xn) {
-  uint64_t version;
-  uint8_t flags;
+  uint64_t version, flags;
 
   if (!btc_varint_read(&version, xp, xn))
     return 0;
 
-  z->version = (uint32_t)version;
-
-  if (!btc_int32_read(&z->height, xp, xn))
+  if (version > UINT32_MAX)
     return 0;
 
-  if (!btc_uint8_read(&flags, xp, xn))
+  if (!btc_varint_read(&flags, xp, xn))
     return 0;
 
+  if (flags > UINT32_MAX)
+    return 0;
+
+  z->version = version;
+  z->height = flags >> 1;
   z->coinbase = flags & 1;
   z->spent = 0;
 
-  if (!btc_output_read(&z->output, xp, xn))
+  if (z->height == INT32_MAX)
+    z->height = -1;
+
+  if (!btc_output_decompress(&z->output, xp, xn))
     return 0;
 
   return 1;
