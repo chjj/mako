@@ -1010,93 +1010,89 @@ btc_msg_clear(btc_msg_t *msg) {
 
   switch (msg->type) {
     case BTC_MSG_VERSION:
-      btc_version_clear((btc_version_t *)msg->body);
+      btc_version_destroy((btc_version_t *)msg->body);
       break;
     case BTC_MSG_VERACK:
-      msg->body = NULL;
       break;
     case BTC_MSG_PING:
-      btc_ping_clear((btc_ping_t *)msg->body);
+      btc_ping_destroy((btc_ping_t *)msg->body);
       break;
     case BTC_MSG_PONG:
-      btc_pong_clear((btc_pong_t *)msg->body);
+      btc_pong_destroy((btc_pong_t *)msg->body);
       break;
     case BTC_MSG_GETADDR:
-      msg->body = NULL;
       break;
     case BTC_MSG_ADDR:
-      btc_addrs_clear((btc_addrs_t *)msg->body);
+      btc_addrs_destroy((btc_addrs_t *)msg->body);
       break;
     case BTC_MSG_INV:
     case BTC_MSG_GETDATA:
     case BTC_MSG_NOTFOUND:
-      btc_zinv_clear((btc_zinv_t *)msg->body);
+      btc_zinv_destroy((btc_zinv_t *)msg->body);
       break;
     case BTC_MSG_INV_FULL:
     case BTC_MSG_GETDATA_FULL:
     case BTC_MSG_NOTFOUND_FULL:
-      btc_inv_clear((btc_inv_t *)msg->body);
+      btc_inv_destroy((btc_inv_t *)msg->body);
       break;
     case BTC_MSG_GETBLOCKS:
     case BTC_MSG_GETHEADERS:
-      btc_getblocks_clear((btc_getblocks_t *)msg->body);
+      btc_getblocks_destroy((btc_getblocks_t *)msg->body);
       break;
     case BTC_MSG_HEADERS:
-      btc_headers_clear((btc_headers_t *)msg->body);
+      btc_headers_destroy((btc_headers_t *)msg->body);
       break;
     case BTC_MSG_SENDHEADERS:
-      msg->body = NULL;
       break;
     case BTC_MSG_BLOCK:
     case BTC_MSG_BLOCK_BASE:
-      btc_block_clear((btc_block_t *)msg->body);
+      btc_block_destroy((btc_block_t *)msg->body);
       break;
     case BTC_MSG_TX:
     case BTC_MSG_TX_BASE:
-      btc_tx_clear((btc_tx_t *)msg->body);
+      btc_tx_destroy((btc_tx_t *)msg->body);
       break;
     case BTC_MSG_REJECT:
-      btc_reject_clear((btc_reject_t *)msg->body);
+      btc_reject_destroy((btc_reject_t *)msg->body);
       break;
     case BTC_MSG_MEMPOOL:
-      msg->body = NULL;
       break;
     case BTC_MSG_FILTERLOAD:
-      btc_bloom_clear((btc_bloom_t *)msg->body);
+      btc_bloom_destroy((btc_bloom_t *)msg->body);
       break;
     case BTC_MSG_FILTERADD:
-      btc_filteradd_clear((btc_filteradd_t *)msg->body);
+      btc_filteradd_destroy((btc_filteradd_t *)msg->body);
       break;
     case BTC_MSG_FILTERCLEAR:
-      msg->body = NULL;
       break;
     case BTC_MSG_MERKLEBLOCK:
-      /* btc_merkleblock_clear((btc_merkleblock_t *)msg->body); */
+      /* btc_merkleblock_destroy((btc_merkleblock_t *)msg->body); */
       break;
     case BTC_MSG_FEEFILTER:
-      btc_feefilter_clear((btc_feefilter_t *)msg->body);
+      btc_feefilter_destroy((btc_feefilter_t *)msg->body);
       break;
     case BTC_MSG_SENDCMPCT:
-      btc_sendcmpct_clear((btc_sendcmpct_t *)msg->body);
+      btc_sendcmpct_destroy((btc_sendcmpct_t *)msg->body);
       break;
     case BTC_MSG_CMPCTBLOCK:
     case BTC_MSG_CMPCTBLOCK_BASE:
-      btc_cmpct_clear((btc_cmpct_t *)msg->body);
+      btc_cmpct_destroy((btc_cmpct_t *)msg->body);
       break;
     case BTC_MSG_GETBLOCKTXN:
-      btc_getblocktxn_clear((btc_getblocktxn_t *)msg->body);
+      btc_getblocktxn_destroy((btc_getblocktxn_t *)msg->body);
       break;
     case BTC_MSG_BLOCKTXN:
     case BTC_MSG_BLOCKTXN_BASE:
-      btc_blocktxn_clear((btc_blocktxn_t *)msg->body);
+      btc_blocktxn_destroy((btc_blocktxn_t *)msg->body);
       break;
     case BTC_MSG_UNKNOWN:
-      btc_unknown_clear((btc_unknown_t *)msg->body);
+      btc_unknown_destroy((btc_unknown_t *)msg->body);
       break;
     default:
-      msg->body = NULL;
       break;
   }
+
+  msg->body = NULL;
 }
 
 void

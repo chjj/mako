@@ -118,20 +118,16 @@ btc_buffer_write(uint8_t *zp, const btc_buffer_t *x) {
 
 int
 btc_buffer_read(btc_buffer_t *z, const uint8_t **xp, size_t *xn) {
+  const uint8_t *zp;
   size_t zn;
 
   if (!btc_size_read(&zn, xp, xn))
     return 0;
 
-  if (*xn < zn)
+  if (!btc_zraw_read(&zp, zn, xp, xn))
     return 0;
 
-  btc_buffer_grow(z, zn);
-
-  if (!btc_raw_read(z->data, zn, xp, xn))
-    return 0;
-
-  z->length = zn;
+  btc_buffer_set(z, zp, zn);
 
   return 1;
 }
