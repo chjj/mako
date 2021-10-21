@@ -109,10 +109,10 @@ btc_bloom_set(btc_bloom_t *bloom,
 }
 
 static size_t
-btc_bloom_index(const btc_bloom_t *bloom,
-                const uint8_t *val,
-                size_t len,
-                uint32_t n) {
+btc_bloom_hash(const btc_bloom_t *bloom,
+               const uint8_t *val,
+               size_t len,
+               uint32_t n) {
   return btc_murmur3_tweak(val, len, n, bloom->tweak) % (bloom->size * 8);
 }
 
@@ -124,9 +124,9 @@ btc_bloom_add(btc_bloom_t *bloom, const uint8_t *val, size_t len) {
     return;
 
   for (i = 0; i < bloom->n; i++) {
-    size_t index = btc_bloom_index(bloom, val, len, i);
+    size_t bit = btc_bloom_hash(bloom, val, len, i);
 
-    bloom->data[index >> 3] |= (1 << (7 & index));
+    bloom->data[bit >> 3] |= (1 << (7 & bit));
   }
 }
 
@@ -138,9 +138,9 @@ btc_bloom_has(const btc_bloom_t *bloom, const uint8_t *val, size_t len) {
     return 0;
 
   for (i = 0; i < bloom->n; i++) {
-    size_t index = btc_bloom_index(bloom, val, len, i);
+    size_t bit = btc_bloom_hash(bloom, val, len, i);
 
-    if ((bloom->data[index >> 3] & (1 << (7 & index))) == 0)
+    if ((bloom->data[bit >> 3] & (1 << (7 & bit))) == 0)
       return 0;
   }
 
@@ -175,14 +175,22 @@ btc_bloom_write(uint8_t *zp, const btc_bloom_t *x) {
 
 int
 btc_bloom_read(btc_bloom_t *z, const uint8_t **xp, size_t *xn) {
-  if (!btc_size_read(&z->size, xp, xn))
+  const uint8_t *zp;
+  size_t zn;
+
+  if (!btc_size_read(&zn, xp, xn))
     return 0;
 
-  if (z->size > 0)
-    z->data = (uint8_t *)btc_realloc(z->data, z->size);
-
-  if (!btc_raw_read(z->data, z->size, xp, xn))
+  if (!btc_zraw_read(&zp, zn, xp, xn))
     return 0;
+
+  if (zn > 0) {
+    z->data = (uint8_t *)btc_realloc(z->data, zn);
+
+    memcpy(z->data, zp, zn);
+  }
+
+  z->size = zn;
 
   if (!btc_uint32_read(&z->n, xp, xn))
     return 0;
