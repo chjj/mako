@@ -62,10 +62,12 @@ enum btc_msgtype {
 };
 
 enum btc_invtype {
+  BTC_INV_UNDEFINED = 0,
   BTC_INV_TX = 1,
   BTC_INV_BLOCK = 2,
   BTC_INV_FILTERED_BLOCK = 3,
   BTC_INV_CMPCT_BLOCK = 4,
+  BTC_INV_WTX = 5,
   BTC_INV_WITNESS_TX = 1 | (1 << 30),
   BTC_INV_WITNESS_BLOCK = 2 | (1 << 30),
   BTC_INV_WITNESS_FILTERED_BLOCK = 3 | (1 << 30),

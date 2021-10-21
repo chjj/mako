@@ -150,12 +150,6 @@ btc_version_read(btc_version_t *z, const uint8_t **xp, size_t *xn) {
 }
 
 /*
- * Verack
- */
-
-/* empty message */
-
-/*
  * Ping
  */
 
@@ -238,12 +232,6 @@ btc_pong_read(btc_pong_t *z, const uint8_t **xp, size_t *xn) {
 }
 
 /*
- * GetAddr
- */
-
-/* empty message */
-
-/*
  * Addr
  */
 
@@ -280,12 +268,17 @@ btc_invitem_set(btc_invitem_t *z, uint32_t type, const uint8_t *hash) {
 
 static uint32_t
 btc_invitem_type(const btc_invitem_t *x) {
-  uint32_t type = x->type;
+  uint32_t type = x->type & ~((uint32_t)BTC_INV_WITNESS_FLAG);
 
-  type &= ~((uint32_t)BTC_INV_WITNESS_FLAG);
-
-  if (type > BTC_INV_BLOCK)
-    type = BTC_INV_BLOCK;
+  switch (type) {
+    case BTC_INV_TX:
+    case BTC_INV_WTX:
+      return BTC_INV_TX;
+    case BTC_INV_BLOCK:
+    case BTC_INV_FILTERED_BLOCK:
+    case BTC_INV_CMPCT_BLOCK:
+      return BTC_INV_BLOCK;
+  }
 
   return type;
 }
@@ -471,18 +464,6 @@ btc_zinv_read(btc_zinv_t *z, const uint8_t **xp, size_t *xn) {
 }
 
 /*
- * GetData
- */
-
-/* inherits btc_inv_t */
-
-/*
- * NotFound
- */
-
-/* inherits btc_inv_t */
-
-/*
  * GetBlocks
  */
 
@@ -564,12 +545,6 @@ btc_getblocks_read(btc_getblocks_t *z, const uint8_t **xp, size_t *xn) {
 }
 
 /*
- * GetHeaders
- */
-
-/* inherits btc_getblocks_t */
-
-/*
  * Hdr
  */
 
@@ -620,24 +595,6 @@ btc_hdr_read(btc_header_t *z, const uint8_t **xp, size_t *xn) {
  */
 
 DEFINE_SERIALIZABLE_VECTOR(btc_headers, btc_hdr, SCOPE_EXTERN)
-
-/*
- * SendHeaders
- */
-
-/* empty message */
-
-/*
- * Block
- */
-
-/* already implemented */
-
-/*
- * TX
- */
-
-/* already implemented */
 
 /*
  * Reject
@@ -760,18 +717,6 @@ btc_reject_read(btc_reject_t *z, const uint8_t **xp, size_t *xn) {
 }
 
 /*
- * Mempool
- */
-
-/* empty message */
-
-/*
- * FilterLoad
- */
-
-/* already implemented */
-
-/*
  * FilterAdd
  */
 
@@ -818,12 +763,6 @@ btc_filteradd_read(btc_filteradd_t *z, const uint8_t **xp, size_t *xn) {
 
   return 1;
 }
-
-/*
- * FilterClear
- */
-
-/* empty message */
 
 /*
  * MerkleBlock
@@ -913,24 +852,6 @@ btc_sendcmpct_read(btc_sendcmpct_t *z, const uint8_t **xp, size_t *xn) {
 
   return 1;
 }
-
-/*
- * CmpctBlock
- */
-
-/* already implemented */
-
-/*
- * GetBlockTxn
- */
-
-/* already implemented */
-
-/*
- * BlockTxn
- */
-
-/* already implemented */
 
 /*
  * Unknown
