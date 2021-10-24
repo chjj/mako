@@ -241,6 +241,30 @@ typedef struct btc_mpentry_s {
   int64_t desc_size;
 } btc_mpentry_t;
 
+/* https://github.com/satoshilabs/slips/blob/master/slip-0132.md */
+enum btc_bip32_type {
+  BTC_BIP32_LEGACY = 0, /*  xpub/xprv, m/44' */
+  BTC_BIP32_NESTED_P2WPKH = 1, /* ypub/yprv, m/49' */
+  BTC_BIP32_P2WPKH = 2, /* zpub/zprv, m/84' */
+  BTC_BIP32_NESTED_P2WSH = 3, /* Ypub/Yprv */
+  BTC_BIP32_P2WSH = 4 /* Zpub/Zprv */
+};
+
+typedef struct btc_hdnode_s {
+  enum btc_bip32_type type;
+  uint8_t depth;
+  uint32_t parent;
+  uint32_t index;
+  uint8_t chain[32];
+  uint8_t seckey[32];
+  uint8_t pubkey[33];
+} btc_hdnode_t;
+
+typedef struct btc_mnemonic_s {
+  uint16_t words[48];
+  int length;
+} btc_mnemonic_t;
+
 /*
  * Maps (Key->Pointer)
  */
