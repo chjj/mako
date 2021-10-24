@@ -53,6 +53,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/array.c
                             src/base58.c
                             src/bech32.c
+                            src/bip32.c
                             src/bip37.c
                             src/bip152.c
                             src/block.c
@@ -231,6 +232,7 @@ set(tests # crypto
           array
           base58
           bech32
+          bip32
           bip37
           bip152
           block
