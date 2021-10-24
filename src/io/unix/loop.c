@@ -931,7 +931,18 @@ btc_socket_send(btc_socket_t *socket,
 
   if (socket->state != BTC_SOCKET_BOUND) {
     socket->loop->error = EPIPE;
+
+    if (data != NULL)
+      free(data);
+
     return -1;
+  }
+
+  if (len == 0) {
+    if (data != NULL)
+      free(data);
+
+    return 1;
   }
 
   chunk = (chunk_t *)safe_malloc(sizeof(chunk_t));
