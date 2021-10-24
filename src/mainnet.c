@@ -495,10 +495,20 @@ static const btc_network_t mainnet = {
   },
   /* .key = */ {
     /* .privkey = */ 0x80,
-    /* .xpubkey = */ 0x0488b21e,
-    /* .xprivkey = */ 0x0488ade4,
-    /* .xpubkey58 = */ "xpub",
-    /* .xprivkey58 = */ "xprv",
+    /* .xpubkey = */ {
+      0x0488b21e, /* xpub (legacy) */
+      0x049d7cb2, /* ypub (nested p2wpkh) */
+      0x04b24746, /* zpub (p2wpkh) */
+      0x0295b43f, /* Ypub (nested p2wsh) */
+      0x02aa7ed3  /* Zpub (p2wsh) */
+    },
+    /* .xprvkey = */ {
+      0x0488ade4, /* xprv (legacy) */
+      0x049d7878, /* yprv (nested p2wpkh) */
+      0x04b2430c, /* zprv (p2wpkh) */
+      0x0295b005, /* Yprv (nested p2wsh) */
+      0x02aa7a99  /* Zprv (p2wsh) */
+    },
     /* .coin_type = */ 0
   },
   /* .address = */ {

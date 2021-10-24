@@ -231,11 +231,9 @@ struct btc_network_s {
    */
   struct btc_network_key_s {
     uint8_t privkey;
-    uint32_t xpubkey;
-    uint32_t xprivkey;
-    const char *xpubkey58;
-    const char *xprivkey58;
-    int coin_type;
+    uint32_t xpubkey[5];
+    uint32_t xprvkey[5];
+    uint32_t coin_type;
   } key;
 
   /**
