@@ -49,7 +49,7 @@ btc_address_set_str(btc_address_t *addr,
   const char *expect = network->address.bech32;
   char hrp[83 + 1];
   uint8_t checksum[32];
-  uint8_t data[55];
+  uint8_t data[55]; /* 36? */
   size_t len;
 
   memset(addr->hash, 0, 40);

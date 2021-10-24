@@ -42,6 +42,9 @@ btc_hash256_final(btc_hash256_t *ctx, uint8_t *out);
 BTC_EXTERN void
 btc_hash256(uint8_t *out, const void *data, size_t size);
 
+BTC_EXTERN void
+btc_hash256_root(uint8_t *out, const void *left, const void *right);
+
 BTC_EXTERN uint32_t
 btc_checksum(const void *data, size_t size);
 
@@ -92,6 +95,74 @@ btc_sha256_final(btc_sha256_t *ctx, uint8_t *out);
 
 BTC_EXTERN void
 btc_sha256(uint8_t *out, const void *data, size_t size);
+
+/*
+ * SHA512
+ */
+
+BTC_EXTERN void
+btc_sha512_init(btc_sha512_t *ctx);
+
+BTC_EXTERN void
+btc_sha512_update(btc_sha512_t *ctx, const void *data, size_t len);
+
+BTC_EXTERN void
+btc_sha512_final(btc_sha512_t *ctx, uint8_t *out);
+
+BTC_EXTERN void
+btc_sha512(uint8_t *out, const void *data, size_t size);
+
+/*
+ * HMAC256
+ */
+
+BTC_EXTERN void
+btc_hmac256_init(btc_hmac256_t *hmac, const uint8_t *key, size_t len);
+
+BTC_EXTERN void
+btc_hmac256_update(btc_hmac256_t *hmac, const void *data, size_t len);
+
+BTC_EXTERN void
+btc_hmac256_final(btc_hmac256_t *hmac, uint8_t *out);
+
+/*
+ * HMAC512
+ */
+
+BTC_EXTERN void
+btc_hmac512_init(btc_hmac512_t *hmac, const uint8_t *key, size_t len);
+
+BTC_EXTERN void
+btc_hmac512_update(btc_hmac512_t *hmac, const void *data, size_t len);
+
+BTC_EXTERN void
+btc_hmac512_final(btc_hmac512_t *hmac, uint8_t *out);
+
+/*
+ * PBKDF256
+ */
+
+BTC_EXTERN void
+btc_pbkdf256_derive(uint8_t *out,
+                    const uint8_t *pass,
+                    size_t pass_len,
+                    const uint8_t *salt,
+                    size_t salt_len,
+                    uint32_t iter,
+                    size_t len);
+
+/*
+ * PBKDF512
+ */
+
+BTC_EXTERN void
+btc_pbkdf512_derive(uint8_t *out,
+                    const uint8_t *pass,
+                    size_t pass_len,
+                    const uint8_t *salt,
+                    size_t salt_len,
+                    uint32_t iter,
+                    size_t len);
 
 #ifdef __cplusplus
 }

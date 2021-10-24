@@ -27,11 +27,16 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/crypto/ecc.c
                             src/crypto/hash160.c
                             src/crypto/hash256.c
+                            src/crypto/hmac256.c
+                            src/crypto/hmac512.c
                             src/crypto/merkle.c
+                            src/crypto/pbkdf256.c
+                            src/crypto/pbkdf512.c
                             src/crypto/rand.c
                             src/crypto/ripemd160.c
                             src/crypto/sha1.c
                             src/crypto/sha256.c
+                            src/crypto/sha512.c
                             src/crypto/siphash.c
                             src/crypto/sys.c
                             src/map/addrmap.c
@@ -211,11 +216,14 @@ set(tests # crypto
           ecdsa
           hash160
           hash256
+          hmac
           merkle
+          pbkdf2
           rand
           ripemd160
           sha1
           sha256
+          sha512
           siphash
           # lib
           address

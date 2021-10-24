@@ -18,58 +18,6 @@
 #include <satoshi/util.h>
 
 /*
- * HMAC
- */
-
-static void
-hmac_init(btc_hmac_t *hmac, const uint8_t *key, size_t len) {
-  uint8_t tmp[32];
-  uint8_t pad[64];
-  size_t i;
-
-  if (len > 64) {
-    btc_sha256_init(&hmac->inner);
-    btc_sha256_update(&hmac->inner, key, len);
-    btc_sha256_final(&hmac->inner, tmp);
-    key = tmp;
-    len = 32;
-  }
-
-  for (i = 0; i < len; i++)
-    pad[i] = key[i] ^ 0x36;
-
-  for (i = len; i < 64; i++)
-    pad[i] = 0x36;
-
-  btc_sha256_init(&hmac->inner);
-  btc_sha256_update(&hmac->inner, pad, 64);
-
-  for (i = 0; i < len; i++)
-    pad[i] = key[i] ^ 0x5c;
-
-  for (i = len; i < 64; i++)
-    pad[i] = 0x5c;
-
-  btc_sha256_init(&hmac->outer);
-  btc_sha256_update(&hmac->outer, pad, 64);
-
-  btc_memzero(tmp, 32);
-  btc_memzero(pad, 64);
-}
-
-static void
-hmac_update(btc_hmac_t *hmac, const void *data, size_t len) {
-  btc_sha256_update(&hmac->inner, data, len);
-}
-
-static void
-hmac_final(btc_hmac_t *hmac, uint8_t *out) {
-  btc_sha256_final(&hmac->inner, out);
-  btc_sha256_update(&hmac->outer, out, 32);
-  btc_sha256_final(&hmac->outer, out);
-}
-
-/*
  * HMAC-DRBG
  */
 
@@ -78,29 +26,29 @@ btc_drbg_update(btc_drbg_t *drbg, const uint8_t *seed, size_t seed_len) {
   static const uint8_t zero[1] = {0x00};
   static const uint8_t one[1] = {0x01};
 
-  hmac_init(&drbg->kmac, drbg->K, 32);
-  hmac_update(&drbg->kmac, drbg->V, 32);
-  hmac_update(&drbg->kmac, zero, 1);
-  hmac_update(&drbg->kmac, seed, seed_len);
-  hmac_final(&drbg->kmac, drbg->K);
+  btc_hmac256_init(&drbg->kmac, drbg->K, 32);
+  btc_hmac256_update(&drbg->kmac, drbg->V, 32);
+  btc_hmac256_update(&drbg->kmac, zero, 1);
+  btc_hmac256_update(&drbg->kmac, seed, seed_len);
+  btc_hmac256_final(&drbg->kmac, drbg->K);
 
-  hmac_init(&drbg->kmac, drbg->K, 32);
-  hmac_update(&drbg->kmac, drbg->V, 32);
-  hmac_final(&drbg->kmac, drbg->V);
+  btc_hmac256_init(&drbg->kmac, drbg->K, 32);
+  btc_hmac256_update(&drbg->kmac, drbg->V, 32);
+  btc_hmac256_final(&drbg->kmac, drbg->V);
 
   if (seed_len > 0) {
-    hmac_init(&drbg->kmac, drbg->K, 32);
-    hmac_update(&drbg->kmac, drbg->V, 32);
-    hmac_update(&drbg->kmac, one, 1);
-    hmac_update(&drbg->kmac, seed, seed_len);
-    hmac_final(&drbg->kmac, drbg->K);
+    btc_hmac256_init(&drbg->kmac, drbg->K, 32);
+    btc_hmac256_update(&drbg->kmac, drbg->V, 32);
+    btc_hmac256_update(&drbg->kmac, one, 1);
+    btc_hmac256_update(&drbg->kmac, seed, seed_len);
+    btc_hmac256_final(&drbg->kmac, drbg->K);
 
-    hmac_init(&drbg->kmac, drbg->K, 32);
-    hmac_update(&drbg->kmac, drbg->V, 32);
-    hmac_final(&drbg->kmac, drbg->V);
+    btc_hmac256_init(&drbg->kmac, drbg->K, 32);
+    btc_hmac256_update(&drbg->kmac, drbg->V, 32);
+    btc_hmac256_final(&drbg->kmac, drbg->V);
   }
 
-  hmac_init(&drbg->kmac, drbg->K, 32);
+  btc_hmac256_init(&drbg->kmac, drbg->K, 32);
 }
 
 void
@@ -122,21 +70,22 @@ btc_drbg_reseed(btc_drbg_t *drbg, const uint8_t *seed, size_t seed_len) {
 void
 btc_drbg_generate(btc_drbg_t *drbg, void *out, size_t len) {
   uint8_t *raw = (uint8_t *)out;
-  size_t size = 32;
-  btc_hmac_t kmac;
+  btc_hmac256_t kmac;
 
   while (len > 0) {
     kmac = drbg->kmac;
-    hmac_update(&kmac, drbg->V, size);
-    hmac_final(&kmac, drbg->V);
+    btc_hmac256_update(&kmac, drbg->V, 32);
+    btc_hmac256_final(&kmac, drbg->V);
 
-    if (size > len)
-      size = len;
+    if (len < 32) {
+      memcpy(raw, drbg->V, len);
+      break;
+    }
 
-    memcpy(raw, drbg->V, size);
+    memcpy(raw, drbg->V, 32);
 
-    raw += size;
-    len -= size;
+    raw += 32;
+    len -= 32;
   }
 
   btc_drbg_update(drbg, NULL, 0);

@@ -32,6 +32,15 @@ btc_hash256(uint8_t *out, const void *data, size_t size) {
   btc_hash256_final(&ctx, out);
 }
 
+void
+btc_hash256_root(uint8_t *out, const void *left, const void *right) {
+  btc_hash256_t ctx;
+  btc_hash256_init(&ctx);
+  btc_hash256_update(&ctx, left, 32);
+  btc_hash256_update(&ctx, right, 32);
+  btc_hash256_final(&ctx, out);
+}
+
 uint32_t
 btc_checksum(const void *data, size_t size) {
   uint8_t hash[32];
