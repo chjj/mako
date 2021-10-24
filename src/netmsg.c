@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <satoshi/bip37.h>
 #include <satoshi/bip152.h>
 #include <satoshi/block.h>
 #include <satoshi/bloom.h>
@@ -765,12 +766,6 @@ btc_filteradd_read(btc_filteradd_t *z, const uint8_t **xp, size_t *xn) {
 }
 
 /*
- * MerkleBlock
- */
-
-/* TODO */
-
-/*
  * FeeFilter
  */
 
@@ -987,7 +982,7 @@ btc_msg_clear(btc_msg_t *msg) {
     case BTC_MSG_FILTERCLEAR:
       break;
     case BTC_MSG_MERKLEBLOCK:
-      /* btc_merkleblock_destroy((btc_merkleblock_t *)msg->body); */
+      btc_merkleblock_destroy((btc_merkleblock_t *)msg->body);
       break;
     case BTC_MSG_FEEFILTER:
       btc_feefilter_destroy((btc_feefilter_t *)msg->body);
@@ -1250,7 +1245,7 @@ btc_msg_alloc(btc_msg_t *msg) {
       msg->body = NULL;
       break;
     case BTC_MSG_MERKLEBLOCK:
-      /* msg->body = btc_merkleblock_create(); */
+      msg->body = btc_merkleblock_create();
       break;
     case BTC_MSG_FEEFILTER:
       msg->body = btc_feefilter_create();
@@ -1327,8 +1322,7 @@ btc_msg_size(const btc_msg_t *x) {
     case BTC_MSG_FILTERCLEAR:
       return 0;
     case BTC_MSG_MERKLEBLOCK:
-      /* return btc_merkleblock_size((const btc_merkleblock_t *)x->body); */
-      return 0;
+      return btc_merkleblock_size((const btc_merkleblock_t *)x->body);
     case BTC_MSG_FEEFILTER:
       return btc_feefilter_size((const btc_feefilter_t *)x->body);
     case BTC_MSG_SENDCMPCT:
@@ -1399,8 +1393,7 @@ btc_msg_write(uint8_t *zp, const btc_msg_t *x) {
     case BTC_MSG_FILTERCLEAR:
       return zp;
     case BTC_MSG_MERKLEBLOCK:
-      /* return btc_merkleblock_write(zp, (const btc_merkleblock_t *)x->body); */
-      return zp;
+      return btc_merkleblock_write(zp, (const btc_merkleblock_t *)x->body);
     case BTC_MSG_FEEFILTER:
       return btc_feefilter_write(zp, (const btc_feefilter_t *)x->body);
     case BTC_MSG_SENDCMPCT:
@@ -1469,8 +1462,7 @@ btc_msg_read(btc_msg_t *z, const uint8_t **xp, size_t *xn) {
     case BTC_MSG_FILTERCLEAR:
       return 1;
     case BTC_MSG_MERKLEBLOCK:
-      /* return btc_merkleblock_read((btc_merkleblock_t *)z->body, xp, xn); */
-      return 1;
+      return btc_merkleblock_read((btc_merkleblock_t *)z->body, xp, xn);
     case BTC_MSG_FEEFILTER:
       return btc_feefilter_read((btc_feefilter_t *)z->body, xp, xn);
     case BTC_MSG_SENDCMPCT:

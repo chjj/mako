@@ -19,6 +19,7 @@
 #include <node/pool.h>
 #include <node/timedata.h>
 
+#include <satoshi/bip37.h>
 #include <satoshi/bip152.h>
 #include <satoshi/block.h>
 #include <satoshi/bloom.h>
@@ -1493,6 +1494,12 @@ btc_peer_on_msg(btc_peer_t *peer, btc_msg_t *msg) {
       break;
     case BTC_MSG_SENDHEADERS:
       btc_peer_on_sendheaders(peer);
+      break;
+    case BTC_MSG_FILTERLOAD:
+      break;
+    case BTC_MSG_FILTERADD:
+      break;
+    case BTC_MSG_FILTERCLEAR:
       break;
     case BTC_MSG_FEEFILTER:
       btc_peer_on_feefilter(peer, (const btc_feefilter_t *)msg->body);
@@ -3907,6 +3914,14 @@ btc_pool_on_msg(btc_pool_t *pool, btc_peer_t *peer, btc_msg_t *msg) {
       break;
     case BTC_MSG_MEMPOOL:
       btc_pool_on_mempool(pool, peer);
+      break;
+    case BTC_MSG_FILTERLOAD:
+      break;
+    case BTC_MSG_FILTERADD:
+      break;
+    case BTC_MSG_FILTERCLEAR:
+      break;
+    case BTC_MSG_MERKLEBLOCK:
       break;
     case BTC_MSG_FEEFILTER:
       btc_pool_on_feefilter(pool, peer, (const btc_feefilter_t *)msg->body);
