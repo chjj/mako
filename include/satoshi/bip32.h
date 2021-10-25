@@ -44,9 +44,6 @@ btc_hdpriv_set(btc_hdnode_t *node,
                const uint8_t *seckey,
                const uint8_t *entropy);
 
-BTC_EXTERN void
-btc_hdpriv_generate(btc_hdnode_t *node, enum btc_bip32_type type);
-
 BTC_EXTERN int
 btc_hdpriv_set_seed(btc_hdnode_t *node,
                     enum btc_bip32_type type,
@@ -58,6 +55,12 @@ btc_hdpriv_set_mnemonic(btc_hdnode_t *node,
                         enum btc_bip32_type type,
                         const btc_mnemonic_t *mn,
                         const char *pass);
+
+BTC_EXTERN void
+btc_hdpriv_generate(btc_hdnode_t *node, enum btc_bip32_type type);
+
+BTC_EXTERN int
+btc_hdpriv_equal(const btc_hdnode_t *x, const btc_hdnode_t *y);
 
 BTC_EXTERN int
 btc_hdpriv_derive(btc_hdnode_t *child,
@@ -80,7 +83,7 @@ btc_hdpriv_account(btc_hdnode_t *child,
 BTC_EXTERN int
 btc_hdpriv_leaf(btc_hdnode_t *child,
                 const btc_hdnode_t *node,
-                uint32_t branch,
+                uint32_t change,
                 uint32_t index);
 
 BTC_EXTERN void
@@ -136,8 +139,8 @@ btc_hdpub_set(btc_hdnode_t *node,
               const uint8_t *pubkey,
               const uint8_t *entropy);
 
-BTC_EXTERN void
-btc_hdpub_set_hdpriv(btc_hdnode_t *z, const btc_hdnode_t *x);
+BTC_EXTERN int
+btc_hdpub_equal(const btc_hdnode_t *x, const btc_hdnode_t *y);
 
 BTC_EXTERN int
 btc_hdpub_derive(btc_hdnode_t *child,
@@ -152,7 +155,7 @@ btc_hdpub_path(btc_hdnode_t *child,
 BTC_EXTERN int
 btc_hdpub_leaf(btc_hdnode_t *child,
                const btc_hdnode_t *node,
-               uint32_t branch,
+               uint32_t change,
                uint32_t index);
 
 BTC_EXTERN void

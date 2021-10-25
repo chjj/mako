@@ -488,7 +488,7 @@ static const btc_network_t mainnet = {
     }
   },
   /* .activation_threshold = */ 1916, /* 95% of 2016 */
-  /* .miner_window = */ 2016, /* nPowTargetTimespan / nPowTargetSpacing */
+  /* .miner_window = */ 2016, /* pow.target_timespan / pow.target_spacing */
   /* .deployments = */ {
     /* .items = */ mainnet_deployments,
     /* .length = */ lengthof(mainnet_deployments)
@@ -496,18 +496,18 @@ static const btc_network_t mainnet = {
   /* .key = */ {
     /* .privkey = */ 0x80,
     /* .xpubkey = */ {
-      0x0488b21e, /* xpub (legacy) */
+      0x0488b21e, /* xpub (p2pkh or p2sh) */
       0x049d7cb2, /* ypub (nested p2wpkh) */
-      0x04b24746, /* zpub (p2wpkh) */
+      0x04b24746, /* zpub (native p2wpkh) */
       0x0295b43f, /* Ypub (nested p2wsh) */
-      0x02aa7ed3  /* Zpub (p2wsh) */
+      0x02aa7ed3  /* Zpub (native p2wsh) */
     },
     /* .xprvkey = */ {
-      0x0488ade4, /* xprv (legacy) */
+      0x0488ade4, /* xprv (p2pkh or p2sh) */
       0x049d7878, /* yprv (nested p2wpkh) */
-      0x04b2430c, /* zprv (p2wpkh) */
+      0x04b2430c, /* zprv (native p2wpkh) */
       0x0295b005, /* Yprv (nested p2wsh) */
-      0x02aa7a99  /* Zprv (p2wsh) */
+      0x02aa7a99  /* Zprv (native p2wsh) */
     },
     /* .coin_type = */ 0
   },

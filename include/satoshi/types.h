@@ -243,7 +243,7 @@ typedef struct btc_mpentry_s {
 
 /* https://github.com/satoshilabs/slips/blob/master/slip-0132.md */
 enum btc_bip32_type {
-  BTC_BIP32_LEGACY = 0, /*  xpub/xprv, m/44' */
+  BTC_BIP32_STANDARD = 0, /*  xpub/xprv, m/44' */
   BTC_BIP32_NESTED_P2WPKH = 1, /* ypub/yprv, m/49' */
   BTC_BIP32_P2WPKH = 2, /* zpub/zprv, m/84' */
   BTC_BIP32_NESTED_P2WSH = 3, /* Ypub/Yprv */

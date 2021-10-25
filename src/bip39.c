@@ -41,7 +41,11 @@
 
 void
 btc_mnemonic_init(btc_mnemonic_t *mn) {
-  memset(mn, 0, sizeof(*mn));
+  int i;
+
+  for (i = 0; i < BIP39_MAX_WORDS; i++)
+    mn->words[i] = 0;
+
   mn->words[11] = 3;
   mn->length = 12;
 }
@@ -53,8 +57,12 @@ btc_mnemonic_clear(btc_mnemonic_t *mn) {
 
 void
 btc_mnemonic_copy(btc_mnemonic_t *z, const btc_mnemonic_t *x) {
-  if (z != x)
-    *z = *x;
+  int i;
+
+  for (i = 0; i < BIP39_MAX_WORDS; i++)
+    z->words[i] = x->words[i];
+
+  z->length = x->length;
 }
 
 void
@@ -363,28 +371,6 @@ btc_mnemonic_import(btc_mnemonic_t *mn, const uint8_t *xp, size_t xn) {
 /*
  * HD Private
  */
-
-int
-btc_hdpriv_set_seed(btc_hdnode_t *node,
-                    enum btc_bip32_type type,
-                    const uint8_t *seed,
-                    size_t length) {
-  static const uint8_t salt[] = "Bitcoin seed";
-  btc_hmac512_t ctx;
-  uint8_t hash[64];
-  int ret = 1;
-
-  btc_hmac512_init(&ctx, salt, sizeof(salt) - 1);
-  btc_hmac512_update(&ctx, seed, length);
-  btc_hmac512_final(&ctx, hash);
-
-  ret &= btc_hdpriv_set(node, type, hash, hash + 32);
-
-  btc_memzero(hash, sizeof(hash));
-  btc_memzero(&ctx, sizeof(ctx));
-
-  return ret;
-}
 
 int
 btc_hdpriv_set_mnemonic(btc_hdnode_t *node,
