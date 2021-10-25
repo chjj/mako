@@ -28,7 +28,7 @@
  * Compact Block
  */
 
-DEFINE_SERIALIZABLE_OBJECT(btc_cmpct, SCOPE_EXTERN)
+DEFINE_SERIALIZABLE_REFOBJ(btc_cmpct, SCOPE_EXTERN)
 
 void
 btc_cmpct_init(btc_cmpct_t *z) {
@@ -42,6 +42,7 @@ btc_cmpct_init(btc_cmpct_t *z) {
   z->count = 0;
   btc_hash_init(z->sipkey);
   z->now = 0;
+  z->_refs = 0;
 }
 
 void
@@ -106,7 +107,7 @@ btc_cmpct_set_block(btc_cmpct_t *z, const btc_block_t *x, int witness) {
 
   CHECK(x->txs.length > 0);
 
-  cb = btc_tx_clone(x->txs.items[0]);
+  cb = btc_tx_ref(x->txs.items[0]);
   cb->_index = 0;
 
   btc_txvec_reset(&z->ptx);
@@ -143,7 +144,7 @@ btc_cmpct_setup(btc_cmpct_t *blk) {
     blk->avail.items[i] = NULL;
 
   for (i = 0; i < blk->ptx.length; i++) {
-    const btc_tx_t *tx = blk->ptx.items[i];
+    btc_tx_t *tx = blk->ptx.items[i];
 
     last += tx->_index + 1;
 
@@ -153,7 +154,7 @@ btc_cmpct_setup(btc_cmpct_t *blk) {
     if ((size_t)last > blk->ids.length + i)
       return -1;
 
-    blk->avail.items[last] = btc_tx_clone(tx);
+    blk->avail.items[last] = btc_tx_ref(tx);
     blk->count += 1;
   }
 
@@ -212,7 +213,7 @@ btc_cmpct_fill_mempool(btc_cmpct_t *blk, btc_hashmapiter_t *iter, int witness) {
       continue;
     }
 
-    blk->avail.items[index] = btc_tx_clone(&entry->tx);
+    blk->avail.items[index] = btc_tx_ref(entry->tx);
     blk->count += 1;
 
     /* We actually may have a siphash collision
@@ -243,7 +244,7 @@ btc_cmpct_fill_missing(btc_cmpct_t *blk, const btc_blocktxn_t *msg) {
     if (offset >= msg->txs.length)
       return 0;
 
-    blk->avail.items[i] = btc_tx_clone(msg->txs.items[offset++]);
+    blk->avail.items[i] = btc_tx_ref(msg->txs.items[offset++]);
     blk->count += 1;
   }
 
@@ -269,11 +270,8 @@ btc_cmpct_finalize(btc_block_t *z, btc_cmpct_t *x) {
 
     CHECK(tx != NULL);
 
-    x->avail.items[i] = NULL;
-    z->txs.items[i] = tx;
+    z->txs.items[i] = btc_tx_ref(tx);
   }
-
-  x->count = 0;
 }
 
 static size_t
@@ -558,8 +556,8 @@ void
 btc_blocktxn_set_block(btc_blocktxn_t *res,
                        const btc_block_t *blk,
                        const btc_getblocktxn_t *req) {
-  const btc_tx_t *tx;
   size_t i, index;
+  btc_tx_t *tx;
 
   btc_header_hash(res->hash, &blk->header);
 
@@ -573,7 +571,7 @@ btc_blocktxn_set_block(btc_blocktxn_t *res,
 
     tx = blk->txs.items[index];
 
-    btc_txvec_push(&res->txs, btc_tx_clone(tx));
+    btc_txvec_push(&res->txs, btc_tx_ref(tx));
   }
 }
 

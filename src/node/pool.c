@@ -3652,8 +3652,7 @@ btc_pool_on_sendcmpct(btc_pool_t *pool,
 static void
 btc_pool_on_cmpctblock(btc_pool_t *pool,
                        btc_peer_t *peer,
-                       btc_msg_t *msg) {
-  btc_cmpct_t *block = (btc_cmpct_t *)msg->body;
+                       btc_cmpct_t *block) {
   btc_mpiter_t iter;
   int rc;
 
@@ -3737,16 +3736,15 @@ btc_pool_on_cmpctblock(btc_pool_t *pool,
   btc_mempool_iterate(&iter, pool->mempool);
 
   if (btc_cmpct_fill_mempool(block, &iter, peer->compact_witness)) {
-    btc_block_t blk;
+    btc_block_t *blk = btc_block_create();
 
     btc_pool_log(pool,
       "Received full compact block %H (%N).",
       block->hash, &peer->addr);
 
-    btc_block_init(&blk);
-    btc_cmpct_finalize(&blk, block);
-    btc_pool_add_block(pool, peer, &blk, BTC_CHAIN_VERIFY_BODY);
-    btc_block_clear(&blk);
+    btc_cmpct_finalize(blk, block);
+    btc_pool_add_block(pool, peer, blk, BTC_CHAIN_VERIFY_BODY);
+    btc_block_destroy(blk);
 
     return;
   }
@@ -3760,10 +3758,7 @@ btc_pool_on_cmpctblock(btc_pool_t *pool,
   block->now = btc_ms();
 
   CHECK(btc_hashset_put(pool->compact_map, block->hash));
-  CHECK(btc_hashmap_put(peer->compact_map, block->hash, block));
-
-  /* Take ownership. */
-  msg->body = NULL;
+  CHECK(btc_hashmap_put(peer->compact_map, block->hash, btc_cmpct_ref(block)));
 
   btc_pool_log(pool,
     "Received non-full compact block %H tx=%zu/%zu (%N).",
@@ -3820,7 +3815,7 @@ btc_pool_on_blocktxn(btc_pool_t *pool,
                      btc_peer_t *peer,
                      const btc_blocktxn_t *res) {
   btc_cmpct_t *block = btc_hashmap_get(peer->compact_map, res->hash);
-  btc_block_t blk;
+  btc_block_t *blk;
 
   if (block == NULL) {
     btc_pool_log(pool, "Peer sent unsolicited blocktxn (%N).",
@@ -3844,10 +3839,11 @@ btc_pool_on_blocktxn(btc_pool_t *pool,
   btc_pool_log(pool, "Filled compact block %H (%N).",
                      block->hash, &peer->addr);
 
-  btc_block_init(&blk);
-  btc_cmpct_finalize(&blk, block);
-  btc_pool_add_block(pool, peer, &blk, BTC_CHAIN_VERIFY_BODY);
-  btc_block_clear(&blk);
+  blk = btc_block_create();
+
+  btc_cmpct_finalize(blk, block);
+  btc_pool_add_block(pool, peer, blk, BTC_CHAIN_VERIFY_BODY);
+  btc_block_destroy(blk);
   btc_cmpct_destroy(block);
 }
 
@@ -3930,7 +3926,7 @@ btc_pool_on_msg(btc_pool_t *pool, btc_peer_t *peer, btc_msg_t *msg) {
       btc_pool_on_sendcmpct(pool, peer, (const btc_sendcmpct_t *)msg->body);
       break;
     case BTC_MSG_CMPCTBLOCK:
-      btc_pool_on_cmpctblock(pool, peer, msg);
+      btc_pool_on_cmpctblock(pool, peer, (btc_cmpct_t *)msg->body);
       break;
     case BTC_MSG_GETBLOCKTXN:
       btc_pool_on_getblocktxn(pool, peer, (const btc_getblocktxn_t *)msg->body);

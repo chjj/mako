@@ -57,6 +57,68 @@ name##_clone(const name##_t *x) {             \
 }
 
 /*
+ * Ref-Counted Object
+ */
+
+#define DEFINE_REFOBJ(name, scope)            \
+scope void                                    \
+name##_init(name##_t *z);                     \
+                                              \
+scope void                                    \
+name##_clear(name##_t *z);                    \
+                                              \
+scope void                                    \
+name##_copy(name##_t *x, const name##_t *y);  \
+                                              \
+scope name##_t *                              \
+name##_create(void) {                         \
+  name##_t *z = btc_malloc(sizeof(name##_t)); \
+                                              \
+  name##_init(z);                             \
+                                              \
+  z->_refs = 1;                               \
+                                              \
+  return z;                                   \
+}                                             \
+                                              \
+scope void                                    \
+name##_destroy(name##_t *z) {                 \
+  if (z->_refs <= 0)                          \
+    btc_abort(); /* LCOV_EXCL_LINE */         \
+                                              \
+  if (--z->_refs == 0) {                      \
+    name##_clear(z);                          \
+    btc_free(z);                              \
+  }                                           \
+}                                             \
+                                              \
+scope name##_t *                              \
+name##_clone(const name##_t *x) {             \
+  name##_t *z = name##_create();              \
+  name##_copy(z, x);                          \
+  return z;                                   \
+}                                             \
+                                              \
+scope name##_t *                              \
+name##_ref(name##_t *z) {                     \
+  if (z->_refs <= 0)                          \
+    btc_abort(); /* LCOV_EXCL_LINE */         \
+                                              \
+  z->_refs++;                                 \
+                                              \
+  return z;                                   \
+}                                             \
+                                              \
+name##_t *                                    \
+name##_refconst(const name##_t *x) {          \
+  if (x->_refs == 0)                          \
+    return name##_clone(x);                   \
+                                              \
+  /* UB if `x` was _defined_ as const! */     \
+  return name##_ref((name##_t *)x);           \
+}
+
+/*
  * Vector
  */
 
@@ -144,9 +206,10 @@ name##_copy(name##_t *z, const name##_t *x) {                   \
   size_t i;                                                     \
                                                                 \
   name##_reset(z);                                              \
+  name##_resize(z, x->length);                                  \
                                                                 \
   for (i = 0; i < x->length; i++)                               \
-    name##_push(z, child##_clone(x->items[i]));                 \
+    z->items[i] = child##_clone(x->items[i]);                   \
 }
 
 /*
@@ -205,6 +268,14 @@ name##_decode(const uint8_t *xp, size_t xn) {                \
 
 #define DEFINE_SERIALIZABLE_OBJECT(name, scope) \
 DEFINE_OBJECT(name, scope)                      \
+DEFINE_SERIALIZABLE(name, scope)
+
+/*
+ * Serializable Ref-Counted Object
+ */
+
+#define DEFINE_SERIALIZABLE_REFOBJ(name, scope) \
+DEFINE_REFOBJ(name, scope)                      \
 DEFINE_SERIALIZABLE(name, scope)
 
 /*

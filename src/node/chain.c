@@ -393,7 +393,7 @@ btc_chain_store_orphan(btc_chain_t *chain,
   }
 
   orphan = btc_orphan_create();
-  orphan->block = btc_block_clone(block);
+  orphan->block = btc_block_refconst(block);
   orphan->flags = flags;
   orphan->id = id;
   orphan->time = btc_now();

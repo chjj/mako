@@ -69,13 +69,6 @@ btc_coins_put(btc_coins_t *coins, uint32_t index, btc_coin_t *coin) {
 
   CHECK(ret != -1);
 
-  /* It might be better to free `coin` in this
-     situation. This call could break things if
-     the coin in the bucket is present in the
-     undo vector. Emphasis on "could": the code
-     is currently structured in such a way that
-     this should be impossible (short of a txid
-     collision). */
   if (ret == 0)
     btc_coin_destroy(kh_value(coins->map, it));
 
@@ -119,8 +112,6 @@ btc_view_destroy(btc_view_t *view) {
   }
 
   kh_destroy(view, view->map);
-
-  view->undo.length = 0; /* Do not double-free coins. */
 
   btc_undo_clear(&view->undo);
 
@@ -212,7 +203,7 @@ btc_view_spend(btc_view_t *view,
 
     coin->spent = 1;
 
-    btc_undo_push(&view->undo, coin);
+    btc_undo_push(&view->undo, btc_coin_ref(coin));
   }
 
   return 1;

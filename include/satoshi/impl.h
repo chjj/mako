@@ -25,6 +25,26 @@ scope name ## _t *                     \
 name ## _clone(const name ## _t *x);
 
 /*
+ * Ref-Counted Object
+ */
+
+#define BTC_DEFINE_REFOBJ(name, scope)  \
+scope name ## _t *                      \
+name ## _create(void);                  \
+                                        \
+scope void                              \
+name ## _destroy(name ## _t *z);        \
+                                        \
+scope name ## _t *                      \
+name ## _clone(const name ## _t *x);    \
+                                        \
+scope name ## _t *                      \
+name ## _ref(name ## _t *z);            \
+                                        \
+scope name ## _t *                      \
+name ## _refconst(const name ## _t *x);
+
+/*
  * Vector
  */
 
@@ -84,6 +104,14 @@ name ## _decode(const uint8_t *xp, size_t xn);
 
 #define BTC_DEFINE_SERIALIZABLE_OBJECT(name, scope) \
 BTC_DEFINE_OBJECT(name, scope)                      \
+BTC_DEFINE_SERIALIZABLE(name, scope)
+
+/*
+ * Serializable Ref-Counted Object
+ */
+
+#define BTC_DEFINE_SERIALIZABLE_REFOBJ(name, scope) \
+BTC_DEFINE_REFOBJ(name, scope)                      \
 BTC_DEFINE_SERIALIZABLE(name, scope)
 
 /*

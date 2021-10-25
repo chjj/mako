@@ -14,6 +14,7 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 #include "common.h"
+#include "buffer.h"
 #include "impl.h"
 #include "types.h"
 
@@ -367,49 +368,31 @@ btc_opcode_read(btc_opcode_t *z, const uint8_t **xp, size_t *xn);
  * Script
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_script, BTC_EXTERN)
+#define btc_script_create btc_buffer_create
+#define btc_script_destroy btc_buffer_destroy
+#define btc_script_clone btc_buffer_clone
+#define btc_script_ref btc_buffer_ref
+#define btc_script_refconst btc_buffer_refconst
 
-BTC_EXTERN void
-btc_script_init(btc_script_t *z);
+#define btc_script_export btc_buffer_export
+#define btc_script_encode btc_buffer_encode
+#define btc_script_import btc_buffer_import
+#define btc_script_decode btc_buffer_decode
 
-BTC_EXTERN void
-btc_script_clear(btc_script_t *z);
-
-BTC_EXTERN uint8_t *
-btc_script_grow(btc_script_t *z, size_t zn);
-
-BTC_EXTERN uint8_t *
-btc_script_resize(btc_script_t *z, size_t zn);
-
-BTC_EXTERN void
-btc_script_set(btc_script_t *z, const uint8_t *xp, size_t xn);
-
-BTC_EXTERN void
-btc_script_copy(btc_script_t *z, const btc_script_t *x);
-
-BTC_EXTERN void
-btc_script_roset(btc_script_t *z, const uint8_t *xp, size_t xn);
-
-BTC_EXTERN void
-btc_script_rocopy(btc_script_t *z, const btc_script_t *x);
-
-BTC_EXTERN btc_script_t *
-btc_script_roclone(const btc_script_t *x);
-
-BTC_EXTERN int
-btc_script_equal(const btc_script_t *x, const btc_script_t *y);
-
-BTC_EXTERN size_t
-btc_script_size(const btc_script_t *x);
-
-BTC_EXTERN uint8_t *
-btc_script_write(uint8_t *zp, const btc_script_t *x);
-
-BTC_EXTERN int
-btc_script_read(btc_script_t *z, const uint8_t **xp, size_t *xn);
-
-BTC_EXTERN void
-btc_script_update(btc__hash256_t *ctx, const btc_script_t *x);
+#define btc_script_init btc_buffer_init
+#define btc_script_clear btc_buffer_clear
+#define btc_script_grow btc_buffer_grow
+#define btc_script_resize btc_buffer_resize
+#define btc_script_set btc_buffer_set
+#define btc_script_copy btc_buffer_copy
+#define btc_script_roset btc_buffer_roset
+#define btc_script_rocopy btc_buffer_rocopy
+#define btc_script_roclone btc_buffer_roclone
+#define btc_script_equal btc_buffer_equal
+#define btc_script_size btc_buffer_size
+#define btc_script_write btc_buffer_write
+#define btc_script_read btc_buffer_read
+#define btc_script_update btc_buffer_update
 
 BTC_EXTERN void
 btc_script_hash160(uint8_t *hash, const btc_script_t *script);

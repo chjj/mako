@@ -32,6 +32,7 @@ typedef struct btc_cmpct_s {
   size_t count;
   uint8_t sipkey[32];
   int64_t now;
+  int _refs;
 } btc_cmpct_t;
 
 typedef struct btc_getblocktxn_s {
@@ -48,7 +49,7 @@ typedef struct btc_blocktxn_s {
  * Compact Block
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_cmpct, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_REFOBJ(btc_cmpct, BTC_EXTERN)
 
 BTC_EXTERN void
 btc_cmpct_init(btc_cmpct_t *z);

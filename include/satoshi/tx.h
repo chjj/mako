@@ -141,7 +141,7 @@ BTC_DEFINE_HASHABLE_VECTOR(btc_outvec, btc_output, BTC_EXTERN)
  * Transaction
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_tx, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_REFOBJ(btc_tx, BTC_EXTERN)
 
 BTC_EXTERN void
 btc_tx_init(btc_tx_t *tx);

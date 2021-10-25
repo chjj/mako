@@ -40,6 +40,7 @@ typedef struct btc_buffer_s {
   uint8_t *data;
   size_t alloc;
   size_t length;
+  int _refs;
 } btc_buffer_t;
 
 typedef struct btc_array_s {
@@ -125,6 +126,7 @@ typedef struct btc_tx_s {
   btc_outvec_t outputs;
   uint32_t locktime;
   int _index;
+  int _refs;
 } btc_tx_t;
 
 typedef struct btc_txvec_s {
@@ -145,6 +147,7 @@ typedef struct btc_header_s {
 typedef struct btc_block_s {
   btc_header_t header;
   btc_txvec_t txs;
+  int _refs;
 } btc_block_t;
 
 typedef struct btc_entry_s {
@@ -166,6 +169,7 @@ typedef struct btc_coin_s {
   int coinbase;
   int spent;
   btc_output_t output;
+  int _refs;
 } btc_coin_t;
 
 typedef struct btc_undo_s {
@@ -228,7 +232,7 @@ typedef struct btc_filter_s {
 typedef struct btc_mpentry_s {
   const uint8_t *hash;
   const uint8_t *whash;
-  btc_tx_t tx;
+  btc_tx_t *tx;
   int32_t height;
   uint32_t size;
   uint32_t sigops;

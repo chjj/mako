@@ -73,10 +73,9 @@ DEFINE_SERIALIZABLE_OBJECT(btc_mpentry, SCOPE_STATIC)
 
 static void
 btc_mpentry_init(btc_mpentry_t *entry) {
-  btc_tx_init(&entry->tx);
-
-  entry->hash = entry->tx.hash;
-  entry->whash = entry->tx.whash;
+  entry->tx = NULL;
+  entry->hash = NULL;
+  entry->whash = NULL;
   entry->height = -1;
   entry->size = 0;
   entry->sigops = 0;
@@ -91,15 +90,17 @@ btc_mpentry_init(btc_mpentry_t *entry) {
 
 static void
 btc_mpentry_clear(btc_mpentry_t *entry) {
-  btc_tx_clear(&entry->tx);
+  if (entry->tx != NULL)
+    btc_tx_destroy(entry->tx);
+
+  entry->tx = NULL;
 }
 
 static void
 btc_mpentry_copy(btc_mpentry_t *z, const btc_mpentry_t *x) {
-  btc_tx_copy(&z->tx, &x->tx);
-
-  z->hash = z->tx.hash;
-  z->whash = z->tx.whash;
+  z->tx = btc_tx_ref(x->tx);
+  z->hash = z->tx->hash;
+  z->whash = z->tx->whash;
   z->height = x->height;
   z->size = x->size;
   z->sigops = x->sigops;
@@ -125,11 +126,6 @@ btc_mpentry_set(btc_mpentry_t *entry,
   int coinbase = 0;
   size_t i;
 
-  btc_tx_copy(&entry->tx, tx);
-
-  entry->hash = entry->tx.hash;
-  entry->whash = entry->tx.whash;
-
   for (i = 0; i < tx->inputs.length; i++) {
     const btc_input_t *input = tx->inputs.items[i];
     const btc_coin_t *coin = btc_view_get(view, &input->prevout);
@@ -143,6 +139,9 @@ btc_mpentry_set(btc_mpentry_t *entry,
       dependencies = 1;
   }
 
+  entry->tx = btc_tx_refconst(tx);
+  entry->hash = entry->tx->hash;
+  entry->whash = entry->tx->whash;
   entry->height = height;
   entry->size = size;
   entry->sigops = sigops;
@@ -157,12 +156,12 @@ btc_mpentry_set(btc_mpentry_t *entry,
 
 static size_t
 btc_mpentry_size(const btc_mpentry_t *x) {
-  return btc_tx_size(&x->tx) + 30;
+  return btc_tx_size(x->tx) + 30;
 }
 
 static uint8_t *
 btc_mpentry_write(uint8_t *zp, const btc_mpentry_t *x) {
-  zp = btc_tx_write(zp, &x->tx);
+  zp = btc_tx_write(zp, x->tx);
   zp = btc_int32_write(zp, x->height);
   zp = btc_uint32_write(zp, x->size);
   zp = btc_uint32_write(zp, x->sigops);
@@ -175,7 +174,9 @@ btc_mpentry_write(uint8_t *zp, const btc_mpentry_t *x) {
 
 static int
 btc_mpentry_read(btc_mpentry_t *z, const uint8_t **xp, size_t *xn) {
-  if (!btc_tx_read(&z->tx, xp, xn))
+  z->tx = btc_tx_create();
+
+  if (!btc_tx_read(z->tx, xp, xn))
     return 0;
 
   if (!btc_int32_read(&z->height, xp, xn))
@@ -199,8 +200,8 @@ btc_mpentry_read(btc_mpentry_t *z, const uint8_t **xp, size_t *xn) {
   if (!btc_uint8_read(&z->dependencies, xp, xn))
     return 0;
 
-  z->hash = z->tx.hash;
-  z->whash = z->tx.whash;
+  z->hash = z->tx->hash;
+  z->whash = z->tx->whash;
 
   return 1;
 }
@@ -483,7 +484,7 @@ btc_mempool_add_orphan(btc_mempool_t *mp,
   btc_hashsetiter_t iter;
   size_t i;
 
-  orphan->tx = btc_tx_clone(tx);
+  orphan->tx = btc_tx_refconst(tx);
   orphan->hash = orphan->tx->hash;
   orphan->missing = 0;
   orphan->id = id;
@@ -609,10 +610,10 @@ btc_mempool_view(btc_mempool_t *mp, const btc_tx_t *tx) {
     if (btc_outmap_has(mp->spents, prevout))
       continue;
 
-    if (prevout->index >= parent->tx.outputs.length)
+    if (prevout->index >= parent->tx->outputs.length)
       continue;
 
-    coin = btc_tx_coin(&parent->tx, prevout->index, -1);
+    coin = btc_tx_coin(parent->tx, prevout->index, -1);
 
     btc_view_put(view, prevout, coin);
   }
@@ -655,7 +656,7 @@ traverse_ancestors(btc_mempool_t *mp,
                    const btc_mpentry_t *child,
                    void (*map)(btc_mpentry_t *,
                                const btc_mpentry_t *)) {
-  const btc_tx_t *tx = &entry->tx;
+  const btc_tx_t *tx = entry->tx;
   size_t i;
 
   for (i = 0; i < tx->inputs.length; i++) {
@@ -729,7 +730,7 @@ btc_mempool_is_double_spend(btc_mempool_t *mp, const btc_tx_t *tx) {
 
 static void
 btc_mempool_track_entry(btc_mempool_t *mp, btc_mpentry_t *entry) {
-  const btc_tx_t *tx = &entry->tx;
+  const btc_tx_t *tx = entry->tx;
   size_t i;
 
   CHECK(!btc_tx_is_coinbase(tx));
@@ -763,7 +764,7 @@ btc_mempool_add_entry(btc_mempool_t *mp,
 static void
 btc_mempool_untrack_entry(btc_mempool_t *mp,
                           const btc_mpentry_t *entry) {
-  const btc_tx_t *tx = &entry->tx;
+  const btc_tx_t *tx = entry->tx;
   size_t i;
 
   CHECK(!btc_tx_is_coinbase(tx));
@@ -791,7 +792,7 @@ btc_mempool_remove_spenders(btc_mempool_t *mp,
   btc_outpoint_t prevout;
   size_t i;
 
-  for (i = 0; i < entry->tx.outputs.length; i++) {
+  for (i = 0; i < entry->tx->outputs.length; i++) {
     btc_outpoint_set(&prevout, entry->hash, i);
 
     spender = btc_outmap_get(mp->spents, &prevout);
@@ -900,7 +901,7 @@ btc_mempool_limit_size(btc_mempool_t *mp, const uint8_t *added) {
   while (btc_hashmap_next(&iter)) {
     btc_mpentry_t *entry = iter.val;
 
-    if (btc_mempool_has_dependencies(mp, &entry->tx))
+    if (btc_mempool_has_dependencies(mp, entry->tx))
       continue;
 
     if (now < entry->time + BTC_MEMPOOL_EXPIRY_TIME) {
@@ -945,7 +946,7 @@ btc_mempool_verify_inputs(btc_mempool_t *mp,
                           const btc_mpentry_t *entry,
                           const btc_view_t *view,
                           unsigned int flags) {
-  const btc_tx_t *tx = &entry->tx;
+  const btc_tx_t *tx = entry->tx;
 
   if (btc_tx_verify(tx, view, flags))
     return 1;
@@ -977,7 +978,7 @@ btc_mempool_verify(btc_mempool_t *mp,
   const btc_deployment_state_t *state = btc_chain_state(mp->chain);
   const btc_entry_t *tip = btc_chain_tip(mp->chain);
   int32_t height = tip->height + 1;
-  const btc_tx_t *tx = &entry->tx;
+  const btc_tx_t *tx = entry->tx;
   btc_verify_error_t err;
   unsigned int flags;
   int64_t minfee;
@@ -1341,7 +1342,7 @@ btc_mempool_handle_reorg(btc_mempool_t *mp) {
 
   while (btc_hashmap_next(&iter)) {
     btc_mpentry_t *entry = iter.val;
-    btc_tx_t *tx = &entry->tx;
+    btc_tx_t *tx = entry->tx;
     btc_view_t *view;
 
     if (!btc_tx_is_final(tx, height, mtp)) {

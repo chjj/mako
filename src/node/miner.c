@@ -109,12 +109,12 @@ btc_blockentry_set_view(btc_blockentry_t *z,
 
 static void
 btc_blockentry_set_mpentry(btc_blockentry_t *z, const btc_mpentry_t *x) {
-  z->tx = btc_tx_clone(&x->tx);
+  z->tx = btc_tx_ref(x->tx);
   z->hash = z->tx->hash;
   z->whash = z->tx->whash;
   z->fee = x->fee;
   z->rate = btc_get_rate(x->size, x->delta_fee);
-  z->weight = btc_tx_weight(&x->tx);
+  z->weight = btc_tx_weight(x->tx);
   z->sigops = x->sigops;
   z->desc_rate = btc_get_rate(x->desc_size, x->desc_fee);
   z->dep_count = 0;
@@ -373,7 +373,7 @@ btc_tmpl_commit(const btc_tmpl_t *bt, const btc_blockproof_t *proof) {
   for (i = 0; i < bt->txs.length; i++) {
     const btc_blockentry_t *item = bt->txs.items[i];
 
-    btc_txvec_push(&block->txs, btc_tx_clone(item->tx));
+    btc_txvec_push(&block->txs, btc_tx_ref(item->tx));
   }
 
   return block;
@@ -435,7 +435,7 @@ btc_tmpl_submitwork(const btc_tmpl_t *bt,
   for (i = 0; i < bt->txs.length; i++) {
     const btc_blockentry_t *item = bt->txs.items[i];
 
-    btc_txvec_push(&block->txs, btc_tx_clone(item->tx));
+    btc_txvec_push(&block->txs, btc_tx_ref(item->tx));
   }
 
   return block;

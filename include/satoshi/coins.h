@@ -40,7 +40,7 @@ typedef struct btc_viewiter_s {
  * Coin
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_coin, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_REFOBJ(btc_coin, BTC_EXTERN)
 
 BTC_EXTERN void
 btc_coin_init(btc_coin_t *z);

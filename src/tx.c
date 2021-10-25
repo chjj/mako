@@ -24,7 +24,7 @@
  * Transaction
  */
 
-DEFINE_SERIALIZABLE_OBJECT(btc_tx, SCOPE_EXTERN)
+DEFINE_SERIALIZABLE_REFOBJ(btc_tx, SCOPE_EXTERN)
 
 void
 btc_tx_init(btc_tx_t *tx) {
@@ -34,6 +34,8 @@ btc_tx_init(btc_tx_t *tx) {
   btc_inpvec_init(&tx->inputs);
   btc_outvec_init(&tx->outputs);
   tx->locktime = 0;
+  tx->_index = 0;
+  tx->_refs = 0;
 }
 
 void

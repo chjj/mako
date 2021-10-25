@@ -16,7 +16,7 @@
  * Coin
  */
 
-DEFINE_SERIALIZABLE_OBJECT(btc_coin, SCOPE_EXTERN)
+DEFINE_SERIALIZABLE_REFOBJ(btc_coin, SCOPE_EXTERN)
 
 void
 btc_coin_init(btc_coin_t *z) {
@@ -25,6 +25,7 @@ btc_coin_init(btc_coin_t *z) {
   z->coinbase = 0;
   z->spent = 0;
   btc_output_init(&z->output);
+  z->_refs = 0;
 }
 
 void

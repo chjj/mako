@@ -97,6 +97,17 @@ btc_scriptnum_import(const uint8_t *xp, size_t xn) {
 
 DEFINE_HASHABLE_VECTOR(btc_stack, btc_buffer, SCOPE_EXTERN)
 
+static void
+btc_stack_assign(btc_stack_t *z, const btc_stack_t *x) {
+  size_t i;
+
+  btc_stack_reset(z);
+  btc_stack_resize(z, x->length);
+
+  for (i = 0; i < x->length; i++)
+    z->items[i] = btc_buffer_ref(x->items[i]);
+}
+
 btc_buffer_t *
 btc_stack_get(const btc_stack_t *stack, int index) {
   if (index < 0)
@@ -555,78 +566,6 @@ btc_opcode_read(btc_opcode_t *z, const uint8_t **xp, size_t *xn) {
 /*
  * Script
  */
-
-DEFINE_SERIALIZABLE_OBJECT(btc_script, SCOPE_EXTERN)
-
-void
-btc_script_init(btc_script_t *z) {
-  btc_buffer_init(z);
-}
-
-void
-btc_script_clear(btc_script_t *z) {
-  btc_buffer_clear(z);
-}
-
-uint8_t *
-btc_script_grow(btc_script_t *z, size_t zn) {
-  return btc_buffer_grow(z, zn);
-}
-
-uint8_t *
-btc_script_resize(btc_script_t *z, size_t zn) {
-  return btc_buffer_resize(z, zn);
-}
-
-void
-btc_script_set(btc_script_t *z, const uint8_t *xp, size_t xn) {
-  btc_buffer_set(z, xp, xn);
-}
-
-void
-btc_script_copy(btc_script_t *z, const btc_script_t *x) {
-  btc_buffer_copy(z, x);
-}
-
-void
-btc_script_roset(btc_script_t *z, const uint8_t *xp, size_t xn) {
-  btc_buffer_roset(z, xp, xn);
-}
-
-void
-btc_script_rocopy(btc_script_t *z, const btc_script_t *x) {
-  btc_buffer_rocopy(z, x);
-}
-
-btc_script_t *
-btc_script_roclone(const btc_script_t *x) {
-  return btc_buffer_roclone(x);
-}
-
-int
-btc_script_equal(const btc_script_t *x, const btc_script_t *y) {
-  return btc_buffer_equal(x, y);
-}
-
-size_t
-btc_script_size(const btc_script_t *x) {
-  return btc_buffer_size(x);
-}
-
-uint8_t *
-btc_script_write(uint8_t *zp, const btc_script_t *x) {
-  return btc_buffer_write(zp, x);
-}
-
-int
-btc_script_read(btc_script_t *z, const uint8_t **xp, size_t *xn) {
-  return btc_buffer_read(z, xp, xn);
-}
-
-void
-btc_script_update(btc_hash256_t *ctx, const btc_script_t *x) {
-  btc_buffer_update(ctx, x);
-}
 
 void
 btc_script_hash160(uint8_t *hash, const btc_script_t *script) {
@@ -1835,7 +1774,7 @@ btc_script_execute(const btc_script_t *script,
         break;
       }
       case BTC_OP_2DUP: {
-        const btc_buffer_t *v1, *v2;
+        btc_buffer_t *v1, *v2;
 
         if (stack->length < 2)
           THROW(BTC_SCRIPT_ERR_INVALID_STACK_OPERATION);
@@ -1843,13 +1782,13 @@ btc_script_execute(const btc_script_t *script,
         v1 = btc_stack_get(stack, -2);
         v2 = btc_stack_get(stack, -1);
 
-        btc_stack_push(stack, btc_buffer_clone(v1));
-        btc_stack_push(stack, btc_buffer_clone(v2));
+        btc_stack_push(stack, btc_buffer_ref(v1));
+        btc_stack_push(stack, btc_buffer_ref(v2));
 
         break;
       }
       case BTC_OP_3DUP: {
-        const btc_buffer_t *v1, *v2, *v3;
+        btc_buffer_t *v1, *v2, *v3;
 
         if (stack->length < 3)
           THROW(BTC_SCRIPT_ERR_INVALID_STACK_OPERATION);
@@ -1858,14 +1797,14 @@ btc_script_execute(const btc_script_t *script,
         v2 = btc_stack_get(stack, -2);
         v3 = btc_stack_get(stack, -1);
 
-        btc_stack_push(stack, btc_buffer_clone(v1));
-        btc_stack_push(stack, btc_buffer_clone(v2));
-        btc_stack_push(stack, btc_buffer_clone(v3));
+        btc_stack_push(stack, btc_buffer_ref(v1));
+        btc_stack_push(stack, btc_buffer_ref(v2));
+        btc_stack_push(stack, btc_buffer_ref(v3));
 
         break;
       }
       case BTC_OP_2OVER: {
-        const btc_buffer_t *v1, *v2;
+        btc_buffer_t *v1, *v2;
 
         if (stack->length < 4)
           THROW(BTC_SCRIPT_ERR_INVALID_STACK_OPERATION);
@@ -1873,8 +1812,8 @@ btc_script_execute(const btc_script_t *script,
         v1 = btc_stack_get(stack, -4);
         v2 = btc_stack_get(stack, -3);
 
-        btc_stack_push(stack, btc_buffer_clone(v1));
-        btc_stack_push(stack, btc_buffer_clone(v2));
+        btc_stack_push(stack, btc_buffer_ref(v1));
+        btc_stack_push(stack, btc_buffer_ref(v2));
 
         break;
       }
@@ -1903,7 +1842,7 @@ btc_script_execute(const btc_script_t *script,
         break;
       }
       case BTC_OP_IFDUP: {
-        const btc_buffer_t *val;
+        btc_buffer_t *val;
 
         if (stack->length == 0)
           THROW(BTC_SCRIPT_ERR_INVALID_STACK_OPERATION);
@@ -1911,7 +1850,7 @@ btc_script_execute(const btc_script_t *script,
         if (btc_stack_get_bool(stack, -1)) {
           val = btc_stack_get(stack, -1);
 
-          btc_stack_push(stack, btc_buffer_clone(val));
+          btc_stack_push(stack, btc_buffer_ref(val));
         }
 
         break;
@@ -1929,14 +1868,14 @@ btc_script_execute(const btc_script_t *script,
         break;
       }
       case BTC_OP_DUP: {
-        const btc_buffer_t *val;
+        btc_buffer_t *val;
 
         if (stack->length == 0)
           THROW(BTC_SCRIPT_ERR_INVALID_STACK_OPERATION);
 
         val = btc_stack_get(stack, -1);
 
-        btc_stack_push(stack, btc_buffer_clone(val));
+        btc_stack_push(stack, btc_buffer_ref(val));
 
         break;
       }
@@ -1953,20 +1892,20 @@ btc_script_execute(const btc_script_t *script,
         break;
       }
       case BTC_OP_OVER: {
-        const btc_buffer_t *val;
+        btc_buffer_t *val;
 
         if (stack->length < 2)
           THROW(BTC_SCRIPT_ERR_INVALID_STACK_OPERATION);
 
         val = btc_stack_get(stack, -2);
 
-        btc_stack_push(stack, btc_buffer_clone(val));
+        btc_stack_push(stack, btc_buffer_ref(val));
 
         break;
       }
       case BTC_OP_PICK:
       case BTC_OP_ROLL: {
-        const btc_buffer_t *val;
+        btc_buffer_t *val;
         int num;
 
         if (stack->length < 2)
@@ -1984,7 +1923,7 @@ btc_script_execute(const btc_script_t *script,
           btc_stack_push(stack, btc_stack_remove(stack, -num - 1));
         } else {
           val = btc_stack_get(stack, -num - 1);
-          btc_stack_push(stack, btc_buffer_clone(val));
+          btc_stack_push(stack, btc_buffer_ref(val));
         }
 
         break;
@@ -2007,14 +1946,14 @@ btc_script_execute(const btc_script_t *script,
         break;
       }
       case BTC_OP_TUCK: {
-        const btc_buffer_t *val;
+        btc_buffer_t *val;
 
         if (stack->length < 2)
           THROW(BTC_SCRIPT_ERR_INVALID_STACK_OPERATION);
 
         val = btc_stack_get(stack, -1);
 
-        btc_stack_insert(stack, -2, btc_buffer_clone(val));
+        btc_stack_insert(stack, -2, btc_buffer_ref(val));
 
         break;
       }
@@ -2510,7 +2449,7 @@ btc_script_verify_program(const btc_stack_t *witness,
   CHECK(btc_script_get_program(&program, output));
 
   btc_stack_init(&stack);
-  btc_stack_copy(&stack, witness);
+  btc_stack_assign(&stack, witness);
 
   if (program.version == 0) {
     if (program.length == 32) {
@@ -2593,7 +2532,7 @@ btc_script_verify(const btc_script_t *input,
 
   /* Copy the stack for P2SH */
   if (flags & BTC_SCRIPT_VERIFY_P2SH)
-    btc_stack_copy(&copy, &stack);
+    btc_stack_assign(&copy, &stack);
 
   /* Execute the previous output script. */
   if ((err = btc_script_execute(output, &stack, flags,
@@ -2632,7 +2571,7 @@ btc_script_verify(const btc_script_t *input,
       THROW(BTC_SCRIPT_ERR_SIG_PUSHONLY);
 
     /* Reset the stack */
-    btc_stack_copy(&stack, &copy);
+    btc_stack_assign(&stack, &copy);
 
     /* Stack should not be empty at this point. */
     if (stack.length == 0)

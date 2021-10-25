@@ -16,13 +16,14 @@
  * Buffer
  */
 
-DEFINE_SERIALIZABLE_OBJECT(btc_buffer, SCOPE_EXTERN)
+DEFINE_SERIALIZABLE_REFOBJ(btc_buffer, SCOPE_EXTERN)
 
 void
 btc_buffer_init(btc_buffer_t *z) {
   z->data = NULL;
   z->alloc = 0;
   z->length = 0;
+  z->_refs = 0;
 }
 
 void

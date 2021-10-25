@@ -562,7 +562,7 @@ btc_hdr_destroy(btc_header_t *hdr) {
 }
 
 static btc_header_t *
-btc_hdr_clone(btc_header_t *hdr) {
+btc_hdr_clone(const btc_header_t *hdr) {
   return btc_header_clone(hdr);
 }
 

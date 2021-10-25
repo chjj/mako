@@ -22,12 +22,13 @@
  * Block
  */
 
-DEFINE_SERIALIZABLE_OBJECT(btc_block, SCOPE_EXTERN)
+DEFINE_SERIALIZABLE_REFOBJ(btc_block, SCOPE_EXTERN)
 
 void
 btc_block_init(btc_block_t *z) {
   btc_header_init(&z->header);
   btc_txvec_init(&z->txs);
+  z->_refs = 0;
 }
 
 void
