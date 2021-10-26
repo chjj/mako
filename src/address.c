@@ -12,6 +12,8 @@
 #include <satoshi/encoding.h>
 #include <satoshi/network.h>
 #include <satoshi/script.h>
+#include <satoshi/util.h>
+#include "bio.h"
 #include "impl.h"
 #include "internal.h"
 
@@ -42,33 +44,11 @@ btc_address_copy(btc_address_t *z, const btc_address_t *x) {
   memcpy(z->hash, x->hash, 40);
 }
 
-int
-btc_address_set_str(btc_address_t *addr,
-                    const char *str,
-                    const btc_network_t *network) {
-  const char *expect = network->address.bech32;
-  char hrp[83 + 1];
-  uint8_t checksum[32];
-  uint8_t data[55]; /* 36? */
-  size_t len;
-
-  memset(addr->hash, 0, 40);
-
-  if (btc_bech32_decode(hrp, &addr->version, addr->hash, &addr->length, str)) {
-    if (addr->version == 0) {
-      if (addr->length != 20 && addr->length != 32)
-        return 0;
-    }
-
-    if (strcmp(hrp, expect) != 0)
-      return 0;
-
-    addr->type = BTC_ADDRESS_WITNESS;
-
-    return 1;
-  }
-
-  len = strlen(str);
+static int
+set_base58(btc_address_t *addr, const char *str, const btc_network_t *network) {
+  size_t len = btc_strnlen(str, 56);
+  enum btc_address_type type;
+  uint8_t data[55];
 
   if (len > sizeof(data))
     return 0;
@@ -80,20 +60,61 @@ btc_address_set_str(btc_address_t *addr,
     return 0;
 
   if (data[0] == network->address.p2pkh)
-    addr->type = BTC_ADDRESS_P2PKH;
+    type = BTC_ADDRESS_P2PKH;
   else if (data[0] == network->address.p2sh)
-    addr->type = BTC_ADDRESS_P2SH;
+    type = BTC_ADDRESS_P2SH;
   else
     return 0;
 
+  if (btc_read32le(data + 21) != btc_checksum(data, 21))
+    return 0;
+
+  addr->type = (unsigned int)type;
   addr->version = 0;
   addr->length = 20;
 
   memcpy(addr->hash, data + 1, 20);
+  memset(addr->hash + 20, 0, 20);
 
-  btc_hash256(checksum, data, 21);
+  return 1;
+}
 
-  return memcmp(data + 21, checksum, 4) == 0;
+static int
+set_bech32(btc_address_t *addr, const char *str, const btc_network_t *network) {
+  const char *expect = network->address.bech32;
+  unsigned int version;
+  char hrp[83 + 1];
+  uint8_t hash[83];
+  size_t length;
+
+  memset(hash, 0, 40);
+
+  if (!btc_bech32_decode(hrp, &version, hash, &length, str))
+    return 0;
+
+  if (version == 0) {
+    if (length != 20 && length != 32)
+      return 0;
+  }
+
+  if (strcmp(hrp, expect) != 0)
+    return 0;
+
+  addr->type = BTC_ADDRESS_WITNESS;
+  addr->version = version;
+  addr->length = length;
+
+  memcpy(addr->hash, hash, 40);
+
+  return 1;
+}
+
+int
+btc_address_set_str(btc_address_t *addr,
+                    const char *str,
+                    const btc_network_t *network) {
+  return set_bech32(addr, str, network)
+      || set_base58(addr, str, network);
 }
 
 void
@@ -103,7 +124,6 @@ btc_address_get_str(char *str,
   switch (addr->type) {
     case BTC_ADDRESS_P2PKH:
     case BTC_ADDRESS_P2SH: {
-      uint8_t checksum[32];
       uint8_t data[25];
 
       CHECK(addr->length == 20);
@@ -114,11 +134,9 @@ btc_address_get_str(char *str,
 
       memcpy(data + 1, addr->hash, 20);
 
-      btc_hash256(checksum, data, 21);
+      btc_write32le(data + 21, btc_checksum(data, 21));
 
-      memcpy(data + 21, checksum, 4);
-
-      CHECK(btc_base58_encode(str, NULL, data, 25));
+      btc_base58_encode(str, data, 25);
 
       break;
     }

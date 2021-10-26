@@ -64,10 +64,10 @@ TEST_NORETURN void
 test_assert_fail(const char *file, int line, const char *expr);
 
 void
-hex_parse(unsigned char *out, size_t size, const char *str);
+hex_parse(unsigned char *zp, size_t zn, const char *xp);
 
 void
-hex_decode(unsigned char *out, size_t *size, const char *str);
+hex_decode(unsigned char *zp, size_t *zn, const char *xp);
 
 int
 btc_clean(const char *prefix);

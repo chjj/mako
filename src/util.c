@@ -11,6 +11,7 @@
 #ifdef _WIN32
 #  include <windows.h> /* SecureZeroMemory */
 #endif
+#include <satoshi/encoding.h>
 #include <satoshi/util.h>
 #include "internal.h"
 
@@ -105,31 +106,19 @@ btc_memxor3(void *z, const void *x, const void *y, size_t n) {
 }
 
 /*
- * Helpers
+ * String
  */
 
-static BTC_INLINE int
-char2nib(int ch) {
-  if (ch >= '0' && ch <= '9')
-    ch -= '0';
-  else if (ch >= 'A' && ch <= 'F')
-    ch -= 'A' - 10;
-  else if (ch >= 'a' && ch <= 'f')
-    ch -= 'a' - 10;
-  else
-    ch = 16;
+size_t
+btc_strnlen(const char *xp, size_t max) {
+  size_t xn = 0;
 
-  return ch;
-}
+  while (*xp++) {
+    if (++xn == max)
+      break;
+  }
 
-static BTC_INLINE int
-nib2char(int ch) {
-  if (ch <= 9)
-    ch += '0';
-  else
-    ch += 'a' - 10;
-
-  return ch;
+  return xn;
 }
 
 /*
@@ -161,40 +150,15 @@ btc_hash_is_null(const uint8_t *xp) {
 
 int
 btc_hash_import(uint8_t *zp, const char *xp) {
-  int i, hi, lo;
-  int j = 32;
-
-  for (i = 0; i < 64; i += 2) {
-    hi = char2nib(xp[i + 0]);
-
-    if (hi >= 16)
-      return 0;
-
-    lo = char2nib(xp[i + 1]);
-
-    if (lo >= 16)
-      return 0;
-
-    zp[--j] = (hi << 4) | lo;
-  }
-
-  if (xp[64] != '\0')
+  if (btc_strnlen(xp, 65) != 64)
     return 0;
 
-  return 1;
+  return btc_base16le_decode(zp, xp, 64);
 }
 
 void
-btc_hash_export(char *zp, const uint8_t *yp) {
-  int j = 0;
-  int i;
-
-  for (i = 31; i >= 0; i--) {
-    zp[j++] = nib2char(yp[i] >> 4);
-    zp[j++] = nib2char(yp[i] & 15);
-  }
-
-  zp[j] = '\0';
+btc_hash_export(char *zp, const uint8_t *xp) {
+  btc_base16le_encode(zp, xp, 32);
 }
 
 /*

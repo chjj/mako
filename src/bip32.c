@@ -441,7 +441,7 @@ btc_hdpriv_get_str(char *str,
 
   btc_hdpriv_export(data, node, network);
 
-  CHECK(btc_base58_encode(str, NULL, data, 82));
+  btc_base58_encode(str, data, 82);
 
   btc_memzero(data, sizeof(data));
 }
@@ -450,7 +450,7 @@ int
 btc_hdpriv_set_str(btc_hdnode_t *node,
                    const char *str,
                    const btc_network_t *network) {
-  size_t len = strlen(str);
+  size_t len = btc_strnlen(str, 116);
   uint8_t data[115];
   int ret = 0;
 
@@ -712,7 +712,7 @@ btc_hdpub_get_str(char *str,
 
   btc_hdpub_export(data, node, network);
 
-  CHECK(btc_base58_encode(str, NULL, data, 82));
+  btc_base58_encode(str, data, 82);
 
   btc_memzero(data, sizeof(data));
 }
@@ -721,7 +721,7 @@ int
 btc_hdpub_set_str(btc_hdnode_t *node,
                   const char *str,
                   const btc_network_t *network) {
-  size_t len = strlen(str);
+  size_t len = btc_strnlen(str, 116);
   uint8_t data[115];
   int ret = 0;
 

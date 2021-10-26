@@ -12,9 +12,48 @@
 #include <stdlib.h>
 #include <string.h>
 #include <satoshi/netaddr.h>
-#include <satoshi/util.h>
 #include <satoshi/printf.h>
 #include "printf_core.h"
+
+/*
+ * Base16
+ */
+
+static const char *base16_charset = "0123456789abcdef";
+
+static size_t
+base16_encode(char *zp, const unsigned char *xp, size_t xn) {
+  size_t zn = xn * 2;
+
+  while (xn--) {
+    int ch = *xp++;
+
+    *zp++ = base16_charset[ch >> 4];
+    *zp++ = base16_charset[ch & 15];
+  }
+
+  *zp = '\0';
+
+  return zn;
+}
+
+static size_t
+base16le_encode(char *zp, const unsigned char *xp, size_t xn) {
+  size_t zn = xn * 2;
+
+  xp += xn;
+
+  while (xn--) {
+    int ch = *--xp;
+
+    *zp++ = base16_charset[ch >> 4];
+    *zp++ = base16_charset[ch & 15];
+  }
+
+  *zp = '\0';
+
+  return zn;
+}
 
 /*
  * State
@@ -42,35 +81,17 @@ state_puts(state_t *st, const char *xp) {
 
 static void
 state_raw(state_t *st, const unsigned char *xp, size_t xn) {
-  char buf[1024];
-  size_t len = 0;
-  size_t i;
+  char zp[1024 + 1];
 
-  for (i = 0; i < xn; i++) {
-    int hi = xp[i] >> 4;
-    int lo = xp[i] & 15;
+  while (xn >= 512) {
+    st->write(st, zp, base16_encode(zp, xp, 512));
 
-    if (hi >= 10)
-      hi += ('a' - 10);
-    else
-      hi += '0';
-
-    if (lo >= 10)
-      lo += ('a' - 10);
-    else
-      lo += '0';
-
-    buf[len++] = hi;
-    buf[len++] = lo;
-
-    if (len == sizeof(buf) / 2) {
-      st->write(st, buf, len);
-      len = 0;
-    }
+    xp += 512;
+    xn -= 512;
   }
 
-  if (len > 0)
-    st->write(st, buf, len);
+  if (xn > 0)
+    st->write(st, zp, base16_encode(zp, xp, xn));
 }
 
 static void
@@ -111,7 +132,7 @@ state_need(state_t *st, size_t n) {
  */
 
 static int
-btc_unsigned(char *z, unsigned long long x, const state_t *st) {
+btc_unsigned(char *zp, unsigned long long x, const state_t *st) {
   unsigned long long t = x;
   int n = 0;
   int i;
@@ -128,10 +149,10 @@ btc_unsigned(char *z, unsigned long long x, const state_t *st) {
     }
   }
 
-  z[n] = '\0';
+  zp[n] = '\0';
 
   for (i = n - 1; i >= 0; i--) {
-    z[i] = '0' + (int)(x % 10);
+    zp[i] = '0' + (int)(x % 10);
     x /= 10;
   }
 
@@ -139,35 +160,35 @@ btc_unsigned(char *z, unsigned long long x, const state_t *st) {
 }
 
 static int
-btc_signed(char *z, long long x, const state_t *st) {
+btc_signed(char *zp, long long x, const state_t *st) {
   int n = 0;
 
   if (x < 0) {
-    *z++ = '-';
+    *zp++ = '-';
 
 #if defined(LLONG_MIN) && defined(ULLONG_MAX)
     if (x == LLONG_MIN)
-      return 1 + btc_unsigned(z, ULLONG_MAX / 2 + 1, st);
+      return 1 + btc_unsigned(zp, ULLONG_MAX / 2 + 1, st);
 #endif
 
-    return 1 + btc_unsigned(z, -x, st);
+    return 1 + btc_unsigned(zp, -x, st);
   }
 
   if (st != NULL) {
     if (st->flags & PRINTF_BLANK_POSITIVE) {
-      *z++ = ' ';
+      *zp++ = ' ';
       n++;
     } else if (st->flags & PRINTF_PLUS_MINUS) {
-      *z++ = '+';
+      *zp++ = '+';
       n++;
     }
   }
 
-  return n + btc_unsigned(z, x, st);
+  return n + btc_unsigned(zp, x, st);
 }
 
 static int
-btc_octal(char *z, unsigned long long x, const state_t *st) {
+btc_octal(char *zp, unsigned long long x, const state_t *st) {
   unsigned long long t = x;
   int n = 0;
   int i;
@@ -187,10 +208,10 @@ btc_octal(char *z, unsigned long long x, const state_t *st) {
     }
   }
 
-  z[n] = '\0';
+  zp[n] = '\0';
 
   for (i = n - 1; i >= 0; i--) {
-    z[i] = '0' + (int)(x & 7);
+    zp[i] = '0' + (int)(x & 7);
     x >>= 3;
   }
 
@@ -198,7 +219,7 @@ btc_octal(char *z, unsigned long long x, const state_t *st) {
 }
 
 static int
-btc_hex(char *z, unsigned long long x, int c, const state_t *st) {
+btc_hex(char *zp, unsigned long long x, int c, const state_t *st) {
   unsigned long long t = x;
   int i, ch;
   int n = 0;
@@ -218,7 +239,7 @@ btc_hex(char *z, unsigned long long x, int c, const state_t *st) {
       n += 2;
   }
 
-  z[n] = '\0';
+  zp[n] = '\0';
 
   for (i = n - 1; i >= 0; i--) {
     ch = x & 15;
@@ -228,15 +249,15 @@ btc_hex(char *z, unsigned long long x, int c, const state_t *st) {
     else
       ch += '0';
 
-    z[i] = ch;
+    zp[i] = ch;
 
     x >>= 4;
   }
 
   if (st != NULL) {
     if (st->flags & PRINTF_ALT_FORM) {
-      z[1] = 'x';
-      z[0] = '0';
+      zp[1] = 'x';
+      zp[0] = '0';
     }
   }
 
@@ -244,11 +265,11 @@ btc_hex(char *z, unsigned long long x, int c, const state_t *st) {
 }
 
 static int
-btc_float(char *z, double x, const state_t *st) {
+btc_float(char *zp, double x, const state_t *st) {
   unsigned long long hi, lo;
   double frac, iptr;
+  char *sp = zp;
   int prec = 6;
-  char *s = z;
   state_t t;
 
   if (st != NULL && (st->flags & PRINTF_PRECISION))
@@ -258,7 +279,7 @@ btc_float(char *z, double x, const state_t *st) {
   t.prec = prec;
 
   if (x < 0.0) {
-    *z++ = '-';
+    *zp++ = '-';
     x = -x;
   }
 
@@ -266,24 +287,24 @@ btc_float(char *z, double x, const state_t *st) {
   hi = (unsigned long long)iptr;
   lo = (unsigned long long)(frac * pow(10, prec));
 
-  z += btc_unsigned(z, hi, NULL);
+  zp += btc_unsigned(zp, hi, NULL);
 
   if (prec != 0) {
-    *z++ = '.';
-    z += btc_unsigned(z, lo, &t);
+    *zp++ = '.';
+    zp += btc_unsigned(zp, lo, &t);
   }
 
-  return z - s;
+  return zp - sp;
 }
 
 #ifdef UINTPTR_MAX
 static int
-btc_ptr(char *z, void *ptr) {
-  uintptr_t x = (uintptr_t)ptr;
-  int n = sizeof(x) * CHAR_BIT + 2;
+btc_ptr(char *zp, void *xp) {
+  uintptr_t x = (uintptr_t)xp;
+  int n = ((sizeof(x) * CHAR_BIT) / 4) + 2;
   int i, ch;
 
-  z[n] = '\0';
+  zp[n] = '\0';
 
   for (i = n - 1; i >= 2; i--) {
     ch = x & 15;
@@ -293,59 +314,35 @@ btc_ptr(char *z, void *ptr) {
     else
       ch += '0';
 
-    z[i] = ch;
+    zp[i] = ch;
 
     x >>= 4;
   }
 
-  z[1] = 'x';
-  z[0] = '0';
+  zp[1] = 'x';
+  zp[0] = '0';
 
   return n;
 }
 #endif
 
 static int
-btc_raw(char *z, const unsigned char *xp, size_t xn) {
-  size_t i;
-
-  for (i = 0; i < xn; i++) {
-    int hi = xp[i] >> 4;
-    int lo = xp[i] & 15;
-
-    if (hi >= 10)
-      hi += ('a' - 10);
-    else
-      hi += '0';
-
-    if (lo >= 10)
-      lo += ('a' - 10);
-    else
-      lo += '0';
-
-    *z++ = hi;
-    *z++ = lo;
-  }
-
-  *z++ = '\0';
-
-  return xn * 2;
+btc_raw(char *zp, const unsigned char *xp, size_t xn) {
+  return base16_encode(zp, xp, xn);
 }
 
 static int
-btc_hash(char *z, const unsigned char *hash) {
-  if (hash == NULL) {
-    strcpy(z, "NULL");
+btc_hash(char *zp, const unsigned char *xp) {
+  if (xp == NULL) {
+    strcpy(zp, "NULL");
     return 4;
   }
 
-  btc_hash_export(z, hash);
-
-  return 64;
+  return base16le_encode(zp, xp, 32);
 }
 
 static int
-btc_date(char *z, int64_t x) {
+btc_date(char *zp, int64_t x) {
   /* https://stackoverflow.com/a/42936293 */
   /* https://howardhinnant.github.io/date_algorithms.html#civil_from_days */
   int zz = (x / 86400) + 719468;
@@ -363,18 +360,18 @@ btc_date(char *z, int64_t x) {
 
   y += (m <= 2);
 
-  return btc_sprintf(z, "%.4u-%.2u-%.2uT%.2u:%.2u:%.2uZ",
-                     y, m, d, hr, min, sec);
+  return btc_sprintf(zp, "%.4u-%.2u-%.2uT%.2u:%.2u:%.2uZ",
+                         y, m, d, hr, min, sec);
 }
 
 static int
-btc_value(char *z, int64_t x, const state_t *st) {
+btc_value(char *zp, int64_t x, const state_t *st) {
   uint64_t hi, lo;
-  char *s = z;
+  char *sp = zp;
   int prec;
 
   if (x < 0) {
-    *z++ = '-';
+    *zp++ = '-';
     x = -x;
   }
 
@@ -391,26 +388,26 @@ btc_value(char *z, int64_t x, const state_t *st) {
       lo /= 10;
   }
 
-  z += btc_unsigned(z, hi, NULL);
+  zp += btc_unsigned(zp, hi, NULL);
 
   if (lo != 0) {
-    *z++ = '.';
-    z += btc_unsigned(z, lo, st);
+    *zp++ = '.';
+    zp += btc_unsigned(zp, lo, st);
   }
 
-  return z - s;
+  return zp - sp;
 }
 
 static int
-btc_addr(char *z, const struct btc_sockaddr_s *x) {
-  btc_netaddr_t addr;
-  btc_netaddr_set_sockaddr(&addr, x);
-  return btc_netaddr_get_str(z, &addr);
+btc_addr(char *zp, const struct btc_sockaddr_s *x) {
+  btc_netaddr_t z;
+  btc_netaddr_set_sockaddr(&z, x);
+  return btc_netaddr_get_str(zp, &z);
 }
 
 static int
-btc_netaddr(char *z, const btc_netaddr_t *x) {
-  return btc_netaddr_get_str(z, x);
+btc_netaddr(char *zp, const btc_netaddr_t *x) {
+  return btc_netaddr_get_str(zp, x);
 }
 
 /*

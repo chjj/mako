@@ -295,7 +295,7 @@ btc_mnemonic_seed(uint8_t *seed, const btc_mnemonic_t *mn, const char *pass) {
   memcpy(passwd, "mnemonic", 8 + 1);
 
   if (pass != NULL) {
-    size_t len = strlen(pass);
+    size_t len = btc_strnlen(pass, 1025);
 
     if (len > 1024)
       btc_abort(); /* LCOV_EXCL_LINE */

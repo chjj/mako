@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <satoshi/encoding.h>
 #include "tests.h"
 
 TEST_NORETURN void
@@ -16,60 +17,20 @@ test_assert_fail(const char *file, int line, const char *expr) {
   abort();
 }
 
-static int
-char2nib(int ch) {
-  if (ch >= '0' && ch <= '9')
-    ch -= '0';
-  else if (ch >= 'A' && ch <= 'F')
-    ch -= 'A' - 10;
-  else if (ch >= 'a' && ch <= 'f')
-    ch -= 'a' - 10;
-  else
-    ch = 16;
+void
+hex_parse(unsigned char *zp, size_t zn, const char *xp) {
+  size_t xn = strlen(xp);
 
-  return ch;
-}
-
-static int
-unhex(unsigned char *out, const char *str, size_t len) {
-  size_t j = 0;
-  int hi, lo;
-  size_t i;
-
-  if (len & 1)
-    return 0;
-
-  for (i = 0; i < len; i += 2) {
-    hi = char2nib(str[i + 0]);
-
-    if (hi >= 16)
-      return 0;
-
-    lo = char2nib(str[i + 1]);
-
-    if (lo >= 16)
-      return 0;
-
-    out[j++] = (hi << 4) | lo;
-  }
-
-  return 1;
+  ASSERT(xn == zn * 2);
+  ASSERT(btc_base16_decode(zp, xp, xn));
 }
 
 void
-hex_parse(unsigned char *out, size_t size, const char *str) {
-  size_t len = strlen(str);
+hex_decode(unsigned char *zp, size_t *zn, const char *xp) {
+  size_t xn = strlen(xp);
 
-  ASSERT(len == size * 2);
-  ASSERT(unhex(out, str, len));
-}
+  ASSERT(xn <= *zn * 2);
+  ASSERT(btc_base16_decode(zp, xp, xn));
 
-void
-hex_decode(unsigned char *out, size_t *size, const char *str) {
-  size_t len = strlen(str);
-
-  ASSERT(len <= *size * 2);
-  ASSERT(unhex(out, str, len));
-
-  *size = len / 2;
+  *zn = xn / 2;
 }

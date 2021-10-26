@@ -20,7 +20,7 @@
 static const char *base58_charset =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
-static const int8_t base58_table[256] = {
+static const signed char base58_table[256] = {
   -1, -1, -1, -1, -1, -1, -1, -1,
   -1, -1, -1, -1, -1, -1, -1, -1,
   -1, -1, -1, -1, -1, -1, -1, -1,
@@ -55,41 +55,35 @@ static const int8_t base58_table[256] = {
   -1, -1, -1, -1, -1, -1, -1, -1
 };
 
-int
-btc_base58_encode(char *dst, size_t *dstlen,
-                  const uint8_t *src, size_t srclen) {
-  size_t zeroes = 0;
-  size_t length = 0;
-  size_t i, j, k, size;
-  unsigned long carry;
-  uint8_t *b58;
+void
+btc_base58_encode(char *zp, const uint8_t *xp, size_t xn) {
+  uint8_t b58[(512 * 138) / 100 + 1]; /* 707 */
+  int i, j, k, size, carry;
+  int zeroes = 0;
+  int length = 0;
 
-  if (srclen > 0x7fffffff)
-    return 0;
+  if (xn > 512)
+    abort(); /* LCOV_EXCL_LINE */
 
-  for (i = 0; i < srclen; i++) {
-    if (src[i] != 0)
+  for (i = 0; i < (int)xn; i++) {
+    if (xp[i] != 0)
       break;
 
     zeroes += 1;
   }
 
-  size = (uint64_t)(srclen - zeroes) * 138 / 100 + 1;
-  b58 = (uint8_t *)malloc(size);
-
-  if (b58 == NULL)
-    return 0;
+  size = ((xn - zeroes) * 138) / 100 + 1;
 
   memset(b58, 0, size);
 
-  for (; i < srclen; i++) {
-    carry = src[i];
+  for (; i < (int)xn; i++) {
+    carry = xp[i];
 
     for (j = 0, k = size - 1; j < size; j++, k--) {
       if (carry == 0 && j >= length)
         break;
 
-      carry += (unsigned long)b58[k] << 8;
+      carry += (int)b58[k] << 8;
       b58[k] = carry % 58;
       carry /= 58;
     }
@@ -104,60 +98,42 @@ btc_base58_encode(char *dst, size_t *dstlen,
   while (i < size && b58[i] == 0)
     i += 1;
 
-  /* Assumes sizeof(dst) >= zeroes + (size - i) + 1. */
+  /* Assumes sizeof(zp) >= zeroes + (size - i) + 1. */
   for (j = 0; j < zeroes; j++)
-    dst[j] = '1';
+    zp[j] = '1';
 
   while (i < size)
-    dst[j++] = base58_charset[b58[i++]];
+    zp[j++] = base58_charset[b58[i++]];
 
-  dst[j] = '\0';
-
-  if (dstlen != NULL)
-    *dstlen = j;
-
-  free(b58);
-
-  return 1;
+  zp[j] = '\0';
 }
 
 int
-btc_base58_decode(uint8_t *dst, size_t *dstlen,
-                  const char *src, size_t srclen) {
-  size_t zeroes = 0;
-  size_t length = 0;
-  size_t i, j, k, size;
-  unsigned long carry;
-  uint8_t *b256;
-  uint8_t val;
+btc_base58_decode(uint8_t *zp, size_t *zn, const char *xp, size_t xn) {
+  uint8_t b256[(1024 * 733) / 1000 + 1]; /* 751 */
+  int i, j, k, size, val, carry;
+  int zeroes = 0;
+  int length = 0;
 
-#if SIZE_MAX > UINT32_MAX
-  if (srclen > 0xffffffff)
+  if (xn > 1024)
     return 0;
-#endif
 
-  for (i = 0; i < srclen; i++) {
-    if (src[i] != '1')
+  for (i = 0; i < (int)xn; i++) {
+    if (xp[i] != '1')
       break;
 
     zeroes += 1;
   }
 
-  size = (uint64_t)srclen * 733 / 1000 + 1;
-  b256 = (uint8_t *)malloc(size);
-
-  if (b256 == NULL)
-    return 0;
+  size = (xn * 733) / 1000 + 1;
 
   memset(b256, 0, size);
 
-  for (; i < srclen; i++) {
-    val = base58_table[src[i] & 0xff];
+  for (; i < (int)xn; i++) {
+    val = base58_table[xp[i] & 0xff];
 
-    if (val & 0x80) {
-      free(b256);
+    if (val == -1)
       return 0;
-    }
 
     carry = val;
 
@@ -165,7 +141,7 @@ btc_base58_decode(uint8_t *dst, size_t *dstlen,
       if (carry == 0 && j >= length)
         break;
 
-      carry += (unsigned long)b256[k] * 58;
+      carry += (int)b256[k] * 58;
       b256[k] = carry;
       carry >>= 8;
     }
@@ -178,26 +154,26 @@ btc_base58_decode(uint8_t *dst, size_t *dstlen,
   /* See: https://github.com/bitcoin/bitcoin/commit/2bcf1fc4 */
   i = size - length;
 
-  /* Assumes sizeof(dst) >= zeroes + (size - i). */
+  /* Assumes sizeof(zp) >= zeroes + (size - i). */
   for (j = 0; j < zeroes; j++)
-    dst[j] = 0;
+    zp[j] = 0;
 
   while (i < size)
-    dst[j++] = b256[i++];
+    zp[j++] = b256[i++];
 
-  if (dstlen != NULL)
-    *dstlen = j;
-
-  free(b256);
+  if (zn != NULL)
+    *zn = j;
 
   return 1;
 }
 
 int
-btc_base58_test(const char *str, size_t len) {
-  while (len--) {
-    if (base58_table[str[len] & 0xff] == -1)
+btc_base58_test(const char *xp) {
+  while (*xp) {
+    if (base58_table[*xp & 0xff] == -1)
       return 0;
+
+    xp++;
   }
 
   return 1;

@@ -16,19 +16,40 @@ extern "C" {
 #include "common.h"
 
 /*
+ * Base16
+ */
+
+BTC_EXTERN void
+btc_base16_encode(char *zp, const uint8_t *xp, size_t xn);
+
+BTC_EXTERN int
+btc_base16_decode(uint8_t *zp, const char *xp, size_t xn);
+
+BTC_EXTERN int
+btc_base16_test(const char *xp);
+
+/*
+ * Base16 (Little Endian)
+ */
+
+BTC_EXTERN void
+btc_base16le_encode(char *zp, const uint8_t *xp, size_t xn);
+
+BTC_EXTERN int
+btc_base16le_decode(uint8_t *zp, const char *xp, size_t xn);
+
+/*
  * Base58
  */
 
-BTC_EXTERN int
-btc_base58_encode(char *dst, size_t *dstlen,
-                  const uint8_t *src, size_t srclen);
+BTC_EXTERN void
+btc_base58_encode(char *zp, const uint8_t *xp, size_t xn);
 
 BTC_EXTERN int
-btc_base58_decode(uint8_t *dst, size_t *dstlen,
-                  const char *src, size_t srclen);
+btc_base58_decode(uint8_t *zp, size_t *zn, const char *xp, size_t xn);
 
 BTC_EXTERN int
-btc_base58_test(const char *str, size_t len);
+btc_base58_test(const char *xp);
 
 /*
  * Bech32
