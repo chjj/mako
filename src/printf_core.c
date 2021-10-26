@@ -142,11 +142,9 @@ btc_unsigned(char *zp, unsigned long long x, const state_t *st) {
     t /= 10;
   } while (t != 0);
 
-  if (st != NULL) {
-    if (st->flags & PRINTF_PRECISION) {
-      if (n < st->prec)
-        n = st->prec;
-    }
+  if (st != NULL && (st->flags & PRINTF_PRECISION)) {
+    if (n < st->prec)
+      n = st->prec;
   }
 
   zp[n] = '\0';
@@ -174,14 +172,12 @@ btc_signed(char *zp, long long x, const state_t *st) {
     return 1 + btc_unsigned(zp, -x, st);
   }
 
-  if (st != NULL) {
-    if (st->flags & PRINTF_BLANK_POSITIVE) {
-      *zp++ = ' ';
-      n++;
-    } else if (st->flags & PRINTF_PLUS_MINUS) {
-      *zp++ = '+';
-      n++;
-    }
+  if (st->flags & PRINTF_BLANK_POSITIVE) {
+    *zp++ = ' ';
+    n++;
+  } else if (st->flags & PRINTF_PLUS_MINUS) {
+    *zp++ = '+';
+    n++;
   }
 
   return n + btc_unsigned(zp, x, st);
@@ -198,14 +194,12 @@ btc_octal(char *zp, unsigned long long x, const state_t *st) {
     t >>= 3;
   } while (t != 0);
 
-  if (st != NULL) {
-    if (st->flags & PRINTF_ALT_FORM)
-      n++;
+  if (st->flags & PRINTF_ALT_FORM)
+    n++;
 
-    if (st->flags & PRINTF_PRECISION) {
-      if (n < st->prec)
-        n = st->prec;
-    }
+  if (st->flags & PRINTF_PRECISION) {
+    if (n < st->prec)
+      n = st->prec;
   }
 
   zp[n] = '\0';
@@ -219,46 +213,35 @@ btc_octal(char *zp, unsigned long long x, const state_t *st) {
 }
 
 static int
-btc_hex(char *zp, unsigned long long x, int c, const state_t *st) {
+btc_hex(char *zp, unsigned long long x, int u, const state_t *st) {
+  const char *charset = u ? "0123456789ABCDEF" : "0123456789abcdef";
   unsigned long long t = x;
-  int i, ch;
   int n = 0;
+  int i;
 
   do {
     n++;
     t >>= 4;
   } while (t != 0);
 
-  if (st != NULL) {
-    if (st->flags & PRINTF_PRECISION) {
-      if (n < st->prec)
-        n = st->prec;
-    }
-
-    if (st->flags & PRINTF_ALT_FORM)
-      n += 2;
+  if (st->flags & PRINTF_PRECISION) {
+    if (n < st->prec)
+      n = st->prec;
   }
+
+  if (st->flags & PRINTF_ALT_FORM)
+    n += 2;
 
   zp[n] = '\0';
 
   for (i = n - 1; i >= 0; i--) {
-    ch = x & 15;
-
-    if (ch >= 10)
-      ch += (c - 10);
-    else
-      ch += '0';
-
-    zp[i] = ch;
-
+    zp[i] = charset[x & 15];
     x >>= 4;
   }
 
-  if (st != NULL) {
-    if (st->flags & PRINTF_ALT_FORM) {
-      zp[1] = 'x';
-      zp[0] = '0';
-    }
+  if (st->flags & PRINTF_ALT_FORM) {
+    zp[1] = 'x';
+    zp[0] = '0';
   }
 
   return n;
@@ -272,7 +255,7 @@ btc_float(char *zp, double x, const state_t *st) {
   int prec = 6;
   state_t t;
 
-  if (st != NULL && (st->flags & PRINTF_PRECISION))
+  if (st->flags & PRINTF_PRECISION)
     prec = st->prec;
 
   t.flags = PRINTF_PRECISION;
@@ -302,20 +285,12 @@ static int
 btc_ptr(char *zp, void *xp) {
   uintptr_t x = (uintptr_t)xp;
   int n = ((sizeof(x) * CHAR_BIT) / 4) + 2;
-  int i, ch;
+  int i;
 
   zp[n] = '\0';
 
   for (i = n - 1; i >= 2; i--) {
-    ch = x & 15;
-
-    if (ch >= 10)
-      ch += ('a' - 10);
-    else
-      ch += '0';
-
-    zp[i] = ch;
-
+    zp[i] = base16_charset[x & 15];
     x >>= 4;
   }
 
@@ -378,7 +353,7 @@ btc_value(char *zp, int64_t x, const state_t *st) {
   hi = (uint64_t)x / 100000000;
   lo = (uint64_t)x % 100000000;
 
-  if (st != NULL && (st->flags & PRINTF_PRECISION)) {
+  if (st->flags & PRINTF_PRECISION) {
     prec = 8 - st->prec;
 
     if (prec < 0)
@@ -684,13 +659,13 @@ btc_printf_core(state_t *st, const char *fmt, va_list ap) {
           }
           case 'x': {
             state_need(st, 2);
-            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned) & 0xff, 'a', st);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned) & 0xff, 0, st);
             st->state = PRINTF_STATE_NONE;
             break;
           }
           case 'X': {
             state_need(st, 2);
-            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned) & 0xff, 'A', st);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned) & 0xff, 1, st);
             st->state = PRINTF_STATE_NONE;
             break;
           }
@@ -729,13 +704,13 @@ btc_printf_core(state_t *st, const char *fmt, va_list ap) {
           }
           case 'x': {
             state_need(st, 4);
-            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned) & 0xffff, 'a', st);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned) & 0xffff, 0, st);
             st->state = PRINTF_STATE_NONE;
             break;
           }
           case 'X': {
             state_need(st, 4);
-            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned) & 0xffff, 'A', st);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned) & 0xffff, 1, st);
             st->state = PRINTF_STATE_NONE;
             break;
           }
@@ -778,13 +753,13 @@ btc_printf_core(state_t *st, const char *fmt, va_list ap) {
           }
           case 'x': {
             state_need(st, 8);
-            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned int), 'a', st);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned int), 0, st);
             st->state = PRINTF_STATE_NONE;
             break;
           }
           case 'X': {
             state_need(st, 8);
-            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned int), 'A', st);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned int), 1, st);
             st->state = PRINTF_STATE_NONE;
             break;
           }
@@ -823,13 +798,13 @@ btc_printf_core(state_t *st, const char *fmt, va_list ap) {
           }
           case 'x': {
             state_need(st, 16);
-            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned long), 'a', st);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned long), 0, st);
             st->state = PRINTF_STATE_NONE;
             break;
           }
           case 'X': {
             state_need(st, 16);
-            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned long), 'A', st);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned long), 1, st);
             st->state = PRINTF_STATE_NONE;
             break;
           }
@@ -872,13 +847,13 @@ btc_printf_core(state_t *st, const char *fmt, va_list ap) {
           }
           case 'x': {
             state_need(st, 16);
-            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned long long), 'a', st);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned long long), 0, st);
             st->state = PRINTF_STATE_NONE;
             break;
           }
           case 'X': {
             state_need(st, 16);
-            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned long long), 'A', st);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, unsigned long long), 1, st);
             st->state = PRINTF_STATE_NONE;
             break;
           }
@@ -926,13 +901,13 @@ btc_printf_core(state_t *st, const char *fmt, va_list ap) {
           }
           case 'x': {
             state_need(st, 16);
-            st->ptr += btc_hex(st->ptr, va_arg(ap, size_t), 'a', st);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, size_t), 0, st);
             st->state = PRINTF_STATE_NONE;
             break;
           }
           case 'X': {
             state_need(st, 16);
-            st->ptr += btc_hex(st->ptr, va_arg(ap, size_t), 'A', st);
+            st->ptr += btc_hex(st->ptr, va_arg(ap, size_t), 1, st);
             st->state = PRINTF_STATE_NONE;
             break;
           }

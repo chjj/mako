@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <satoshi/encoding.h>
+#include <satoshi/util.h>
 #include "internal.h"
 
 /*
@@ -106,6 +107,8 @@ btc_base58_encode(char *zp, const uint8_t *xp, size_t xn) {
     zp[j++] = base58_charset[b58[i++]];
 
   zp[j] = '\0';
+
+  btc_memzero(b58, size);
 }
 
 int
@@ -132,8 +135,10 @@ btc_base58_decode(uint8_t *zp, size_t *zn, const char *xp, size_t xn) {
   for (; i < (int)xn; i++) {
     val = base58_table[xp[i] & 0xff];
 
-    if (val == -1)
+    if (val == -1) {
+      btc_memzero(b256, size);
       return 0;
+    }
 
     carry = val;
 
@@ -163,6 +168,8 @@ btc_base58_decode(uint8_t *zp, size_t *zn, const char *xp, size_t xn) {
 
   if (zn != NULL)
     *zn = j;
+
+  btc_memzero(b256, size);
 
   return 1;
 }

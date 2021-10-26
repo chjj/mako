@@ -458,7 +458,7 @@ btc_hdpriv_set_str(btc_hdnode_t *node,
     return 0;
 
   if (!btc_base58_decode(data, &len, str, len))
-    goto fail;
+    return 0;
 
   if (len != 82)
     goto fail;
@@ -729,7 +729,7 @@ btc_hdpub_set_str(btc_hdnode_t *node,
     return 0;
 
   if (!btc_base58_decode(data, &len, str, len))
-    goto fail;
+    return 0;
 
   if (len != 82)
     goto fail;
