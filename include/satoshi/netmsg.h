@@ -103,7 +103,7 @@ typedef struct btc_version_s {
   uint64_t nonce;
   char agent[256 + 1];
   int32_t height;
-  uint8_t no_relay;
+  uint8_t relay;
 } btc_version_t;
 
 typedef struct btc_ping_s {

@@ -111,7 +111,7 @@ typedef struct btc_peer_s {
   uint64_t services;
   int32_t height;
   char agent[256 + 1];
-  int no_relay;
+  int relay;
   int prefer_headers;
   uint8_t hash_continue[32];
   int64_t fee_rate;
@@ -481,6 +481,7 @@ btc_peer_create(btc_pool_t *pool) {
   peer->id = pool->id++;
   peer->version = -1;
   peer->height = -1;
+  peer->relay = 1;
   peer->fee_rate = -1;
   peer->compact_mode = -1;
   peer->last_pong = -1;
@@ -715,7 +716,7 @@ btc_peer_send_version(btc_peer_t *peer) {
   strcpy(msg.agent, BTC_NET_USER_AGENT);
 
   msg.height = btc_chain_height(peer->pool->chain);
-  msg.no_relay = 0;
+  msg.relay = 1;
 
   return btc_peer_sendmsg(peer, BTC_MSG_VERSION, &msg);
 }
@@ -1152,7 +1153,7 @@ btc_peer_announce(btc_peer_t *peer, uint32_t type, const uint8_t *hash) {
   btc_mempool_t *mp = peer->pool->mempool;
 
   /* Do not send txs to spv clients that have relay unset. */
-  if (type == BTC_INV_TX && peer->no_relay)
+  if (type == BTC_INV_TX && !peer->relay)
     return 0;
 
   /* Don't send if they already have it. */
@@ -1273,7 +1274,7 @@ btc_peer_on_version(btc_peer_t *peer, const btc_version_t *msg) {
   peer->services = msg->services;
   peer->height = msg->height;
   strcpy(peer->agent, msg->agent);
-  peer->no_relay = msg->no_relay;
+  peer->relay = msg->relay;
   peer->local = msg->remote;
 
   if (!peer->network->self_connect) {

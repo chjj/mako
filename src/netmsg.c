@@ -39,7 +39,7 @@ btc_version_init(btc_version_t *msg) {
   memset(msg->agent, 0, sizeof(msg->agent));
   strcpy(msg->agent, BTC_NET_USER_AGENT);
   msg->height = 0;
-  msg->no_relay = 0;
+  msg->relay = 1;
 }
 
 void
@@ -58,7 +58,7 @@ btc_version_copy(btc_version_t *z, const btc_version_t *x) {
   z->nonce = x->nonce;
   strcpy(z->agent, x->agent);
   z->height = x->height;
-  z->no_relay = x->no_relay;
+  z->relay = x->relay;
 }
 
 size_t
@@ -83,7 +83,7 @@ btc_version_write(uint8_t *zp, const btc_version_t *x) {
   zp = btc_uint64_write(zp, x->nonce);
   zp = btc_string_write(zp, x->agent);
   zp = btc_int32_write(zp, x->height);
-  zp = btc_uint8_write(zp, x->no_relay ? 0 : 1);
+  zp = btc_uint8_write(zp, x->relay);
   return zp;
 }
 
@@ -127,12 +127,10 @@ btc_version_read(btc_version_t *z, const uint8_t **xp, size_t *xn) {
   }
 
   if (*xn > 0) {
-    if (!btc_uint8_read(&z->no_relay, xp, xn))
+    if (!btc_uint8_read(&z->relay, xp, xn))
       return 0;
-
-    z->no_relay = (z->no_relay == 0);
   } else {
-    z->no_relay = 0;
+    z->relay = 1;
   }
 
   if (z->version == 10300)
