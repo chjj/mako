@@ -23,6 +23,73 @@
 #include "internal.h"
 
 /*
+ * Constants
+ */
+
+static const char *btc_cmds[] = {
+  "addr",
+  "block",
+  "blocktxn",
+  "cmpctblock",
+  "feefilter",
+  "filteradd",
+  "filterclear",
+  "filterload",
+  "getaddr",
+  "getblocks",
+  "getblocktxn",
+  "getdata",
+  "getheaders",
+  "headers",
+  "inv",
+  "mempool",
+  "merkleblock",
+  "notfound",
+  "ping",
+  "pong",
+  "reject",
+  "sendcmpct",
+  "sendheaders",
+  "tx",
+  "verack",
+  "version",
+  /* Internal */
+  "blocktxn", /* base */
+  "block", /* base */
+  "cmpctblock", /* base */
+  "getdata", /* full */
+  "inv", /* full */
+  "notfound", /* full */
+  "tx", /* base */
+  "unknown"
+};
+
+/* Must be updated if internal types are added. */
+#define BTC_INTERNAL_TYPES 8
+
+static enum btc_msgtype
+find_type(const char *cmd) {
+  int end = lengthof(btc_cmds) - BTC_INTERNAL_TYPES - 1;
+  int start = 0;
+  int pos, cmp;
+
+  while (start <= end) {
+    pos = (start + end) >> 1;
+    cmp = strcmp(btc_cmds[pos], cmd);
+
+    if (cmp == 0)
+      return (enum btc_msgtype)pos;
+
+    if (cmp < 0)
+      start = pos + 1;
+    else
+      end = pos - 1;
+  }
+
+  return BTC_MSG_UNKNOWN;
+}
+
+/*
  * Version
  */
 
@@ -912,7 +979,7 @@ DEFINE_SERIALIZABLE_OBJECT(btc_msg, SCOPE_EXTERN)
 
 void
 btc_msg_init(btc_msg_t *msg) {
-  msg->type = BTC_MSG_INTERNAL;
+  msg->type = BTC_MSG_UNKNOWN;
   memset(msg->cmd, 0, sizeof(msg->cmd));
   msg->body = NULL;
 }
@@ -1016,166 +1083,20 @@ btc_msg_copy(btc_msg_t *z, const btc_msg_t *x) {
 
 void
 btc_msg_set_type(btc_msg_t *msg, enum btc_msgtype type) {
-  const char *cmd;
-
   msg->type = type;
-
-  switch (type) {
-    case BTC_MSG_VERSION:
-      cmd = "version";
-      break;
-    case BTC_MSG_VERACK:
-      cmd = "verack";
-      break;
-    case BTC_MSG_PING:
-      cmd = "ping";
-      break;
-    case BTC_MSG_PONG:
-      cmd = "pong";
-      break;
-    case BTC_MSG_GETADDR:
-      cmd = "getaddr";
-      break;
-    case BTC_MSG_ADDR:
-      cmd = "addr";
-      break;
-    case BTC_MSG_INV:
-    case BTC_MSG_INV_FULL:
-      cmd = "inv";
-      break;
-    case BTC_MSG_GETDATA:
-    case BTC_MSG_GETDATA_FULL:
-      cmd = "getdata";
-      break;
-    case BTC_MSG_NOTFOUND:
-    case BTC_MSG_NOTFOUND_FULL:
-      cmd = "notfound";
-      break;
-    case BTC_MSG_GETBLOCKS:
-      cmd = "getblocks";
-      break;
-    case BTC_MSG_GETHEADERS:
-      cmd = "getheaders";
-      break;
-    case BTC_MSG_HEADERS:
-      cmd = "headers";
-      break;
-    case BTC_MSG_SENDHEADERS:
-      cmd = "sendheaders";
-      break;
-    case BTC_MSG_BLOCK:
-    case BTC_MSG_BLOCK_BASE:
-      cmd = "block";
-      break;
-    case BTC_MSG_TX:
-    case BTC_MSG_TX_BASE:
-      cmd = "tx";
-      break;
-    case BTC_MSG_REJECT:
-      cmd = "reject";
-      break;
-    case BTC_MSG_MEMPOOL:
-      cmd = "mempool";
-      break;
-    case BTC_MSG_FILTERLOAD:
-      cmd = "filterload";
-      break;
-    case BTC_MSG_FILTERADD:
-      cmd = "filteradd";
-      break;
-    case BTC_MSG_FILTERCLEAR:
-      cmd = "filterclear";
-      break;
-    case BTC_MSG_MERKLEBLOCK:
-      cmd = "merkleblock";
-      break;
-    case BTC_MSG_FEEFILTER:
-      cmd = "feefilter";
-      break;
-    case BTC_MSG_SENDCMPCT:
-      cmd = "sendcmpct";
-      break;
-    case BTC_MSG_CMPCTBLOCK:
-    case BTC_MSG_CMPCTBLOCK_BASE:
-      cmd = "cmpctblock";
-      break;
-    case BTC_MSG_GETBLOCKTXN:
-      cmd = "getblocktxn";
-      break;
-    case BTC_MSG_BLOCKTXN:
-    case BTC_MSG_BLOCKTXN_BASE:
-      cmd = "blocktxn";
-      break;
-    default:
-      cmd = "unknown";
-      break;
-  }
-
-  CHECK(strlen(cmd) <= sizeof(msg->cmd) - 1);
-
-  strcpy(msg->cmd, cmd);
+  strcpy(msg->cmd, btc_cmds[type]);
 }
 
 void
 btc_msg_set_cmd(btc_msg_t *msg, const char *cmd) {
-  if (strcmp(cmd, "version") == 0)
-    msg->type = BTC_MSG_VERSION;
-  else if (strcmp(cmd, "verack") == 0)
-    msg->type = BTC_MSG_VERACK;
-  else if (strcmp(cmd, "ping") == 0)
-    msg->type = BTC_MSG_PING;
-  else if (strcmp(cmd, "pong") == 0)
-    msg->type = BTC_MSG_PONG;
-  else if (strcmp(cmd, "getaddr") == 0)
-    msg->type = BTC_MSG_GETADDR;
-  else if (strcmp(cmd, "addr") == 0)
-    msg->type = BTC_MSG_ADDR;
-  else if (strcmp(cmd, "inv") == 0)
-    msg->type = BTC_MSG_INV;
-  else if (strcmp(cmd, "getdata") == 0)
-    msg->type = BTC_MSG_GETDATA;
-  else if (strcmp(cmd, "notfound") == 0)
-    msg->type = BTC_MSG_NOTFOUND;
-  else if (strcmp(cmd, "getblocks") == 0)
-    msg->type = BTC_MSG_GETBLOCKS;
-  else if (strcmp(cmd, "getheaders") == 0)
-    msg->type = BTC_MSG_GETHEADERS;
-  else if (strcmp(cmd, "headers") == 0)
-    msg->type = BTC_MSG_HEADERS;
-  else if (strcmp(cmd, "sendheaders") == 0)
-    msg->type = BTC_MSG_SENDHEADERS;
-  else if (strcmp(cmd, "block") == 0)
-    msg->type = BTC_MSG_BLOCK;
-  else if (strcmp(cmd, "tx") == 0)
-    msg->type = BTC_MSG_TX;
-  else if (strcmp(cmd, "reject") == 0)
-    msg->type = BTC_MSG_REJECT;
-  else if (strcmp(cmd, "mempool") == 0)
-    msg->type = BTC_MSG_MEMPOOL;
-  else if (strcmp(cmd, "filterload") == 0)
-    msg->type = BTC_MSG_FILTERLOAD;
-  else if (strcmp(cmd, "filteradd") == 0)
-    msg->type = BTC_MSG_FILTERADD;
-  else if (strcmp(cmd, "filterclear") == 0)
-    msg->type = BTC_MSG_FILTERCLEAR;
-  else if (strcmp(cmd, "merkleblock") == 0)
-    msg->type = BTC_MSG_MERKLEBLOCK;
-  else if (strcmp(cmd, "feefilter") == 0)
-    msg->type = BTC_MSG_FEEFILTER;
-  else if (strcmp(cmd, "sendcmpct") == 0)
-    msg->type = BTC_MSG_SENDCMPCT;
-  else if (strcmp(cmd, "cmpctblock") == 0)
-    msg->type = BTC_MSG_CMPCTBLOCK;
-  else if (strcmp(cmd, "getblocktxn") == 0)
-    msg->type = BTC_MSG_GETBLOCKTXN;
-  else if (strcmp(cmd, "blocktxn") == 0)
-    msg->type = BTC_MSG_BLOCKTXN;
-  else
-    msg->type = BTC_MSG_UNKNOWN;
+  enum btc_msgtype type = find_type(cmd);
+  size_t len = strlen(cmd);
 
-  CHECK(strlen(cmd) <= sizeof(msg->cmd) - 1);
+  CHECK(len + 1 <= sizeof(msg->cmd));
 
-  strcpy(msg->cmd, cmd);
+  msg->type = type;
+
+  memcpy(msg->cmd, cmd, len + 1);
 }
 
 void
