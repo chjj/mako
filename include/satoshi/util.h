@@ -17,6 +17,29 @@ extern "C" {
 #include "common.h"
 
 /*
+ * Constants
+ */
+
+#define BTC_PRECISION 8
+#define BTC_AMOUNT_LEN (1 + (19 - BTC_PRECISION) + 1 + BTC_PRECISION)
+
+/*
+ * Amount
+ */
+
+BTC_EXTERN size_t
+btc_amount_export(char *zp, int64_t x);
+
+BTC_EXTERN int
+btc_amount_import(int64_t *z, const char *xp);
+
+BTC_EXTERN double
+btc_amount_to_double(int64_t x);
+
+BTC_EXTERN int
+btc_amount_from_double(int64_t *z, double x);
+
+/*
  * Compact
  */
 

@@ -11,6 +11,7 @@
 #include <satoshi/array.h>
 #include <satoshi/buffer.h>
 #include <satoshi/consensus.h>
+#include <satoshi/encoding.h>
 #include <satoshi/crypto/ecc.h>
 #include <satoshi/crypto/hash.h>
 #include <satoshi/policy.h>
@@ -419,6 +420,31 @@ btc_opcode_key_count(const btc_opcode_t *op) {
     return 0;
 
   return btc_smi_decode(op->value);
+}
+
+static int
+btc_opcode_is_int(const btc_opcode_t *op) {
+  uint8_t tmp[9];
+  int64_t num;
+  size_t len;
+
+  if (op->value > 6)
+    return 0;
+
+  if (op->value == 0)
+    return 1;
+
+  num = btc_scriptnum_import(op->data, op->length);
+
+  if (num < INT_MIN || num > INT_MAX)
+    return 0;
+
+  len = btc_scriptnum_export(tmp, num);
+
+  if (len != op->length)
+    return 0;
+
+  return memcmp(tmp, op->data, op->length) == 0;
 }
 
 void
@@ -2718,4 +2744,344 @@ btc_writer_compile(btc_script_t *z, const btc_writer_t *x) {
 
   for (i = 0; i < x->length; i++)
     zp = btc_opcode_write(zp, x->items[i]);
+}
+
+/*
+ * Disassembler
+ */
+
+static const char *
+asm_opcode(int value) {
+  switch (value) {
+#define X(name) case BTC_##name: return #name
+    /* push value */
+    X(OP_0);
+    X(OP_PUSHDATA1);
+    X(OP_PUSHDATA2);
+    X(OP_PUSHDATA4);
+    X(OP_1NEGATE);
+    X(OP_RESERVED);
+    X(OP_1);
+    X(OP_2);
+    X(OP_3);
+    X(OP_4);
+    X(OP_5);
+    X(OP_6);
+    X(OP_7);
+    X(OP_8);
+    X(OP_9);
+    X(OP_10);
+    X(OP_11);
+    X(OP_12);
+    X(OP_13);
+    X(OP_14);
+    X(OP_15);
+    X(OP_16);
+
+    /* control */
+    X(OP_NOP);
+    X(OP_VER);
+    X(OP_IF);
+    X(OP_NOTIF);
+    X(OP_VERIF);
+    X(OP_VERNOTIF);
+    X(OP_ELSE);
+    X(OP_ENDIF);
+    X(OP_VERIFY);
+    X(OP_RETURN);
+
+    /* stack ops */
+    X(OP_TOALTSTACK);
+    X(OP_FROMALTSTACK);
+    X(OP_2DROP);
+    X(OP_2DUP);
+    X(OP_3DUP);
+    X(OP_2OVER);
+    X(OP_2ROT);
+    X(OP_2SWAP);
+    X(OP_IFDUP);
+    X(OP_DEPTH);
+    X(OP_DROP);
+    X(OP_DUP);
+    X(OP_NIP);
+    X(OP_OVER);
+    X(OP_PICK);
+    X(OP_ROLL);
+    X(OP_ROT);
+    X(OP_SWAP);
+    X(OP_TUCK);
+
+    /* splice ops */
+    X(OP_CAT);
+    X(OP_SUBSTR);
+    X(OP_LEFT);
+    X(OP_RIGHT);
+    X(OP_SIZE);
+
+    /* bit logic */
+    X(OP_INVERT);
+    X(OP_AND);
+    X(OP_OR);
+    X(OP_XOR);
+    X(OP_EQUAL);
+    X(OP_EQUALVERIFY);
+    X(OP_RESERVED1);
+    X(OP_RESERVED2);
+
+    /* numeric */
+    X(OP_1ADD);
+    X(OP_1SUB);
+    X(OP_2MUL);
+    X(OP_2DIV);
+    X(OP_NEGATE);
+    X(OP_ABS);
+    X(OP_NOT);
+    X(OP_0NOTEQUAL);
+    X(OP_ADD);
+    X(OP_SUB);
+    X(OP_MUL);
+    X(OP_DIV);
+    X(OP_MOD);
+    X(OP_LSHIFT);
+    X(OP_RSHIFT);
+    X(OP_BOOLAND);
+    X(OP_BOOLOR);
+    X(OP_NUMEQUAL);
+    X(OP_NUMEQUALVERIFY);
+    X(OP_NUMNOTEQUAL);
+    X(OP_LESSTHAN);
+    X(OP_GREATERTHAN);
+    X(OP_LESSTHANOREQUAL);
+    X(OP_GREATERTHANOREQUAL);
+    X(OP_MIN);
+    X(OP_MAX);
+    X(OP_WITHIN);
+
+    /* crypto */
+    X(OP_RIPEMD160);
+    X(OP_SHA1);
+    X(OP_SHA256);
+    X(OP_HASH160);
+    X(OP_HASH256);
+    X(OP_CODESEPARATOR);
+    X(OP_CHECKSIG);
+    X(OP_CHECKSIGVERIFY);
+    X(OP_CHECKMULTISIG);
+    X(OP_CHECKMULTISIGVERIFY);
+
+    /* expansion */
+    X(OP_NOP1);
+    X(OP_CHECKLOCKTIMEVERIFY);
+    X(OP_CHECKSEQUENCEVERIFY);
+    X(OP_NOP4);
+    X(OP_NOP5);
+    X(OP_NOP6);
+    X(OP_NOP7);
+    X(OP_NOP8);
+    X(OP_NOP9);
+    X(OP_NOP10);
+
+    X(OP_INVALIDOPCODE);
+#undef X
+  }
+  return NULL;
+}
+
+static int
+asm_cpy(char *zp, const char *xp) {
+  const char *sp = xp;
+
+  while (*xp)
+    *zp++ = *xp++;
+
+  *zp = '\0';
+
+  return xp - sp;
+}
+
+static int
+asm_uint(char *zp, unsigned int x) {
+  unsigned int t = x;
+  int n = 0;
+  int i;
+
+  do {
+    n++;
+    t /= 10;
+  } while (t != 0);
+
+  zp[n] = '\0';
+
+  for (i = n - 1; i >= 0; i--) {
+    zp[i] = '0' + (int)(x % 10);
+    x /= 10;
+  }
+
+  return n;
+}
+
+static int
+asm_int(char *zp, int x) {
+  if (x < 0) {
+    *zp++ = '-';
+    return 1 + asm_uint(zp, -x);
+  }
+
+  return asm_uint(zp, x);
+}
+
+static int
+asm_hex(char *zp, unsigned int x, int n) {
+  int i;
+
+  n += 2;
+
+  zp[n] = '\0';
+
+  for (i = n - 1; i >= 2; i--) {
+    zp[i] = "0123456789abcdef"[x & 15];
+    x >>= 4;
+  }
+
+  zp[1] = 'x';
+  zp[0] = '0';
+
+  return n;
+}
+
+static size_t
+btc_script_asmlen(const btc_script_t *script) {
+  btc_reader_t reader;
+  btc_opcode_t op;
+  size_t length = 0;
+  char tmp[12];
+
+  btc_reader_init(&reader, script);
+
+  while (reader.length > 0) {
+    const char *name;
+
+    if (length > 0)
+      length += 1; /* ' ' */
+
+    if (!btc_reader_next(&op, &reader)) {
+      length += 7; /* [error] */
+      break;
+    }
+
+    if (op.value == BTC_OP_0) {
+      length += 4; /* OP_0 */
+      continue;
+    }
+
+    if (btc_opcode_is_int(&op)) {
+      int num = btc_scriptnum_import(op.data, op.length);
+      length += asm_int(tmp, num);
+      continue;
+    }
+
+    if (op.value <= BTC_OP_PUSHDATA4) {
+      if (op.value < BTC_OP_PUSHDATA1) {
+        length += 4; /* 0x00 */
+      } else {
+        length += 12; /* OP_PUSHDATA* */
+
+        length += 1; /* ' ' */
+
+        if (op.length <= 0xff)
+          length += 4; /* 0x00 */
+        else if (op.length <= 0xffff)
+          length += 6; /* 0x0000 */
+        else
+          length += 10; /* 0x00000000 */
+      }
+
+      length += 1; /* ' ' */
+      length += 2; /* 0x */
+
+      length += op.length * 2;
+
+      continue;
+    }
+
+    name = asm_opcode(op.value);
+
+    if (name != NULL)
+      length += strlen(name); /* OP_* */
+    else
+      length += 4; /* 0x00 */
+  }
+
+  return length;
+}
+
+char *
+btc_script_asm(const btc_script_t *script) {
+  char *str = btc_malloc(btc_script_asmlen(script) + 1);
+  btc_reader_t reader;
+  btc_opcode_t op;
+  char *zp = str;
+
+  btc_reader_init(&reader, script);
+
+  while (reader.length > 0) {
+    const char *name;
+
+    if (zp != str)
+      *zp++ = ' ';
+
+    if (!btc_reader_next(&op, &reader)) {
+      zp += asm_cpy(zp, "[error]");
+      break;
+    }
+
+    if (op.value == BTC_OP_0) {
+      zp += asm_cpy(zp, "OP_0");
+      continue;
+    }
+
+    if (btc_opcode_is_int(&op)) {
+      int num = btc_scriptnum_import(op.data, op.length);
+      zp += asm_int(zp, num);
+      continue;
+    }
+
+    if (op.value <= BTC_OP_PUSHDATA4) {
+      if (op.value < BTC_OP_PUSHDATA1) {
+        zp += asm_hex(zp, op.value, 2);
+      } else {
+        zp += asm_cpy(zp, asm_opcode(op.value));
+
+        *zp++ = ' ';
+
+        if (op.length <= 0xff)
+          zp += asm_hex(zp, op.length, 2);
+        else if (op.length <= 0xffff)
+          zp += asm_hex(zp, op.length, 4);
+        else
+          zp += asm_hex(zp, op.length, 8);
+      }
+
+      *zp++ = ' ';
+      *zp++ = '0';
+      *zp++ = 'x';
+
+      btc_base16_encode(zp, op.data, op.length);
+
+      zp += op.length * 2;
+
+      continue;
+    }
+
+    name = asm_opcode(op.value);
+
+    if (name != NULL)
+      zp += asm_cpy(zp, name);
+    else
+      zp += asm_hex(zp, op.value, 2);
+  }
+
+  *zp = '\0';
+
+  return str;
 }

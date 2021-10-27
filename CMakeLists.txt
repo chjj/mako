@@ -50,6 +50,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/map/outmap.c
                             src/map/outset.c
                             src/address.c
+                            src/amount.c
                             src/array.c
                             src/base16.c
                             src/base58.c

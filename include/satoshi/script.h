@@ -594,6 +594,13 @@ btc_writer_push_num(btc_writer_t *z, int64_t value, uint8_t *scratch);
 BTC_EXTERN void
 btc_writer_compile(btc_script_t *z, const btc_writer_t *x);
 
+/*
+ * Disassembler
+ */
+
+BTC_EXTERN char *
+btc_script_asm(const btc_script_t *script);
+
 #ifdef __cplusplus
 }
 #endif
