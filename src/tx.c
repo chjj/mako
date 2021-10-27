@@ -124,11 +124,10 @@ static void
 btc_tx_sighash_v0(uint8_t *hash,
                   const btc_tx_t *tx,
                   size_t index,
-                  const btc_script_t *prev_,
+                  const btc_script_t *prev,
                   int type) {
   const btc_input_t *input;
   const btc_output_t *output;
-  btc_script_t prev;
   btc_hash256_t ctx;
   size_t i;
 
@@ -141,10 +140,6 @@ btc_tx_sighash_v0(uint8_t *hash,
       return;
     }
   }
-
-  /* Remove all code separators. */
-  btc_script_init(&prev);
-  btc_script_remove_separators(&prev, prev_);
 
   /* Start hashing. */
   btc_hash256_init(&ctx);
@@ -165,7 +160,7 @@ btc_tx_sighash_v0(uint8_t *hash,
 
     /* Replace script with previous
        output script if current index. */
-    btc_script_update(&ctx, &prev);
+    btc_script_update_v0(&ctx, prev);
     btc_uint32_update(&ctx, input->sequence);
   } else {
     btc_size_update(&ctx, tx->inputs.length);
@@ -179,7 +174,7 @@ btc_tx_sighash_v0(uint8_t *hash,
       /* Replace script with previous
          output script if current index. */
       if (i == index) {
-        btc_script_update(&ctx, &prev);
+        btc_script_update_v0(&ctx, prev);
         btc_uint32_update(&ctx, input->sequence);
         continue;
       }
@@ -199,8 +194,6 @@ btc_tx_sighash_v0(uint8_t *hash,
       }
     }
   }
-
-  btc_script_clear(&prev);
 
   /* Serialize outputs. */
   switch (type & 0x1f) {

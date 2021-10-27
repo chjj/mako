@@ -1306,47 +1306,70 @@ btc_script_find_and_delete(btc_script_t *z, const btc_buffer_t *sig) {
 }
 
 void
-btc_script_remove_separators(btc_script_t *z, const btc_script_t *x) {
+btc_script_update_v0(btc_hash256_t *ctx, const btc_script_t *x) {
   /**
-   * Get the script's "subscript" starting at a separator.
-   * Remove all OP_CODESEPARATORs if present. This bizarre
-   * behavior is necessary for signing and verification when
-   * code separators are present.
+   * Hash the script, skipping all code separators.
+   *
+   * Historically, this function's behavior would
+   * have been identical to FindAndDelete. Modern
+   * Bitcoin Core no longer handles parse errors in
+   * the same way as Satoshi's original code and
+   * instead only includes the bytes read up until
+   * the line where the parse error occurred.
+   *
+   * It's unclear whether the Core developers knew
+   * they were altering the behavior of a consensus
+   * critical function when they refactored this[1].
+   *
+   * Nonetheless, either behavior should be valid
+   * (assuming no one can figure out a way to have
+   * a malformed script to complete execution).
+   *
+   * Since we do not consider Core to be the sole
+   * stewards of the protocol, our function
+   * implements Satoshi's original behavior.
+   *
+   * See mainnet for a historical transaction
+   * utilizing this feature[2].
+   *
+   * [1] https://github.com/bitcoin/bitcoin/pull/2645
+   * [2] https://mempool.space/tx/4d932e00d5e20e31211136651f1665309a11908e438bb4c30799154d26812491
    */
-  btc_reader_t reader;
-  btc_writer_t writer;
+  const uint8_t *bp = x->data;
+  const uint8_t *xp = x->data;
+  size_t xn = x->length;
+  btc_reader_t rd;
   btc_opcode_t op;
   int found = 0;
 
-  btc_reader_init(&reader, x);
+  btc_reader_init(&rd, x);
 
-  /* Optimizing for the common case:
-     Check for any separators first. */
-  while (btc_reader_next(&op, &reader)) {
-    if (op.value == BTC_OP_CODESEPARATOR) {
-      found = 1;
-      break;
-    }
+  while (btc_reader_next(&op, &rd)) {
+    if (op.value == BTC_OP_CODESEPARATOR)
+      found++;
   }
 
-  if (!found) {
-    btc_script_copy(z, x);
+  if (found == 0) {
+    btc_size_update(ctx, xn);
+    btc_raw_update(ctx, xp, xn);
     return;
   }
 
-  /* Uncommon case: someone actually
-     has a code separator. Go through
-     and remove them all. */
-  btc_reader_init(&reader, x);
-  btc_writer_init(&writer);
+  btc_size_update(ctx, xn - found);
 
-  while (btc_reader_next(&op, &reader)) {
-    if (op.value != BTC_OP_CODESEPARATOR)
-      btc_writer_push(&writer, btc_opcode_clone(&op));
+  while (btc_opcode_read(&op, &xp, &xn)) {
+    if (op.value == BTC_OP_CODESEPARATOR) {
+      btc_raw_update(ctx, bp, xp - bp - 1);
+      bp = xp;
+    }
   }
 
-  btc_writer_compile(z, &writer);
-  btc_writer_clear(&writer);
+  /* Conceptually, the below line does not
+     exist in modern Bitcoin Core. */
+  xp = x->data + x->length;
+
+  if (bp != xp)
+    btc_raw_update(ctx, bp, xp - bp);
 }
 
 static int
