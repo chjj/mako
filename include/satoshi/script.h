@@ -271,8 +271,8 @@ enum btc_opcode {
  * Small Integer
  */
 
-#define btc_smi_encode(x) ((x) == 0 ? BTC_OP_0 : ((x) + (BTC_OP_1 - 1)))
-#define btc_smi_decode(x) ((x) == BTC_OP_0 ? 0 : ((x) - (BTC_OP_1 - 1)))
+#define btc_smi_encode(x) ((x) == 0 ? BTC_OP_0 : ((int)(x) + (BTC_OP_1 - 1)))
+#define btc_smi_decode(x) ((x) == BTC_OP_0 ? 0 : ((int)(x) - (BTC_OP_1 - 1)))
 
 /*
  * Script Number
@@ -292,6 +292,9 @@ btc_scriptnum_import(const uint8_t *xp, size_t xn);
  */
 
 BTC_DEFINE_HASHABLE_VECTOR(btc_stack, btc_buffer, BTC_EXTERN)
+
+BTC_EXTERN void
+btc_stack_assign(btc_stack_t *z, const btc_stack_t *x);
 
 BTC_EXTERN btc_buffer_t *
 btc_stack_get(const btc_stack_t *stack, int index);
@@ -343,17 +346,23 @@ btc_opcode_equal(const btc_opcode_t *x, const btc_opcode_t *y);
 BTC_EXTERN int
 btc_opcode_is_minimal(const btc_opcode_t *x);
 
-BTC_EXTERN int
-btc_opcode_is_disabled(const btc_opcode_t *x);
-
-BTC_EXTERN int
-btc_opcode_is_branch(const btc_opcode_t *x);
+BTC_EXTERN void
+btc_opcode_set(btc_opcode_t *z, int value);
 
 BTC_EXTERN void
 btc_opcode_set_push(btc_opcode_t *z, const uint8_t *data, size_t length);
 
 BTC_EXTERN void
+btc_opcode_set_data(btc_opcode_t *z, const uint8_t *data, size_t length);
+
+BTC_EXTERN void
 btc_opcode_set_num(btc_opcode_t *z, int64_t value, uint8_t *scratch);
+
+BTC_EXTERN int64_t
+btc_opcode_get_num(int64_t *z,
+                   const btc_opcode_t *x,
+                   int minimal,
+                   size_t limit);
 
 BTC_EXTERN size_t
 btc_opcode_size(const btc_opcode_t *x);

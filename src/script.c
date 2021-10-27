@@ -98,7 +98,7 @@ btc_scriptnum_import(const uint8_t *xp, size_t xn) {
 
 DEFINE_HASHABLE_VECTOR(btc_stack, btc_buffer, SCOPE_EXTERN)
 
-static void
+void
 btc_stack_assign(btc_stack_t *z, const btc_stack_t *x) {
   size_t i;
 
@@ -368,7 +368,7 @@ btc_opcode_is_minimal(const btc_opcode_t *x) {
   return x->value == BTC_OP_PUSHDATA4;
 }
 
-int
+static int
 btc_opcode_is_disabled(const btc_opcode_t *x) {
   switch (x->value) {
     case BTC_OP_CAT:
@@ -391,7 +391,7 @@ btc_opcode_is_disabled(const btc_opcode_t *x) {
   return 0;
 }
 
-int
+static int
 btc_opcode_is_branch(const btc_opcode_t *x) {
   return x->value >= BTC_OP_IF && x->value <= BTC_OP_ENDIF;
 }
@@ -422,29 +422,11 @@ btc_opcode_key_count(const btc_opcode_t *op) {
   return btc_smi_decode(op->value);
 }
 
-static int
-btc_opcode_is_int(const btc_opcode_t *op) {
-  uint8_t tmp[9];
-  int64_t num;
-  size_t len;
-
-  if (op->value > 6)
-    return 0;
-
-  if (op->value == 0)
-    return 1;
-
-  num = btc_scriptnum_import(op->data, op->length);
-
-  if (num < INT_MIN || num > INT_MAX)
-    return 0;
-
-  len = btc_scriptnum_export(tmp, num);
-
-  if (len != op->length)
-    return 0;
-
-  return memcmp(tmp, op->data, op->length) == 0;
+void
+btc_opcode_set(btc_opcode_t *z, int value) {
+  z->value = value;
+  z->data = NULL;
+  z->length = 0;
 }
 
 void
@@ -463,14 +445,63 @@ btc_opcode_set_push(btc_opcode_t *z, const uint8_t *data, size_t length) {
 }
 
 void
-btc_opcode_set_num(btc_opcode_t *z, int64_t value, uint8_t *scratch) {
-  if (value >= -1 && value <= 16) {
-    z->value = btc_smi_encode(value);
-    z->data = NULL;
-    z->length = 0;
-  } else {
-    btc_opcode_set_push(z, scratch, btc_scriptnum_export(scratch, value));
+btc_opcode_set_data(btc_opcode_t *z, const uint8_t *data, size_t length) {
+  /* Not used on the consensus layer: always use set_push instead.
+     In fact, there's not really any place in the code where we
+     might need this, but it is here anyway for completeness. */
+  if (length == 1) {
+    if (data[0] == 0x81) {
+      btc_opcode_set(z, BTC_OP_1NEGATE);
+      return;
+    }
+
+    if (data[0] >= 1 && data[0] <= 16) {
+      btc_opcode_set(z, btc_smi_encode(data[0]));
+      return;
+    }
   }
+
+  btc_opcode_set_push(z, data, length);
+}
+
+void
+btc_opcode_set_num(btc_opcode_t *z, int64_t value, uint8_t *scratch) {
+  if (value >= -1 && value <= 16)
+    btc_opcode_set(z, btc_smi_encode(value));
+  else
+    btc_opcode_set_push(z, scratch, btc_scriptnum_export(scratch, value));
+}
+
+int64_t
+btc_opcode_get_num(int64_t *z,
+                   const btc_opcode_t *x,
+                   int minimal,
+                   size_t limit) {
+  if ((size_t)x->value <= limit) {
+    if (minimal) {
+      if (!btc_opcode_is_minimal(x))
+        return 0;
+
+      if (!btc_scriptnum_is_minimal(x->data, x->length))
+        return 0;
+    }
+
+    *z = btc_scriptnum_import(x->data, x->length);
+
+    return 1;
+  }
+
+  if (x->value == BTC_OP_1NEGATE) {
+    *z = -1;
+    return 1;
+  }
+
+  if (x->value >= BTC_OP_1 && x->value <= BTC_OP_16) {
+    *z = btc_smi_decode(x->value);
+    return 1;
+  }
+
+  return 0;
 }
 
 size_t
@@ -1101,33 +1132,15 @@ btc_script_is_push_only(const btc_script_t *script) {
 int32_t
 btc_script_get_height(const btc_script_t *script) {
   btc_opcode_t op;
-  uint8_t tmp[9];
   int64_t num;
 
   if (!btc_opcode_import(&op, script->data, script->length))
     return -1;
 
-  if (op.value == BTC_OP_0)
-    return 0;
-
-  if (op.value >= BTC_OP_1 && op.value <= BTC_OP_16)
-    return btc_smi_decode(op.value);
-
-  if (op.value > 6)
+  if (!btc_opcode_get_num(&num, &op, 1, 4))
     return -1;
 
-  num = btc_scriptnum_import(op.data, op.length);
-
-  if (num < 16)
-    return -1;
-
-  if (num > INT32_MAX)
-    return -1;
-
-  if (btc_scriptnum_export(tmp, num) != op.length)
-    return -1;
-
-  if (memcmp(op.data, tmp, op.length) != 0)
+  if (num < 0)
     return -1;
 
   return num;
@@ -1344,20 +1357,19 @@ btc_script_equal_push(const btc_script_t *x, const btc_buffer_t *y) {
    * This function avoids allocations and is used for ensuring
    * that a nested segwit+p2sh input script was not malleated.
    */
-  uint8_t raw[5 + BTC_MAX_SCRIPT_PUSH];
-  btc_script_t expect;
-  btc_opcode_t op;
-  size_t len;
+  const uint8_t *xp = x->data;
+  size_t xn = x->length;
+  btc_opcode_t op1, op2;
 
-  btc_opcode_set_push(&op, y->data, y->length);
+  if (!btc_opcode_read(&op1, &xp, &xn))
+    return 0;
 
-  CHECK(btc_opcode_size(&op) <= sizeof(raw));
+  if (xn != 0)
+    return 0;
 
-  len = btc_opcode_export(raw, &op);
+  btc_opcode_set_push(&op2, y->data, y->length);
 
-  btc_script_roset(&expect, raw, len);
-
-  return btc_script_equal(x, &expect);
+  return btc_opcode_equal(&op1, &op2);
 }
 
 static int
@@ -2888,7 +2900,7 @@ asm_opcode(int value) {
 }
 
 static int
-asm_cpy(char *zp, const char *xp) {
+asm_copy(char *zp, const char *xp) {
   const char *sp = xp;
 
   while (*xp)
@@ -2900,15 +2912,29 @@ asm_cpy(char *zp, const char *xp) {
 }
 
 static int
-asm_uint(char *zp, unsigned int x) {
-  unsigned int t = x;
+asm_uint_size(unsigned int x) {
   int n = 0;
-  int i;
 
   do {
     n++;
-    t /= 10;
-  } while (t != 0);
+    x /= 10;
+  } while (x != 0);
+
+  return n;
+}
+
+static int
+asm_int_size(int x) {
+  if (x < 0)
+    return 1 + asm_uint_size(-x);
+
+  return asm_uint_size(x);
+}
+
+static int
+asm_uint(char *zp, unsigned int x) {
+  int n = asm_uint_size(x);
+  int i;
 
   zp[n] = '\0';
 
@@ -2953,53 +2979,45 @@ static size_t
 btc_script_asmlen(const btc_script_t *script) {
   btc_reader_t reader;
   btc_opcode_t op;
-  size_t length = 0;
-  char tmp[12];
+  size_t zn = 0;
+  int64_t num;
 
   btc_reader_init(&reader, script);
 
   while (reader.length > 0) {
     const char *name;
 
-    if (length > 0)
-      length += 1; /* ' ' */
+    if (zn > 0)
+      zn += 1; /* ' ' */
 
     if (!btc_reader_next(&op, &reader)) {
-      length += 7; /* [error] */
+      zn += 7; /* [error] */
       break;
     }
 
-    if (op.value == BTC_OP_0) {
-      length += 4; /* OP_0 */
-      continue;
-    }
-
-    if (btc_opcode_is_int(&op)) {
-      int num = btc_scriptnum_import(op.data, op.length);
-      length += asm_int(tmp, num);
+    if (btc_opcode_get_num(&num, &op, 1, 4)) {
+      zn += asm_int_size(num);
       continue;
     }
 
     if (op.value <= BTC_OP_PUSHDATA4) {
       if (op.value < BTC_OP_PUSHDATA1) {
-        length += 4; /* 0x00 */
+        zn += 4; /* 0x[nn] */
       } else {
-        length += 12; /* OP_PUSHDATA* */
-
-        length += 1; /* ' ' */
+        zn += 12; /* OP_PUSHDATA[n] */
+        zn += 1; /* ' ' */
 
         if (op.length <= 0xff)
-          length += 4; /* 0x00 */
+          zn += 4; /* 0x[nn] */
         else if (op.length <= 0xffff)
-          length += 6; /* 0x0000 */
+          zn += 6; /* 0x[nnnn] */
         else
-          length += 10; /* 0x00000000 */
+          zn += 10; /* 0x[nnnnnnnn] */
       }
 
-      length += 1; /* ' ' */
-      length += 2; /* 0x */
-
-      length += op.length * 2;
+      zn += 1; /* ' ' */
+      zn += 2; /* 0x */
+      zn += op.length * 2;
 
       continue;
     }
@@ -3007,12 +3025,12 @@ btc_script_asmlen(const btc_script_t *script) {
     name = asm_opcode(op.value);
 
     if (name != NULL)
-      length += strlen(name); /* OP_* */
+      zn += strlen(name); /* OP_[name] */
     else
-      length += 4; /* 0x00 */
+      zn += 4; /* 0x[nn] */
   }
 
-  return length;
+  return zn;
 }
 
 char *
@@ -3021,6 +3039,7 @@ btc_script_asm(const btc_script_t *script) {
   btc_reader_t reader;
   btc_opcode_t op;
   char *zp = str;
+  int64_t num;
 
   btc_reader_init(&reader, script);
 
@@ -3031,17 +3050,11 @@ btc_script_asm(const btc_script_t *script) {
       *zp++ = ' ';
 
     if (!btc_reader_next(&op, &reader)) {
-      zp += asm_cpy(zp, "[error]");
+      zp += asm_copy(zp, "[error]");
       break;
     }
 
-    if (op.value == BTC_OP_0) {
-      zp += asm_cpy(zp, "OP_0");
-      continue;
-    }
-
-    if (btc_opcode_is_int(&op)) {
-      int num = btc_scriptnum_import(op.data, op.length);
+    if (btc_opcode_get_num(&num, &op, 1, 4)) {
       zp += asm_int(zp, num);
       continue;
     }
@@ -3050,7 +3063,7 @@ btc_script_asm(const btc_script_t *script) {
       if (op.value < BTC_OP_PUSHDATA1) {
         zp += asm_hex(zp, op.value, 2);
       } else {
-        zp += asm_cpy(zp, asm_opcode(op.value));
+        zp += asm_copy(zp, asm_opcode(op.value));
 
         *zp++ = ' ';
 
@@ -3076,7 +3089,7 @@ btc_script_asm(const btc_script_t *script) {
     name = asm_opcode(op.value);
 
     if (name != NULL)
-      zp += asm_cpy(zp, name);
+      zp += asm_copy(zp, name);
     else
       zp += asm_hex(zp, op.value, 2);
   }
