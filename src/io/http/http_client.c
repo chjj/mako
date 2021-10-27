@@ -474,11 +474,11 @@ http_client_request(http_client_t *client, const http_options_t *options) {
   int nread;
 
   if (!http_client_write_head(client, options))
-    return 0;
+    return NULL;
 
   if (options->body != NULL) {
     if (!http_client_write(client, options->body, strlen(options->body)))
-      return 0;
+      return NULL;
   }
 
   http_client_reset(client);
