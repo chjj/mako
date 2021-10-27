@@ -1249,60 +1249,74 @@ btc_script_witness_sigops(const btc_script_t *script,
 }
 
 int
-btc_script_find_and_delete(btc_script_t *z, const btc_buffer_t *sig) {
+btc_script_find_and_delete(btc_script_t *z, const btc_buffer_t *item) {
   /**
-   * Remove all matched data elements from
-   * a script's code (used to remove signatures
-   * before verification). Note that this
-   * compares and removes data on the _byte level_.
-   * It also reserializes the data to a single
-   * script with minimaldata encoding beforehand.
-   * A signature will _not_ be removed if it is
-   * not minimaldata.
+   * Remove all matched data elements from a script.
    *
-   * https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2014-November/006878.html
-   * https://test.webbtc.com/tx/19aa42fee0fa57c45d3b16488198b27caaacc4ff5794510d0c17f173f05587ff
+   * Note that this will serialize the target stack
+   * item as minimaldata beforehand[1].
+   *
+   * Furthermore, Satoshi's original code includes
+   * the remaining bytes after a parse error. Our
+   * code does the same in spite of the fact that
+   * it should not make a difference for consensus
+   * (a script which contains a parse error is
+   * always considered invalid when executed).
+   *
+   * See testnet3 for some historical transactions
+   * utilizing this feature[2][3].
+   *
+   * [1] https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2014-November/006878.html
+   * [2] https://mempool.space/testnet/tx/19aa42fee0fa57c45d3b16488198b27caaacc4ff5794510d0c17f173f05587ff
+   * [3] https://mempool.space/testnet/tx/2c63aa814701cef5dbd4bbaddab3fea9117028f2434dddcdab8339141e9b14d1
    */
-  btc_reader_t reader;
-  btc_writer_t writer;
-  btc_opcode_t target;
-  btc_opcode_t op;
-  int total = 0;
+  const uint8_t *xp = z->data;
+  size_t xn = z->length;
+  btc_opcode_t op, pd;
+  const uint8_t *tp;
+  uint8_t *zp, *sp;
+  btc_reader_t rd;
   int found = 0;
+  size_t tn;
 
-  btc_opcode_set_push(&target, sig->data, sig->length);
+  btc_opcode_set_push(&pd, item->data, item->length);
 
-  if (z->length < btc_opcode_size(&target))
+  if (xn < btc_opcode_size(&pd))
     return 0;
 
-  btc_reader_init(&reader, z);
+  btc_reader_init(&rd, z);
 
-  while (btc_reader_next(&op, &reader)) {
-    if (btc_opcode_equal(&op, &target)) {
-      found = 1;
+  while (btc_reader_next(&op, &rd)) {
+    if (btc_opcode_equal(&op, &pd))
+      found++;
+  }
+
+  if (found == 0)
+    return 0;
+
+  zp = btc_malloc(xn);
+  sp = zp;
+
+  while (xn > 0) {
+    tp = xp;
+    tn = xn;
+
+    if (!btc_opcode_read(&op, &xp, &xn)) {
+      sp = btc_raw_write(sp, tp, tn);
       break;
     }
-  }
 
-  if (!found)
-    return 0;
-
-  btc_reader_init(&reader, z);
-  btc_writer_init(&writer);
-
-  while (btc_reader_next(&op, &reader)) {
-    if (btc_opcode_equal(&op, &target)) {
-      total += 1;
+    if (btc_opcode_equal(&op, &pd))
       continue;
-    }
 
-    btc_writer_push(&writer, btc_opcode_clone(&op));
+    sp = btc_opcode_write(sp, &op);
   }
 
-  btc_writer_compile(z, &writer);
-  btc_writer_clear(&writer);
+  btc_script_set(z, zp, sp - zp);
 
-  return total;
+  btc_free(zp);
+
+  return found;
 }
 
 void

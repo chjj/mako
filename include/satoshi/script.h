@@ -531,7 +531,7 @@ btc_script_witness_sigops(const btc_script_t *script,
                           const btc_stack_t *witness);
 
 BTC_EXTERN int
-btc_script_find_and_delete(btc_script_t *z, const btc_buffer_t *sig);
+btc_script_find_and_delete(btc_script_t *z, const btc_buffer_t *item);
 
 BTC_EXTERN void
 btc_script_update_v0(btc__hash256_t *ctx, const btc_script_t *x);
