@@ -132,8 +132,13 @@ btc_tx_sighash_v0(uint8_t *hash,
   size_t i;
 
   if ((type & 0x1f) == BTC_SIGHASH_SINGLE) {
-    /* Bitcoind used to return 1 as an error code:
-       it ended up being treated like a hash. */
+    /**
+     * Satoshi's code returned 1 as an error code.
+     * This ended up being cast to a uint256[1][2].
+     *
+     * [1] https://bitcointalk.org/index.php?topic=260595.0
+     * [2] https://mempool.space/tx/315ac7d4c26d69668129cc352851d9389b4a6868f1509c6c8b66bead11e2619f
+     */
     if (index >= tx->outputs.length) {
       btc_hash_init(hash);
       hash[0] = 0x01;
