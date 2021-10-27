@@ -952,3 +952,22 @@ on_request(http_server_t *server, http_req_t *req, http_res_t *res) {
 
   return 1;
 }
+
+/*
+ * Testing
+ */
+
+json_value *
+btc_rpc_call(btc_rpc_t *rpc, const char *method, const json_value *params) {
+  int index = btc_rpc_find_handler(method);
+  rpc_res_t res;
+
+  rpc_res_init(&res);
+
+  if (index < 0)
+    rpc_res_error(&res, RPC_METHOD_NOT_FOUND, "Method not found");
+  else
+    btc_rpc_methods[index].handler(rpc, params, &res);
+
+  return rpc_res_encode(&res, 0);
+}

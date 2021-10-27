@@ -32,6 +32,13 @@ btc_rpc_open(btc_rpc_t *rpc);
 BTC_EXTERN void
 btc_rpc_close(btc_rpc_t *rpc);
 
+struct _json_value;
+
+BTC_EXTERN struct _json_value *
+btc_rpc_call(btc_rpc_t *rpc,
+             const char *method,
+             const struct _json_value *params);
+
 #ifdef __cplusplus
 }
 #endif
