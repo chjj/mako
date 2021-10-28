@@ -605,7 +605,7 @@ btc_miner_add_address(btc_miner_t *miner, const btc_address_t *addr) {
 }
 
 void
-btc_miner_get_address(btc_address_t *addr, btc_miner_t *miner) {
+btc_miner_get_address(btc_miner_t *miner, btc_address_t *addr) {
   if (miner->addrs.length == 0) {
     btc_address_init(addr);
   } else {
@@ -771,7 +771,7 @@ btc_miner_template(btc_miner_t *miner) {
   bt->sigops = 400; /* reserved */
 
   btc_buffer_copy(&bt->cbflags, &miner->cbflags);
-  btc_miner_get_address(&bt->address, miner);
+  btc_miner_get_address(miner, &bt->address);
 
   if (miner->mempool != NULL)
     btc_miner_assemble(miner, bt);

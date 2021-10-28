@@ -167,7 +167,7 @@ BTC_EXTERN void
 btc_miner_add_address(btc_miner_t *miner, const btc_address_t *addr);
 
 BTC_EXTERN void
-btc_miner_get_address(btc_address_t *addr, btc_miner_t *miner);
+btc_miner_get_address(btc_miner_t *miner, btc_address_t *addr);
 
 BTC_EXTERN void
 btc_miner_set_data(btc_miner_t *miner, const uint8_t *flags, size_t length);

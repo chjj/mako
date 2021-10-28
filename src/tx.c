@@ -722,12 +722,12 @@ btc_tx_output_value(const btc_tx_t *tx) {
 
 int64_t
 btc_tx_fee(const btc_tx_t *tx, const btc_view_t *view) {
-  int64_t value = btc_tx_input_value(tx, view);
+  int64_t inpval = btc_tx_input_value(tx, view);
 
-  if (value < 0)
+  if (inpval < 0)
     return -1;
 
-  return value - btc_tx_output_value(tx);
+  return inpval - btc_tx_output_value(tx);
 }
 
 int
@@ -857,7 +857,7 @@ int
 btc_tx_check_sanity(btc_verify_error_t *err, const btc_tx_t *tx) {
   const btc_input_t *input;
   const btc_output_t *output;
-  int64_t total = 0;
+  int64_t outval = 0;
   size_t i, size;
 
   if (tx->inputs.length == 0)
@@ -878,9 +878,9 @@ btc_tx_check_sanity(btc_verify_error_t *err, const btc_tx_t *tx) {
     if (output->value > BTC_MAX_MONEY)
       THROW("bad-txns-vout-toolarge", 100, 0);
 
-    total += output->value;
+    outval += output->value;
 
-    if (total < 0 || total > BTC_MAX_MONEY)
+    if (outval < 0 || outval > BTC_MAX_MONEY)
       THROW("bad-txns-txouttotal-toolarge", 100, 0);
   }
 
@@ -911,8 +911,8 @@ btc_tx_check_inputs(btc_verify_error_t *err,
                     int32_t height) {
   const btc_input_t *input;
   const btc_coin_t *coin;
-  int64_t value, fee;
-  int64_t total = 0;
+  int64_t outval, fee;
+  int64_t inpval = 0;
   size_t i;
 
   for (i = 0; i < tx->inputs.length; i++) {
@@ -930,19 +930,19 @@ btc_tx_check_inputs(btc_verify_error_t *err,
     if (coin->output.value < 0 || coin->output.value > BTC_MAX_MONEY)
       THROW("bad-txns-inputvalues-outofrange", 100, -1);
 
-    total += coin->output.value;
+    inpval += coin->output.value;
 
-    if (total < 0 || total > BTC_MAX_MONEY)
+    if (inpval < 0 || inpval > BTC_MAX_MONEY)
       THROW("bad-txns-inputvalues-outofrange", 100, -1);
   }
 
   /* Overflows already checked in `btc_tx_check_sanity`. */
-  value = btc_tx_output_value(tx);
+  outval = btc_tx_output_value(tx);
 
-  if (total < value)
+  if (inpval < outval)
     THROW("bad-txns-in-belowout", 100, -1);
 
-  fee = total - value;
+  fee = inpval - outval;
 
   if (fee < 0)
     THROW("bad-txns-fee-negative", 100, -1);
