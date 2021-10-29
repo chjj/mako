@@ -28,7 +28,7 @@ typedef void btc_socket_socket_cb(btc_socket_t *, btc_socket_t *);
 typedef void btc_socket_connect_cb(btc_socket_t *);
 typedef void btc_socket_close_cb(btc_socket_t *);
 typedef void btc_socket_error_cb(btc_socket_t *);
-typedef void btc_socket_data_cb(btc_socket_t *, const void *, size_t);
+typedef  int btc_socket_data_cb(btc_socket_t *, const void *, size_t);
 typedef void btc_socket_drain_cb(btc_socket_t *);
 typedef void btc_socket_message_cb(btc_socket_t *,
                                    const void *,

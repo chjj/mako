@@ -259,7 +259,7 @@ on_error(btc_socket_t *socket) {
   btc_socket_close(socket);
 }
 
-static void
+static int
 on_data(btc_socket_t *socket, const void *data, size_t size) {
   http_conn_t *conn = btc_socket_get_data(socket);
 
@@ -270,6 +270,8 @@ on_data(btc_socket_t *socket, const void *data, size_t size) {
 
   if (conn->parser.upgrade || nparsed != size || size == 0)
     btc_socket_close(socket);
+
+  return 1;
 }
 
 static int

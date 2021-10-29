@@ -152,7 +152,6 @@ struct btc_socket_s {
 #ifdef BTC_USE_POLL
   size_t index;
 #endif
-  unsigned char buffer[65536];
   chunk_t *head;
   chunk_t *tail;
   size_t total;
@@ -196,6 +195,7 @@ struct btc_loop_s {
   int nfds;
   btc_socket_t *sockets[FD_SETSIZE];
 #endif
+  unsigned char buffer[65536];
   struct btc_closed_queue {
     btc_socket_t *head;
     btc_socket_t *tail;
@@ -1281,8 +1281,8 @@ fail:
     }
 
     case BTC_SOCKET_CONNECTED: {
-      unsigned char *buf = socket->buffer;
-      size_t size = sizeof(socket->buffer);
+      unsigned char *buf = loop->buffer;
+      size_t size = sizeof(loop->buffer);
       int fd = socket->fd;
       int len;
 
@@ -1310,7 +1310,8 @@ fail:
         if ((size_t)len > size)
           abort();
 
-        socket->on_data(socket, buf, len);
+        if (!socket->on_data(socket, buf, len))
+          break;
 
         if (len == 0)
           break;
@@ -1320,8 +1321,8 @@ fail:
     }
 
     case BTC_SOCKET_BOUND: {
-      unsigned char *buf = socket->buffer;
-      size_t size = sizeof(socket->buffer);
+      unsigned char *buf = loop->buffer;
+      size_t size = sizeof(loop->buffer);
       struct sockaddr_storage storage;
       struct sockaddr *from = (struct sockaddr *)&storage;
       int fd = socket->fd;

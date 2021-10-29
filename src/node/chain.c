@@ -88,7 +88,7 @@ btc_orphan_copy(btc_orphan_t *z, const btc_orphan_t *x) {
  * TX Checker
  */
 
-#define USE_WORKERS
+#undef USE_WORKERS
 
 #ifdef USE_WORKERS
 typedef struct btc_txwork_s {

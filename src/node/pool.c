@@ -338,10 +338,11 @@ btc_parser_parse(btc_parser_t *parser, const uint8_t *data, size_t length) {
   return 1;
 }
 
-static void
+static size_t
 btc_parser_feed(btc_parser_t *parser, const uint8_t *data, size_t length) {
   uint8_t *ptr = btc_parser_append(parser, data, length);
   size_t len = parser->total;
+  size_t parsed = 0;
   size_t size;
 
   while (!parser->closed && len >= parser->waiting) {
@@ -354,12 +355,16 @@ btc_parser_feed(btc_parser_t *parser, const uint8_t *data, size_t length) {
 
     ptr += size;
     len -= size;
+
+    parsed += size;
   }
 
   if (len > 0 && ptr != parser->pending)
     memmove(parser->pending, ptr, len);
 
   parser->total = len;
+
+  return parsed;
 }
 
 /*
@@ -384,7 +389,7 @@ btc_peer_on_close(btc_peer_t *peer);
 static void
 btc_peer_on_error(btc_peer_t *peer, const char *msg);
 
-static void
+static int
 btc_peer_on_data(btc_peer_t *peer, const uint8_t *data, size_t size);
 
 static void
@@ -439,11 +444,11 @@ on_error(btc_socket_t *socket) {
                     btc_socket_strerror(socket));
 }
 
-static void
+static int
 on_data(btc_socket_t *socket, const void *data, size_t size) {
-  btc_peer_on_data((btc_peer_t *)btc_socket_get_data(socket),
-                   (const uint8_t *)data,
-                   size);
+  return btc_peer_on_data((btc_peer_t *)btc_socket_get_data(socket),
+                          (const uint8_t *)data,
+                          size);
 }
 
 static void
@@ -1445,20 +1450,20 @@ btc_peer_on_error(btc_peer_t *peer, const char *msg) {
   btc_peer_close(peer);
 }
 
-static void
+static int
 btc_peer_on_data(btc_peer_t *peer, const uint8_t *data, size_t size) {
   if (peer->state == BTC_PEER_DEAD)
-    return;
+    return 0;
 
   if (size == 0) {
     btc_peer_log(peer, "Peer sent EOF (%N).", &peer->addr);
     btc_peer_close(peer);
-    return;
+    return 0;
   }
 
   peer->last_recv = btc_ms();
 
-  btc_parser_feed(&peer->parser, data, size);
+  return btc_parser_feed(&peer->parser, data, size) == 0;
 }
 
 static int
