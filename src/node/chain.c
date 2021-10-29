@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include <io/core.h>
+#include <io/workers.h>
 
 #include <node/chain.h>
 #include <node/chaindb.h>
@@ -23,6 +24,7 @@
 #include <satoshi/crypto/hash.h>
 #include <satoshi/entry.h>
 #include <satoshi/header.h>
+#include <satoshi/list.h>
 #include <satoshi/map.h>
 #include <satoshi/mpi.h>
 #include <satoshi/network.h>
@@ -83,6 +85,111 @@ btc_orphan_copy(btc_orphan_t *z, const btc_orphan_t *x) {
 }
 
 /*
+ * TX Checker
+ */
+
+typedef struct btc_txwork_s {
+  const btc_tx_t *tx;
+  const btc_view_t *view;
+  unsigned int flags;
+  int result;
+  struct btc_txwork_s *next;
+} btc_txwork_t;
+
+typedef struct btc_checker_s {
+  btc_workers_t *pool;
+  btc_txwork_t *head;
+  btc_txwork_t *tail;
+  size_t length;
+  int result;
+} btc_checker_t;
+
+static void
+btc_checker_init(btc_checker_t *checker, btc_workers_t *pool) {
+  checker->pool = pool;
+  btc_queue_init(checker);
+  checker->result = 1;
+}
+
+static void
+btc_checker_clear(btc_checker_t *checker) {
+  btc_txwork_t *work, *next;
+
+  if (checker->pool == NULL) {
+    checker->result = 1;
+    return;
+  }
+
+  for (work = checker->head; work != NULL; work = next) {
+    next = work->next;
+    btc_free(work);
+  }
+
+  btc_queue_init(checker);
+}
+
+static void
+btc_checker_work(void *arg) {
+  btc_txwork_t *work = arg;
+
+  work->result = btc_tx_verify(work->tx, work->view, work->flags);
+}
+
+static void
+btc_checker_push(btc_checker_t *checker,
+                 const btc_tx_t *tx,
+                 const btc_view_t *view,
+                 unsigned int flags) {
+  btc_txwork_t *work;
+
+  if (checker->pool == NULL) {
+    if (checker->result)
+      checker->result = btc_tx_verify(tx, view, flags);
+    return;
+  }
+
+  work = btc_malloc(sizeof(btc_txwork_t));
+  work->tx = tx;
+  work->view = view;
+  work->flags = flags;
+  work->result = 0;
+  work->next = NULL;
+
+  btc_queue_push(checker, work);
+}
+
+static int
+btc_checker_verify(btc_checker_t *checker) {
+  btc_txwork_t *work, *next;
+  btc_workq_t batch;
+  int ret = 1;
+
+  if (checker->pool == NULL) {
+    ret = checker->result;
+    checker->result = 1;
+    return ret;
+  }
+
+  btc_workq_init(&batch);
+
+  for (work = checker->head; work != NULL; work = work->next)
+    btc_workq_push(&batch, btc_checker_work, work);
+
+  btc_workers_batch(checker->pool, &batch);
+  btc_workers_wait(checker->pool);
+
+  for (work = checker->head; work != NULL; work = next) {
+    next = work->next;
+    ret &= work->result;
+    btc_free(work);
+  }
+
+  btc_queue_init(checker);
+
+  return ret;
+}
+
+/*
  * Chain
  */
 
@@ -91,6 +198,7 @@ struct btc_chain_s {
   btc_logger_t *logger;
   btc_chaindb_t *db;
   const btc_timedata_t *timedata;
+  btc_workers_t *workers;
   btc_hashset_t *invalid;
   btc_hashmap_t *orphan_map;
   btc_hashmap_t *orphan_prev;
@@ -120,6 +228,7 @@ btc_chain_create(const btc_network_t *network) {
   chain->logger = NULL;
   chain->db = btc_chaindb_create(network);
   chain->timedata = NULL;
+  chain->workers = btc_workers_create(4);
   chain->invalid = btc_hashset_create();
   chain->orphan_map = btc_hashmap_create();
   chain->orphan_prev = btc_hashmap_create();
@@ -149,6 +258,8 @@ btc_chain_destroy(btc_chain_t *chain) {
   btc_hashset_destroy(chain->invalid);
   btc_hashmap_destroy(chain->orphan_map);
   btc_hashmap_destroy(chain->orphan_prev);
+
+  btc_workers_destroy(chain->workers);
 
   btc_chaindb_destroy(chain->db);
 
@@ -1202,9 +1313,12 @@ btc_chain_verify_inputs(btc_chain_t *chain,
   btc_view_t *view = btc_view_create();
   int32_t height = prev->height + 1;
   btc_verify_error_t err;
+  btc_checker_t checker;
   int64_t reward = 0;
   int sigops = 0;
   size_t i;
+
+  btc_checker_init(&checker, chain->workers);
 
   /* Check all transactions. */
   for (i = 0; i < block->txs.length; i++) {
@@ -1286,6 +1400,7 @@ btc_chain_verify_inputs(btc_chain_t *chain,
     goto fail;
   }
 
+#if 0
   /* Verify all transactions. */
   for (i = 1; i < block->txs.length; i++) {
     const btc_tx_t *tx = block->txs.items[i];
@@ -1299,10 +1414,28 @@ btc_chain_verify_inputs(btc_chain_t *chain,
       goto fail;
     }
   }
+#else
+  /* Verify all transactions in parallel. */
+  for (i = 1; i < block->txs.length; i++) {
+    const btc_tx_t *tx = block->txs.items[i];
+
+    btc_checker_push(&checker, tx, view, state->flags);
+  }
+
+  if (!btc_checker_verify(&checker)) {
+    btc_chain_throw(chain, hdr,
+                    "invalid",
+                    "mandatory-script-verify-flag-failed",
+                    100,
+                    0);
+    goto fail;
+  }
+#endif
 
   return view;
 fail:
   btc_view_destroy(view);
+  btc_checker_clear(&checker);
   return NULL;
 }
 
