@@ -181,6 +181,12 @@ btc_miner_update_time(btc_miner_t *miner, btc_tmpl_t *bt);
 BTC_EXTERN btc_tmpl_t *
 btc_miner_template(btc_miner_t *miner);
 
+BTC_EXTERN void
+btc_miner_setgenerate(btc_miner_t *miner, int value, int active);
+
+BTC_EXTERN void
+btc_miner_generate(btc_miner_t *miner, int todo, int active);
+
 #ifdef __cplusplus
 }
 #endif

@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <io/core.h>
 #include <io/loop.h>
 
 #include <node/chain.h>
@@ -49,6 +50,54 @@
 
 static const uint8_t zero_nonce[32] = {0};
 static const uint8_t default_flags[] = "mined by libsatoshi";
+
+/*
+ * Types
+ */
+
+struct btc_cpuminer_s;
+
+typedef struct btc_cputhread_s {
+  struct btc_cpuminer_s *cpu;
+  uint32_t nonce1;
+  uint32_t nonce2;
+  /* Protected by cpu.lock. */
+  int64_t time;
+  uint32_t nonce;
+  uint8_t root[32];
+  int result;
+} btc_cputhread_t;
+
+typedef struct btc_cpuminer_s {
+  btc_miner_t *miner;
+  int mining;
+  int64_t last_check;
+  btc_mutex_t *lock;
+  btc_cond_t *master;
+  btc_cond_t *worker;
+  btc_cputhread_t *threads;
+  int length;
+  uint8_t last_tip[32];
+  int64_t last_job;
+  int limit;
+  int todo;
+  /* Protected by cpu.lock. */
+  btc_tmpl_t *job;
+  int active;
+  int stop;
+} btc_cpuminer_t;
+
+struct btc_miner_s {
+  const btc_network_t *network;
+  btc_loop_t *loop;
+  btc_logger_t *logger;
+  const btc_timedata_t *timedata;
+  btc_chain_t *chain;
+  btc_mempool_t *mempool;
+  btc_buffer_t cbflags;
+  btc_vector_t addrs;
+  btc_cpuminer_t cpu;
+};
 
 /*
  * Block Entry
@@ -519,19 +568,364 @@ fail:
 }
 
 /*
- * Miner
+ * CPU Miner
  */
 
-struct btc_miner_s {
-  const btc_network_t *network;
-  btc_loop_t *loop;
-  btc_logger_t *logger;
-  const btc_timedata_t *timedata;
-  btc_chain_t *chain;
-  btc_mempool_t *mempool;
-  btc_buffer_t cbflags;
-  btc_vector_t addrs;
-};
+static void
+btc_cpuminer_init(btc_cpuminer_t *cpu, btc_miner_t *miner, int length) {
+  btc_cputhread_t *thread;
+  int i;
+
+  if (length < 1)
+    length = 1;
+
+  cpu->miner = miner;
+  cpu->mining = 0;
+  cpu->last_check = 0;
+  cpu->lock = btc_mutex_create();
+  cpu->master = btc_cond_create();
+  cpu->worker = btc_cond_create();
+  cpu->threads = btc_malloc(length * sizeof(btc_cputhread_t));
+  cpu->length = length;
+  btc_hash_init(cpu->last_tip);
+  cpu->last_job = 0;
+  cpu->limit = 0;
+  cpu->todo = 0;
+  cpu->job = NULL;
+  cpu->active = 0;
+  cpu->stop = 0;
+
+  for (i = 0; i < length; i++) {
+    thread = &cpu->threads[i];
+
+    memset(thread, 0, sizeof(*thread));
+
+    thread->cpu = cpu;
+    thread->result = -1;
+  }
+}
+
+static void
+btc_cpuminer_clear(btc_cpuminer_t *cpu) {
+  btc_mutex_destroy(cpu->lock);
+  btc_cond_destroy(cpu->master);
+  btc_cond_destroy(cpu->worker);
+  btc_free(cpu->threads);
+}
+
+static void
+btc_cpuminer_start_job(btc_cpuminer_t *cpu) {
+  /* Must be called with lock held. */
+  btc_cputhread_t *thread;
+  int i;
+
+  if (cpu->job != NULL)
+    btc_tmpl_destroy(cpu->job);
+
+  cpu->job = btc_miner_template(cpu->miner);
+
+  btc_hash_copy(cpu->last_tip, cpu->job->prev_block);
+
+  cpu->last_job = btc_ms();
+
+  for (i = 0; i < cpu->length; i++) {
+    thread = &cpu->threads[i];
+
+    thread->nonce1 = UINT32_C(1) << (31 - i);
+    thread->nonce2 = 0;
+    thread->time = cpu->job->time;
+    thread->nonce = 0;
+
+    btc_tmpl_root(thread->root, cpu->job, thread->nonce1, 0);
+
+    thread->result = -1;
+  }
+}
+
+static void
+btc_cpuminer_stop_job(btc_cpuminer_t *cpu) {
+  /* Must be called with lock held. */
+  btc_cputhread_t *thread;
+  int i;
+
+  if (cpu->job != NULL)
+    btc_tmpl_destroy(cpu->job);
+
+  cpu->job = NULL;
+
+  for (i = 0; i < cpu->length; i++) {
+    thread = &cpu->threads[i];
+
+    thread->nonce1 = 0;
+    thread->nonce2 = 0;
+    thread->time = 0;
+    thread->nonce = 0;
+
+    btc_hash_init(thread->root);
+
+    thread->result = -1;
+  }
+}
+
+static void
+on_tick(btc_loop_t *loop, void *data);
+
+static void
+mining_thread(void *arg);
+
+static void
+btc_cpuminer_start(btc_cpuminer_t *cpu, int active) {
+  btc_thread_t *thread = btc_thread_alloc();
+  btc_miner_t *miner = cpu->miner;
+  int i;
+
+  if (active < 1)
+    active = 1;
+
+  if (active > cpu->length)
+    active = cpu->length;
+
+  CHECK(cpu->mining == 0);
+  CHECK(cpu->active == 0);
+
+  cpu->mining = 1;
+
+  btc_loop_on_tick(miner->loop, on_tick, cpu);
+
+  for (i = 0; i < active; i++) {
+    btc_thread_create(thread, mining_thread, &cpu->threads[i]);
+    btc_thread_detach(thread);
+  }
+
+  cpu->active = active;
+
+  btc_thread_free(thread);
+}
+
+static void
+btc_cpuminer_stop(btc_cpuminer_t *cpu) {
+  btc_miner_t *miner = cpu->miner;
+
+  CHECK(cpu->mining == 1);
+
+  btc_mutex_lock(cpu->lock);
+
+  cpu->stop = 1;
+
+  btc_cpuminer_stop_job(cpu);
+  btc_hash_init(cpu->last_tip);
+
+  btc_cond_signal(cpu->worker);
+  btc_mutex_unlock(cpu->lock);
+
+  btc_mutex_lock(cpu->lock);
+
+  while (cpu->active > 0)
+    btc_cond_wait(cpu->master, cpu->lock);
+
+  cpu->stop = 0;
+
+  btc_mutex_unlock(cpu->lock);
+
+  cpu->mining = 0;
+  cpu->limit = 0;
+  cpu->todo = 0;
+
+  btc_loop_off_tick(miner->loop, on_tick, cpu);
+}
+
+static void
+btc_cpuminer_setgenerate(btc_cpuminer_t *cpu, int value, int active) {
+  int mining = (value != 0);
+
+  if (cpu->mining == mining)
+    return;
+
+  if (mining)
+    btc_cpuminer_start(cpu, active);
+  else
+    btc_cpuminer_stop(cpu);
+}
+
+static void
+btc_cpuminer_generate(btc_cpuminer_t *cpu, int todo, int active) {
+  cpu->limit = 1;
+  cpu->todo = todo;
+  btc_cpuminer_setgenerate(cpu, 1, active);
+}
+
+static void
+on_tick(btc_loop_t *loop, void *data) {
+  btc_cpuminer_t *cpu = data;
+  btc_miner_t *miner = cpu->miner;
+  btc_cputhread_t *thread;
+  const btc_entry_t *tip;
+  btc_blockproof_t proof;
+  btc_block_t *block;
+  int64_t now = btc_ms();
+  int i;
+
+  CHECK(loop != NULL);
+  CHECK(cpu->mining == 1);
+
+  if (now < cpu->last_check + 300)
+    return;
+
+  cpu->last_check = now;
+
+  btc_mutex_lock(cpu->lock);
+
+  /* Get tip for below checks. */
+  tip = btc_chain_tip(miner->chain);
+
+  /* Do we have a job? */
+  if (cpu->job == NULL) {
+    /* Is this a new tip? */
+    if (!btc_hash_equal(cpu->last_tip, tip->hash)) {
+      /* Start a new job. */
+      btc_cpuminer_start_job(cpu);
+      btc_cond_broadcast(cpu->worker);
+    }
+    goto done;
+  }
+
+  for (i = 0; i < cpu->length; i++) {
+    thread = &cpu->threads[i];
+
+    /* Did we find a block? */
+    if (thread->result == 1) {
+      CHECK(btc_tmpl_prove(&proof,
+                           cpu->job,
+                           thread->nonce1,
+                           thread->nonce2,
+                           thread->time,
+                           thread->nonce));
+
+      block = btc_tmpl_commit(cpu->job, &proof);
+
+      if (!btc_hash_equal(cpu->job->prev_block, tip->hash)) {
+        /* Job is stale. Start new job immediately. */
+        btc_cpuminer_start_job(cpu);
+        btc_cond_broadcast(cpu->worker);
+      } else {
+        /* Wait for new job. */
+        btc_cpuminer_stop_job(cpu);
+      }
+
+      btc_mutex_unlock(cpu->lock);
+
+      CHECK(btc_chain_add(miner->chain, block, BTC_CHAIN_VERIFY_NONE, 0));
+
+      btc_block_destroy(block);
+
+      if (cpu->limit && --cpu->todo == 0)
+        btc_cpuminer_stop(cpu);
+
+      return;
+    }
+  }
+
+  /* Is our job stale? */
+  if (!btc_hash_equal(cpu->job->prev_block, tip->hash)) {
+    btc_cpuminer_start_job(cpu);
+    btc_cond_broadcast(cpu->worker);
+    goto done;
+  }
+
+  /* Do we need to check the mempool again? */
+  if (now >= cpu->last_job + 60 * 1000) {
+    btc_cpuminer_start_job(cpu);
+    btc_cond_broadcast(cpu->worker);
+    goto done;
+  }
+
+  now = btc_timedata_now(miner->timedata);
+
+  for (i = 0; i < cpu->length; i++) {
+    thread = &cpu->threads[i];
+
+    /* Are we still working? */
+    if (thread->result == -1)
+      continue;
+
+    /* Update timestamp if possible. */
+    if (now > thread->time) {
+      thread->nonce = 0;
+      thread->time = now;
+      thread->result = -1;
+      continue;
+    }
+
+    /* Increment extra nonce. */
+    if (thread->nonce >= (UINT32_C(1) << 31)) {
+      thread->nonce1 += (++thread->nonce2 == 0);
+      thread->nonce = 0;
+
+      btc_tmpl_root(thread->root,
+                    cpu->job,
+                    thread->nonce1,
+                    thread->nonce2);
+
+      thread->result = -1;
+
+      continue;
+    }
+
+    thread->result = -1;
+  }
+
+  btc_cond_broadcast(cpu->worker);
+
+done:
+  btc_mutex_unlock(cpu->lock);
+}
+
+static void
+mining_thread(void *arg) {
+  btc_cputhread_t *thread = arg;
+  btc_cpuminer_t *cpu = thread->cpu;
+  btc_header_t hdr;
+  int result = -1;
+
+  for (;;) {
+    btc_mutex_lock(cpu->lock);
+
+    CHECK(thread->result == -1);
+
+    if (result != -1) {
+      thread->result = result;
+      thread->nonce = hdr.nonce;
+    }
+
+    while (!cpu->stop) {
+      if (cpu->job != NULL && thread->result == -1)
+        break;
+
+      btc_cond_wait(cpu->worker, cpu->lock);
+    }
+
+    if (cpu->stop)
+      break;
+
+    btc_tmpl_header(&hdr, cpu->job,
+                          thread->root,
+                          thread->time,
+                          thread->nonce);
+
+    btc_mutex_unlock(cpu->lock);
+
+    result = btc_header_mine(&hdr, 1 << 24);
+  }
+
+  if (--cpu->active == 0)
+    btc_cond_signal(cpu->master);
+
+  btc_mutex_unlock(cpu->lock);
+}
+
+/*
+ * Miner
+ */
 
 btc_miner_t *
 btc_miner_create(const btc_network_t *network,
@@ -551,6 +945,7 @@ btc_miner_create(const btc_network_t *network,
 
   btc_buffer_init(&miner->cbflags);
   btc_vector_init(&miner->addrs);
+  btc_cpuminer_init(&miner->cpu, miner, btc_sys_cpu_count());
 
   btc_buffer_set(&miner->cbflags, default_flags, sizeof(default_flags) - 1);
 
@@ -561,11 +956,15 @@ void
 btc_miner_destroy(btc_miner_t *miner) {
   size_t i;
 
+  if (miner->cpu.mining)
+    btc_cpuminer_stop(&miner->cpu);
+
   for (i = 0; i < miner->addrs.length; i++)
     btc_address_destroy(miner->addrs.items[i]);
 
   btc_vector_clear(&miner->addrs);
   btc_buffer_clear(&miner->cbflags);
+  btc_cpuminer_clear(&miner->cpu);
 
   btc_free(miner);
 }
@@ -784,4 +1183,14 @@ btc_miner_template(btc_miner_t *miner) {
     bt->txs.length + 1);
 
   return bt;
+}
+
+void
+btc_miner_setgenerate(btc_miner_t *miner, int value, int active) {
+  btc_cpuminer_setgenerate(&miner->cpu, value, active);
+}
+
+void
+btc_miner_generate(btc_miner_t *miner, int todo, int active) {
+  btc_cpuminer_generate(&miner->cpu, todo, active);
 }
