@@ -348,6 +348,9 @@ btc_parser_feed(btc_parser_t *parser, const uint8_t *data, size_t length) {
   while (!parser->closed && len >= parser->waiting) {
     size = parser->waiting;
 
+    if (parser->has_header)
+      parsed += size;
+
     if (!btc_parser_parse(parser, ptr, size)) {
       if (!parser->closed)
         parser->on_error(parser->arg);
@@ -355,8 +358,6 @@ btc_parser_feed(btc_parser_t *parser, const uint8_t *data, size_t length) {
 
     ptr += size;
     len -= size;
-
-    parsed += size;
   }
 
   if (len > 0 && ptr != parser->pending)

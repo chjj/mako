@@ -39,9 +39,6 @@ typedef void btc_socket_message_cb(btc_socket_t *,
  * Socket
  */
 
-BTC_EXTERN void
-btc_socket_destroy(btc_socket_t *socket);
-
 BTC_EXTERN btc_loop_t *
 btc_socket_loop(btc_socket_t *socket);
 
@@ -116,7 +113,9 @@ BTC_EXTERN const char *
 btc_loop_strerror(btc_loop_t *loop);
 
 BTC_EXTERN btc_socket_t *
-btc_loop_listen(btc_loop_t *loop, const struct btc_sockaddr_s *addr, int max);
+btc_loop_listen(btc_loop_t *loop,
+                const struct btc_sockaddr_s *addr,
+                int backlog);
 
 BTC_EXTERN btc_socket_t *
 btc_loop_connect(btc_loop_t *loop, const struct btc_sockaddr_s *addr);

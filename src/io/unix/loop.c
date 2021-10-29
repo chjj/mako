@@ -480,7 +480,7 @@ btc_socket_create(btc_loop_t *loop) {
   return socket;
 }
 
-void
+static void
 btc_socket_destroy(btc_socket_t *socket) {
   chunk_t *chunk, *next;
 
@@ -583,7 +583,9 @@ btc_socket_setaddr(btc_socket_t *socket, const btc_sockaddr_t *addr) {
 }
 
 static int
-btc_socket_listen(btc_socket_t *server, const btc_sockaddr_t *addr, int max) {
+btc_socket_listen(btc_socket_t *server,
+                  const btc_sockaddr_t *addr,
+                  int backlog) {
   int fd;
 
   if (!btc_socket_setaddr(server, addr))
@@ -602,7 +604,7 @@ btc_socket_listen(btc_socket_t *server, const btc_sockaddr_t *addr, int max) {
     return 0;
   }
 
-  if (listen(fd, max) == -1) {
+  if (listen(fd, backlog) == -1) {
     server->loop->error = errno;
     close(fd);
     return 0;
@@ -1187,10 +1189,10 @@ btc_loop_unregister(btc_loop_t *loop, btc_socket_t *socket) {
 }
 
 btc_socket_t *
-btc_loop_listen(btc_loop_t *loop, const btc_sockaddr_t *addr, int max) {
+btc_loop_listen(btc_loop_t *loop, const btc_sockaddr_t *addr, int backlog) {
   btc_socket_t *socket = btc_socket_create(loop);
 
-  if (!btc_socket_listen(socket, addr, max))
+  if (!btc_socket_listen(socket, addr, backlog))
     goto fail;
 
   if (!btc_loop_register(loop, socket)) {
