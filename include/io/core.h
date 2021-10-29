@@ -13,10 +13,14 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdint.h>
+#ifndef _WIN32
+#include <pthread.h>
+#endif
+
 #include "../satoshi/common.h"
 
 /*
- * Defines
+ * Constants
  */
 
 #define BTC_O_RDONLY     (1 <<  0)
@@ -89,8 +93,14 @@ extern "C" {
 #define BTC_LOCK_EX 1
 #define BTC_LOCK_UN 2
 
+#define BTC_MSEC(ts) \
+  (((ts)->tv_sec * 1000) + ((ts)->tv_nsec / 1000000))
+
+#define BTC_USEC(ts) \
+  (((ts)->tv_sec * 1000000) + ((ts)->tv_nsec / 1000))
+
 #define BTC_NSEC(ts) \
-  ((uint64_t)(ts)->tv_sec * 1000000000 + (uint64_t)(ts)->tv_nsec)
+  (((ts)->tv_sec * 1000000000) + (ts)->tv_nsec)
 
 #define BTC_PATH_MAX 1023
 
@@ -108,8 +118,14 @@ extern "C" {
 #define BTC_AF_INET6 6
 #define BTC_AF_UNIX 10
 
+#if defined(_WIN32)
+#  define BTC_ONCE_INIT {NULL, 0}
+#else
+#  define BTC_ONCE_INIT PTHREAD_ONCE_INIT
+#endif
+
 /*
- * Structs
+ * Types
  */
 
 typedef struct btc_timespec_s {
@@ -140,11 +156,24 @@ typedef struct btc_dirent_s {
   char d_name[256];
 } btc_dirent_t;
 
-struct btc_mutex_s;
-struct btc_rwlock_s;
-
 typedef struct btc_mutex_s btc_mutex_t;
 typedef struct btc_rwlock_s btc_rwlock_t;
+typedef struct btc_cond_s btc_cond_t;
+typedef struct btc_thread_s btc_thread_t;
+
+#if defined(_WIN32)
+typedef struct btc_once_s {
+  void *event; /* HANDLE */
+  int ran;
+} btc_once_t;
+
+typedef struct btc_tls_s {
+  unsigned long index; /* DWORD */
+} btc_tls_t;
+#else
+typedef pthread_once_t btc_once_t;
+typedef pthread_key_t btc_tls_t;
+#endif
 
 typedef struct btc_sockaddr_s {
   int family;
@@ -251,7 +280,7 @@ btc_path_resolve(char *out, const char *path);
  */
 
 BTC_EXTERN int
-btc_sys_random(void *dst, size_t size);
+btc_sys_cpu_count(void);
 
 /*
  * Mutex
@@ -268,6 +297,9 @@ btc_mutex_lock(btc_mutex_t *mtx);
 
 BTC_EXTERN void
 btc_mutex_unlock(btc_mutex_t *mtx);
+
+BTC_EXTERN int
+btc_mutex_trylock(btc_mutex_t *mtx);
 
 /*
  * Read-Write Lock
@@ -290,6 +322,78 @@ btc_rwlock_rdlock(btc_rwlock_t *mtx);
 
 BTC_EXTERN void
 btc_rwlock_rdunlock(btc_rwlock_t *mtx);
+
+BTC_EXTERN int
+btc_rwlock_trywrlock(btc_rwlock_t *mtx);
+
+BTC_EXTERN int
+btc_rwlock_tryrdlock(btc_rwlock_t *mtx);
+
+/*
+ * Conditional
+ */
+
+BTC_EXTERN btc_cond_t *
+btc_cond_create(void);
+
+BTC_EXTERN void
+btc_cond_destroy(btc_cond_t *cond);
+
+BTC_EXTERN void
+btc_cond_signal(btc_cond_t *cond);
+
+BTC_EXTERN void
+btc_cond_broadcast(btc_cond_t *cond);
+
+BTC_EXTERN void
+btc_cond_wait(btc_cond_t *cond, btc_mutex_t *mtx);
+
+BTC_EXTERN int
+btc_cond_timedwait(btc_cond_t *cond,
+                   btc_mutex_t *mtx,
+                   const btc_timespec_t *timeout);
+
+/*
+ * Thread
+ */
+
+BTC_EXTERN btc_thread_t *
+btc_thread_alloc(void);
+
+BTC_EXTERN void
+btc_thread_free(btc_thread_t *thread);
+
+BTC_EXTERN void
+btc_thread_create(btc_thread_t *thread, void *(*start)(void *), void *arg);
+
+BTC_EXTERN void
+btc_thread_detach(btc_thread_t *thread);
+
+BTC_EXTERN void
+btc_thread_join(btc_thread_t *thread);
+
+/*
+ * Once
+ */
+
+BTC_EXTERN void
+btc_once(btc_once_t *guard, void (*callback)(void));
+
+/*
+ * TLS
+ */
+
+BTC_EXTERN void
+btc_tls_init(btc_tls_t *key);
+
+BTC_EXTERN void
+btc_tls_clear(btc_tls_t *key);
+
+BTC_EXTERN void *
+btc_tls_get(btc_tls_t *key);
+
+BTC_EXTERN void
+btc_tls_set(btc_tls_t *key, void *value);
 
 /*
  * Time

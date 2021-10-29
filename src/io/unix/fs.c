@@ -30,10 +30,6 @@
 #endif
 #include <unistd.h>
 
-#ifndef SSIZE_MAX
-#  define SSIZE_MAX ((ssize_t)((size_t)-1 / 2))
-#endif
-
 #ifdef __wasi__
 /* lseek(3) is statement expression in wasi-libc. */
 #  pragma GCC diagnostic ignored "-Wgnu-statement-expression"
@@ -717,8 +713,8 @@ btc_fs_tell(int fd) {
 int
 btc_fs_read(int fd, void *dst, size_t len) {
   unsigned char *buf = (unsigned char *)dst;
-  size_t max = SSIZE_MAX;
-  ssize_t nread;
+  size_t max = INT_MAX;
+  int nread;
 
   while (len > 0) {
     if (max > len)
@@ -744,8 +740,8 @@ btc_fs_read(int fd, void *dst, size_t len) {
 int
 btc_fs_write(int fd, const void *src, size_t len) {
   const unsigned char *buf = (const unsigned char *)src;
-  size_t max = SSIZE_MAX;
-  ssize_t nwrite;
+  size_t max = INT_MAX;
+  int nwrite;
 
   while (len > 0) {
     if (max > len)
@@ -771,8 +767,8 @@ btc_fs_write(int fd, const void *src, size_t len) {
 int
 btc_fs_pread(int fd, void *dst, size_t len, int64_t pos) {
   unsigned char *buf = (unsigned char *)dst;
-  size_t max = SSIZE_MAX;
-  ssize_t nread;
+  size_t max = INT_MAX;
+  int nread;
 
   while (len > 0) {
     if (max > len)
@@ -799,8 +795,8 @@ btc_fs_pread(int fd, void *dst, size_t len, int64_t pos) {
 int
 btc_fs_pwrite(int fd, const void *src, size_t len, int64_t pos) {
   const unsigned char *buf = (const unsigned char *)src;
-  size_t max = SSIZE_MAX;
-  ssize_t nwrite;
+  size_t max = INT_MAX;
+  int nwrite;
 
 #ifdef __APPLE__
   static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;

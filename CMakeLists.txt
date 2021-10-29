@@ -98,7 +98,8 @@ list(APPEND io_sources src/io/http/http_client.c
                        src/io/http/http_server.c
                        src/io/addrinfo.c
                        src/io/core.c
-                       src/io/sockaddr.c)
+                       src/io/sockaddr.c
+                       src/io/workers.c)
 
 if(WIN32)
   list(APPEND io_sources src/io/win/fs.c
@@ -269,6 +270,7 @@ set(tests # crypto
           loop
           thread
           http_client
+          workers
           # node
           addrman
           chaindb

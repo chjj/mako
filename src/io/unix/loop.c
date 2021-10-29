@@ -218,7 +218,8 @@ static void *
 safe_malloc(size_t size) {
   void *ptr = malloc(size);
 
-  CHECK(ptr != NULL);
+  if (ptr == NULL)
+    abort(); /* LCOV_EXCL_LINE */
 
   return ptr;
 }
@@ -227,10 +228,8 @@ static void *
 safe__realloc(void *ptr, size_t new_size, size_t old_size) {
   ptr = realloc(ptr, new_size);
 
-  if (ptr == NULL) {
+  if (ptr == NULL)
     abort(); /* LCOV_EXCL_LINE */
-    return NULL;
-  }
 
   if (new_size > old_size)
     memset((char *)ptr + old_size, 0, new_size - old_size);
