@@ -249,7 +249,7 @@ btc_tx_has_duplicate_inputs(const btc_tx_t *tx);
 BTC_EXTERN int
 btc_tx_check_sanity(btc_verify_error_t *err, const btc_tx_t *tx);
 
-BTC_EXTERN int
+BTC_EXTERN int64_t
 btc_tx_check_inputs(btc_verify_error_t *err,
                     const btc_tx_t *tx,
                     const btc_view_t *view,

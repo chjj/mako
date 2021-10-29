@@ -28,6 +28,7 @@ typedef struct btc_work_s {
 typedef struct btc_workq_s {
   btc_work_t *head;
   btc_work_t *tail;
+  int length;
 } btc_workq_t;
 
 typedef struct btc_workers_s btc_workers_t;
@@ -50,7 +51,7 @@ btc_workq_push(btc_workq_t *queue, btc_work_f *func, void *arg);
  */
 
 BTC_EXTERN btc_workers_t *
-btc_workers_create(int length);
+btc_workers_create(int threads, int max_batch);
 
 BTC_EXTERN void
 btc_workers_destroy(btc_workers_t *pool);
