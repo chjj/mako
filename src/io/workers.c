@@ -163,7 +163,7 @@ struct btc_workers_s {
   int stop;
 };
 
-static void *
+static void
 worker_thread(void *arg);
 
 btc_workers_t *
@@ -281,7 +281,7 @@ btc_workers_slice(btc_workers_t *pool, btc_workq_t *jobs) {
   return length;
 }
 
-static void *
+static void
 worker_thread(void *arg) {
   btc_workers_t *pool = arg;
   btc_work_t *work, *next;
@@ -328,6 +328,4 @@ worker_thread(void *arg) {
 
   btc_cond_signal(pool->master);
   btc_mutex_unlock(pool->mutex);
-
-  return NULL;
 }

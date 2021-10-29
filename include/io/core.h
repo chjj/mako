@@ -364,7 +364,7 @@ BTC_EXTERN void
 btc_thread_free(btc_thread_t *thread);
 
 BTC_EXTERN void
-btc_thread_create(btc_thread_t *thread, void *(*start)(void *), void *arg);
+btc_thread_create(btc_thread_t *thread, void (*start)(void *), void *arg);
 
 BTC_EXTERN void
 btc_thread_detach(btc_thread_t *thread);

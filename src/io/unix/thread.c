@@ -52,9 +52,20 @@ struct btc_cond_s {
   pthread_cond_t handle;
 };
 
+struct btc_args_s {
+  void (*start)(void *);
+  void *arg;
+};
+
 struct btc_thread_s {
   pthread_t handle;
 };
+
+/*
+ * Types
+ */
+
+typedef struct btc_args_s btc_args_t;
 
 /*
  * Helpers
@@ -292,8 +303,20 @@ thread_stack_size(void) {
 }
 #endif
 
+static void *
+btc_thread_run(void *ptr) {
+  btc_args_t args = *((btc_args_t *)ptr);
+
+  free(ptr);
+
+  args.start(args.arg);
+
+  return NULL;
+}
+
 void
-btc_thread_create(btc_thread_t *thread, void *(*start)(void *), void *arg) {
+btc_thread_create(btc_thread_t *thread, void (*start)(void *), void *arg) {
+  btc_args_t *args = safe_malloc(sizeof(btc_args_t));
   pthread_attr_t *attr = NULL;
 
 #if defined(__APPLE__) || defined(__linux__)
@@ -311,7 +334,10 @@ btc_thread_create(btc_thread_t *thread, void *(*start)(void *), void *arg) {
   }
 #endif
 
-  if (pthread_create(&thread->handle, attr, start, arg) != 0)
+  args->start = start;
+  args->arg = arg;
+
+  if (pthread_create(&thread->handle, attr, btc_thread_run, args) != 0)
     abort(); /* LCOV_EXCL_LINE */
 }
 

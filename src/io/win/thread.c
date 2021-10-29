@@ -54,7 +54,7 @@ struct btc_cond_s {
 };
 
 struct btc_args_s {
-  void *(*start)(void *);
+  void (*start)(void *);
   void *arg;
 };
 
@@ -394,7 +394,7 @@ btc_thread_run(void *ptr) {
 }
 
 void
-btc_thread_create(btc_thread_t *thread, void *(*start)(void *), void *arg) {
+btc_thread_create(btc_thread_t *thread, void (*start)(void *), void *arg) {
   btc_args_t *args = safe_malloc(sizeof(btc_args_t));
 
   args->start = start;
