@@ -956,9 +956,6 @@ void
 btc_miner_destroy(btc_miner_t *miner) {
   size_t i;
 
-  if (miner->cpu.mining)
-    btc_cpuminer_stop(&miner->cpu);
-
   for (i = 0; i < miner->addrs.length; i++)
     btc_address_destroy(miner->addrs.items[i]);
 
@@ -995,7 +992,8 @@ btc_miner_open(btc_miner_t *miner) {
 
 void
 btc_miner_close(btc_miner_t *miner) {
-  (void)miner;
+  if (miner->cpu.mining)
+    btc_cpuminer_stop(&miner->cpu);
 }
 
 void
@@ -1025,7 +1023,7 @@ btc_miner_set_data(btc_miner_t *miner,
 
 void
 btc_miner_set_flags(btc_miner_t *miner, const char *flags) {
-  btc_miner_set_data(miner, (uint8_t *)flags, strlen(flags));
+  btc_miner_set_data(miner, (const uint8_t *)flags, strlen(flags));
 }
 
 void
