@@ -38,13 +38,13 @@ enum btc_score {
 typedef struct btc_addrent_s {
   btc_netaddr_t addr;
   btc_netaddr_t src;
-  struct btc_addrent_s *prev;
-  struct btc_addrent_s *next;
   uint8_t used;
   int32_t ref_count;
   int32_t attempts;
   int64_t last_success;
   int64_t last_attempt;
+  struct btc_addrent_s *prev;
+  struct btc_addrent_s *next;
 } btc_addrent_t;
 
 typedef btc_addrmapiter_t btc_addriter_t;
@@ -66,16 +66,16 @@ BTC_EXTERN void
 btc_addrman_set_timedata(btc_addrman_t *man, const btc_timedata_t *td);
 
 BTC_EXTERN int
-btc_addrman_open(btc_addrman_t *man);
+btc_addrman_open(btc_addrman_t *man, const char *file);
 
 BTC_EXTERN void
 btc_addrman_close(btc_addrman_t *man);
 
 BTC_EXTERN void
-btc_addrman_flush(btc_addrman_t *man);
+btc_addrman_flush(btc_addrman_t *man, const char *file);
 
 BTC_EXTERN size_t
-btc_addrman_size(btc_addrman_t *man);
+btc_addrman_total(btc_addrman_t *man);
 
 BTC_EXTERN int
 btc_addrman_is_full(btc_addrman_t *man);
@@ -141,6 +141,15 @@ btc_addrman_iterate(btc_addriter_t *iter, btc_addrman_t *man);
 
 BTC_EXTERN int
 btc_addrman_next(const btc_netaddr_t **addr, btc_addriter_t *iter);
+
+BTC_EXTERN size_t
+btc_addrman_size(const btc_addrman_t *man);
+
+BTC_EXTERN size_t
+btc_addrman_export(uint8_t *zp, const btc_addrman_t *man);
+
+BTC_EXTERN int
+btc_addrman_import(btc_addrman_t *man, const uint8_t *xp, size_t xn);
 
 #ifdef __cplusplus
 }

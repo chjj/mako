@@ -2151,7 +2151,7 @@ int
 btc_pool_open(btc_pool_t *pool) {
   btc_pool_log(pool, "Opening pool.");
 
-  if (!btc_addrman_open(pool->addrman))
+  if (!btc_addrman_open(pool->addrman, NULL))
     return 0;
 
   if (!btc_pool_listen(pool)) {
@@ -2392,7 +2392,7 @@ btc_pool_add_loader(btc_pool_t *pool) {
 
 static int
 btc_pool_fill_outbound(btc_pool_t *pool) {
-  size_t total = btc_addrman_size(pool->addrman);
+  size_t total = btc_addrman_total(pool->addrman);
   size_t i, need;
 
   if (pool->peers.load == NULL) {
@@ -2788,7 +2788,7 @@ btc_pool_on_addr(btc_pool_t *pool,
   btc_pool_log(pool,
     "Received %zu addrs (hosts=%zu, peers=%zu) (%N).",
     addrs->length,
-    btc_addrman_size(pool->addrman),
+    btc_addrman_total(pool->addrman),
     pool->peers.length,
     &peer->addr);
 

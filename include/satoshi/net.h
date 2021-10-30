@@ -89,6 +89,14 @@ enum btc_net_services {
   BTC_NET_SERVICE_WITNESS = 1 << 3,
 
   /**
+   * Default services.
+   */
+
+  BTC_NET_DEFAULT_SERVICES = BTC_NET_SERVICE_NETWORK
+                           | BTC_NET_SERVICE_WITNESS
+                           | BTC_NET_SERVICE_BLOOM,
+
+  /**
    * Our services.
    */
 

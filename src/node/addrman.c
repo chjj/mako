@@ -34,6 +34,7 @@
  * Constants
  */
 
+#define SER_VERSION 0
 #define HORIZON_DAYS 30
 #define MAX_RETRIES 3
 #define MIN_FAIL_DAYS 7
@@ -44,8 +45,40 @@
 #define MAX_ENTRIES 64
 
 /*
+ * Address Key
+ */
+
+#define BTC_ADDRKEY_SIZE 18
+
+static uint8_t *
+btc_addrkey_write(uint8_t *zp, const btc_netaddr_t *x) {
+  zp = btc_raw_write(zp, x->raw, 16);
+  zp = btc_uint16_write(zp, x->port);
+  return zp;
+}
+
+static int
+btc_addrkey_read(btc_netaddr_t *z, const uint8_t **xp, size_t *xn) {
+  uint16_t port;
+
+  btc_netaddr_init(z);
+
+  if (!btc_raw_read(z->raw, 16, xp, xn))
+    return 0;
+
+  if (!btc_uint16_read(&port, xp, xn))
+    return 0;
+
+  z->port = port;
+
+  return 1;
+}
+
+/*
  * Address Entry
  */
+
+#define BTC_ADDRENT_SIZE (2 * BTC_ADDRKEY_SIZE + 36)
 
 DEFINE_OBJECT(btc_addrent, SCOPE_STATIC)
 
@@ -53,13 +86,13 @@ static void
 btc_addrent_init(btc_addrent_t *entry) {
   btc_netaddr_init(&entry->addr);
   btc_netaddr_init(&entry->src);
-  entry->prev = NULL;
-  entry->next = NULL;
   entry->used = 0;
   entry->ref_count = 0;
   entry->attempts = 0;
   entry->last_success = 0;
   entry->last_attempt = 0;
+  entry->prev = NULL;
+  entry->next = NULL;
 }
 
 static void
@@ -72,13 +105,13 @@ static void
 btc_addrent_copy(btc_addrent_t *z, const btc_addrent_t *x) {
   btc_netaddr_copy(&z->addr, &x->addr);
   btc_netaddr_copy(&z->src, &x->src);
-  z->prev = x->prev;
-  z->next = x->next;
   z->used = x->used;
   z->ref_count = x->ref_count;
   z->attempts = x->attempts;
   z->last_success = x->last_success;
   z->last_attempt = x->last_attempt;
+  z->prev = x->prev;
+  z->next = x->next;
 }
 
 static double
@@ -95,6 +128,53 @@ btc_addrent_chance(const btc_addrent_t *entry, int64_t now) {
   c *= pow(0.66, attempts);
 
   return c;
+}
+
+static uint8_t *
+btc_addrent_write(uint8_t *zp, const btc_addrent_t *x) {
+  zp = btc_addrkey_write(zp, &x->addr);
+  zp = btc_uint64_write(zp, x->addr.services);
+  zp = btc_int64_write(zp, x->addr.time);
+  zp = btc_addrkey_write(zp, &x->src);
+  zp = btc_int32_write(zp, x->attempts);
+  zp = btc_int64_write(zp, x->last_success);
+  zp = btc_int64_write(zp, x->last_attempt);
+  return zp;
+}
+
+static int
+btc_addrent_read(btc_addrent_t *z, const uint8_t **xp, size_t *xn) {
+  if (!btc_addrkey_read(&z->addr, xp, xn))
+    return 0;
+
+  if (!btc_uint64_read(&z->addr.services, xp, xn))
+    return 0;
+
+  if (!btc_int64_read(&z->addr.time, xp, xn))
+    return 0;
+
+  if (!btc_addrkey_read(&z->src, xp, xn))
+    return 0;
+
+  z->src.services = BTC_NET_DEFAULT_SERVICES;
+  z->src.time = btc_now();
+
+  z->used = 0;
+  z->ref_count = 0;
+
+  if (!btc_int32_read(&z->attempts, xp, xn))
+    return 0;
+
+  if (!btc_int64_read(&z->last_success, xp, xn))
+    return 0;
+
+  if (!btc_int64_read(&z->last_attempt, xp, xn))
+    return 0;
+
+  z->prev = NULL;
+  z->next = NULL;
+
+  return 1;
 }
 
 /*
@@ -259,8 +339,45 @@ btc_addrman_log(btc_addrman_t *man, const char *fmt, ...) {
   va_end(ap);
 }
 
-int
-btc_addrman_open(btc_addrman_t *man) {
+static int
+btc_addrman_read_file(btc_addrman_t *man, const char *file) {
+  int fd = btc_fs_open(file, BTC_O_RDONLY, 0);
+  uint8_t *xp = NULL;
+  btc_stat_t stat;
+  int ret = 0;
+  size_t xn;
+
+  if (fd == -1)
+    return 0;
+
+  if (!btc_fs_fstat(fd, &stat))
+    goto fail;
+
+  xn = stat.st_size;
+
+  if (xn == 0)
+    goto fail;
+
+  xp = btc_malloc(xn);
+
+  if (!btc_fs_read(fd, xp, xn))
+    goto fail;
+
+  if (!btc_addrman_import(man, xp, xn))
+    goto fail;
+
+  ret = 1;
+fail:
+  btc_fs_close(fd);
+
+  if (xp != NULL)
+    btc_free(xp);
+
+  return ret;
+}
+
+static int
+btc_addrman_resolve(btc_addrman_t *man) {
   const btc_network_t *network = man->network;
   int64_t now = btc_now();
   btc_sockaddr_t *res, *p;
@@ -279,7 +396,7 @@ btc_addrman_open(btc_addrman_t *man) {
         btc_netaddr_set_sockaddr(&addr, p);
 
         addr.time = now;
-        addr.services = BTC_NET_LOCAL_SERVICES;
+        addr.services = BTC_NET_DEFAULT_SERVICES;
         addr.port = network->port;
 
         btc_addrman_add(man, &addr, NULL);
@@ -299,23 +416,54 @@ btc_addrman_open(btc_addrman_t *man) {
       break;
   }
 
-  btc_addrman_log(man, "Resolved %zu seeds.", btc_addrman_size(man));
+  btc_addrman_log(man, "Resolved %zu seeds.", btc_addrman_total(man));
 
-  return btc_addrman_size(man) > 0;
+  return btc_addrman_total(man) > 0;
+}
+
+int
+btc_addrman_open(btc_addrman_t *man, const char *file) {
+  if (file != NULL) {
+    if (btc_addrman_read_file(man, file))
+      return 1;
+
+    btc_addrman_log(man, "Could not read %s.", file);
+  }
+
+  return btc_addrman_resolve(man);
 }
 
 void
 btc_addrman_close(btc_addrman_t *man) {
-  (void)man;
+  btc_addrman_reset(man);
+}
+
+static int
+btc_addrman_write_file(btc_addrman_t *man, const char *file) {
+  size_t zn = btc_addrman_size(man);
+  uint8_t *zp = btc_malloc(zn);
+  int ret;
+
+  CHECK(btc_addrman_export(zp, man) == zn);
+
+  ret = btc_fs_write_file(file, 0644, zp, zn);
+
+  btc_free(zp);
+
+  return ret;
 }
 
 void
-btc_addrman_flush(btc_addrman_t *man) {
-  (void)man;
+btc_addrman_flush(btc_addrman_t *man, const char *file) {
+  /* TODO: Put this on a worker thread. */
+  if (man->needs_flush) {
+    btc_addrman_write_file(man, file);
+    man->needs_flush = 0;
+  }
 }
 
 size_t
-btc_addrman_size(btc_addrman_t *man) {
+btc_addrman_total(btc_addrman_t *man) {
   return man->total_fresh + man->total_used;
 }
 
@@ -326,7 +474,26 @@ btc_addrman_is_full(btc_addrman_t *man) {
 
 void
 btc_addrman_reset(btc_addrman_t *man) {
-  (void)man;
+  btc_addrmapiter_t iter;
+  size_t i;
+
+  btc_addrmap_iterate(&iter, man->map);
+
+  while (btc_addrmap_next(&iter))
+    btc_addrent_destroy(iter.val);
+
+  btc_addrmap_reset(man->map);
+
+  for (i = 0; i < MAX_FRESH_BUCKETS; i++)
+    btc_addrmap_reset(man->fresh.items[i]);
+
+  for (i = 0; i < MAX_USED_BUCKETS; i++)
+    btc_list_reset((btc_bucket_t *)man->used.items[i]);
+
+  man->total_fresh = 0;
+  man->total_used = 0;
+
+  btc_getrandom(man->key, 32);
 }
 
 void
@@ -931,4 +1098,203 @@ btc_addrman_next(const btc_netaddr_t **addr, btc_addriter_t *iter) {
     return 1;
   }
   return 0;
+}
+
+size_t
+btc_addrman_size(const btc_addrman_t *man) {
+  size_t size = 0;
+  int i;
+
+  size += 4;
+  size += 4;
+  size += 32;
+
+  size += btc_size_size(btc_addrmap_size(man->map));
+  size += btc_addrmap_size(man->map) * BTC_ADDRENT_SIZE;
+
+  for (i = 0; i < MAX_FRESH_BUCKETS; i++) {
+    const btc_addrmap_t *bucket = man->fresh.items[i];
+
+    size += btc_size_size(btc_addrmap_size(bucket));
+    size += btc_addrmap_size(bucket) * BTC_ADDRKEY_SIZE;
+  }
+
+  for (i = 0; i < MAX_USED_BUCKETS; i++) {
+    const btc_bucket_t *bucket = man->used.items[i];
+
+    size += btc_size_size(bucket->length);
+    size += bucket->length * BTC_ADDRKEY_SIZE;
+  }
+
+  return size;
+}
+
+static uint8_t *
+btc_addrman_write(uint8_t *zp, const btc_addrman_t *man) {
+  btc_addrmapiter_t iter, it;
+  int i;
+
+  btc_addrmap_iterate(&iter, man->map);
+
+  zp = btc_uint32_write(zp, SER_VERSION);
+  zp = btc_uint32_write(zp, man->network->magic);
+  zp = btc_raw_write(zp, man->key, 32);
+
+  zp = btc_size_write(zp, btc_addrmap_size(man->map));
+
+  while (btc_addrmap_next(&iter))
+    zp = btc_addrent_write(zp, iter.val);
+
+  for (i = 0; i < MAX_FRESH_BUCKETS; i++) {
+    const btc_addrmap_t *bucket = man->fresh.items[i];
+
+    btc_addrmap_iterate(&it, bucket);
+
+    zp = btc_size_write(zp, btc_addrmap_size(bucket));
+
+    while (btc_addrmap_next(&it)) {
+      const btc_addrent_t *entry = it.val;
+
+      zp = btc_addrkey_write(zp, &entry->addr);
+    }
+  }
+
+  for (i = 0; i < MAX_USED_BUCKETS; i++) {
+    const btc_bucket_t *bucket = man->used.items[i];
+    const btc_addrent_t *entry;
+
+    zp = btc_size_write(zp, bucket->length);
+
+    for (entry = bucket->head; entry != NULL; entry = entry->next)
+      zp = btc_addrkey_write(zp, &entry->addr);
+  }
+
+  return zp;
+}
+
+static int
+btc_addrman_read(btc_addrman_t *man, const uint8_t **xp, size_t *xn) {
+  uint32_t version, magic;
+  btc_addrmapiter_t iter;
+  size_t i, j, length;
+
+  btc_addrman_reset(man);
+
+  if (!btc_uint32_read(&version, xp, xn))
+    goto fail;
+
+  if (!btc_uint32_read(&magic, xp, xn))
+    goto fail;
+
+  if (version != SER_VERSION)
+    goto fail;
+
+  if (magic != man->network->magic)
+    goto fail;
+
+  if (!btc_raw_read(man->key, 32, xp, xn))
+    goto fail;
+
+  if (!btc_size_read(&length, xp, xn))
+    goto fail;
+
+  for (i = 0; i < length; i++) {
+    btc_addrent_t *entry = btc_addrent_create();
+
+    if (!btc_addrent_read(entry, xp, xn)) {
+      btc_addrent_destroy(entry);
+      goto fail;
+    }
+
+    if (!btc_addrmap_put(man->map, &entry->addr, entry)) {
+      btc_addrent_destroy(entry);
+      goto fail;
+    }
+  }
+
+  for (i = 0; i < MAX_FRESH_BUCKETS; i++) {
+    btc_addrmap_t *bucket = man->fresh.items[i];
+
+    if (!btc_size_read(&length, xp, xn))
+      goto fail;
+
+    for (j = 0; j < length; j++) {
+      btc_addrent_t *entry;
+      btc_netaddr_t key;
+
+      if (!btc_addrkey_read(&key, xp, xn))
+        goto fail;
+
+      entry = btc_addrmap_get(man->map, &key);
+
+      if (entry == NULL)
+        goto fail;
+
+      if (entry->ref_count == 0)
+        man->total_fresh++;
+
+      entry->ref_count++;
+
+      btc_addrmap_put(bucket, &entry->addr, entry);
+    }
+
+    if (btc_addrmap_size(bucket) > MAX_ENTRIES)
+      goto fail; /* Bucket size mismatch. */
+  }
+
+  for (i = 0; i < MAX_USED_BUCKETS; i++) {
+    btc_bucket_t *bucket = man->used.items[i];
+
+    if (!btc_size_read(&length, xp, xn))
+      goto fail;
+
+    for (j = 0; j < length; j++) {
+      btc_addrent_t *entry;
+      btc_netaddr_t key;
+
+      if (!btc_addrkey_read(&key, xp, xn))
+        goto fail;
+
+      entry = btc_addrmap_get(man->map, &key);
+
+      if (entry == NULL || entry->ref_count != 0 || entry->used)
+        goto fail;
+
+      man->total_used++;
+
+      entry->used = 1;
+
+      btc_list_push(bucket, entry, btc_addrent_t);
+    }
+
+    if (bucket->length > MAX_ENTRIES)
+      goto fail; /* Bucket size mismatch. */
+  }
+
+  if (*xn == 0)
+    goto fail;
+
+  btc_addrmap_iterate(&iter, man->map);
+
+  while (btc_addrmap_next(&iter)) {
+    btc_addrent_t *entry = iter.val;
+
+    if (!entry->used && entry->ref_count == 0)
+      goto fail;
+  }
+
+  return 1;
+fail:
+  btc_addrman_reset(man);
+  return 0;
+}
+
+size_t
+btc_addrman_export(uint8_t *zp, const btc_addrman_t *man) {
+  return btc_addrman_write(zp, man) - zp;
+}
+
+int
+btc_addrman_import(btc_addrman_t *man, const uint8_t *xp, size_t xn) {
+  return btc_addrman_read(man, &xp, &xn);
 }
