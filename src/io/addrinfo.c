@@ -23,6 +23,22 @@
 #  include <netinet/in.h>
 #endif
 
+#undef HAVE_GETIFADDRS
+
+#if defined(__linux__)     \
+ || defined(__APPLE__)     \
+ || defined(__OpenBSD__)   \
+ || defined(__FreeBSD__)   \
+ || defined(__NetBSD__)    \
+ || defined(__DragonFly__) \
+ || defined(__HAIKU__)     \
+ || defined(__CYGWIN__)    \
+ || defined(__MSYS__)
+#  include <ifaddrs.h>
+#  include <net/if.h>
+#  define HAVE_GETIFADDRS
+#endif
+
 /*
  * Address Info
  */
@@ -51,12 +67,8 @@ btc_getaddrinfo(btc_sockaddr_t **res, const char *name) {
 
     addr = (btc_sockaddr_t *)malloc(sizeof(btc_sockaddr_t));
 
-    if (addr == NULL) {
+    if (addr == NULL)
       abort(); /* LCOV_EXCL_LINE */
-      return 0; /* LCOV_EXCL_LINE */
-    }
-
-    memset(addr, 0, sizeof(*addr));
 
     if (!btc_sockaddr_set(addr, p->ai_addr))
       abort(); /* LCOV_EXCL_LINE */
@@ -84,4 +96,74 @@ btc_freeaddrinfo(btc_sockaddr_t *res) {
     free(res);
     res = next;
   }
+}
+
+int
+btc_getifaddrs(btc_sockaddr_t **res) {
+#if defined(_WIN32)
+  char name[256];
+
+  *res = NULL;
+
+  if (gethostname(name, sizeof(name)) == SOCKET_ERROR)
+    return 0;
+
+  return btc_getaddrinfo(res, name);
+#elif defined(HAVE_GETIFADDRS)
+  btc_sockaddr_t *addr = NULL;
+  btc_sockaddr_t *prev = NULL;
+  struct ifaddrs *r, *p;
+
+  *res = NULL;
+
+  if (getifaddrs(&r) != 0)
+    return 0;
+
+  for (p = r; p != NULL; p = p->ifa_next) {
+    if (p->ifa_addr == NULL)
+      continue;
+
+    if ((p->ifa_flags & IFF_UP) == 0)
+      continue;
+
+    if (strcmp(p->ifa_name, "lo") == 0)
+      continue;
+
+    if (strcmp(p->ifa_name, "lo0") == 0)
+      continue;
+
+    if (p->ifa_addr->sa_family != AF_INET
+        && p->ifa_addr->sa_family != AF_INET6) {
+      continue;
+    }
+
+    addr = (btc_sockaddr_t *)malloc(sizeof(btc_sockaddr_t));
+
+    if (addr == NULL)
+      abort(); /* LCOV_EXCL_LINE */
+
+    if (!btc_sockaddr_set(addr, p->ifa_addr))
+      abort(); /* LCOV_EXCL_LINE */
+
+    if (*res == NULL)
+      *res = addr;
+
+    if (prev != NULL)
+      prev->next = addr;
+
+    prev = addr;
+  }
+
+  freeifaddrs(r);
+
+  return 1;
+#else /* !HAVE_GETIFADDRS */
+  *res = NULL;
+  return 0;
+#endif /* !HAVE_GETIFADDRS */
+}
+
+void
+btc_freeifaddrs(btc_sockaddr_t *res) {
+  btc_freeaddrinfo(res);
 }

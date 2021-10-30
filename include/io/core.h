@@ -462,6 +462,12 @@ btc_getaddrinfo(btc_sockaddr_t **res, const char *name);
 BTC_EXTERN void
 btc_freeaddrinfo(btc_sockaddr_t *res);
 
+BTC_EXTERN int
+btc_getifaddrs(btc_sockaddr_t **res);
+
+BTC_EXTERN void
+btc_freeifaddrs(btc_sockaddr_t *res);
+
 #ifdef __cplusplus
 }
 #endif
