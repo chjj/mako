@@ -188,6 +188,64 @@ btc_checker_verify(btc_checker_t *checker) {
 #endif
 
 /*
+ * State Cache
+ */
+
+typedef struct btc_statecache_s {
+  btc_hashtab_t *bits[32];
+} btc_statecache_t;
+
+static void
+btc_statecache_init(btc_statecache_t *cache, const btc_network_t *network) {
+  const btc_deployment_t *deploy;
+  size_t i;
+
+  for (i = 0; i < 32; i++)
+    cache->bits[i] = NULL;
+
+  for (i = 0; i < network->deployments.length; i++) {
+    deploy = &network->deployments.items[i];
+
+    CHECK(cache->bits[deploy->bit] == NULL);
+
+    cache->bits[deploy->bit] = btc_hashtab_create();
+  }
+}
+
+static void
+btc_statecache_clear(btc_statecache_t *cache) {
+  int i;
+
+  for (i = 0; i < 32; i++) {
+    if (cache->bits[i] != NULL)
+      btc_hashtab_destroy(cache->bits[i]);
+
+    cache->bits[i] = NULL;
+  }
+}
+
+static void
+btc_statecache_set(btc_statecache_t *cache,
+                   int bit,
+                   const btc_entry_t *entry,
+                   int state) {
+  btc_hashtab_t *map = cache->bits[bit];
+
+  CHECK(map != NULL);
+
+  btc_hashtab_put(map, entry->hash, state);
+}
+
+static int
+btc_statecache_get(btc_statecache_t *cache, int bit, const btc_entry_t *entry) {
+  btc_hashtab_t *map = cache->bits[bit];
+
+  CHECK(map != NULL);
+
+  return btc_hashtab_get(map, entry->hash);
+}
+
+/*
  * Chain
  */
 
@@ -202,6 +260,7 @@ struct btc_chain_s {
   btc_hashset_t *invalid;
   btc_hashmap_t *orphan_map;
   btc_hashmap_t *orphan_prev;
+  btc_statecache_t cache;
   btc_entry_t *tip;
   int32_t height;
   btc_deployment_state_t state;
@@ -234,6 +293,7 @@ btc_chain_create(const btc_network_t *network) {
   chain->invalid = btc_hashset_create();
   chain->orphan_map = btc_hashmap_create();
   chain->orphan_prev = btc_hashmap_create();
+  btc_statecache_init(&chain->cache, network);
   chain->tip = NULL;
   chain->height = -1;
 
@@ -260,6 +320,7 @@ btc_chain_destroy(btc_chain_t *chain) {
   btc_hashset_destroy(chain->invalid);
   btc_hashmap_destroy(chain->orphan_map);
   btc_hashmap_destroy(chain->orphan_prev);
+  btc_statecache_clear(&chain->cache);
 
 #ifdef USE_WORKERS
   btc_workers_destroy(chain->workers);
@@ -732,8 +793,8 @@ btc_chain_get_state(btc_chain_t *chain,
   int bit = deployment->bit;
   btc_vector_t compute;
   int32_t height, count;
+  int i, state, cached;
   int64_t time;
-  int i, state;
 
   if (deployment->threshold != -1)
     threshold = deployment->threshold;
@@ -758,10 +819,18 @@ btc_chain_get_state(btc_chain_t *chain,
   btc_vector_init(&compute);
 
   while (entry != NULL) {
+    cached = btc_statecache_get(&chain->cache, bit, entry);
+
+    if (cached != -1) {
+      state = cached;
+      break;
+    }
+
     time = btc_entry_median_time(entry);
 
     if (time < deployment->start_time) {
       state = BTC_CHAIN_DEFINED;
+      btc_statecache_set(&chain->cache, bit, entry, state);
       break;
     }
 
@@ -835,6 +904,8 @@ btc_chain_get_state(btc_chain_t *chain,
         break;
       }
     }
+
+    btc_statecache_set(&chain->cache, bit, entry, state);
   }
 
   btc_vector_clear(&compute);
