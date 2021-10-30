@@ -427,7 +427,6 @@ btc_thread_join(btc_thread_t *thread) {
 void
 btc_once(btc_once_t *guard, void (*callback)(void)) {
   HANDLE created, existing;
-  DWORD result;
 
   if (guard->ran)
     return;
@@ -449,9 +448,7 @@ btc_once(btc_once_t *guard, void (*callback)(void)) {
   } else {
     CloseHandle(created);
 
-    result = WaitForSingleObject(existing, INFINITE);
-
-    if (result != WAIT_OBJECT_0)
+    if (WaitForSingleObject(existing, INFINITE) != WAIT_OBJECT_0)
       abort(); /* LCOV_EXCL_LINE */
   }
 }
