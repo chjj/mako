@@ -7,15 +7,17 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <io/core.h>
 
 /*
- * High-level Calls
+ * Filesystem
  */
 
 int
 btc_fs_read_file(const char *name, void *dst, size_t len) {
-  int fd = btc_fs_open(name, BTC_O_RDONLY | BTC_O_SEQUENTIAL, 0);
+  int flags = BTC_O_RDONLY | BTC_O_SEQUENTIAL;
+  int fd = btc_fs_open(name, flags, 0);
   int ret = 0;
 
   if (fd == -1)
@@ -33,7 +35,7 @@ fail:
 int
 btc_fs_write_file(const char *name,
                   uint32_t mode,
-                  const void *dst,
+                  const void *src,
                   size_t len) {
   int flags = BTC_O_WRONLY | BTC_O_CREAT | BTC_O_TRUNC;
   int fd = btc_fs_open(name, flags, mode);
@@ -42,12 +44,57 @@ btc_fs_write_file(const char *name,
   if (fd == -1)
     return 0;
 
-  if (!btc_fs_write(fd, dst, len))
+  if (!btc_fs_write(fd, src, len))
     goto fail;
 
   ret = 1;
 fail:
   btc_fs_close(fd);
+  return ret;
+}
+
+int
+btc_fs_alloc_file(unsigned char **dst, size_t *len, const char *name) {
+  int flags = BTC_O_RDONLY | BTC_O_SEQUENTIAL;
+  int fd = btc_fs_open(name, flags, 0);
+  uint8_t *xp = NULL;
+  btc_stat_t stat;
+  int ret = 0;
+  size_t xn;
+
+  if (fd == -1)
+    return 0;
+
+  if (!btc_fs_fstat(fd, &stat))
+    goto fail;
+
+  if ((uint64_t)stat.st_size > (SIZE_MAX >> 1))
+    goto fail;
+
+  xn = stat.st_size;
+
+  if (xn == 0)
+    goto fail;
+
+  xp = malloc(xn);
+
+  if (xp == NULL)
+    goto fail;
+
+  if (!btc_fs_read(fd, xp, xn))
+    goto fail;
+
+  *dst = xp;
+  *len = xn;
+
+  xp = NULL;
+  ret = 1;
+fail:
+  btc_fs_close(fd);
+
+  if (xp != NULL)
+    free(xp);
+
   return ret;
 }
 
@@ -72,6 +119,10 @@ btc_fs_close_lock(int fd) {
   btc_fs_flock(fd, BTC_LOCK_UN);
   btc_fs_close(fd);
 }
+
+/*
+ * Path
+ */
 
 size_t
 btc_path_join(char *zp, ...) {
@@ -98,6 +149,10 @@ btc_path_join(char *zp, ...) {
 
   return zn;
 }
+
+/*
+ * Time
+ */
 
 int64_t
 btc_time_sec(void) {

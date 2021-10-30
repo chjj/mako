@@ -267,8 +267,11 @@ btc_fs_read_file(const char *name, void *dst, size_t len);
 BTC_EXTERN int
 btc_fs_write_file(const char *name,
                   uint32_t mode,
-                  const void *dst,
+                  const void *src,
                   size_t len);
+
+BTC_EXTERN int
+btc_fs_alloc_file(unsigned char **dst, size_t *len, const char *name);
 
 BTC_EXTERN int
 btc_fs_open_lock(const char *name, uint32_t mode);

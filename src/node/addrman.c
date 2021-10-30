@@ -341,39 +341,20 @@ btc_addrman_log(btc_addrman_t *man, const char *fmt, ...) {
 
 static int
 btc_addrman_read_file(btc_addrman_t *man, const char *file) {
-  int fd = btc_fs_open(file, BTC_O_RDONLY, 0);
-  uint8_t *xp = NULL;
-  btc_stat_t stat;
-  int ret = 0;
+  uint8_t *xp;
   size_t xn;
 
-  if (fd == -1)
+  if (!btc_fs_alloc_file(&xp, &xn, file))
     return 0;
 
-  if (!btc_fs_fstat(fd, &stat))
-    goto fail;
-
-  xn = stat.st_size;
-
-  if (xn == 0)
-    goto fail;
-
-  xp = btc_malloc(xn);
-
-  if (!btc_fs_read(fd, xp, xn))
-    goto fail;
-
-  if (!btc_addrman_import(man, xp, xn))
-    goto fail;
-
-  ret = 1;
-fail:
-  btc_fs_close(fd);
-
-  if (xp != NULL)
+  if (!btc_addrman_import(man, xp, xn)) {
     btc_free(xp);
+    return 0;
+  }
 
-  return ret;
+  btc_free(xp);
+
+  return 1;
 }
 
 static int
