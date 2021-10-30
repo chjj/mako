@@ -100,7 +100,16 @@ btc_path_join(char *zp, ...) {
 }
 
 int64_t
-btc_ms(void) {
+btc_time_sec(void) {
+  btc_timespec_t ts;
+
+  btc_time_get(&ts);
+
+  return ts.tv_sec;
+}
+
+int64_t
+btc_time_msec(void) {
   btc_timespec_t ts;
 
   btc_time_get(&ts);
@@ -109,7 +118,7 @@ btc_ms(void) {
 }
 
 int64_t
-btc_us(void) {
+btc_time_usec(void) {
   btc_timespec_t ts;
 
   btc_time_get(&ts);
@@ -118,7 +127,7 @@ btc_us(void) {
 }
 
 int64_t
-btc_ns(void) {
+btc_time_nsec(void) {
   btc_timespec_t ts;
 
   btc_time_get(&ts);

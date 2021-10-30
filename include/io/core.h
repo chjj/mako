@@ -261,6 +261,21 @@ btc_fs_flock(int fd, int operation);
 BTC_EXTERN int
 btc_fs_close(int fd);
 
+BTC_EXTERN int
+btc_fs_read_file(const char *name, void *dst, size_t len);
+
+BTC_EXTERN int
+btc_fs_write_file(const char *name,
+                  uint32_t mode,
+                  const void *dst,
+                  size_t len);
+
+BTC_EXTERN int
+btc_fs_open_lock(const char *name, uint32_t mode);
+
+BTC_EXTERN void
+btc_fs_close_lock(int fd);
+
 /*
  * Process
  */
@@ -271,6 +286,9 @@ btc_ps_cwd(char *buf, size_t size);
 /*
  * Path
  */
+
+BTC_EXTERN size_t
+btc_path_join(char *zp, ...);
 
 BTC_EXTERN size_t
 btc_path_resolve(char *out, const char *path);
@@ -349,9 +367,7 @@ BTC_EXTERN void
 btc_cond_wait(btc_cond_t *cond, btc_mutex_t *mtx);
 
 BTC_EXTERN int
-btc_cond_timedwait(btc_cond_t *cond,
-                   btc_mutex_t *mtx,
-                   const btc_timespec_t *timeout);
+btc_cond_timedwait(btc_cond_t *cond, btc_mutex_t *mtx, int64_t msec);
 
 /*
  * Thread
@@ -402,36 +418,27 @@ btc_tls_set(btc_tls_t *key, void *value);
 BTC_EXTERN void
 btc_time_get(btc_timespec_t *ts);
 
-/*
- * High-level Calls
- */
+BTC_EXTERN int64_t
+btc_time_sec(void);
 
-BTC_EXTERN int
-btc_fs_read_file(const char *name, void *dst, size_t len);
+BTC_EXTERN int64_t
+btc_time_msec(void);
 
-BTC_EXTERN int
-btc_fs_write_file(const char *name,
-                  uint32_t mode,
-                  const void *dst,
-                  size_t len);
+BTC_EXTERN int64_t
+btc_time_usec(void);
 
-BTC_EXTERN int
-btc_fs_open_lock(const char *name, uint32_t mode);
+BTC_EXTERN int64_t
+btc_time_nsec(void);
 
 BTC_EXTERN void
-btc_fs_close_lock(int fd);
+btc_time_sleep(int64_t msec);
 
-BTC_EXTERN size_t
-btc_path_join(char *zp, ...);
+/*
+ * Temporary
+ */
 
-BTC_EXTERN int64_t
-btc_ms(void);
-
-BTC_EXTERN int64_t
-btc_us(void);
-
-BTC_EXTERN int64_t
-btc_ns(void);
+#define btc_ms btc_time_msec
+#define btc_us btc_time_usec
 
 /*
  * Socket Address

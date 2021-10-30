@@ -47,3 +47,11 @@ btc_time_get(btc_timespec_t *ts) {
   ts->tv_sec = ns / UINT64_C(1000000000);
   ts->tv_nsec = ns % UINT64_C(1000000000);
 }
+
+void
+btc_time_sleep(int64_t msec) {
+  if (msec < 0)
+    msec = 0;
+
+  Sleep((DWORD)msec);
+}

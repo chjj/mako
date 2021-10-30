@@ -350,13 +350,12 @@ btc_cond_wait(btc_cond_t *cond, btc_mutex_t *mtx) {
 }
 
 int
-btc_cond_timedwait(btc_cond_t *cond,
-                   btc_mutex_t *mtx,
-                   const btc_timespec_t *timeout) {
-  DWORD ms = BTC_MSEC(timeout);
+btc_cond_timedwait(btc_cond_t *cond, btc_mutex_t *mtx, int64_t msec) {
+  if (msec < 0)
+    abort(); /* LCOV_EXCL_LINE */
 
 #if defined(HAVE_COND_VAR)
-  if (SleepConditionVariableCS(&cond->handle, &mtx->handle, ms))
+  if (SleepConditionVariableCS(&cond->handle, &mtx->handle, msec))
     return 1;
 
   if (GetLastError() != ERROR_TIMEOUT)
@@ -364,7 +363,7 @@ btc_cond_timedwait(btc_cond_t *cond,
 
   return 0;
 #else
-  return cond_wait(cond, mtx, ms);
+  return cond_wait(cond, mtx, msec);
 #endif
 }
 

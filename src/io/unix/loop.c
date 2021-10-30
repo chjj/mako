@@ -10,6 +10,9 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#if !defined(FD_SETSIZE) && !defined(FD_SET)
+#include <sys/select.h>
+#endif
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -40,7 +43,7 @@
 #elif defined(BTC_USE_POLL)
 #  include <poll.h>
 #else
-#  include <sys/select.h>
+/* include <sys/select.h> */
 #endif
 
 #if (defined(BTC_USE_SELECT) \
@@ -432,24 +435,30 @@ safe_epoll_create(void) {
  */
 
 static void
-time_sleep(long long ms) {
+time_sleep(long long msec) {
   struct timeval tv;
+#ifdef __linux__
   int rc;
+#endif
 
-  if (ms <= 0)
+  if (msec <= 0)
     return;
 
   memset(&tv, 0, sizeof(tv));
 
   tv.tv_sec = 0;
-  tv.tv_usec = ms * 1000;
+  tv.tv_usec = msec * 1000;
 
   /* Linux updates the timeval. This is one
      situation where we actually _want_ that
      behavior. */
+#if defined(__linux__)
   do {
     rc = select(0, NULL, NULL, NULL, &tv);
   } while (rc == -1 && errno == EINTR);
+#else
+  select(0, NULL, NULL, NULL, &tv);
+#endif
 }
 
 static long long

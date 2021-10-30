@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <limits.h> /* PTHREAD_STACK_MIN */
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h> /* sysconf, getpagesize */
@@ -241,16 +242,17 @@ btc_cond_wait(btc_cond_t *cond, btc_mutex_t *mtx) {
 }
 
 int
-btc_cond_timedwait(btc_cond_t *cond,
-                   btc_mutex_t *mtx,
-                   const btc_timespec_t *timeout) {
+btc_cond_timedwait(btc_cond_t *cond, btc_mutex_t *mtx, int64_t msec) {
   struct timespec ts;
   int ret;
 
   memset(&ts, 0, sizeof(ts));
 
-  ts.tv_sec = timeout->tv_sec;
-  ts.tv_nsec = timeout->tv_nsec;
+  if (msec < 0)
+    abort(); /* LCOV_EXCL_LINE */
+
+  ts.tv_sec = msec / 1000;
+  ts.tv_nsec = (msec % 1000) * 1000000;
 
   ret = pthread_cond_timedwait(&cond->handle, &mtx->handle, &ts);
 
