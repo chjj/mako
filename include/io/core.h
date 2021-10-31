@@ -186,6 +186,22 @@ typedef struct btc_sockaddr_s {
 struct sockaddr;
 
 /*
+ * Address Info
+ */
+
+BTC_EXTERN int
+btc_getaddrinfo(btc_sockaddr_t **res, const char *name);
+
+BTC_EXTERN void
+btc_freeaddrinfo(btc_sockaddr_t *res);
+
+BTC_EXTERN int
+btc_getifaddrs(btc_sockaddr_t **res);
+
+BTC_EXTERN void
+btc_freeifaddrs(btc_sockaddr_t *res);
+
+/*
  * Filesystem
  */
 
@@ -280,11 +296,14 @@ BTC_EXTERN void
 btc_fs_close_lock(int fd);
 
 /*
- * Process
+ * Network
  */
 
-BTC_EXTERN int
-btc_ps_cwd(char *buf, size_t size);
+BTC_EXTERN void
+btc_net_startup(void);
+
+BTC_EXTERN void
+btc_net_cleanup(void);
 
 /*
  * Path
@@ -297,11 +316,11 @@ BTC_EXTERN size_t
 btc_path_resolve(char *out, const char *path);
 
 /*
- * System
+ * Process
  */
 
 BTC_EXTERN int
-btc_sys_cpu_count(void);
+btc_ps_cwd(char *buf, size_t size);
 
 /*
  * Mutex
@@ -415,6 +434,32 @@ BTC_EXTERN void
 btc_tls_set(btc_tls_t *key, void *value);
 
 /*
+ * Socket Address
+ */
+
+BTC_EXTERN void
+btc_sockaddr_init(btc_sockaddr_t *addr);
+
+BTC_EXTERN int
+btc_sockaddr_set(btc_sockaddr_t *z, const struct sockaddr *x);
+
+BTC_EXTERN int
+btc_sockaddr_get(struct sockaddr *z, const btc_sockaddr_t *x);
+
+BTC_EXTERN int
+btc_sockaddr_import(btc_sockaddr_t *z, const char *xp, int port);
+
+BTC_EXTERN int
+btc_sockaddr_export(char *zp, int *port, const btc_sockaddr_t *x);
+
+/*
+ * System
+ */
+
+BTC_EXTERN int
+btc_sys_cpu_count(void);
+
+/*
  * Time
  */
 
@@ -442,41 +487,6 @@ btc_time_sleep(int64_t msec);
 
 #define btc_ms btc_time_msec
 #define btc_us btc_time_usec
-
-/*
- * Socket Address
- */
-
-BTC_EXTERN void
-btc_sockaddr_init(btc_sockaddr_t *addr);
-
-BTC_EXTERN int
-btc_sockaddr_set(btc_sockaddr_t *z, const struct sockaddr *x);
-
-BTC_EXTERN int
-btc_sockaddr_get(struct sockaddr *z, const btc_sockaddr_t *x);
-
-BTC_EXTERN int
-btc_sockaddr_import(btc_sockaddr_t *z, const char *xp, int port);
-
-BTC_EXTERN int
-btc_sockaddr_export(char *zp, int *port, const btc_sockaddr_t *x);
-
-/*
- * Address Info
- */
-
-BTC_EXTERN int
-btc_getaddrinfo(btc_sockaddr_t **res, const char *name);
-
-BTC_EXTERN void
-btc_freeaddrinfo(btc_sockaddr_t *res);
-
-BTC_EXTERN int
-btc_getifaddrs(btc_sockaddr_t **res);
-
-BTC_EXTERN void
-btc_freeifaddrs(btc_sockaddr_t *res);
 
 #ifdef __cplusplus
 }

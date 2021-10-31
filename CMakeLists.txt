@@ -104,11 +104,13 @@ list(APPEND io_sources src/io/http/http_client.c
 if(WIN32)
   list(APPEND io_sources src/io/win/fs.c
                          src/io/win/loop.c
+                         src/io/win/net.c
                          src/io/win/thread.c
                          src/io/win/time.c)
 else()
   list(APPEND io_sources src/io/unix/fs.c
                          src/io/unix/loop.c
+                         src/io/unix/net.c
                          src/io/unix/thread.c
                          src/io/unix/time.c)
 endif()
@@ -131,8 +133,8 @@ else()
   list(APPEND satoshi_defines BTC_HAVE_INT128)
   if(NOT MINGW)
     list(APPEND satoshi_defines BTC_TLS=__thread)
+    list(APPEND satoshi_defines _GNU_SOURCE)
   endif()
-  list(APPEND satoshi_defines _GNU_SOURCE)
 endif()
 
 test_big_endian(BTC_BIGENDIAN)
@@ -165,7 +167,12 @@ else()
 endif()
 
 list(APPEND satoshi_includes ${PROJECT_SOURCE_DIR}/include)
-list(APPEND satoshi_libs m)
+
+if(WIN32)
+  list(APPEND satoshi_libs ws2_32)
+else()
+  list(APPEND satoshi_libs m)
+endif()
 
 add_subdirectory(deps/json)
 add_subdirectory(deps/lmdb)

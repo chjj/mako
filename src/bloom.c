@@ -264,7 +264,7 @@ btc_filter_set(btc_filter_t *filter, uint32_t items, double rate) {
 
   CHECK(rate >= 0.0 && rate <= 1.0);
 
-  n = (int)round(lograte / log(0.5));
+  n = (int)((lograte / log(0.5)) + 0.5);
 
   if (n > 50)
     n = 50;
