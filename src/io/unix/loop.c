@@ -15,6 +15,7 @@
 #endif
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <sys/un.h>
 #include <fcntl.h>
@@ -579,6 +580,11 @@ btc_socket_strerror(btc_socket_t *socket) {
 size_t
 btc_socket_buffered(btc_socket_t *socket) {
   return socket->total;
+}
+
+void
+btc_socket_set_nodelay(btc_socket_t *socket, int value) {
+  setsockopt(socket->fd, IPPROTO_TCP, TCP_NODELAY, &value, sizeof(value));
 }
 
 static int

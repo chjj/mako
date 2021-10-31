@@ -404,6 +404,7 @@ btc_peer_on_parse_error(btc_peer_t *peer);
 
 static void
 on_server_socket(btc_socket_t *server, btc_socket_t *socket) {
+  btc_socket_set_nodelay(socket, 1);
   btc_pool_on_socket((btc_pool_t *)btc_socket_get_data(server), socket);
 }
 
@@ -431,6 +432,7 @@ on_tick(btc_loop_t *loop, void *data) {
 
 static void
 on_connect(btc_socket_t *socket) {
+  btc_socket_set_nodelay(socket, 1);
   btc_peer_on_connect((btc_peer_t *)btc_socket_get_data(socket));
 }
 

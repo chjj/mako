@@ -81,6 +81,9 @@ btc_socket_strerror(btc_socket_t *socket);
 BTC_EXTERN size_t
 btc_socket_buffered(btc_socket_t *socket);
 
+BTC_EXTERN void
+btc_socket_set_nodelay(btc_socket_t *socket, int value);
+
 BTC_EXTERN int
 btc_socket_write(btc_socket_t *socket, void *data, size_t len);
 
