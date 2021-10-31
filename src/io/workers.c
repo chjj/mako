@@ -324,8 +324,8 @@ worker_thread(void *arg) {
     }
   }
 
-  pool->threads--;
+  if (--pool->threads == 0)
+    btc_cond_signal(pool->master);
 
-  btc_cond_signal(pool->master);
   btc_mutex_unlock(pool->mutex);
 }

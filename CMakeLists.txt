@@ -98,18 +98,17 @@ list(APPEND io_sources src/io/http/http_client.c
                        src/io/http/http_server.c
                        src/io/addrinfo.c
                        src/io/core.c
+                       src/io/loop.c
                        src/io/sockaddr.c
                        src/io/workers.c)
 
 if(WIN32)
   list(APPEND io_sources src/io/win/fs.c
-                         src/io/win/loop.c
                          src/io/win/net.c
                          src/io/win/thread.c
                          src/io/win/time.c)
 else()
   list(APPEND io_sources src/io/unix/fs.c
-                         src/io/unix/loop.c
                          src/io/unix/net.c
                          src/io/unix/thread.c
                          src/io/unix/time.c)

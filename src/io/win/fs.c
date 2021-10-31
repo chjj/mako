@@ -20,19 +20,20 @@
  * Helpers
  */
 
-#define FILETIME_TO_UINT(filetime) \
-  (*((uint64_t *)&(filetime)) - UINT64_C(116444736000000000))
+static void
+btc_timespec_set_filetime(btc_timespec_t *ts, const FILETIME *ft) {
+  static const uint64_t epoch = UINT64_C(116444736000000000);
+  ULARGE_INTEGER ul;
+  uint64_t ns;
 
-#define FILETIME_TO_TIME_T(filetime) \
-  (FILETIME_TO_UINT(filetime) / UINT64_C(10000000))
+  ul.LowPart = ft->dwLowDateTime;
+  ul.HighPart = ft->dwHighDateTime;
 
-#define FILETIME_TO_TIME_NS(filetime, secs) \
-  ((FILETIME_TO_UINT(filetime) - (secs * UINT64_C(10000000))) * 100)
+  ns = (uint64_t)(ul.QuadPart - epoch) * 100;
 
-#define FILETIME_TO_TIMESPEC(ts, filetime) do {              \
-  (ts).tv_sec = FILETIME_TO_TIME_T(filetime);                \
-  (ts).tv_nsec = FILETIME_TO_TIME_NS(filetime, (ts).tv_sec); \
-} while(0)
+  ts->tv_sec = ns / UINT64_C(1000000000);
+  ts->tv_nsec = ns % UINT64_C(1000000000);
+}
 
 /*
  * Filesystem
@@ -171,10 +172,10 @@ btc_fs__stat_handle(HANDLE handle, btc_stat_t *st) {
   st->st_rdev = 0;
   st->st_size = ul_size.QuadPart;
 
-  FILETIME_TO_TIMESPEC(st->st_atim, info.ftLastAccessTime);
-  FILETIME_TO_TIMESPEC(st->st_ctim, info.ftCreationTime);
-  FILETIME_TO_TIMESPEC(st->st_mtim, info.ftLastWriteTime);
-  FILETIME_TO_TIMESPEC(st->st_birthtim, info.ftCreationTime);
+  btc_timespec_set_filetime(&st->st_atim, &info.ftLastAccessTime);
+  btc_timespec_set_filetime(&st->st_ctim, &info.ftCreationTime);
+  btc_timespec_set_filetime(&st->st_mtim, &info.ftLastWriteTime);
+  btc_timespec_set_filetime(&st->st_birthtim, &info.ftCreationTime);
 
   st->st_blksize = 4096;
   st->st_blocks = (st->st_size + 4095) / 4096;
