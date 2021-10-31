@@ -338,18 +338,18 @@ btc_parser_parse(btc_parser_t *parser, const uint8_t *data, size_t length) {
   return 1;
 }
 
-static size_t
+static int
 btc_parser_feed(btc_parser_t *parser, const uint8_t *data, size_t length) {
   uint8_t *ptr = btc_parser_append(parser, data, length);
   size_t len = parser->total;
-  size_t parsed = 0;
+  int parsed = 0;
   size_t size;
 
   while (!parser->closed && len >= parser->waiting) {
     size = parser->waiting;
 
     if (parser->has_header)
-      parsed += size;
+      parsed = 1;
 
     if (!btc_parser_parse(parser, ptr, size)) {
       if (!parser->closed)
@@ -1466,7 +1466,7 @@ btc_peer_on_data(btc_peer_t *peer, const uint8_t *data, size_t size) {
 
   peer->last_recv = btc_ms();
 
-  return btc_parser_feed(&peer->parser, data, size) == 0;
+  return !btc_parser_feed(&peer->parser, data, size);
 }
 
 static int
