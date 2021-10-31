@@ -42,7 +42,7 @@ btc_time_get(btc_timespec_t *ts) {
   ul.LowPart = ft.dwLowDateTime;
   ul.HighPart = ft.dwHighDateTime;
 
-  ns = (uint64_t)(ul.QuadPart - epoch) * 100;
+  ns = (ul.QuadPart - epoch) * 100;
 
   ts->tv_sec = ns / UINT64_C(1000000000);
   ts->tv_nsec = ns % UINT64_C(1000000000);

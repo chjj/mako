@@ -880,9 +880,11 @@ btc_socket_talk(btc_socket_t *socket, int family) {
     case BTC_AF_INET6:
       domain = PF_INET6;
       break;
+#ifndef _WIN32
     case BTC_AF_UNIX:
       domain = PF_UNIX;
       break;
+#endif
     default:
       socket->loop->error = BTC_EAFNOSUPPORT;
       return 0;

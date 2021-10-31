@@ -130,7 +130,7 @@ extern "C" {
 
 typedef struct btc_timespec_s {
   int64_t /* time_t */ tv_sec;
-  uint32_t /* long */ tv_nsec;
+  int32_t /* long */ tv_nsec;
 } btc_timespec_t;
 
 typedef struct btc_stat_s {

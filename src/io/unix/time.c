@@ -27,7 +27,7 @@ btc_time_get(btc_timespec_t *ts) {
     abort(); /* LCOV_EXCL_LINE */
 
   ts->tv_sec = tv.tv_sec;
-  ts->tv_nsec = (uint32_t)tv.tv_usec * 1000;
+  ts->tv_nsec = tv.tv_usec * 1000;
 }
 
 void
