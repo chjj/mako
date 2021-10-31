@@ -154,7 +154,7 @@ static int new_value (json_state * state,
             values_size = sizeof (*value->u.object.values) * value->u.object.length;
 
             if (! (value->u.object.values = (json_object_entry *) json_alloc
-                  (state, values_size + ((unsigned long) value->u.object.values), 0)) )
+                  (state, values_size + value->u.object._alloc, 0)) )
             {
                return 0;
             }
@@ -422,7 +422,7 @@ json_value * json_parse_ex (json_settings * settings,
                   case json_object:
 
                      if (state.first_pass)
-                        (*(json_char **) &top->u.object.values) += string_length + 1;
+                        top->u.object._alloc += string_length + 1;
                      else
                      {
                         top->u.object.values [top->u.object.length].name
