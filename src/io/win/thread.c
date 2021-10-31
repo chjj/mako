@@ -21,9 +21,8 @@
 
 #undef HAVE_COND_VAR
 
-/* TODO: Should be Windows Vista */
-#if (defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0601) /* Windows 7 (2009) */ \
- && (defined(_MSC_VER) && _MSC_VER >= 1600) /* VS 2010 */                    \
+#if (defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0600) /* Vista (2007) */ \
+ && (defined(_MSC_VER) && _MSC_VER >= 1500) /* VS 2008 */                \
  && !defined(__MINGW32__)
 #  define HAVE_COND_VAR
 #endif

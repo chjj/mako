@@ -125,6 +125,10 @@ list(APPEND node_sources src/node/addrman.c
                          src/node/rpc.c
                          src/node/timedata.c)
 
+if(WIN32)
+  list(APPEND satoshi_defines _WIN32_WINNT=0x501)
+endif()
+
 if(WIN32 AND NOT MINGW)
   list(APPEND satoshi_defines "BTC_TLS=__declspec(thread)")
 else()

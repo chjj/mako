@@ -53,7 +53,14 @@ btc_getaddrinfo(btc_sockaddr_t **res, const char *name) {
 
   memset(&hints, 0, sizeof(hints));
 
-  hints.ai_flags = AI_V4MAPPED | AI_ADDRCONFIG;
+#ifdef AI_V4MAPPED
+  hints.ai_flags |= AI_V4MAPPED;
+#endif
+
+#ifdef AI_ADDRCONFIG
+  hints.ai_flags |= AI_ADDRCONFIG;
+#endif
+
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_protocol = 0;
