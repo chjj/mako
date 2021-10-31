@@ -1,0 +1,44 @@
+#!/bin/sh
+
+# mingw32-configure - mingw32 wrapper for configure scripts
+# Copyright (c) 2020, Christopher Jeffrey (MIT License).
+# https://github.com/bcoin-org/libtorsion
+#
+# Partially based on:
+#   https://github.com/jedisct1/libsodium/blob/master/dist-build/msys2-win64.sh
+
+set -e
+
+ARCH=${MINGW_ARCH:-x86_64}
+
+export PREFIX="`pwd`/$ARCH-w64-mingw32"
+export AR="$ARCH-w64-mingw32-ar"
+export AS="$ARCH-w64-mingw32-as"
+export CC="$ARCH-w64-mingw32-cc"
+export CPP="$ARCH-w64-mingw32-cpp"
+export CXX="$ARCH-w64-mingw32-c++"
+export DLLTOOL="$ARCH-w64-mingw32-dlltool"
+export FF="$ARCH-w64-mingw32-gfortran"
+export LD="$ARCH-w64-mingw32-ld"
+export NM="$ARCH-w64-mingw32-nm"
+export OBJCOPY="$ARCH-w64-mingw32-objcopy"
+export OBJDUMP="$ARCH-w64-mingw32-objdump"
+export RANLIB="$ARCH-w64-mingw32-ranlib"
+export STRINGS="$ARCH-w64-mingw32-strings"
+export STRIP="$ARCH-w64-mingw32-strip"
+export WINDRES="$ARCH-w64-mingw32-windres"
+export ARFLAGS='cr'
+
+CONFIGURE="$1"
+
+shift
+
+if ! test -d "$PREFIX"; then
+  mkdir "$PREFIX"
+fi
+
+exec "$CONFIGURE" --prefix="$PREFIX"                    \
+                  --exec-prefix="$PREFIX"               \
+                  --with-sysroot=/usr/$ARCH-w64-mingw32 \
+                  --host=$ARCH-w64-mingw32              \
+                  "$@"

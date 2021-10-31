@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# mingw-cmake - mingw wrapper for cmake
+# Copyright (c) 2020, Christopher Jeffrey (MIT License).
+# https://github.com/bcoin-org/libtorsion
+
+set -e
+
+DIR=`dirname "$0"`
+DIR=`cd "$DIR" && pwd`
+
+CMAKE="$1"
+
+shift
+
+exec "$CMAKE" -G 'Unix Makefiles'                                       \
+              -DCMAKE_TOOLCHAIN_FILE="$DIR/cmake/Toolchain/MinGW.cmake" \
+              "$@"

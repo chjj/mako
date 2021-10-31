@@ -1,0 +1,31 @@
+#!/bin/sh
+
+# mingw-make - mingw wrapper for makefiles
+# Copyright (c) 2020, Christopher Jeffrey (MIT License).
+# https://github.com/bcoin-org/libtorsion
+
+ARCH=${MINGW_ARCH:-x86_64}
+
+export AR="$ARCH-w64-mingw32-ar"
+export AS="$ARCH-w64-mingw32-as"
+export CC="$ARCH-w64-mingw32-cc"
+export CPP="$ARCH-w64-mingw32-cpp"
+export CXX="$ARCH-w64-mingw32-c++"
+export DLLTOOL="$ARCH-w64-mingw32-dlltool"
+export FF="$ARCH-w64-mingw32-gfortran"
+export LD="$ARCH-w64-mingw32-ld"
+export NM="$ARCH-w64-mingw32-nm"
+export OBJCOPY="$ARCH-w64-mingw32-objcopy"
+export OBJDUMP="$ARCH-w64-mingw32-objdump"
+export RANLIB="$ARCH-w64-mingw32-ranlib"
+export STRINGS="$ARCH-w64-mingw32-strings"
+export STRIP="$ARCH-w64-mingw32-strip"
+export WINDRES="$ARCH-w64-mingw32-windres"
+export ARFLAGS='cr'
+
+if ! "$CC" --version > /dev/null 2>& 1; then
+  echo "$CC is not available!" >& 2
+  exit 1
+fi
+
+exec "$@"
