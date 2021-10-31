@@ -1605,7 +1605,7 @@ handle_ticks(btc_loop_t *loop) {
   for (tick = loop->ticks.head; tick != NULL; tick = next) {
     next = tick->next;
 
-    tick->handler(loop, tick->data);
+    tick->handler(tick->data);
   }
 }
 
@@ -1785,14 +1785,14 @@ btc_loop_start(btc_loop_t *loop) {
       if (error == BTC_EINTR)
         continue;
 
-#ifdef _WIN32
-      if (error == BTC_EINVAL) {
-        time_sleep(BTC_TICK_RATE - diff);
-        continue;
-      }
-#endif
+#if defined(_WIN32)
+      if (error != BTC_EINVAL)
+        abort();
 
+      count = 0;
+#else
       abort();
+#endif
     }
 
     if (count != 0) {

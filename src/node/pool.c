@@ -416,11 +416,9 @@ on_server_close(btc_socket_t *server) {
 }
 
 static void
-on_tick(btc_loop_t *loop, void *data) {
-  btc_pool_t *pool = (btc_pool_t *)data;
+on_tick(void *arg) {
+  btc_pool_t *pool = (btc_pool_t *)arg;
   btc_peer_t *peer, *next;
-
-  (void)loop;
 
   for (peer = pool->peers.head; peer != NULL; peer = next) {
     next = peer->next;

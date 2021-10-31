@@ -668,7 +668,7 @@ btc_cpuminer_stop_job(btc_cpuminer_t *cpu) {
 }
 
 static void
-on_tick(btc_loop_t *loop, void *data);
+on_tick(void *arg);
 
 static void
 mining_thread(void *arg);
@@ -755,8 +755,8 @@ btc_cpuminer_generate(btc_cpuminer_t *cpu, int todo, int active) {
 }
 
 static void
-on_tick(btc_loop_t *loop, void *data) {
-  btc_cpuminer_t *cpu = data;
+on_tick(void *arg) {
+  btc_cpuminer_t *cpu = arg;
   btc_miner_t *miner = cpu->miner;
   btc_cputhread_t *thread;
   const btc_entry_t *tip;
@@ -765,7 +765,6 @@ on_tick(btc_loop_t *loop, void *data) {
   int64_t now = btc_ms();
   int i;
 
-  CHECK(loop != NULL);
   CHECK(cpu->mining == 1);
 
   if (now < cpu->last_check + 300)

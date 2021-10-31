@@ -23,7 +23,7 @@ typedef struct btc_socket_s btc_socket_t;
 
 struct btc_sockaddr_s;
 
-typedef void btc_loop_tick_cb(btc_loop_t *, void *arg);
+typedef void btc_loop_tick_cb(void *arg);
 typedef void btc_socket_socket_cb(btc_socket_t *, btc_socket_t *);
 typedef void btc_socket_connect_cb(btc_socket_t *);
 typedef void btc_socket_close_cb(btc_socket_t *);
