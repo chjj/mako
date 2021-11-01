@@ -16,6 +16,42 @@
 #include <io/core.h>
 
 /*
+ * Globals
+ */
+
+static btc_once_t btc_freq_guard = BTC_ONCE_INIT;
+static double btc_freq_inv = 1.0;
+
+/*
+ * Helpers
+ */
+
+static void
+btc_time_qpf(void) {
+  LARGE_INTEGER freq;
+
+  if (!QueryPerformanceFrequency(&freq))
+    abort(); /* LCOV_EXCL_LINE */
+
+  if (freq.QuadPart == 0)
+    abort(); /* LCOV_EXCL_LINE */
+
+  btc_freq_inv = 1.0 / (double)freq.QuadPart;
+}
+
+static int64_t
+btc_time_qpc(double scale) {
+  LARGE_INTEGER ctr;
+
+  btc_once(&btc_freq_guard, btc_time_qpf);
+
+  if (!QueryPerformanceCounter(&ctr))
+    abort(); /* LCOV_EXCL_LINE */
+
+  return ((double)ctr.QuadPart * btc_freq_inv) * scale;
+}
+
+/*
  * Time
  */
 
@@ -35,17 +71,34 @@ btc_time_get(btc_timespec_t *ts) {
   static const uint64_t epoch = UINT64_C(116444736000000000);
   ULARGE_INTEGER ul;
   FILETIME ft;
-  uint64_t ns;
 
   GetSystemTimeAsFileTime(&ft);
 
   ul.LowPart = ft.dwLowDateTime;
   ul.HighPart = ft.dwHighDateTime;
 
-  ns = (ul.QuadPart - epoch) * 100;
+  ts->tv_sec = (ul.QuadPart - epoch) / 10000000;
+  ts->tv_nsec = ((ul.QuadPart - epoch) % 10000000) * 100;
+}
 
-  ts->tv_sec = ns / UINT64_C(1000000000);
-  ts->tv_nsec = ns % UINT64_C(1000000000);
+int64_t
+btc_time_sec(void) {
+  return btc_time_qpc(1.0);
+}
+
+int64_t
+btc_time_msec(void) {
+  return btc_time_qpc(1000.0);
+}
+
+int64_t
+btc_time_usec(void) {
+  return btc_time_qpc(1000000.0);
+}
+
+int64_t
+btc_time_nsec(void) {
+  return btc_time_qpc(1000000000.0);
 }
 
 void

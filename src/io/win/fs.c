@@ -24,15 +24,12 @@ static void
 btc_timespec_set_filetime(btc_timespec_t *ts, const FILETIME *ft) {
   static const uint64_t epoch = UINT64_C(116444736000000000);
   ULARGE_INTEGER ul;
-  uint64_t ns;
 
   ul.LowPart = ft->dwLowDateTime;
   ul.HighPart = ft->dwHighDateTime;
 
-  ns = (ul.QuadPart - epoch) * 100;
-
-  ts->tv_sec = ns / UINT64_C(1000000000);
-  ts->tv_nsec = ns % UINT64_C(1000000000);
+  ts->tv_sec = (ul.QuadPart - epoch) / 10000000;
+  ts->tv_nsec = ((ul.QuadPart - epoch) % 10000000) * 100;
 }
 
 /*
