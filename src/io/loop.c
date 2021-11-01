@@ -92,19 +92,12 @@ typedef long long btc_msec_t;
  * Backend
  */
 
-#ifdef _WIN32
-#  undef BTC_USE_SELECT
-#  undef BTC_USE_POLL
-#  undef BTC_USE_EPOLL
-#  define BTC_USE_SELECT
-#endif
-
 #if !defined(BTC_USE_SELECT) \
  && !defined(BTC_USE_POLL)   \
  && !defined(BTC_USE_EPOLL)
 #  if defined(__linux__)
 #    define BTC_USE_EPOLL
-#  elif defined(_AIX)
+#  elif defined(_WIN32) || defined(_AIX)
 #    define BTC_USE_SELECT
 #  else
 #    define BTC_USE_POLL
@@ -542,64 +535,6 @@ safe_epoll_create(void) {
   return fd;
 }
 #endif
-
-/*
- * Time Helpers
- */
-
-static void
-time_sleep(btc_msec_t msec) {
-#if defined(_WIN32)
-  if (msec > 0)
-    Sleep((DWORD)msec);
-#else
-  struct timeval tv;
-#ifdef __linux__
-  int rc;
-#endif
-
-  if (msec <= 0)
-    return;
-
-  memset(&tv, 0, sizeof(tv));
-
-  tv.tv_sec = 0;
-  tv.tv_usec = msec * 1000;
-
-  /* Linux updates the timeval. This is one
-     situation where we actually _want_ that
-     behavior. */
-#if defined(__linux__)
-  do {
-    rc = select(0, NULL, NULL, NULL, &tv);
-  } while (rc == -1 && errno == EINTR);
-#else
-  select(0, NULL, NULL, NULL, &tv);
-#endif
-#endif
-}
-
-static btc_msec_t
-time_msec(void) {
-#if defined(_WIN32)
-  ULARGE_INTEGER ul;
-  FILETIME ft;
-
-  GetSystemTimeAsFileTime(&ft);
-
-  ul.LowPart = ft.dwLowDateTime;
-  ul.HighPart = ft.dwHighDateTime;
-
-  return ul.QuadPart / 10000;
-#else
-  struct timeval tv;
-
-  if (gettimeofday(&tv, NULL) != 0)
-    abort(); /* LCOV_EXCL_LINE */
-
-  return (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;
-#endif
-}
 
 /*
  * Socket
@@ -1660,9 +1595,9 @@ btc_loop_start(btc_loop_t *loop) {
   loop->running = 1;
 
   while (loop->running) {
-    prev = time_msec();
+    prev = btc_time_msec();
     count = epoll_wait(loop->fd, loop->events, loop->max, BTC_TICK_RATE);
-    diff = time_msec() - prev;
+    diff = btc_time_msec() - prev;
 
     if (diff < 0)
       diff = 0;
@@ -1691,7 +1626,7 @@ btc_loop_start(btc_loop_t *loop) {
     if (count == loop->max)
       btc_loop_grow(loop, (count * 3) / 2);
 
-    time_sleep(BTC_TICK_RATE - diff);
+    btc_time_sleep(BTC_TICK_RATE - diff);
   }
 
   for (socket = loop->head; socket != NULL; socket = next) {
@@ -1716,9 +1651,9 @@ btc_loop_start(btc_loop_t *loop) {
   loop->running = 1;
 
   while (loop->running) {
-    prev = time_msec();
+    prev = btc_time_msec();
     count = poll(loop->pfds, loop->length, BTC_TICK_RATE);
-    diff = time_msec() - prev;
+    diff = btc_time_msec() - prev;
 
     if (diff < 0)
       diff = 0;
@@ -1753,7 +1688,7 @@ btc_loop_start(btc_loop_t *loop) {
     handle_ticks(loop);
     handle_closed(loop);
 
-    time_sleep(BTC_TICK_RATE - diff);
+    btc_time_sleep(BTC_TICK_RATE - diff);
   }
 
   while (loop->length > 0) {
@@ -1792,7 +1727,7 @@ btc_loop_start(btc_loop_t *loop) {
 #endif
     memcpy(&to, &tv, sizeof(tv));
 
-    prev = time_msec();
+    prev = btc_time_msec();
 
 #if defined(_WIN32)
     count = select(FD_SETSIZE, &loop->rfdi, &loop->wfdi, &loop->efdi, &to);
@@ -1800,7 +1735,7 @@ btc_loop_start(btc_loop_t *loop) {
     count = select(loop->nfds, &loop->rfdi, &loop->wfdi, NULL, &to);
 #endif
 
-    diff = time_msec() - prev;
+    diff = btc_time_msec() - prev;
 
     if (diff < 0)
       diff = 0;
@@ -1842,7 +1777,7 @@ btc_loop_start(btc_loop_t *loop) {
     handle_ticks(loop);
     handle_closed(loop);
 
-    time_sleep(BTC_TICK_RATE - diff);
+    btc_time_sleep(BTC_TICK_RATE - diff);
   }
 
   for (socket = loop->head; socket != NULL; socket = next) {
