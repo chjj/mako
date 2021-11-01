@@ -57,6 +57,7 @@ typedef signed __int64 btc_msec_t;
 #  define BTC_EMFILE WSAEMFILE
 #  define BTC_EPIPE WSAENOTCONN
 #  define BTC_EWOULDBLOCK WSAEWOULDBLOCK
+#  define BTC_EMSGSIZE WSAEMSGSIZE
 #  define BTC_EAFNOSUPPORT WSAEAFNOSUPPORT
 #  define BTC_ENOBUFS WSAENOBUFS
 #  define BTC_EISCONN WSAEISCONN
@@ -76,6 +77,7 @@ typedef long long btc_msec_t;
 #  define BTC_EMFILE EMFILE
 #  define BTC_EPIPE EPIPE
 #  define BTC_EWOULDBLOCK EWOULDBLOCK
+#  define BTC_EMSGSIZE EMSGSIZE
 #  define BTC_EAFNOSUPPORT EAFNOSUPPORT
 #  define BTC_ENOBUFS ENOBUFS
 #  define BTC_EISCONN EISCONN
@@ -269,8 +271,10 @@ struct btc_loop_s {
 #ifdef _WIN32
   fd_set efdi;
 #endif
-  btc_sockfd_t nfds;
-  btc_socket_t *sockets[FD_SETSIZE];
+  int nfds;
+  btc_socket_t *head;
+  btc_socket_t *tail;
+  size_t length;
 #endif
   unsigned char buffer[65536];
 #ifdef _WIN32
@@ -411,7 +415,7 @@ try_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
   int fd;
 
 #if defined(__GLIBC__) && defined(_GNU_SOURCE) && defined(SOCK_CLOEXEC)
-  fd = accept4(sockfd, addr, addrlen, SOCK_CLOEXEC | SOCK_NONBLOCK);
+  fd = accept4(sockfd, addr, addrlen, SOCK_CLOEXEC);
 
   if (fd != -1 || errno != EINVAL)
     return fd;
@@ -427,7 +431,9 @@ try_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
 #endif
 
 static btc_sockfd_t
-safe_accept(btc_sockfd_t sockfd, struct sockaddr *addr, btc_socklen_t *addrlen) {
+safe_accept(btc_sockfd_t sockfd,
+            struct sockaddr *addr,
+            btc_socklen_t *addrlen) {
 #if defined(_WIN32)
   return accept(sockfd, addr, addrlen);
 #else
@@ -453,8 +459,8 @@ safe_socket(int domain, int type, int protocol) {
 #else
   int fd;
 
-#if defined(__GLIBC__) && defined(SOCK_CLOEXEC) && defined(SOCK_NONBLOCK)
-  fd = socket(domain, type | SOCK_CLOEXEC | SOCK_NONBLOCK, protocol);
+#if defined(__GLIBC__) && defined(SOCK_CLOEXEC)
+  fd = socket(domain, type | SOCK_CLOEXEC, protocol);
 
   if (fd != -1 || errno != EINVAL)
     return fd;
@@ -491,7 +497,9 @@ safe_listener(int domain, int type, int protocol) {
 }
 
 static int
-safe_connect(btc_sockfd_t sockfd, const struct sockaddr *addr, btc_socklen_t addrlen) {
+safe_connect(btc_sockfd_t sockfd,
+             const struct sockaddr *addr,
+             btc_socklen_t addrlen) {
 #if defined(_WIN32)
   return connect(sockfd, addr, addrlen);
 #else
@@ -943,7 +951,7 @@ btc_socket_flush_write(btc_socket_t *socket) {
         break;
 
       if ((size_t)len > chunk->len)
-        abort();
+        abort(); /* LCOV_EXCL_LINE */
 
       chunk->raw += len;
       chunk->len -= len;
@@ -997,6 +1005,12 @@ btc_socket_write(btc_socket_t *socket, void *data, size_t len) {
       free(data);
 
     return !socket->draining;
+  }
+
+  if (len > INT_MAX) {
+    socket->loop->error = BTC_EMSGSIZE;
+    free(data);
+    return -1;
   }
 
   chunk = (chunk_t *)safe_malloc(sizeof(chunk_t));
@@ -1104,6 +1118,12 @@ btc_socket_send(btc_socket_t *socket,
       free(data);
 
     return 1;
+  }
+
+  if (len > INT_MAX) {
+    socket->loop->error = BTC_EMSGSIZE;
+    free(data);
+    return -1;
   }
 
   chunk = (chunk_t *)safe_malloc(sizeof(chunk_t));
@@ -1319,20 +1339,27 @@ btc_loop_register(btc_loop_t *loop, btc_socket_t *socket) {
 
   return 1;
 #else
+#if defined(_WIN32)
+  if (loop->length >= FD_SETSIZE) {
+    loop->error = BTC_EMFILE;
+    return 0;
+  }
+
+  loop->nfds = FD_SETSIZE;
+#else
   if (socket->fd >= FD_SETSIZE) {
     loop->error = BTC_EMFILE;
     return 0;
   }
 
-  CHECK(loop->sockets[socket->fd] == NULL);
-
   if (socket->fd + 1 > loop->nfds)
     loop->nfds = socket->fd + 1;
+#endif
 
   FD_SET(socket->fd, &loop->rfds);
   FD_SET(socket->fd, &loop->wfds);
 
-  loop->sockets[socket->fd] = socket;
+  btc_list_push(loop, socket, btc_socket_t);
 
   return 1;
 #endif
@@ -1363,7 +1390,7 @@ btc_loop_unregister(btc_loop_t *loop, btc_socket_t *socket) {
   FD_CLR(socket->fd, &loop->rfds);
   FD_CLR(socket->fd, &loop->wfds);
 
-  loop->sockets[socket->fd] = NULL;
+  btc_list_remove(loop, socket, btc_socket_t);
 #endif
 }
 
@@ -1491,7 +1518,7 @@ fail:
         }
 
         if ((size_t)len > size)
-          abort();
+          abort(); /* LCOV_EXCL_LINE */
 
         if (!socket->on_data(socket, buf, len))
           break;
@@ -1516,7 +1543,7 @@ fail:
       CHECK(size <= INT_MAX);
 
       while (socket->state == BTC_SOCKET_BOUND) {
-        memset(from, 0, sizeof(storage));
+        memset(&storage, 0, sizeof(storage));
 
         fromlen = sizeof(storage);
 
@@ -1541,7 +1568,7 @@ fail:
         }
 
         if ((size_t)len > size)
-          abort();
+          abort(); /* LCOV_EXCL_LINE */
 
         btc_sockaddr_set(&addr, from);
 
@@ -1628,7 +1655,7 @@ void
 btc_loop_start(btc_loop_t *loop) {
   btc_socket_t *socket, *next;
   struct epoll_event *event;
-  long long prev, diff;
+  btc_msec_t prev, diff;
   int i, count;
 
   loop->running = 1;
@@ -1645,7 +1672,7 @@ btc_loop_start(btc_loop_t *loop) {
       if (errno == EINTR)
         continue;
 
-      abort();
+      abort(); /* LCOV_EXCL_LINE */
     }
 
     for (i = 0; i < count; i++) {
@@ -1683,7 +1710,7 @@ btc_loop_start(btc_loop_t *loop) {
 void
 btc_loop_start(btc_loop_t *loop) {
   btc_socket_t *socket;
-  long long prev, diff;
+  btc_msec_t prev, diff;
   struct pollfd *pfd;
   int count;
 
@@ -1701,7 +1728,7 @@ btc_loop_start(btc_loop_t *loop) {
       if (errno == EINTR)
         continue;
 
-      abort();
+      abort(); /* LCOV_EXCL_LINE */
     }
 
     if (count != 0) {
@@ -1746,10 +1773,9 @@ btc_loop_start(btc_loop_t *loop) {
 #else /* BTC_USE_SELECT */
 void
 btc_loop_start(btc_loop_t *loop) {
-  btc_socket_t *socket;
+  btc_socket_t *socket, *next;
   struct timeval tv, to;
   btc_msec_t prev, diff;
-  btc_sockfd_t fd;
   int count;
 
   memset(&tv, 0, sizeof(tv));
@@ -1787,29 +1813,28 @@ btc_loop_start(btc_loop_t *loop) {
 
 #if defined(_WIN32)
       if (error != BTC_EINVAL)
-        abort();
+        abort(); /* LCOV_EXCL_LINE */
 
       count = 0;
 #else
-      abort();
+      abort(); /* LCOV_EXCL_LINE */
 #endif
     }
 
     if (count != 0) {
-      for (fd = 0; fd < loop->nfds; fd++) {
-        socket = loop->sockets[fd];
+      for (socket = loop->head; socket != NULL; socket = next) {
+        next = socket->next;
 
-        if (socket == NULL)
-          continue;
-
-        if (FD_ISSET(fd, &loop->rfdi))
+        if (FD_ISSET(socket->fd, &loop->rfdi))
           handle_read(loop, socket);
 
 #if defined(_WIN32)
-        if (FD_ISSET(fd, &loop->wfdi) | FD_ISSET(fd, &loop->efdi))
+        if (FD_ISSET(socket->fd, &loop->wfdi)
+            | FD_ISSET(socket->fd, &loop->efdi)) {
           handle_write(loop, socket);
+        }
 #else
-        if (FD_ISSET(fd, &loop->wfdi))
+        if (FD_ISSET(socket->fd, &loop->wfdi))
           handle_write(loop, socket);
 #endif
       }
@@ -1821,11 +1846,8 @@ btc_loop_start(btc_loop_t *loop) {
     time_sleep(BTC_TICK_RATE - diff);
   }
 
-  for (fd = 0; fd < loop->nfds; fd++) {
-    socket = loop->sockets[fd];
-
-    if (socket == NULL)
-      continue;
+  for (socket = loop->head; socket != NULL; socket = next) {
+    next = socket->next;
 
     btc_socket_close(socket);
     socket->on_close(socket);
@@ -1833,6 +1855,7 @@ btc_loop_start(btc_loop_t *loop) {
   }
 
   btc_list_init(&loop->closed);
+  btc_list_init(loop);
 
   loop->nfds = 0;
 }
