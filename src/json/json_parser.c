@@ -93,11 +93,13 @@ typedef struct
 
 static void * default_alloc (size_t size, int zero, void * user_data)
 {
+   (void)user_data;
    return zero ? calloc (1, size) : malloc (size);
 }
 
 static void default_free (void * ptr, void * user_data)
 {
+   (void)user_data;
    free (ptr);
 }
 
@@ -159,7 +161,7 @@ static int new_value (json_state * state,
                return 0;
             }
 
-            value->_reserved.object_mem = (*(char **) &value->u.object.values) + values_size;
+            value->_reserved.object_mem = (char *)value->u.object.values + values_size;
 
             value->u.object.length = 0;
             break;
