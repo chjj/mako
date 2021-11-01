@@ -1,5 +1,5 @@
 /*!
- * sys.c - os/system entropy for libsatoshi
+ * sysrand.c - os/system entropy for libsatoshi
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
  * https://github.com/chjj/libsatoshi
  *
@@ -423,7 +423,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
-#include "sys.h"
+#include "sysrand.h"
 
 /*
  * Options

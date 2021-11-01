@@ -37,7 +37,7 @@
 #include <satoshi/crypto/rand.h>
 #include <satoshi/crypto/stream.h>
 #include <satoshi/util.h>
-#include "sys.h"
+#include "sysrand.h"
 #include "../internal.h"
 
 /*

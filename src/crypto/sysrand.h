@@ -1,5 +1,5 @@
 /*!
- * sys.h - system entropy source for libsatoshi
+ * sysrand.h - system entropy source for libsatoshi
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
  * https://github.com/chjj/libsatoshi
  */
