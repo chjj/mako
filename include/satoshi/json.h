@@ -7,6 +7,8 @@
 #ifndef BTC_JSON_H
 #define BTC_JSON_H
 
+#include <stddef.h>
+#include <stdint.h>
 #include "common.h"
 #include "json/json_parser.h"
 #include "json/json_builder.h"

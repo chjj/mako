@@ -55,6 +55,9 @@
 
 #endif
 
+#include "../common.h"
+
+#define json_value_none btc_json_value_none
 #define json_parse btc_json_parse
 #define json_parse_ex btc_json_parse_ex
 #define json_value_free btc_json_value_free
@@ -92,6 +95,7 @@ typedef enum
 
 } json_type;
 
+BTC_EXTERN
 extern const struct _json_value json_value_none;
 
 typedef struct _json_object_entry
@@ -261,21 +265,25 @@ typedef struct _json_value
 
 } json_value;
 
+BTC_EXTERN
 json_value * json_parse (const json_char * json,
                          size_t length);
 
 #define json_error_max 128
+BTC_EXTERN
 json_value * json_parse_ex (json_settings * settings,
                             const json_char * json,
                             size_t length,
                             char * error);
 
+BTC_EXTERN
 void json_value_free (json_value *);
 
 
 /* Not usually necessary, unless you used a custom mem_alloc and now want to
  * use a custom mem_free.
  */
+BTC_EXTERN
 void json_value_free_ex (json_settings * settings,
                          json_value *);
 
