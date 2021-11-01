@@ -268,10 +268,11 @@ struct btc_loop_s {
 #else
   fd_set rfds, rfdi;
   fd_set wfds, wfdi;
-#ifdef _WIN32
+#if defined(_WIN32)
   fd_set efdi;
-#endif
+#else
   int nfds;
+#endif
   btc_socket_t *head;
   btc_socket_t *tail;
   size_t length;
@@ -1344,8 +1345,6 @@ btc_loop_register(btc_loop_t *loop, btc_socket_t *socket) {
     loop->error = BTC_EMFILE;
     return 0;
   }
-
-  loop->nfds = FD_SETSIZE;
 #else
   if (socket->fd >= FD_SETSIZE) {
     loop->error = BTC_EMFILE;
@@ -1795,7 +1794,7 @@ btc_loop_start(btc_loop_t *loop) {
     prev = time_msec();
 
 #if defined(_WIN32)
-    count = select(loop->nfds, &loop->rfdi, &loop->wfdi, &loop->efdi, &to);
+    count = select(FD_SETSIZE, &loop->rfdi, &loop->wfdi, &loop->efdi, &to);
 #else
     count = select(loop->nfds, &loop->rfdi, &loop->wfdi, NULL, &to);
 #endif
@@ -1857,7 +1856,9 @@ btc_loop_start(btc_loop_t *loop) {
   btc_list_init(&loop->closed);
   btc_list_init(loop);
 
+#ifndef _WIN32
   loop->nfds = 0;
+#endif
 }
 #endif /* BTC_USE_SELECT */
 
