@@ -1775,6 +1775,7 @@ btc_loop_start(btc_loop_t *loop) {
   btc_socket_t *socket, *next;
   struct timeval tv, to;
   btc_msec_t prev, diff;
+  btc_sockfd_t fd;
   int count;
 
   memset(&tv, 0, sizeof(tv));
@@ -1823,17 +1824,16 @@ btc_loop_start(btc_loop_t *loop) {
     if (count != 0) {
       for (socket = loop->head; socket != NULL; socket = next) {
         next = socket->next;
+        fd = socket->fd;
 
-        if (FD_ISSET(socket->fd, &loop->rfdi))
+        if (FD_ISSET(fd, &loop->rfdi))
           handle_read(loop, socket);
 
 #if defined(_WIN32)
-        if (FD_ISSET(socket->fd, &loop->wfdi)
-            | FD_ISSET(socket->fd, &loop->efdi)) {
+        if (FD_ISSET(fd, &loop->wfdi) | FD_ISSET(fd, &loop->efdi))
           handle_write(loop, socket);
-        }
 #else
-        if (FD_ISSET(socket->fd, &loop->wfdi))
+        if (FD_ISSET(fd, &loop->wfdi))
           handle_write(loop, socket);
 #endif
       }
