@@ -322,6 +322,9 @@ btc_path_resolve(char *out, const char *path);
 BTC_EXTERN int
 btc_ps_cwd(char *buf, size_t size);
 
+BTC_EXTERN int
+btc_ps_getenv(char *out, size_t size, const char *name);
+
 /*
  * Mutex
  */
@@ -458,6 +461,9 @@ btc_sockaddr_export(char *zp, int *port, const btc_sockaddr_t *x);
 
 BTC_EXTERN int
 btc_sys_cpu_count(void);
+
+BTC_EXTERN int
+btc_sys_homedir(char *out, size_t size);
 
 /*
  * Time

@@ -9,32 +9,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h> /* sysconf, getpagesize */
+#include <unistd.h> /* getpagesize */
 #include <pthread.h>
 #include <io/core.h>
 
 #if defined(__APPLE__) || defined(__linux__)
 #  include <sys/resource.h> /* getrlimit */
-#endif
-
-/*
- * Compat
- */
-
-#undef HAVE_SYSCTL
-
-#if defined(__APPLE__)     \
- || defined(__FreeBSD__)   \
- || defined(__OpenBSD__)   \
- || defined(__NetBSD__)    \
- || defined(__DragonFly__)
-#  include <sys/types.h>
-#  include <sys/sysctl.h>
-#  if defined(CTL_HW) && (defined(HW_AVAILCPU) || defined(HW_NCPU))
-#    define HAVE_SYSCTL
-#  endif
-#elif defined(__hpux)
-#  include <sys/mpctl.h>
 #endif
 
 /*
@@ -390,63 +370,4 @@ void
 btc_tls_set(btc_tls_t *key, void *value) {
   if (pthread_setspecific(*key, value) != 0)
     abort(); /* LCOV_EXCL_LINE */
-}
-
-/*
- * System
- */
-
-#ifdef HAVE_SYSCTL
-static int
-try_sysctl(int name) {
-  int ret = -1;
-  size_t len;
-  int mib[4];
-
-  len = sizeof(ret);
-
-  mib[0] = CTL_HW;
-  mib[1] = name;
-
-  if (sysctl(mib, 2, &ret, &len, NULL, 0) != 0)
-    return -1;
-
-  return ret;
-}
-#endif
-
-int
-btc_sys_cpu_count(void) {
-  /* https://stackoverflow.com/questions/150355 */
-#if defined(__linux__) || defined(__sun) || defined(_AIX)
-  /* Linux, Solaris, AIX */
-# if defined(_SC_NPROCESSORS_ONLN)
-  return (int)sysconf(_SC_NPROCESSORS_ONLN);
-# else
-  return -1;
-# endif
-#elif defined(HAVE_SYSCTL)
-  /* Apple, FreeBSD, OpenBSD, NetBSD, DragonFly BSD */
-  int ret = -1;
-# if defined(HW_AVAILCPU)
-  ret = try_sysctl(HW_AVAILCPU);
-# endif
-# if defined(HW_NCPU)
-  if (ret < 1)
-    ret = try_sysctl(HW_NCPU);
-# endif
-  return ret;
-#elif defined(__hpux)
-  /* HP-UX */
-  return mpctl(MPC_GETNUMSPUS, NULL, NULL);
-#elif defined(__sgi)
-  /* IRIX */
-# if defined(_SC_NPROC_ONLN)
-  return (int)sysconf(_SC_NPROC_ONLN);
-# else
-  return -1;
-# endif
-#else
-  return -1;
-#endif
 }

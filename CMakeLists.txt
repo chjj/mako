@@ -105,11 +105,15 @@ list(APPEND io_sources src/io/http/http_client.c
 if(WIN32)
   list(APPEND io_sources src/io/win/fs.c
                          src/io/win/net.c
+                         src/io/win/ps.c
+                         src/io/win/sys.c
                          src/io/win/thread.c
                          src/io/win/time.c)
 else()
   list(APPEND io_sources src/io/unix/fs.c
                          src/io/unix/net.c
+                         src/io/unix/ps.c
+                         src/io/unix/sys.c
                          src/io/unix/thread.c
                          src/io/unix/time.c)
 endif()
@@ -174,7 +178,7 @@ endif()
 list(APPEND satoshi_includes ${PROJECT_SOURCE_DIR}/include)
 
 if(WIN32)
-  list(APPEND satoshi_libs ws2_32)
+  list(APPEND satoshi_libs userenv ws2_32)
 else()
   list(APPEND satoshi_libs m)
 endif()

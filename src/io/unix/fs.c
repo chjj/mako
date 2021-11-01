@@ -5,11 +5,9 @@
  */
 
 #undef HAVE_FCNTL
-#undef HAVE_PTHREAD
 
 #if !defined(__EMSCRIPTEN__) && !defined(__wasi__)
 #  define HAVE_FCNTL
-#  define HAVE_PTHREAD
 #endif
 
 #include <errno.h>
@@ -25,7 +23,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
-#ifdef HAVE_PTHREAD
+#ifdef __APPLE__
 #include <pthread.h>
 #endif
 #include <unistd.h>
@@ -905,28 +903,6 @@ btc_fs_flock(int fd, int operation) {
 int
 btc_fs_close(int fd) {
   return close(fd) == 0;
-}
-
-/*
- * Process
- */
-
-int
-btc_ps_cwd(char *buf, size_t size) {
-  if (size < 2)
-    return 0;
-
-#if defined(__wasi__)
-  buf[0] = '/';
-  buf[1] = '\0';
-#else
-  if (getcwd(buf, size) == NULL)
-    return 0;
-
-  buf[size - 1] = '\0';
-#endif
-
-  return 1;
 }
 
 /*

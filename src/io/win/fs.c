@@ -736,22 +736,6 @@ btc_fs_close(int fd) {
 }
 
 /*
- * Process
- */
-
-int
-btc_ps_cwd(char *buf, size_t size) {
-  DWORD len;
-
-  if (size < 2)
-    return 0;
-
-  len = GetCurrentDirectoryA(size, buf);
-
-  return len >= 1 && len <= size - 1;
-}
-
-/*
  * Path
  */
 

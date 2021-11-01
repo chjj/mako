@@ -488,14 +488,3 @@ btc_tls_set(btc_tls_t *key, void *value) {
   if (TlsSetValue(key->index, value) == FALSE)
     abort(); /* LCOV_EXCL_LINE */
 }
-
-/*
- * System
- */
-
-int
-btc_sys_cpu_count(void) {
-  SYSTEM_INFO info;
-  GetSystemInfo(&info);
-  return info.dwNumberOfProcessors;
-}
