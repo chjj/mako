@@ -34,12 +34,34 @@
 /* Requires json.h from json-parser
  * https://github.com/udp/json-parser
  */
-#include "json.h"
+#include "json_parser.h"
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
+
+#define json_builder_extra btc_json_builder_extra
+#define json_array_new btc_json_array_new
+#define json_array_push btc_json_array_push
+#define json_object_new btc_json_object_new
+#define json_object_push btc_json_object_push
+#define json_object_push_length btc_json_object_push_length
+#define json_object_push_nocopy btc_json_object_push_nocopy
+#define json_object_merge btc_json_object_merge
+#define json_object_sort btc_json_object_sort
+#define json_string_new btc_json_string_new
+#define json_string_new_length btc_json_string_new_length
+#define json_string_new_nocopy btc_json_string_new_nocopy
+#define json_integer_new btc_json_integer_new
+#define json_double_new btc_json_double_new
+#define json_boolean_new btc_json_boolean_new
+#define json_null_new btc_json_null_new
+#define json_measure btc_json_measure
+#define json_measure_ex btc_json_measure_ex
+#define json_serialize btc_json_serialize
+#define json_serialize_ex btc_json_serialize_ex
+#define json_builder_free btc_json_builder_free
 
 /* IMPORTANT NOTE:  If you want to use json-builder functions with values
  * allocated by json-parser as part of the parsing process, you must pass

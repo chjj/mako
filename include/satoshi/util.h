@@ -127,6 +127,13 @@ btc_hash_export(char *zp, const uint8_t *xp);
 BTC_EXTERN int64_t
 btc_now(void);
 
+/*
+ * PoW
+ */
+
+BTC_EXTERN double
+btc_difficulty(uint32_t bits);
+
 #ifdef __cplusplus
 }
 #endif

@@ -173,3 +173,25 @@ btc_now(void) {
 
   return (int64_t)now;
 }
+
+/*
+ * PoW
+ */
+
+double
+btc_difficulty(uint32_t bits) {
+  double diff = (double)0x0000ffff / (double)(bits & 0x00ffffff);
+  int shift = (bits >> 24) & 0xff;
+
+  while (shift < 29) {
+    diff *= 256.0;
+    shift++;
+  }
+
+  while (shift > 29) {
+    diff /= 256.0;
+    shift--;
+  }
+
+  return diff;
+}

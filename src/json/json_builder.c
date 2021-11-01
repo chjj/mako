@@ -28,7 +28,7 @@
  * SUCH DAMAGE.
  */
 
-#include "json-builder.h"
+#include <satoshi/json/json_builder.h>
 
 #include <string.h>
 #include <assert.h>
@@ -37,9 +37,9 @@
 
 static const json_serialize_opts default_opts =
 {
-   json_serialize_mode_single_line,
-   0,
-   3  /* indent_size */
+   json_serialize_mode_multiline,
+   json_serialize_opt_pack_brackets,
+   2  /* indent_size */
 };
 
 typedef struct json_builder_value

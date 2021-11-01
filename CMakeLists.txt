@@ -39,6 +39,8 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/crypto/sha512.c
                             src/crypto/siphash.c
                             src/crypto/sysrand.c
+                            src/json/json_builder.c
+                            src/json/json_parser.c
                             src/map/addrmap.c
                             src/map/hashmap.c
                             src/map/hashset.c
@@ -72,6 +74,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/input.c
                             src/inpvec.c
                             src/internal.c
+                            src/json.c
                             src/mainnet.c
                             src/mpi.c
                             src/murmur3.c
@@ -183,7 +186,6 @@ else()
   list(APPEND satoshi_libs m)
 endif()
 
-add_subdirectory(deps/json)
 add_subdirectory(deps/lmdb)
 
 add_library(satoshi_static STATIC ${satoshi_sources})
@@ -216,7 +218,7 @@ target_compile_definitions(satoshi_node PUBLIC ${satoshi_defines})
 target_compile_options(satoshi_node PUBLIC ${satoshi_cflags})
 target_include_directories(satoshi_node PUBLIC ${satoshi_includes})
 target_link_options(satoshi_node INTERFACE ${satoshi_ldflags})
-target_link_libraries(satoshi_node PRIVATE json lmdb)
+target_link_libraries(satoshi_node PRIVATE lmdb)
 set_property(TARGET satoshi_node PROPERTY OUTPUT_NAME node)
 
 add_library(satoshi_tests STATIC test/lib/tests.c test/lib/clean.c)

@@ -55,6 +55,11 @@
 
 #endif
 
+#define json_parse btc_json_parse
+#define json_parse_ex btc_json_parse_ex
+#define json_value_free btc_json_value_free
+#define json_value_free_ex btc_json_value_free_ex
+
 typedef struct
 {
    unsigned long max_memory;
