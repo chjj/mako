@@ -4,9 +4,9 @@
  * https://github.com/chjj/libsatoshi
  */
 
-#include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <satoshi/address.h>

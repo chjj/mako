@@ -15,8 +15,11 @@
 #include "types.h"
 
 #define json_object_get btc_json_object_get
+#define json_object_remove btc_json_object_remove
 #define json_encode btc_json_encode
 #define json_encode_ex btc_json_encode_ex
+#define json_decode btc_json_decode
+#define json_decode_ex btc_json_decode_ex
 #define json_print btc_json_print
 #define json_print_ex btc_json_print_ex
 
@@ -56,11 +59,23 @@ extern "C" {
 BTC_EXTERN json_value *
 json_object_get(const json_value *obj, const char *name);
 
+BTC_EXTERN json_value *
+json_object_remove(json_value *obj, const char *name);
+
 BTC_EXTERN json_char *
 json_encode(json_value *value);
 
 BTC_EXTERN json_char *
 json_encode_ex(json_value *value, json_serialize_opts opts);
+
+BTC_EXTERN json_value *
+json_decode(const json_char *json, size_t length);
+
+BTC_EXTERN json_value *
+json_decode_ex(json_settings *settings,
+               const json_char *json,
+               size_t length,
+               char *error_buf);
 
 BTC_EXTERN void
 json_print(json_value *value, int (*json_puts)(const char *));

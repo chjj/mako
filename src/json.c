@@ -4,8 +4,8 @@
  * https://github.com/chjj/libsatoshi
  */
 
-#include <stdlib.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <satoshi/address.h>
@@ -23,67 +23,6 @@
 #include <satoshi/util.h>
 
 #include "internal.h"
-
-/*
- * JSON Extras
- */
-
-static const json_serialize_opts default_opts = {
-  json_serialize_mode_multiline,
-  json_serialize_opt_pack_brackets,
-  2
-};
-
-json_value *
-json_object_get(const json_value *obj, const char *name) {
-  const json_object_entry *entry;
-  unsigned int i;
-
-  if (obj->type != json_object)
-    return NULL;
-
-  for (i = 0; i < obj->u.object.length; i++) {
-    entry = &obj->u.object.values[i];
-
-    if (strcmp(entry->name, name) == 0)
-      return (json_value *)entry->value;
-  }
-
-  return NULL;
-}
-
-json_char *
-json_encode_ex(json_value *value, json_serialize_opts opts) {
-  size_t size = json_measure_ex(value, opts);
-  json_char *buf = malloc(size * sizeof(json_char));
-
-  if (buf != NULL)
-    json_serialize_ex(buf, value, opts);
-  else
-    abort();
-
-  return buf;
-}
-
-json_char *
-json_encode(json_value *value) {
-  return json_encode_ex(value, default_opts);
-}
-
-void
-json_print_ex(json_value *value,
-              int (*json_puts)(const char *),
-              json_serialize_opts opts) {
-  char *buf = json_encode_ex(value, opts);
-
-  json_puts(buf);
-  free(buf);
-}
-
-void
-json_print(json_value *value, int (*json_puts)(const char *)) {
-  json_print_ex(value, json_puts, default_opts);
-}
 
 /*
  * JSON Objects

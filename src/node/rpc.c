@@ -85,22 +85,10 @@ enum rpc_error {
  * HTTP Helpers
  */
 
-static const json_serialize_opts json_options = {
-  json_serialize_mode_multiline,
-  json_serialize_opt_pack_brackets,
-  2
-};
-
 static void
 http_res_send_json(http_res_t *res, json_value *value) {
-  /* Note: json_measure includes the null terminator. */
-  size_t size = json_measure_ex(value, json_options);
-  char *body = btc_malloc(size);
-  size_t length;
-
-  json_serialize_ex(body, value, json_options);
-
-  length = strlen(body);
+  char *body = json_encode(value);
+  size_t length = strlen(body);
 
   body[length++] = '\n';
 

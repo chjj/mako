@@ -37,9 +37,9 @@
 
 static const json_serialize_opts default_opts =
 {
-   json_serialize_mode_multiline,
-   json_serialize_opt_pack_brackets,
-   2  /* indent_size */
+   json_serialize_mode_packed,
+   0,
+   0
 };
 
 typedef struct json_builder_value

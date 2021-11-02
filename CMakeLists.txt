@@ -16,6 +16,7 @@ set(satoshi_ldflags)
 set(satoshi_libs)
 set(io_sources)
 set(node_sources)
+set(client_sources)
 
 set(CMAKE_C_STANDARD 90)
 set(CMAKE_C_EXTENSIONS OFF)
@@ -40,6 +41,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/crypto/siphash.c
                             src/crypto/sysrand.c
                             src/json/json_builder.c
+                            src/json/json_extra.c
                             src/json/json_parser.c
                             src/map/addrmap.c
                             src/map/hashmap.c
@@ -133,6 +135,8 @@ list(APPEND node_sources src/node/addrman.c
                          src/node/rpc.c
                          src/node/timedata.c)
 
+list(APPEND client_sources src/client/client.c)
+
 if(WIN32)
   list(APPEND satoshi_defines _WIN32_WINNT=0x501)
 endif()
@@ -222,6 +226,13 @@ target_link_options(satoshi_node INTERFACE ${satoshi_ldflags})
 target_link_libraries(satoshi_node PRIVATE lmdb)
 set_property(TARGET satoshi_node PROPERTY OUTPUT_NAME node)
 
+add_library(satoshi_client STATIC ${client_sources})
+target_compile_definitions(satoshi_client PUBLIC ${satoshi_defines})
+target_compile_options(satoshi_client PUBLIC ${satoshi_cflags})
+target_include_directories(satoshi_client PUBLIC ${satoshi_includes})
+target_link_options(satoshi_client INTERFACE ${satoshi_ldflags})
+set_property(TARGET satoshi_client PROPERTY OUTPUT_NAME client)
+
 add_library(satoshi_tests STATIC test/lib/tests.c test/lib/clean.c)
 target_compile_definitions(satoshi_tests PUBLIC ${satoshi_defines})
 target_compile_options(satoshi_tests PUBLIC ${satoshi_cflags})
@@ -233,6 +244,11 @@ add_executable(satoshid src/node/main.c)
 target_link_libraries(satoshid PRIVATE satoshi_node
                                        satoshi_io
                                        satoshi_static)
+
+add_executable(satoshi src/client/main.c)
+target_link_libraries(satoshi PRIVATE satoshi_client
+                                      satoshi_io
+                                      satoshi_static)
 
 set(tests # crypto
           bip340
@@ -303,6 +319,7 @@ foreach(name ${tests})
   add_executable(t-${name} test/t-${name}.c)
   target_link_libraries(t-${name} PRIVATE satoshi_tests
                                           satoshi_node
+                                          satoshi_client
                                           satoshi_io
                                           satoshi_static)
   add_test(NAME ${name} COMMAND t-${name})
@@ -312,6 +329,7 @@ foreach(name http_server)
   add_executable(t-${name} test/t-${name}.c)
   target_link_libraries(t-${name} PRIVATE satoshi_tests
                                           satoshi_node
+                                          satoshi_client
                                           satoshi_io
                                           satoshi_static)
 endforeach()
