@@ -39,6 +39,9 @@ btc_amount_to_double(int64_t x);
 BTC_EXTERN int
 btc_amount_from_double(int64_t *z, double x);
 
+BTC_EXTERN void
+btc_amount_inspect(int64_t x);
+
 /*
  * Compact
  */
@@ -119,6 +122,9 @@ btc_hash_import(uint8_t *zp, const char *xp);
 
 BTC_EXTERN void
 btc_hash_export(char *zp, const uint8_t *xp);
+
+BTC_EXTERN void
+btc_hash_inspect(const uint8_t *xp);
 
 /*
  * Time

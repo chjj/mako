@@ -68,6 +68,9 @@ btc_buffer_read(btc_buffer_t *z, const uint8_t **xp, size_t *xn);
 BTC_EXTERN void
 btc_buffer_update(btc__hash256_t *ctx, const btc_buffer_t *x);
 
+BTC_EXTERN void
+btc_buffer_inspect(const btc_buffer_t *item);
+
 #ifdef __cplusplus
 }
 #endif

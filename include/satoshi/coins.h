@@ -60,6 +60,9 @@ btc_coin_write(uint8_t *zp, const btc_coin_t *x);
 BTC_EXTERN int
 btc_coin_read(btc_coin_t *z, const uint8_t **xp, size_t *xn);
 
+BTC_EXTERN void
+btc_coin_inspect(const btc_coin_t *coin, const btc_network_t *network);
+
 /*
  * Undo Coins
  */

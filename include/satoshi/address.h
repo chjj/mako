@@ -66,6 +66,9 @@ btc_address_set_program(btc_address_t *addr, const btc_program_t *program);
 BTC_EXTERN void
 btc_address_get_program(btc_program_t *program, const btc_address_t *addr);
 
+BTC_EXTERN void
+btc_address_inspect(const btc_address_t *addr, const btc_network_t *network);
+
 #ifdef __cplusplus
 }
 #endif

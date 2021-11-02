@@ -73,6 +73,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/heap.c
                             src/input.c
                             src/inpvec.c
+                            src/inspect.c
                             src/internal.c
                             src/json.c
                             src/mainnet.c

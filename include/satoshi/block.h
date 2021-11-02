@@ -83,6 +83,11 @@ btc_block_write(uint8_t *zp, const btc_block_t *x);
 BTC_EXTERN int
 btc_block_read(btc_block_t *z, const uint8_t **xp, size_t *xn);
 
+BTC_EXTERN void
+btc_block_inspect(const btc_block_t *block,
+                  const btc_view_t *view,
+                  const btc_network_t *network);
+
 #ifdef __cplusplus
 }
 #endif

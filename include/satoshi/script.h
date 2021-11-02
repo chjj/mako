@@ -325,6 +325,9 @@ btc_stack_push_num(btc_stack_t *stack, int64_t num);
 BTC_EXTERN void
 btc_stack_push_bool(btc_stack_t *stack, int value);
 
+BTC_EXTERN void
+btc_stack_inspect(const btc_stack_t *stack);
+
 /*
  * Opcode
  */
@@ -564,6 +567,12 @@ btc_script_compress(uint8_t *zp, const btc_script_t *x);
 
 BTC_EXTERN int
 btc_script_decompress(btc_script_t *z, const uint8_t **xp, size_t *xn);
+
+BTC_EXTERN void
+btc_scriptsig_inspect(const btc_script_t *script);
+
+BTC_EXTERN void
+btc_script_inspect(const btc_script_t *script, const btc_network_t *network);
 
 /*
  * Reader

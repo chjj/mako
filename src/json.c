@@ -1,33 +1,26 @@
 /*!
- * rpc.c - rpc for libsatoshi
+ * json.c - json functions for libsatoshi
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
  * https://github.com/chjj/libsatoshi
  */
 
-#include <stdarg.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 
 #include <satoshi/address.h>
 #include <satoshi/block.h>
 #include <satoshi/coins.h>
 #include <satoshi/consensus.h>
-#include <satoshi/crypto/hash.h>
 #include <satoshi/encoding.h>
 #include <satoshi/entry.h>
 #include <satoshi/header.h>
 #include <satoshi/json.h>
-#include <satoshi/map.h>
-#include <satoshi/net.h>
 #include <satoshi/netaddr.h>
-#include <satoshi/netmsg.h>
 #include <satoshi/network.h>
 #include <satoshi/script.h>
 #include <satoshi/tx.h>
 #include <satoshi/util.h>
-#include <satoshi/vector.h>
 
 #include "internal.h"
 
@@ -120,54 +113,6 @@ json_hash_get(uint8_t *hash, const json_value *obj) {
 }
 
 json_value *
-json_buffer_new(const btc_buffer_t *item) {
-  char *str;
-
-  if (item->length == 0)
-    return json_string_new_length(0, "");
-
-  str = btc_malloc(item->length * 2 + 1);
-
-  btc_base16_encode(str, item->data, item->length);
-
-  return json_string_new_nocopy(item->length * 2, str);
-}
-
-int
-json_buffer_get(btc_buffer_t *item, const json_value *obj) {
-  if (obj->type != json_string)
-    return 0;
-
-  btc_buffer_grow(item, obj->u.string.length / 2);
-
-  if (!btc_base16_decode(item->data, obj->u.string.ptr, obj->u.string.length))
-    return 0;
-
-  item->length = obj->u.string.length / 2;
-
-  return 1;
-}
-
-json_value *
-json_address_new(const btc_address_t *addr, const btc_network_t *network) {
-  char str[BTC_ADDRESS_MAXLEN + 1];
-
-  btc_address_get_str(str, addr, network);
-
-  return json_string_new(str);
-}
-
-int
-json_address_get(btc_address_t *addr,
-                 const json_value *obj,
-                 const btc_network_t *network) {
-  if (obj->type != json_string)
-    return 0;
-
-  return btc_address_set_str(addr, obj->u.string.ptr, network);
-}
-
-json_value *
 json_amount_new(int64_t x) {
   if ((x % BTC_COIN) == 0)
     return json_integer_new(x / BTC_COIN);
@@ -217,6 +162,54 @@ json_amount_get(int64_t *z, const json_value *obj) {
   }
 
   return 0;
+}
+
+json_value *
+json_buffer_new(const btc_buffer_t *item) {
+  char *str;
+
+  if (item->length == 0)
+    return json_string_new_length(0, "");
+
+  str = btc_malloc(item->length * 2 + 1);
+
+  btc_base16_encode(str, item->data, item->length);
+
+  return json_string_new_nocopy(item->length * 2, str);
+}
+
+int
+json_buffer_get(btc_buffer_t *item, const json_value *obj) {
+  if (obj->type != json_string)
+    return 0;
+
+  btc_buffer_grow(item, obj->u.string.length / 2);
+
+  if (!btc_base16_decode(item->data, obj->u.string.ptr, obj->u.string.length))
+    return 0;
+
+  item->length = obj->u.string.length / 2;
+
+  return 1;
+}
+
+json_value *
+json_address_new(const btc_address_t *addr, const btc_network_t *network) {
+  char str[BTC_ADDRESS_MAXLEN + 1];
+
+  btc_address_get_str(str, addr, network);
+
+  return json_string_new(str);
+}
+
+int
+json_address_get(btc_address_t *addr,
+                 const json_value *obj,
+                 const btc_network_t *network) {
+  if (obj->type != json_string)
+    return 0;
+
+  return btc_address_set_str(addr, obj->u.string.ptr, network);
 }
 
 json_value *
@@ -328,6 +321,16 @@ json_coin_new(const btc_coin_t *coin, const btc_network_t *network) {
   json_object_push(obj, "value", json_amount_new(coin->output.value));
   json_object_push(obj, "scriptPubKey", json_script_new(&coin->output.script,
                                                         network));
+
+  return obj;
+}
+
+json_value *
+json_outpoint_new(const btc_outpoint_t *outpoint) {
+  json_value *obj = json_object_new(2);
+
+  json_object_push(obj, "txid", json_hash_new(outpoint->hash));
+  json_object_push(obj, "vout", json_integer_new(outpoint->index));
 
   return obj;
 }

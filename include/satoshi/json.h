@@ -1,5 +1,5 @@
 /*!
- * json.h - json for libsatoshi
+ * json.h - json functions for libsatoshi
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
  * https://github.com/chjj/libsatoshi
  */
@@ -22,18 +22,19 @@
 
 #define json_hash_new btc_json_hash_new
 #define json_hash_get btc_json_hash_get
+#define json_amount_new btc_json_amount_new
+#define json_amount_get btc_json_amount_get
 #define json_buffer_new btc_json_buffer_new
 #define json_buffer_get btc_json_buffer_get
 #define json_address_new btc_json_address_new
 #define json_address_get btc_json_address_get
-#define json_amount_new btc_json_amount_new
-#define json_amount_get btc_json_amount_get
 #define json_netaddr_new btc_json_netaddr_new
 #define json_netaddr_get btc_json_netaddr_get
 #define json_stack_new btc_json_stack_new
 #define json_scriptsig_new btc_json_scriptsig_new
 #define json_script_new btc_json_script_new
 #define json_coin_new btc_json_coin_new
+#define json_outpoint_new btc_json_outpoint_new
 #define json_input_new btc_json_input_new
 #define json_output_new btc_json_output_new
 #define json_output_new_ex btc_json_output_new_ex
@@ -81,6 +82,12 @@ BTC_EXTERN int
 json_hash_get(uint8_t *hash, const json_value *obj);
 
 BTC_EXTERN json_value *
+json_amount_new(int64_t x);
+
+BTC_EXTERN int
+json_amount_get(int64_t *z, const json_value *obj);
+
+BTC_EXTERN json_value *
 json_buffer_new(const btc_buffer_t *item);
 
 BTC_EXTERN int
@@ -93,12 +100,6 @@ BTC_EXTERN int
 json_address_get(btc_address_t *addr,
                  const json_value *obj,
                  const btc_network_t *network);
-
-BTC_EXTERN json_value *
-json_amount_new(int64_t x);
-
-BTC_EXTERN int
-json_amount_get(int64_t *z, const json_value *obj);
 
 BTC_EXTERN json_value *
 json_netaddr_new(const btc_netaddr_t *addr);
@@ -117,6 +118,9 @@ json_script_new(const btc_script_t *script, const btc_network_t *network);
 
 BTC_EXTERN json_value *
 json_coin_new(const btc_coin_t *coin, const btc_network_t *network);
+
+BTC_EXTERN json_value *
+json_outpoint_new(const btc_outpoint_t *outpoint);
 
 BTC_EXTERN json_value *
 json_input_new(const btc_input_t *input,

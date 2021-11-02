@@ -46,4 +46,7 @@ btc_header_verify(const btc_header_t *hdr);
 BTC_EXTERN int
 btc_header_mine(btc_header_t *hdr, uint32_t limit);
 
+BTC_EXTERN void
+btc_header_inspect(const btc_header_t *hdr);
+
 #endif /* BTC_HEADER_H */
