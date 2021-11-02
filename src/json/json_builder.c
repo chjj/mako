@@ -323,6 +323,21 @@ json_value * json_integer_new (json_int_t integer)
    return value;
 }
 
+json_value * json_amount_new (json_int_t integer)
+{
+   json_value * value = (json_value *) calloc (1, sizeof (json_builder_value));
+
+   if (!value)
+      return NULL;
+
+   ((json_builder_value *) value)->is_builder_value = 1;
+
+   value->type = json_amount;
+   value->u.integer = integer;
+
+   return value;
+}
+
 json_value * json_double_new (double dbl)
 {
    json_value * value = (json_value *) calloc (1, sizeof (json_builder_value));
@@ -520,6 +535,18 @@ static size_t serialize_string (json_char * buf,
    return buf - orig_buf;
 }
 
+static int measure_integer (json_int_t value)
+{
+   int length = 0;
+
+   do {
+      length += 1;
+      value /= 10;
+   } while (value != 0);
+
+   return length;
+}
+
 size_t json_measure (json_value * value)
 {
    return json_measure_ex (value, default_opts);
@@ -536,9 +563,9 @@ size_t json_measure_ex (json_value * value, json_serialize_opts opts)
    size_t newlines = 0;
    size_t depth = 0;
    size_t indents = 0;
-   int flags;
+   int flags, pad;
    int bracket_size, comma_size, colon_size;
-   char tmp[32];
+   char tmp[64];
 
    flags = get_serialize_flags (opts);
 
@@ -550,7 +577,7 @@ size_t json_measure_ex (json_value * value, json_serialize_opts opts)
 
    while (value)
    {
-      json_int_t integer;
+      json_int_t integer, hi, lo;
       json_object_entry * entry;
 
       switch (value->type)
@@ -658,9 +685,37 @@ size_t json_measure_ex (json_value * value, json_serialize_opts opts)
 
             break;
 
+         case json_amount:
+
+            integer = value->u.integer;
+
+            if (integer < 0)
+            {
+               total += 1;  /* `-` */
+               integer = - integer;
+            }
+
+            hi = integer / 100000000;
+            lo = integer % 100000000;
+
+            if (lo != 0) {
+               pad = 8 - measure_integer(lo);
+
+               while ((lo % 10) == 0)
+                  lo /= 10;
+
+               total += measure_integer(lo);
+               total += pad;  /* `0` */
+               total += 1;  /* `.` */
+            }
+
+            total += measure_integer(hi);
+
+            break;
+
          case json_double:
 
-            total += sprintf (tmp, "%.16g", value->u.dbl);
+            total += sprintf (tmp, "%.g", value->u.dbl);
 
             /* Because sometimes we need to add ".0" if sprintf does not do it
              * for us. Downside is that we allocate more bytes than strictly
@@ -728,12 +783,12 @@ void json_serialize (json_char * buf, json_value * value)
 
 void json_serialize_ex (json_char * buf, json_value * value, json_serialize_opts opts)
 {
-   json_int_t integer, orig_integer;
+   json_int_t integer, orig_integer, hi, lo;
    json_object_entry * entry;
    json_char * ptr, * dot;
    int indent = 0;
    char indent_char;
-   int i;
+   int i, pad;
    int flags;
 
    flags = get_serialize_flags (opts);
@@ -875,11 +930,59 @@ void json_serialize_ex (json_char * buf, json_value * value, json_serialize_opts
 
             break;
 
+         case json_amount:
+
+            integer = value->u.integer;
+
+            if (integer < 0)
+            {
+               *buf ++ = '-';
+               integer = - integer;
+            }
+
+            hi = integer / 100000000;
+            lo = integer % 100000000;
+            pad = 0;
+
+            if (lo != 0) {
+               pad = 8 - measure_integer(lo);
+
+               while ((lo % 10) == 0)
+                  lo /= 10;
+
+               buf += measure_integer(lo);
+               buf += pad;  /* `0` */
+               buf += 1;  /* `.` */
+            }
+
+            buf += measure_integer(hi);
+
+            ptr = buf;
+
+            if (lo != 0) {
+               do {
+                  *-- ptr = "0123456789"[lo % 10];
+                  lo /= 10;
+               } while (lo != 0);
+
+               while (pad--)
+                  *-- ptr = '0';
+
+               *-- ptr = '.';
+            }
+
+            do {
+               *-- ptr = "0123456789"[hi % 10];
+               hi /= 10;
+            } while (hi != 0);
+
+            break;
+
          case json_double:
 
             ptr = buf;
 
-            buf += sprintf (buf, "%.16g", value->u.dbl);
+            buf += sprintf (buf, "%.g", value->u.dbl);
 
             if ((dot = strchr (ptr, ',')))
             {

@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <satoshi/coins.h>
+#include <satoshi/network.h>
 #include <satoshi/script.h>
 #include <satoshi/tx.h>
 #include <satoshi/util.h>

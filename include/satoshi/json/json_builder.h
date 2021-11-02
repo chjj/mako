@@ -54,6 +54,7 @@ extern "C"
 #define json_string_new_length btc_json_string_new_length
 #define json_string_new_nocopy btc_json_string_new_nocopy
 #define json_integer_new btc_json_integer_new
+#define json_amount_new btc_json_amount_new
 #define json_double_new btc_json_double_new
 #define json_boolean_new btc_json_boolean_new
 #define json_null_new btc_json_null_new
@@ -140,6 +141,8 @@ json_value * json_string_new_nocopy (unsigned int length, json_char *);
  ***/
 BTC_EXTERN
 json_value * json_integer_new (json_int_t);
+BTC_EXTERN
+json_value * json_amount_new (json_int_t);
 BTC_EXTERN
 json_value * json_double_new (double);
 BTC_EXTERN

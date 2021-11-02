@@ -132,17 +132,38 @@ state_need(state_t *st, size_t n) {
  */
 
 static int
-btc_unsigned(char *zp, unsigned long long x, const state_t *st) {
-  unsigned long long t = x;
+btc_uint_size(unsigned long long x) {
   int n = 0;
-  int i;
 
   do {
     n++;
-    t /= 10;
-  } while (t != 0);
+    x /= 10;
+  } while (x != 0);
 
-  if (st != NULL && (st->flags & PRINTF_PRECISION)) {
+  return n;
+}
+
+static int
+btc_uint_write(char *zp, unsigned long long x) {
+  int n = btc_uint_size(x);
+  int i;
+
+  zp[n] = '\0';
+
+  for (i = n - 1; i >= 0; i--) {
+    zp[i] = '0' + (int)(x % 10);
+    x /= 10;
+  }
+
+  return n;
+}
+
+static int
+btc_unsigned(char *zp, unsigned long long x, const state_t *st) {
+  int n = btc_uint_size(x);
+  int i;
+
+  if (st->flags & PRINTF_PRECISION) {
     if (n < st->prec)
       n = st->prec;
   }
@@ -253,13 +274,10 @@ btc_float(char *zp, double x, const state_t *st) {
   double frac, iptr;
   char *sp = zp;
   int prec = 6;
-  state_t t;
+  int i;
 
   if (st->flags & PRINTF_PRECISION)
     prec = st->prec;
-
-  t.flags = PRINTF_PRECISION;
-  t.prec = prec;
 
   if (x < 0.0) {
     *zp++ = '-';
@@ -270,11 +288,19 @@ btc_float(char *zp, double x, const state_t *st) {
   hi = (unsigned long long)iptr;
   lo = (unsigned long long)(frac * pow(10, prec));
 
-  zp += btc_unsigned(zp, hi, NULL);
+  zp += btc_uint_write(zp, hi);
 
   if (prec != 0) {
     *zp++ = '.';
-    zp += btc_unsigned(zp, lo, &t);
+
+    zp[prec] = '\0';
+
+    for (i = prec - 1; i >= 0; i--) {
+      zp[i] = '0' + (int)(lo % 10);
+      lo /= 10;
+    }
+
+    zp += prec;
   }
 
   return zp - sp;
@@ -340,10 +366,10 @@ btc_date(char *zp, int64_t x) {
 }
 
 static int
-btc_value(char *zp, int64_t x, const state_t *st) {
+btc_value(char *zp, int64_t x) {
   uint64_t hi, lo;
   char *sp = zp;
-  int prec;
+  int n;
 
   if (x < 0) {
     *zp++ = '-';
@@ -353,21 +379,22 @@ btc_value(char *zp, int64_t x, const state_t *st) {
   hi = (uint64_t)x / 100000000;
   lo = (uint64_t)x % 100000000;
 
-  if (st->flags & PRINTF_PRECISION) {
-    prec = 8 - st->prec;
-
-    if (prec < 0)
-      prec = 0;
-
-    while (prec--)
-      lo /= 10;
-  }
-
-  zp += btc_unsigned(zp, hi, NULL);
+  zp += btc_uint_write(zp, hi);
 
   if (lo != 0) {
+    n = btc_uint_size(lo);
+
     *zp++ = '.';
-    zp += btc_unsigned(zp, lo, st);
+
+    while (n < 8) {
+      *zp++ = '0';
+      n++;
+    }
+
+    while ((lo % 10) == 0)
+      lo /= 10;
+
+    zp += btc_uint_write(zp, lo);
   }
 
   return zp - sp;
@@ -610,7 +637,7 @@ btc_printf_core(state_t *st, const char *fmt, va_list ap) {
           case 'v': {
             /* bitcoin amount */
             state_grow(st, 22);
-            st->ptr += btc_value(st->ptr, va_arg(ap, int64_t), st);
+            st->ptr += btc_value(st->ptr, va_arg(ap, int64_t));
             st->state = PRINTF_STATE_NONE;
             break;
           }

@@ -22,15 +22,21 @@
  */
 
 static int
-encode64(char *zp, int64_t x) {
-  int64_t t = x;
+size64(int64_t x) {
   int n = 0;
-  int i;
 
   do {
     n++;
-    t /= 10;
-  } while (t != 0);
+    x /= 10;
+  } while (x != 0);
+
+  return n;
+}
+
+static int
+encode64(char *zp, int64_t x) {
+  int n = size64(x);
+  int i;
 
   zp[n] = '\0';
 
@@ -74,6 +80,7 @@ size_t
 btc_amount_export(char *zp, int64_t x) {
   int64_t hi, lo;
   char *sp = zp;
+  int n;
 
   if (x < 0) {
     *zp++ = '-';
@@ -86,7 +93,18 @@ btc_amount_export(char *zp, int64_t x) {
   zp += encode64(zp, hi);
 
   if (lo != 0) {
+    n = size64(lo);
+
     *zp++ = '.';
+
+    while (n < BTC_PRECISION) {
+      *zp++ = '0';
+      n++;
+    }
+
+    while ((lo % 10) == 0)
+      lo /= 10;
+
     zp += encode64(zp, lo);
   }
 
@@ -95,12 +113,12 @@ btc_amount_export(char *zp, int64_t x) {
 
 int
 btc_amount_import(int64_t *z, const char *xp) {
+  int neg = (*xp == '-');
   int64_t lo = 0;
   int64_t hi;
   int64_t x;
-  int neg;
+  int n;
 
-  neg = (*xp == '-');
   xp += neg;
 
   if (!decode64(&hi, &xp, 19 - BTC_PRECISION))
@@ -109,8 +127,17 @@ btc_amount_import(int64_t *z, const char *xp) {
   if (*xp == '.') {
     xp++;
 
-    if (!decode64(&lo, &xp, BTC_PRECISION))
+    n = decode64(&lo, &xp, BTC_PRECISION);
+
+    if (n == 0)
       return 0;
+
+    if (lo != 0) {
+      while (n < BTC_PRECISION) {
+        lo *= 10;
+        n++;
+      }
+    }
   }
 
   if (*xp != '\0')

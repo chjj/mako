@@ -22,7 +22,6 @@
 
 #define json_hash_new btc_json_hash_new
 #define json_hash_get btc_json_hash_get
-#define json_amount_new btc_json_amount_new
 #define json_amount_get btc_json_amount_get
 #define json_buffer_new btc_json_buffer_new
 #define json_buffer_get btc_json_buffer_get
@@ -80,9 +79,6 @@ json_hash_new(const uint8_t *hash);
 
 BTC_EXTERN int
 json_hash_get(uint8_t *hash, const json_value *obj);
-
-BTC_EXTERN json_value *
-json_amount_new(int64_t x);
 
 BTC_EXTERN int
 json_amount_get(int64_t *z, const json_value *obj);

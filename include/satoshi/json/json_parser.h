@@ -88,6 +88,7 @@ typedef enum
    json_object,
    json_array,
    json_integer,
+   json_amount,
    json_double,
    json_string,
    json_boolean,

@@ -112,14 +112,6 @@ json_hash_get(uint8_t *hash, const json_value *obj) {
   return btc_hash_import(hash, obj->u.string.ptr);
 }
 
-json_value *
-json_amount_new(int64_t x) {
-  if ((x % BTC_COIN) == 0)
-    return json_integer_new(x / BTC_COIN);
-
-  return json_double_new(btc_amount_to_double(x));
-}
-
 int
 json_amount_get(int64_t *z, const json_value *obj) {
   if (obj->type == json_integer) {
