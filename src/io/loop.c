@@ -50,6 +50,7 @@ typedef char btc_sockopt_t;
 typedef signed __int64 btc_msec_t;
 #  define BTC_INVALID_SOCKET INVALID_SOCKET
 #  define BTC_SOCKET_ERROR SOCKET_ERROR
+#  define BTC_NOSIGNAL 0
 #  define btc_errno (WSAGetLastError())
 #  define BTC_EINTR WSAEINTR
 #  define BTC_EAGAIN WSAEWOULDBLOCK
@@ -70,6 +71,11 @@ typedef int btc_sockopt_t;
 typedef long long btc_msec_t;
 #  define BTC_INVALID_SOCKET -1
 #  define BTC_SOCKET_ERROR -1
+#  if defined(MSG_NOSIGNAL)
+#    define BTC_NOSIGNAL MSG_NOSIGNAL
+#  else
+#    define BTC_NOSIGNAL 0
+#  endif
 #  define btc_errno errno
 #  define BTC_EINTR EINTR
 #  define BTC_EAGAIN EAGAIN
@@ -417,6 +423,13 @@ try_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
 
   fd = accept(sockfd, addr, addrlen);
 
+#ifdef SO_NOSIGPIPE
+  if (fd != -1) {
+    int yes = 1;
+    setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &yes, sizeof(yes));
+  }
+#endif
+
   if (fd != -1)
     set_cloexec(fd);
 
@@ -461,6 +474,13 @@ safe_socket(int domain, int type, int protocol) {
 #endif
 
   fd = socket(domain, type, protocol);
+
+#ifdef SO_NOSIGPIPE
+  if (fd != -1) {
+    int yes = 1;
+    setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &yes, sizeof(yes));
+  }
+#endif
 
   if (fd != -1)
     set_cloexec(fd);
@@ -864,7 +884,7 @@ btc_socket_flush_write(btc_socket_t *socket) {
     CHECK(chunk->len <= INT_MAX);
 
     while (chunk->len > 0) {
-      len = send(socket->fd, (void *)chunk->raw, chunk->len, 0);
+      len = send(socket->fd, (void *)chunk->raw, chunk->len, BTC_NOSIGNAL);
 
       if (len == BTC_SOCKET_ERROR) {
         int error = btc_errno;
@@ -991,7 +1011,7 @@ btc_socket_flush_send(btc_socket_t *socket) {
       len = sendto(socket->fd,
                    (void *)chunk->raw,
                    chunk->len,
-                   0,
+                   BTC_NOSIGNAL,
                    chunk->addr,
                    addrlen);
 
@@ -1631,13 +1651,11 @@ btc_loop_start(btc_loop_t *loop) {
 
   for (socket = loop->head; socket != NULL; socket = next) {
     next = socket->next;
-
     btc_socket_close(socket);
-    socket->on_close(socket);
-    btc_socket_destroy(socket);
   }
 
-  btc_list_init(&loop->closed);
+  handle_closed(loop);
+
   btc_list_init(loop);
 }
 #elif defined(BTC_USE_POLL)
@@ -1691,15 +1709,10 @@ btc_loop_start(btc_loop_t *loop) {
     btc_time_sleep(BTC_TICK_RATE - diff);
   }
 
-  while (loop->length > 0) {
-    socket = loop->sockets[0];
+  while (loop->length > 0)
+    btc_socket_close(loop->sockets[0]);
 
-    btc_socket_close(socket);
-    socket->on_close(socket);
-    btc_socket_destroy(socket);
-  }
-
-  btc_list_init(&loop->closed);
+  handle_closed(loop);
 
   loop->index = 0;
   loop->length = 0;
@@ -1782,13 +1795,11 @@ btc_loop_start(btc_loop_t *loop) {
 
   for (socket = loop->head; socket != NULL; socket = next) {
     next = socket->next;
-
     btc_socket_close(socket);
-    socket->on_close(socket);
-    btc_socket_destroy(socket);
   }
 
-  btc_list_init(&loop->closed);
+  handle_closed(loop);
+
   btc_list_init(loop);
 
 #ifndef _WIN32

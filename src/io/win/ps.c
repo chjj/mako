@@ -9,6 +9,12 @@
 #include <io/core.h>
 
 /*
+ * Globals
+ */
+
+static void (*global_handler)(int) = NULL;
+
+/*
  * Process
  */
 
@@ -37,4 +43,20 @@ btc_ps_getenv(char *out, size_t size, const char *name) {
 int
 btc_ps_daemon(void) {
   return 0;
+}
+
+static BOOL WINAPI
+ctrl_handler(DWORD type) {
+  /* Note: this runs on a separate thread. */
+  /* Sleep to prevent ExitProcess from being called. */
+  /* May need to add a mutex for `loop->running`? */
+  global_handler(0);
+  Sleep(INFINITE);
+  return TRUE;
+}
+
+void
+btc_ps_onterm(void (*handler)(int)) {
+  global_handler = handler;
+  SetConsoleCtrlHandler(ctrl_handler, TRUE);
 }

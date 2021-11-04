@@ -42,6 +42,7 @@
 typedef SOCKET btc_sockfd_t;
 #  define BTC_INVALID_SOCKET INVALID_SOCKET
 #  define BTC_SOCKET_ERROR SOCKET_ERROR
+#  define BTC_NOSIGNAL 0
 #  define btc_errno (WSAGetLastError())
 #  define BTC_EINTR WSAEINTR
 #  define btc_closesocket closesocket
@@ -49,6 +50,11 @@ typedef SOCKET btc_sockfd_t;
 typedef int btc_sockfd_t;
 #  define BTC_INVALID_SOCKET -1
 #  define BTC_SOCKET_ERROR -1
+#  if defined(MSG_NOSIGNAL)
+#    define BTC_NOSIGNAL MSG_NOSIGNAL
+#  else
+#    define BTC_NOSIGNAL 0
+#  endif
 #  define btc_errno errno
 #  define BTC_EINTR EINTR
 #  define btc_closesocket close
@@ -199,6 +205,13 @@ http_connect(const struct sockaddr *addr) {
 
   if (fd == BTC_INVALID_SOCKET)
     return BTC_INVALID_SOCKET;
+
+#ifdef SO_NOSIGPIPE
+  {
+    int yes = 1;
+    setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &yes, sizeof(yes));
+  }
+#endif
 
   if (connect(fd, addr, addrlen) == BTC_SOCKET_ERROR) {
     btc_closesocket(fd);
@@ -400,7 +413,7 @@ http_client_write(http_client_t *client, const char *buf, size_t len) {
 
   while (len > 0) {
     do {
-      nwrite = send(client->fd, buf, len, 0);
+      nwrite = send(client->fd, buf, len, BTC_NOSIGNAL);
     } while (nwrite == BTC_SOCKET_ERROR && btc_errno == BTC_EINTR);
 
     if (nwrite == BTC_SOCKET_ERROR)

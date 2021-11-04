@@ -12,6 +12,16 @@
 #include <node/node.h>
 #include <satoshi/config.h>
 
+/*
+ * Globals
+ */
+
+static btc_node_t *global_node = NULL;
+
+/*
+ * Config
+ */
+
 static int
 get_config(btc_conf_t *args, int argc, char **argv) {
   char prefix[700];
@@ -23,12 +33,34 @@ get_config(btc_conf_t *args, int argc, char **argv) {
   }
 
   btc_conf_parse(args, argv, argc, prefix, 0);
-  btc_conf_read(&conf, args->config);
-  btc_conf_merge(args, &conf);
+
+  if (!args->help && !args->version) {
+    btc_conf_read(&conf, args->config);
+    btc_conf_merge(args, &conf);
+  }
+
   btc_conf_finalize(args, prefix);
 
   return 1;
 }
+
+/*
+ * Signal Handling
+ */
+
+static void
+on_sigterm(int signum) {
+  (void)signum;
+
+  if (global_node != NULL)
+    btc_node_stop(global_node);
+
+  global_node = NULL;
+}
+
+/*
+ * Main
+ */
 
 int
 main(int argc, char **argv) {
@@ -40,12 +72,12 @@ main(int argc, char **argv) {
     return EXIT_FAILURE;
 
   if (args.help) {
-    fprintf(stderr, "RTFM.\n");
-    return EXIT_FAILURE;
+    puts("RTFM!");
+    return EXIT_SUCCESS;
   }
 
   if (args.version) {
-    printf("0.0.0\n");
+    puts("0.0.0");
     return EXIT_SUCCESS;
   }
 
@@ -67,7 +99,16 @@ main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
+  global_node = node;
+
+  btc_ps_onterm(on_sigterm);
+
   btc_node_start(node);
+
+  global_node = NULL;
+
+  btc_node_close(node);
+  btc_node_destroy(node);
 
   btc_net_cleanup();
 

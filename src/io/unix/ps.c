@@ -4,6 +4,7 @@
  * https://github.com/chjj/libsatoshi
  */
 
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -75,4 +76,23 @@ btc_ps_daemon(void) {
 
   return 1;
 #endif
+}
+
+static void
+btc_signal(int signal, void (*handler)(int)) {
+  struct sigaction sa;
+
+  sa.sa_handler = handler;
+
+  sigemptyset(&sa.sa_mask);
+
+  sa.sa_flags = 0;
+
+  sigaction(signal, &sa, NULL);
+}
+
+void
+btc_ps_onterm(void (*handler)(int)) {
+  btc_signal(SIGTERM, handler);
+  btc_signal(SIGINT, handler);
 }

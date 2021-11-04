@@ -2018,14 +2018,11 @@ btc_pool_create(const btc_network_t *network,
   pool->max_inbound = 8;
   pool->synced = 0;
 
-  btc_loop_on_tick(loop, on_tick, pool);
-
   return pool;
 }
 
 void
 btc_pool_destroy(btc_pool_t *pool) {
-  btc_loop_off_tick(pool->loop, on_tick, pool);
   btc_addrman_destroy(pool->addrman);
   btc_peers_clear(&pool->peers);
   btc_nonces_clear(&pool->nonces);
@@ -2163,11 +2160,15 @@ btc_pool_open(btc_pool_t *pool) {
 
   btc_pool_reset_chain(pool);
 
+  btc_loop_on_tick(pool->loop, on_tick, pool);
+
   return 1;
 }
 
 void
 btc_pool_close(btc_pool_t *pool) {
+  btc_loop_off_tick(pool->loop, on_tick, pool);
+
   if (pool->server != NULL)
     btc_socket_close(pool->server);
 

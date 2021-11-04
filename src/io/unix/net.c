@@ -4,11 +4,12 @@
  * https://github.com/chjj/libsatoshi
  */
 
+#include <signal.h>
 #include <io/core.h>
 
 void
 btc_net_startup(void) {
-  return;
+  signal(SIGPIPE, SIG_IGN);
 }
 
 void

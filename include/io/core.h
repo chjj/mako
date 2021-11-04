@@ -328,6 +328,9 @@ btc_ps_getenv(char *out, size_t size, const char *name);
 BTC_EXTERN int
 btc_ps_daemon(void);
 
+BTC_EXTERN void
+btc_ps_onterm(void (*handler)(int));
+
 /*
  * Mutex
  */

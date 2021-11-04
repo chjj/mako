@@ -77,8 +77,12 @@ get_config(btc_conf_t *args, int argc, char **argv) {
   }
 
   btc_conf_parse(args, argv, argc, prefix, 1);
-  btc_conf_read(&conf, args->config);
-  btc_conf_merge(args, &conf);
+
+  if (!args->help && !args->version) {
+    btc_conf_read(&conf, args->config);
+    btc_conf_merge(args, &conf);
+  }
+
   btc_conf_finalize(args, prefix);
 
   return 1;
@@ -102,12 +106,12 @@ main(int argc, char **argv) {
     return EXIT_FAILURE;
 
   if (args.help) {
-    fprintf(stderr, "RTFM.\n");
-    return EXIT_FAILURE;
+    puts("RTFM!");
+    return EXIT_SUCCESS;
   }
 
   if (args.version) {
-    printf("0.0.0\n");
+    puts("0.0.0");
     return EXIT_SUCCESS;
   }
 
