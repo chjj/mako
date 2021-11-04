@@ -12,7 +12,8 @@
  * Globals
  */
 
-static void (*global_handler)(int) = NULL;
+static void (*global_handler)(void *) = NULL;
+static void *global_arg = NULL;
 
 /*
  * Process
@@ -46,17 +47,25 @@ btc_ps_daemon(void) {
 }
 
 static BOOL WINAPI
-ctrl_handler(DWORD type) {
+real_handler(DWORD type) {
   /* Note: this runs on a separate thread. */
-  /* Sleep to prevent ExitProcess from being called. */
   /* May need to add a mutex for `loop->running`? */
-  global_handler(0);
-  Sleep(INFINITE);
+  (void)type;
+
+  if (global_handler != NULL) {
+    global_handler(global_arg);
+    global_handler = NULL;
+  }
+
+  Sleep(INFINITE); /* Prevent ExitProcess from being called. */
+
   return TRUE;
 }
 
 void
-btc_ps_onterm(void (*handler)(int)) {
+btc_ps_onterm(void (*handler)(void *), void *arg) {
   global_handler = handler;
-  SetConsoleCtrlHandler(ctrl_handler, TRUE);
+  global_arg = arg;
+
+  SetConsoleCtrlHandler(real_handler, TRUE);
 }

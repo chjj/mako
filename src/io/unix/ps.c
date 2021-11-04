@@ -11,6 +11,13 @@
 #include <io/core.h>
 
 /*
+ * Globals
+ */
+
+static void (*global_handler)(void *) = NULL;
+static void *global_arg = NULL;
+
+/*
  * Process
  */
 
@@ -91,8 +98,21 @@ btc_signal(int signal, void (*handler)(int)) {
   sigaction(signal, &sa, NULL);
 }
 
+static void
+real_handler(int signum) {
+  (void)signum;
+
+  if (global_handler != NULL) {
+    global_handler(global_arg);
+    global_handler = NULL;
+  }
+}
+
 void
-btc_ps_onterm(void (*handler)(int)) {
-  btc_signal(SIGTERM, handler);
-  btc_signal(SIGINT, handler);
+btc_ps_onterm(void (*handler)(void *), void *arg) {
+  global_handler = handler;
+  global_arg = arg;
+
+  btc_signal(SIGTERM, real_handler);
+  btc_signal(SIGINT, real_handler);
 }

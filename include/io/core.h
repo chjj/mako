@@ -329,7 +329,7 @@ BTC_EXTERN int
 btc_ps_daemon(void);
 
 BTC_EXTERN void
-btc_ps_onterm(void (*handler)(int));
+btc_ps_onterm(void (*handler)(void *), void *arg);
 
 /*
  * Mutex

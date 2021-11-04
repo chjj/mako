@@ -13,12 +13,6 @@
 #include <satoshi/config.h>
 
 /*
- * Globals
- */
-
-static btc_node_t *global_node = NULL;
-
-/*
  * Config
  */
 
@@ -49,13 +43,8 @@ get_config(btc_conf_t *args, int argc, char **argv) {
  */
 
 static void
-on_sigterm(int signum) {
-  (void)signum;
-
-  if (global_node != NULL)
-    btc_node_stop(global_node);
-
-  global_node = NULL;
+on_sigterm(void *arg) {
+  btc_node_stop((btc_node_t *)arg);
 }
 
 /*
@@ -99,13 +88,9 @@ main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  global_node = node;
-
-  btc_ps_onterm(on_sigterm);
+  btc_ps_onterm(on_sigterm, node);
 
   btc_node_start(node);
-
-  global_node = NULL;
 
   btc_node_close(node);
   btc_node_destroy(node);
