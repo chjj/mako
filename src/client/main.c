@@ -163,6 +163,8 @@ main(int argc, char **argv) {
     goto fail;
   }
 
+  btc_net_startup();
+
   client = btc_client_create();
 
   if (!btc_client_open(client, args.rpc_connect, args.rpc_port)) {
@@ -189,6 +191,8 @@ fail:
 
   if (client != NULL)
     btc_client_destroy(client);
+
+  btc_net_cleanup();
 
   return ret;
 }
