@@ -33,3 +33,8 @@ btc_ps_getenv(char *out, size_t size, const char *name) {
 
   return len != 0;
 }
+
+int
+btc_ps_daemon(void) {
+  return 0;
+}

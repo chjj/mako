@@ -10,6 +10,10 @@
 #include <string.h>
 
 #include <client/client.h>
+
+#include <io/core.h>
+
+#include <satoshi/config.h>
 #include <satoshi/json.h>
 
 #include "../internal.h"
@@ -17,8 +21,6 @@
 /*
  * Constants
  */
-
-#define MAX_PARAMS 8
 
 static const json_serialize_opts json_options = {
   json_serialize_mode_multiline,
@@ -32,7 +34,7 @@ static const json_serialize_opts json_options = {
 
 static const struct {
   const char *method;
-  json_type schema[MAX_PARAMS];
+  json_type schema[8];
 } rpc_methods[] = {
   { "getinfo", { json_none } },
   { "sendtoaddress", { json_string, json_amount } }
@@ -61,113 +63,23 @@ find_schema(const char *method) {
 }
 
 /*
- * Argument Parsing
+ * Config
  */
 
-typedef struct args_s {
-  const char *config;
-  const char *prefix;
-  const char *hostname;
-  unsigned short port;
-  const char *user;
-  const char *pass;
-  const char *method;
-  const char *params[MAX_PARAMS];
-  size_t length;
-} args_t;
-
 static int
-arg_match(const char **zp, const char *xp, const char *yp) {
-  while (*xp && *xp == *yp) {
-    xp++;
-    yp++;
+get_config(btc_conf_t *args, int argc, char **argv) {
+  char prefix[700];
+  btc_conf_t conf;
+
+  if (!btc_sys_datadir(prefix, sizeof(prefix), "satoshi")) {
+    fprintf(stderr, "Could not find suitable datadir.\n");
+    return 0;
   }
 
-  if (*yp)
-    return 0;
-
-  *zp = xp;
-
-  return 1;
-}
-
-static int
-args_init(args_t *args, char **argv, size_t argc) {
-  size_t i;
-
-  args->config = NULL;
-  args->prefix = NULL;
-  args->hostname = "127.0.0.1";
-  args->port = 8332;
-  args->user = NULL;
-  args->pass = NULL;
-  args->method = NULL;
-  args->length = 0;
-
-  for (i = 1; i < argc; i++) {
-    const char *arg = argv[i];
-    const char *val;
-
-    if (arg_match(&args->config, arg, "-conf="))
-      continue;
-
-    if (arg_match(&args->prefix, arg, "-datadir="))
-      continue;
-
-    if (arg_match(&args->hostname, arg, "-rpcconnect="))
-      continue;
-
-    if (arg_match(&val, arg, "-rpcport=")) {
-      if (sscanf(val, "%hu", &args->port) != 1)
-        return 0;
-      continue;
-    }
-
-    if (arg_match(&args->user, arg, "-rpcuser="))
-      continue;
-
-    if (arg_match(&args->pass, arg, "-rpcpassword="))
-      continue;
-
-    if (arg_match(&val, arg, "-chain=")) {
-      if (strcmp(val, "mainnet") == 0 || strcmp(val, "main") == 0)
-        args->port = 8332;
-      else if (strcmp(val, "testnet") == 0 || strcmp(val, "test") == 0)
-        args->port = 18332;
-      else if (strcmp(val, "regtest") == 0)
-        args->port = 48332;
-      else if (strcmp(val, "simnet") == 0)
-        args->port = 18556;
-      else
-        return 0;
-
-      continue;
-    }
-
-    if (strcmp(arg, "-testnet") == 0) {
-      args->port = 8332;
-      continue;
-    }
-
-    if (strcmp(arg, "-version") == 0) {
-      puts("0.0.0");
-      exit(0);
-      return 0;
-    }
-
-    if (args->method == NULL) {
-      args->method = arg;
-      continue;
-    }
-
-    if (args->length == MAX_PARAMS)
-      return 0;
-
-    args->params[args->length++] = arg;
-  }
-
-  if (args->method == NULL)
-    return 0;
+  btc_conf_parse(args, argv, argc, prefix, 1);
+  btc_conf_read(&conf, args->config);
+  btc_conf_merge(args, &conf);
+  btc_conf_finalize(args, prefix);
 
   return 1;
 }
@@ -182,20 +94,28 @@ main(int argc, char **argv) {
   json_value *params = NULL;
   const json_type *schema;
   json_value *result;
-  args_t args;
-  int ret = 1;
+  btc_conf_t args;
+  int ret = EXIT_FAILURE;
   size_t i;
 
-  if (!args_init(&args, argv, argc)) {
-    fprintf(stderr, "Invalid arguments.\n");
-    return 1;
+  if (!get_config(&args, argc, argv))
+    return EXIT_FAILURE;
+
+  if (args.help) {
+    fprintf(stderr, "RTFM.\n");
+    return EXIT_FAILURE;
+  }
+
+  if (args.version) {
+    printf("0.0.0\n");
+    return EXIT_SUCCESS;
   }
 
   schema = find_schema(args.method);
 
   if (schema == NULL) {
     fprintf(stderr, "RPC method '%s' not found.\n", args.method);
-    return 1;
+    return EXIT_FAILURE;
   }
 
   params = json_array_new(args.length);
@@ -245,9 +165,9 @@ main(int argc, char **argv) {
 
   client = btc_client_create();
 
-  if (!btc_client_open(client, args.hostname, args.port)) {
+  if (!btc_client_open(client, args.rpc_connect, args.rpc_port)) {
     fprintf(stderr, "Could not connect to %s:%d.\n",
-                    args.hostname, args.port);
+                    args.rpc_connect, args.rpc_port);
     goto fail;
   }
 
@@ -262,7 +182,7 @@ main(int argc, char **argv) {
   json_print_ex(result, puts, json_options);
   json_builder_free(result);
 
-  ret = 0;
+  ret = EXIT_SUCCESS;
 fail:
   if (params != NULL)
     json_builder_free(params);

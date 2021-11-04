@@ -48,3 +48,31 @@ btc_ps_getenv(char *out, size_t size, const char *name) {
 
   return 1;
 }
+
+int
+btc_ps_daemon(void) {
+#if defined(__wasi__) || defined(__EMSCRIPTEN__)
+  return 0;
+#else
+  pid_t pid = fork();
+
+  if (pid < 0)
+    return 0;
+
+  if (pid > 0) {
+    exit(EXIT_SUCCESS);
+    return 1;
+  }
+
+  if (setsid() < 0) {
+    exit(EXIT_FAILURE);
+    return 0;
+  }
+
+  close(STDIN_FILENO);
+  close(STDOUT_FILENO);
+  close(STDERR_FILENO);
+
+  return 1;
+#endif
+}

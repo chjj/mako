@@ -5,6 +5,7 @@
  */
 
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pwd.h>
@@ -126,6 +127,29 @@ btc_sys_homedir(char *out, size_t size) {
     return 0;
 
   memcpy(out, pwd.pw_dir, len + 1);
+
+  return 1;
+}
+
+int
+btc_sys_datadir(char *out, size_t size, const char *name) {
+  char home[1024];
+
+  if (!btc_sys_homedir(home, sizeof(home)))
+    return 0;
+
+#if defined(__APPLE__)
+  if (strlen(home) + strlen(name) + 30 > size)
+    return 0;
+
+  sprintf(out, "%s/Library/Application Support/%c%s",
+               home, name[0] & ~32, name + 1);
+#else
+  if (strlen(home) + strlen(name) + 3 > size)
+    return 0;
+
+  sprintf(out, "%s/.%s", home, name);
+#endif
 
   return 1;
 }

@@ -190,7 +190,7 @@ endif()
 list(APPEND satoshi_includes ${PROJECT_SOURCE_DIR}/include)
 
 if(WIN32)
-  list(APPEND satoshi_libs userenv ws2_32)
+  list(APPEND satoshi_libs shell32 userenv ws2_32)
 else()
   list(APPEND satoshi_libs m)
 endif()

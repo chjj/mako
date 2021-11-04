@@ -54,7 +54,7 @@ btc_die(const char *fmt, ...) {
   vfprintf(stderr, fmt, ap);
   fputc('\n', stderr);
   va_end(ap);
-  exit(1);
+  exit(EXIT_FAILURE);
   return 0;
 }
 
@@ -435,6 +435,7 @@ btc_conf_init(btc_conf_t *conf,
   conf->network_active = 1;
   conf->disable_wallet = 0;
 
+  conf->map_size = 16;
   conf->checkpoints = 1;
   conf->prune = 0;
   conf->workers = 0;
@@ -493,6 +494,7 @@ btc_conf_reset(btc_conf_t *conf) {
   conf->daemon = -1;
   conf->network_active = -1;
   conf->disable_wallet = -1;
+  conf->map_size = -1;
   conf->checkpoints = -1;
   conf->prune = -1;
   conf->workers = INT_MIN;
@@ -545,6 +547,9 @@ btc_conf_parse(btc_conf_t *args,
       continue;
 
     if (btc_match_argbool(&args->disable_wallet, arg, "-disablewallet="))
+      continue;
+
+    if (btc_match_int(&args->map_size, arg, "-mapsize="))
       continue;
 
     if (btc_match_argbool(&args->checkpoints, arg, "-checkpoints="))
@@ -709,6 +714,9 @@ btc_conf_read(btc_conf_t *conf, const char *file) {
     if (btc_match_bool(&conf->disable_wallet, zp, "disablewallet="))
       continue;
 
+    if (btc_match_int(&conf->map_size, zp, "mapsize="))
+      continue;
+
     if (btc_match_bool(&conf->checkpoints, zp, "checkpoints="))
       continue;
 
@@ -799,6 +807,8 @@ btc_conf_read(btc_conf_t *conf, const char *file) {
 
     btc_free(zp);
 
+    fclose(stream);
+
     return btc_die("Invalid option `%s`.", zp);
   }
 
@@ -808,6 +818,8 @@ btc_conf_read(btc_conf_t *conf, const char *file) {
   btc_str_set(conf->config, file);
 
   btc_free(zp);
+
+  fclose(stream);
 
   return 1;
 }
@@ -819,6 +831,9 @@ btc_conf_merge(btc_conf_t *args, const btc_conf_t *conf) {
 
   if (args->disable_wallet == -1 && conf->disable_wallet != -1)
     args->disable_wallet = conf->disable_wallet;
+
+  if (args->map_size == -1 && conf->map_size != -1)
+    args->map_size = conf->map_size;
 
   if (args->checkpoints == -1 && conf->checkpoints != -1)
     args->checkpoints = conf->checkpoints;
@@ -918,6 +933,9 @@ btc_conf_finalize(btc_conf_t *args, const char *prefix) {
 
   if (args->disable_wallet == -1)
     args->disable_wallet = 0;
+
+  if (args->map_size <= 0 || args->map_size > 256)
+    args->map_size = 16;
 
   if (args->checkpoints == -1)
     args->checkpoints = 1;

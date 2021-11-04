@@ -325,6 +325,9 @@ btc_ps_cwd(char *buf, size_t size);
 BTC_EXTERN int
 btc_ps_getenv(char *out, size_t size, const char *name);
 
+BTC_EXTERN int
+btc_ps_daemon(void);
+
 /*
  * Mutex
  */
@@ -464,6 +467,9 @@ btc_sys_cpu_count(void);
 
 BTC_EXTERN int
 btc_sys_homedir(char *out, size_t size);
+
+BTC_EXTERN int
+btc_sys_datadir(char *out, size_t size, const char *name);
 
 /*
  * Time

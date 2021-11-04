@@ -26,6 +26,7 @@ struct btc_conf_s {
   int daemon;
   int network_active;
   int disable_wallet;
+  int map_size;
   int checkpoints;
   int prune;
   int workers;
