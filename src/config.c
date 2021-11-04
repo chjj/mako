@@ -675,11 +675,6 @@ btc_conf_parse(btc_conf_t *args,
     return btc_die("Invalid option `%s`.", arg);
   }
 
-  if (allow_params) {
-    if (args->method == NULL)
-      return btc_die("Must specify a method.");
-  }
-
   if (args->network == NULL)
     args->network = btc_mainnet;
 

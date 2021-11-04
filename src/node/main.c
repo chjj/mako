@@ -61,7 +61,7 @@ main(int argc, char **argv) {
     return EXIT_FAILURE;
 
   if (args.help) {
-    puts("RTFM!");
+    puts("Usage: satoshid [options]");
     return EXIT_SUCCESS;
   }
 

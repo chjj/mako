@@ -106,13 +106,18 @@ main(int argc, char **argv) {
     return EXIT_FAILURE;
 
   if (args.help) {
-    puts("RTFM!");
+    puts("Usage: satoshi [options] <command> [params]");
     return EXIT_SUCCESS;
   }
 
   if (args.version) {
     puts("0.0.0");
     return EXIT_SUCCESS;
+  }
+
+  if (args.method == NULL) {
+    fprintf(stderr, "Must specify a command.\n");
+    return EXIT_FAILURE;
   }
 
   schema = find_schema(args.method);
