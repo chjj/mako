@@ -269,6 +269,16 @@ typedef struct btc_mnemonic_s {
   int length;
 } btc_mnemonic_t;
 
+enum btc_ipnet {
+  BTC_IPNET_NONE,
+  BTC_IPNET_IPV4,
+  BTC_IPNET_IPV6,
+  BTC_IPNET_ONION,
+  BTC_IPNET_TEREDO
+};
+
+typedef struct btc_conf_s btc_conf_t;
+
 /*
  * Maps (Key->Pointer)
  */

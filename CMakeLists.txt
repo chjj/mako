@@ -69,6 +69,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/coin.c
                             src/compact.c
                             src/compress.c
+                            src/config.c
                             src/consensus.c
                             src/entry.c
                             src/header.c
@@ -90,8 +91,11 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/policy.c
                             src/printf.c
                             src/printf_core.c
+                            src/regtest.c
                             src/script.c
+                            src/simnet.c
                             src/sprintf.c
+                            src/testnet.c
                             src/tx.c
                             src/undo.c
                             src/util.c
@@ -279,6 +283,7 @@ set(tests # crypto
           block
           bloom
           coin
+          config
           entry
           header
           heap

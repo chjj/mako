@@ -65,14 +65,6 @@ static const uint8_t btc_tor_onion[6] = {
   0xeb, 0x43
 };
 
-enum btc_ipnet {
-  BTC_IPNET_NONE,
-  BTC_IPNET_IPV4,
-  BTC_IPNET_IPV6,
-  BTC_IPNET_ONION,
-  BTC_IPNET_TEREDO
-};
-
 enum btc_reachability {
   BTC_REACH_UNREACHABLE,
   BTC_REACH_DEFAULT,
@@ -125,10 +117,7 @@ DEFINE_SERIALIZABLE_OBJECT(btc_netaddr, SCOPE_EXTERN)
 
 void
 btc_netaddr_init(btc_netaddr_t *addr) {
-  addr->time = 0;
-  addr->services = 0;
-  memset(addr->raw, 0, sizeof(addr->raw));
-  addr->port = 0;
+  memset(addr, 0, sizeof(*addr));
 }
 
 void
@@ -139,6 +128,33 @@ btc_netaddr_clear(btc_netaddr_t *addr) {
 void
 btc_netaddr_copy(btc_netaddr_t *z, const btc_netaddr_t *x) {
   *z = *x;
+}
+
+int
+btc_netaddr_set(btc_netaddr_t *z, const char *addr, int port) {
+  btc_netaddr_init(z);
+
+  if (inet_pton4(addr, z->raw + 12) == 0) {
+    memset(z->raw +  0, 0x00, 10);
+    memset(z->raw + 10, 0xff, 2);
+    z->port = port;
+    return 1;
+  }
+
+  if (inet_pton6(addr, z->raw) == 0) {
+    z->port = port;
+    return 1;
+  }
+
+  return 0;
+}
+
+void
+btc_netaddr_get(char *zp, const btc_netaddr_t *x) {
+  if (btc_netaddr_is_mapped(x))
+    CHECK(inet_ntop4(x->raw + 12, zp, BTC_ADDRSTRLEN + 1) == 0);
+  else
+    CHECK(inet_ntop6(x->raw, zp, BTC_ADDRSTRLEN + 1) == 0);
 }
 
 uint32_t

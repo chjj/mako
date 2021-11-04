@@ -44,6 +44,12 @@ btc_netaddr_clear(btc_netaddr_t *addr);
 BTC_EXTERN void
 btc_netaddr_copy(btc_netaddr_t *z, const btc_netaddr_t *x);
 
+BTC_EXTERN int
+btc_netaddr_set(btc_netaddr_t *z, const char *addr, int port);
+
+BTC_EXTERN void
+btc_netaddr_get(char *zp, const btc_netaddr_t *x);
+
 BTC_EXTERN uint32_t
 btc_netaddr_hash(const btc_netaddr_t *x);
 

@@ -300,6 +300,9 @@ btc_network_deployment(const btc_network_t *network, const char *name);
  */
 
 BTC_EXTERN extern const btc_network_t *btc_mainnet;
+BTC_EXTERN extern const btc_network_t *btc_testnet;
+BTC_EXTERN extern const btc_network_t *btc_regtest;
+BTC_EXTERN extern const btc_network_t *btc_simnet;
 
 #ifdef __cplusplus
 }
