@@ -55,6 +55,7 @@ typedef struct btc_tmpl_s {
   int sigops;
   int64_t fees;
   uint8_t commitment[32];
+  uint32_t chain_nonce;
   btc_buffer_t cbflags;
   btc_address_t address;
   btc_vector_t txs;
@@ -181,11 +182,14 @@ btc_miner_update_time(btc_miner_t *miner, btc_tmpl_t *bt);
 BTC_EXTERN btc_tmpl_t *
 btc_miner_template(btc_miner_t *miner);
 
+BTC_EXTERN int
+btc_miner_getgenerate(btc_miner_t *miner);
+
 BTC_EXTERN void
 btc_miner_setgenerate(btc_miner_t *miner, int value, int active);
 
 BTC_EXTERN void
-btc_miner_generate(btc_miner_t *miner, int todo, int active);
+btc_miner_generate(btc_miner_t *miner, int blocks, const btc_address_t *addr);
 
 #ifdef __cplusplus
 }

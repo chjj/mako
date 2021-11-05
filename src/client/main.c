@@ -36,8 +36,12 @@ static const struct {
   const char *method;
   json_type schema[8];
 } rpc_methods[] = {
+  { "generate", { json_integer } },
+  { "generatetoaddress", { json_integer, json_string } },
+  { "getgenerate", { json_none } },
   { "getinfo", { json_none } },
-  { "sendtoaddress", { json_string, json_amount } }
+  { "sendtoaddress", { json_string, json_amount } },
+  { "setgenerate", { json_boolean, json_integer } }
 };
 
 static const json_type *
@@ -153,9 +157,12 @@ main(int argc, char **argv) {
         case json_object:
         case json_array:
         case json_integer:
-        case json_boolean:
         case json_null:
           if (obj->type == type)
+            continue;
+          break;
+        case json_boolean:
+          if (obj->type == json_integer || obj->type == json_boolean)
             continue;
           break;
         case json_double:

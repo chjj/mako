@@ -9,6 +9,10 @@
 #include <satoshi/consensus.h>
 #include "internal.h"
 
+/*
+ * Consensus
+ */
+
 int
 btc_has_versionbit(uint32_t version, int bit) {
   if ((version & BTC_VERSION_TOP_MASK) != BTC_VERSION_TOP_BITS)

@@ -411,6 +411,19 @@ btc_addrman_open(btc_addrman_t *man, const char *file) {
     btc_addrman_log(man, "Could not read %s.", file);
   }
 
+  if (man->network->seeds.length == 0) {
+    btc_netaddr_t addr;
+
+    btc_netaddr_set(&addr, "127.0.0.1", man->network->port);
+
+    addr.time = btc_now();
+    addr.services = BTC_NET_LOCAL_SERVICES;
+
+    btc_addrman_add(man, &addr, NULL);
+
+    return 1;
+  }
+
   return btc_addrman_resolve(man);
 }
 

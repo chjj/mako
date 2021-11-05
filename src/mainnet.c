@@ -10,12 +10,15 @@
 #include "internal.h"
 
 static const char *mainnet_seeds[] = {
-  "seed.bitcoin.sipa.be", /* Pieter Wuille */
-  "dnsseed.bluematt.me", /* Matt Corallo */
-  "dnsseed.bitcoin.dashjr.org", /* Luke Dashjr */
-  "seed.bitcoinstats.com", /* Christian Decker */
-  "seed.bitcoin.jonasschnelli.ch", /* Jonas Schnelli */
-  "seed.btc.petertodd.org" /* Peter Todd */
+  "seed.bitcoin.sipa.be.", /* Pieter Wuille */
+  "dnsseed.bluematt.me.", /* Matt Corallo */
+  "dnsseed.bitcoin.dashjr.org.", /* Luke Dashjr */
+  "seed.bitcoinstats.com.", /* Christian Decker */
+  "seed.bitcoin.jonasschnelli.ch.", /* Jonas Schnelli */
+  "seed.btc.petertodd.org.", /* Peter Todd */
+  "seed.bitcoin.sprovoost.nl.", /* Sjors Provoost */
+  "dnsseed.emzy.de.", /* Stephan Oeste */
+  "seed.bitcoin.wiz.biz." /* Jason Maurice */
 };
 
 static const btc_checkpoint_t mainnet_checkpoints[] = {

@@ -79,8 +79,6 @@ typedef struct btc_cpuminer_s {
   int length;
   uint8_t last_tip[32];
   int64_t last_job;
-  int limit;
-  int todo;
   /* Protected by cpu.lock. */
   btc_tmpl_t *job;
   int active;
@@ -187,6 +185,7 @@ btc_tmpl_init(btc_tmpl_t *bt) {
   bt->interval = 210000;
   bt->weight = 4000;
   bt->sigops = 400;
+  bt->chain_nonce = btc_random();
 
   btc_buffer_init(&bt->cbflags);
   btc_address_init(&bt->address);
@@ -288,7 +287,7 @@ btc_tmpl_coinbase(const btc_tmpl_t *bt, uint32_t nonce1, uint32_t nonce2) {
                                 bt->cbflags.length);
 
   /* Smaller nonce for good measure. */
-  btc_uint32_write(nonce_raw, btc_random());
+  btc_uint32_write(nonce_raw, bt->chain_nonce);
   btc_writer_push_data(&writer, nonce_raw, 4);
 
   /* Extra nonce: incremented when the nonce overflows. */
@@ -337,13 +336,12 @@ void
 btc_tmpl_compute(uint8_t *root, const btc_tmpl_t *bt, const uint8_t *hash) {
   size_t length = bt->txs.length + 1;
   uint8_t *hashes = (uint8_t *)btc_malloc(length * 32);
-  const btc_blockentry_t *entry;
   size_t i;
 
   btc_hash_copy(&hashes[0 * 32], hash);
 
   for (i = 1; i < length; i++) {
-    entry = (const btc_blockentry_t *)bt->txs.items[i - 1];
+    const btc_blockentry_t *entry = bt->txs.items[i - 1];
 
     btc_hash_copy(&hashes[i * 32], entry->hash);
   }
@@ -589,8 +587,6 @@ btc_cpuminer_init(btc_cpuminer_t *cpu, btc_miner_t *miner, int length) {
   cpu->length = length;
   btc_hash_init(cpu->last_tip);
   cpu->last_job = 0;
-  cpu->limit = 0;
-  cpu->todo = 0;
   cpu->job = NULL;
   cpu->active = 0;
   cpu->stop = 0;
@@ -728,8 +724,6 @@ btc_cpuminer_stop(btc_cpuminer_t *cpu) {
   btc_mutex_unlock(cpu->lock);
 
   cpu->mining = 0;
-  cpu->limit = 0;
-  cpu->todo = 0;
 
   btc_loop_off_tick(miner->loop, on_tick, cpu);
 }
@@ -748,13 +742,6 @@ btc_cpuminer_setgenerate(btc_cpuminer_t *cpu, int value, int active) {
 }
 
 static void
-btc_cpuminer_generate(btc_cpuminer_t *cpu, int todo, int active) {
-  cpu->limit = 1;
-  cpu->todo = todo;
-  btc_cpuminer_setgenerate(cpu, 1, active);
-}
-
-static void
 on_tick(void *arg) {
   btc_cpuminer_t *cpu = arg;
   btc_miner_t *miner = cpu->miner;
@@ -767,7 +754,7 @@ on_tick(void *arg) {
 
   CHECK(cpu->mining == 1);
 
-  if (now < cpu->last_check + 300)
+  if (now < cpu->last_check + 100)
     return;
 
   cpu->last_check = now;
@@ -813,12 +800,9 @@ on_tick(void *arg) {
 
       btc_mutex_unlock(cpu->lock);
 
-      CHECK(btc_chain_add(miner->chain, block, BTC_CHAIN_VERIFY_NONE, 0));
+      CHECK(btc_chain_add(miner->chain, block, BTC_CHAIN_DEFAULT_FLAGS, 0));
 
       btc_block_destroy(block);
-
-      if (cpu->limit && --cpu->todo == 0)
-        btc_cpuminer_stop(cpu);
 
       return;
     }
@@ -1182,12 +1166,32 @@ btc_miner_template(btc_miner_t *miner) {
   return bt;
 }
 
+int
+btc_miner_getgenerate(btc_miner_t *miner) {
+  return miner->cpu.mining;
+}
+
 void
 btc_miner_setgenerate(btc_miner_t *miner, int value, int active) {
   btc_cpuminer_setgenerate(&miner->cpu, value, active);
 }
 
 void
-btc_miner_generate(btc_miner_t *miner, int todo, int active) {
-  btc_cpuminer_generate(&miner->cpu, todo, active);
+btc_miner_generate(btc_miner_t *miner, int blocks, const btc_address_t *addr) {
+  int i;
+
+  for (i = 0; i < blocks; i++) {
+    btc_tmpl_t *bt = btc_miner_template(miner);
+    btc_block_t *block;
+
+    if (addr != NULL)
+      btc_address_copy(&bt->address, addr);
+
+    block = btc_tmpl_mine(bt);
+
+    CHECK(btc_chain_add(miner->chain, block, BTC_CHAIN_DEFAULT_FLAGS, 0));
+
+    btc_block_destroy(block);
+    btc_tmpl_destroy(bt);
+  }
 }

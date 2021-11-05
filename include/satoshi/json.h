@@ -14,6 +14,9 @@
 #include "json/json_builder.h"
 #include "types.h"
 
+#define json_boolean_get btc_json_boolean_get
+#define json_signed_get btc_json_signed_get
+#define json_unsigned_get btc_json_unsigned_get
 #define json_object_get btc_json_object_get
 #define json_object_remove btc_json_object_remove
 #define json_encode btc_json_encode
@@ -55,6 +58,15 @@ extern "C" {
 /*
  * JSON Extras
  */
+
+BTC_EXTERN int
+json_boolean_get(int *z, const json_value *obj);
+
+BTC_EXTERN int
+json_signed_get(int *z, const json_value *obj);
+
+BTC_EXTERN int
+json_unsigned_get(int *z, const json_value *obj);
 
 BTC_EXTERN json_value *
 json_object_get(const json_value *obj, const char *name);

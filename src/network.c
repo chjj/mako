@@ -10,6 +10,10 @@
 #include <satoshi/network.h>
 #include "internal.h"
 
+/*
+ * Network
+ */
+
 const btc_checkpoint_t *
 btc_network_checkpoint(const btc_network_t *network, int32_t height) {
   const btc_checkpoint_t *chk;

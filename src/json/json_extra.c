@@ -4,6 +4,7 @@
  * https://github.com/chjj/libsatoshi
  */
 
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <satoshi/json.h>
@@ -11,6 +12,59 @@
 /*
  * JSON Extras
  */
+
+int
+json_boolean_get(int *z, const json_value *obj) {
+  if (obj->type == json_integer) {
+    if (obj->u.integer != 0 && obj->u.integer != 1)
+      return 0;
+
+    *z = obj->u.integer;
+
+    return 1;
+  }
+
+  if (obj->type == json_boolean) {
+    *z = obj->u.boolean;
+    return 1;
+  }
+
+  return 0;
+}
+
+int
+json_signed_get(int *z, const json_value *obj) {
+  if (obj->type == json_integer) {
+    if (obj->u.integer < INT_MIN)
+      return 0;
+
+    if (obj->u.integer > INT_MAX)
+      return 0;
+
+    *z = obj->u.integer;
+
+    return 1;
+  }
+
+  return 0;
+}
+
+int
+json_unsigned_get(int *z, const json_value *obj) {
+  if (obj->type == json_integer) {
+    if (obj->u.integer < 0)
+      return 0;
+
+    if (obj->u.integer > INT_MAX)
+      return 0;
+
+    *z = obj->u.integer;
+
+    return 1;
+  }
+
+  return 0;
+}
 
 static json_object_entry *
 json_object_find(const json_value *obj, const char *name) {

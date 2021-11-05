@@ -10,6 +10,10 @@
 #include <satoshi/policy.h>
 #include "internal.h"
 
+/*
+ * Policy
+ */
+
 int64_t
 btc_get_min_fee(size_t size, int64_t rate) {
   int64_t fee;

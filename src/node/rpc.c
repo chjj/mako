@@ -82,6 +82,15 @@ enum rpc_error {
 };
 
 /*
+ * Types
+ */
+
+typedef struct {
+  unsigned int length;
+  json_value **values;
+} json_params;
+
+/*
  * HTTP Helpers
  */
 
@@ -277,19 +286,125 @@ btc_rpc_close(btc_rpc_t *rpc) {
 }
 
 /*
- * Methods
+ * Macros
+ */
+
+#define THROW_MISC(msg) do {               \
+  rpc_res_error(res, RPC_MISC_ERROR, msg); \
+  return;                                  \
+} while (0)
+
+#define THROW_TYPE(name, type) do {                                          \
+  rpc_res_error(res, RPC_TYPE_ERROR, "`" #name "` must be a(n) " #type "."); \
+  return;                                                                    \
+} while (0)
+
+/*
+ * Info
  */
 
 static void
-btc_rpc_getinfo(btc_rpc_t *rpc, const json_value *params, rpc_res_t *res) {
-  json_value *result = json_object_new(1);
+btc_rpc_getinfo(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
+  json_value *result;
 
   (void)rpc;
-  (void)params;
+
+  if (params->length != 0)
+    THROW_MISC("getinfo");
+
+  result = json_object_new(1);
 
   json_object_push(result, "time", json_integer_new(btc_ms()));
 
   res->result = result;
+}
+
+/*
+ * Mining
+ */
+
+static void
+btc_rpc_getgenerate(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
+  int mining;
+
+  if (params->length != 0)
+    THROW_MISC("getgenerate");
+
+  mining = btc_miner_getgenerate(rpc->miner);
+
+  res->result = json_boolean_new(mining);
+}
+
+static void
+btc_rpc_setgenerate(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
+  int active = 1;
+  int mine;
+
+  if (params->length < 1 || params->length > 2)
+    THROW_MISC("setgenerate mine ( active )");
+
+  if (!json_boolean_get(&mine, params->values[0]))
+    THROW_TYPE(mine, boolean);
+
+  if (params->length > 1) {
+    if (!json_unsigned_get(&active, params->values[1]))
+      THROW_TYPE(active, integer);
+
+    if (active == 0)
+      active = 1;
+  }
+
+  btc_miner_setgenerate(rpc->miner, mine, active);
+
+  res->result = json_boolean_new(mine);
+}
+
+static void
+btc_rpc_generate(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
+  const btc_entry_t *tip = btc_chain_tip(rpc->chain);
+  int blocks;
+
+  if (params->length != 1)
+    THROW_MISC("generate numblocks");
+
+  if (!json_unsigned_get(&blocks, params->values[0]))
+    THROW_TYPE(numblocks, integer);
+
+  btc_miner_generate(rpc->miner, blocks, NULL);
+
+  res->result = json_array_new(blocks);
+
+  while (blocks--) {
+    tip = tip->next;
+    json_array_push(res->result, json_hash_new(tip->hash));
+  }
+}
+
+static void
+btc_rpc_generatetoaddress(btc_rpc_t *rpc,
+                          const json_params *params,
+                          rpc_res_t *res) {
+  const btc_entry_t *tip = btc_chain_tip(rpc->chain);
+  btc_address_t addr;
+  int blocks;
+
+  if (params->length != 2)
+    THROW_MISC("generatetoaddress numblocks address");
+
+  if (!json_unsigned_get(&blocks, params->values[0]))
+    THROW_TYPE(numblocks, integer);
+
+  if (!json_address_get(&addr, params->values[1], rpc->network))
+    THROW_TYPE(address, address);
+
+  btc_miner_generate(rpc->miner, blocks, &addr);
+
+  res->result = json_array_new(blocks);
+
+  while (blocks--) {
+    tip = tip->next;
+    json_array_push(res->result, json_hash_new(tip->hash));
+  }
 }
 
 /*
@@ -299,10 +414,14 @@ btc_rpc_getinfo(btc_rpc_t *rpc, const json_value *params, rpc_res_t *res) {
 static const struct {
   const char *method;
   void (*handler)(btc_rpc_t *,
-                  const json_value *,
+                  const json_params *,
                   rpc_res_t *);
 } btc_rpc_methods[] = {
-  { "getinfo", btc_rpc_getinfo }
+  { "generate", btc_rpc_generate },
+  { "generatetoaddress", btc_rpc_generatetoaddress },
+  { "getgenerate", btc_rpc_getgenerate },
+  { "getinfo", btc_rpc_getinfo },
+  { "setgenerate", btc_rpc_setgenerate }
 };
 
 static int
@@ -334,6 +453,7 @@ btc_rpc_find_handler(const char *method) {
 static void
 btc_rpc_handle(btc_rpc_t *rpc, const rpc_req_t *req, rpc_res_t *res) {
   int index = btc_rpc_find_handler(req->method);
+  json_params params;
 
   if (index < 0) {
     rpc_res_error(res, RPC_METHOD_NOT_FOUND, "Method not found");
@@ -342,7 +462,10 @@ btc_rpc_handle(btc_rpc_t *rpc, const rpc_req_t *req, rpc_res_t *res) {
 
   btc_rpc_log(rpc, "Incoming RPC request: %s.", req->method);
 
-  btc_rpc_methods[index].handler(rpc, req->params, res);
+  params.length = req->params->u.array.length;
+  params.values = req->params->u.array.values;
+
+  btc_rpc_methods[index].handler(rpc, &params, res);
 }
 
 static int
@@ -396,10 +519,18 @@ btc_rpc_call(btc_rpc_t *rpc, const char *method, const json_value *params) {
 
   rpc_res_init(&res);
 
-  if (index < 0)
+  if (index < 0) {
     rpc_res_error(&res, RPC_METHOD_NOT_FOUND, "Method not found");
-  else
-    btc_rpc_methods[index].handler(rpc, params, &res);
+  } else if (params->type != json_array) {
+    rpc_res_error(&res, RPC_INVALID_REQUEST, "Invalid request");
+  } else {
+    json_params parms;
+
+    parms.length = params->u.array.length;
+    parms.values = params->u.array.values;
+
+    btc_rpc_methods[index].handler(rpc, &parms, &res);
+  }
 
   return rpc_res_encode(&res, 0);
 }
