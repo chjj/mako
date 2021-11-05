@@ -305,6 +305,9 @@ btc_net_startup(void);
 BTC_EXTERN void
 btc_net_cleanup(void);
 
+BTC_EXTERN int
+btc_net_external(btc_sockaddr_t *addr, int family, int port);
+
 /*
  * Path
  */

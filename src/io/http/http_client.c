@@ -126,6 +126,7 @@ on_close(btc_socket_t *socket) {
   http_client_t *client = btc_socket_get_data(socket);
   client->socket = NULL;
   client->connected = 0;
+  client->done = 1;
 }
 
 static void
@@ -479,7 +480,7 @@ http_client_write_head(http_client_t *client, const http_options_t *opt) {
     return 0;
 
   if (client->port != 80) {
-    if (!http_client_print(client, "Host: %s:%u\r\n", client->hostname,
+    if (!http_client_print(client, "Host: %s:%d\r\n", client->hostname,
                                                       client->port)) {
       return 0;
     }
@@ -551,9 +552,6 @@ http_client_request(http_client_t *client, const http_options_t *options) {
   start = btc_time_msec();
 
   while (!client->done) {
-    if (client->socket == NULL)
-      goto fail;
-
     if (btc_time_msec() > start + 10 * 1000)
       goto fail;
 
@@ -588,4 +586,27 @@ http_get(const char *hostname, int port, const char *path, int family) {
 fail:
   http_client_destroy(client);
   return msg;
+}
+
+int
+btc_net_external(btc_sockaddr_t *addr, int family, int port) {
+  http_msg_t *msg = http_get("icanhazip.com", 80, "/", family);
+  char *xp;
+  int ret;
+
+  if (msg == NULL)
+    return 0;
+
+  xp = msg->body.data;
+
+  while (*xp > ' ')
+    xp++;
+
+  *xp = '\0';
+
+  ret = btc_sockaddr_import(addr, xp, port);
+
+  http_msg_destroy(msg);
+
+  return ret;
 }

@@ -189,7 +189,7 @@ static void
 http_res_write_head(http_res_t *res,
                     unsigned int status,
                     const char *type,
-                    unsigned int length) {
+                    unsigned long length) {
   const char *desc = http_status_str(status);
   char date[64];
   size_t i;

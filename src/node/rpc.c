@@ -78,7 +78,18 @@ enum rpc_error {
   RPC_CLIENT_NODE_NOT_ADDED = -24,
   RPC_CLIENT_NODE_NOT_CONNECTED = -29,
   RPC_CLIENT_INVALID_IP_OR_SUBNET = -30,
-  RPC_CLIENT_P2P_DISABLED = -31
+  RPC_CLIENT_P2P_DISABLED = -31,
+
+  /* Wallet errors */
+  RPC_WALLET_ERROR = -4,
+  RPC_WALLET_INSUFFICIENT_FUNDS = -6,
+  RPC_WALLET_INVALID_ACCOUNT_NAME = -11,
+  RPC_WALLET_KEYPOOL_RAN_OUT = -12,
+  RPC_WALLET_UNLOCK_NEEDED = -13,
+  RPC_WALLET_PASSPHRASE_INCORRECT = -14,
+  RPC_WALLET_WRONG_ENC_STATE = -15,
+  RPC_WALLET_ENCRYPTION_FAILED = -16,
+  RPC_WALLET_ALREADY_UNLOCKED = -17
 };
 
 /*
@@ -500,7 +511,6 @@ on_request(http_server_t *server, http_req_t *req, http_res_t *res) {
 
   obj = rpc_res_encode(&rres, rreq.id);
 
-  http_res_header(res, "X-Long-Polling", "/?longpoll=1");
   http_res_send_json(res, obj);
 
   json_builder_free(obj);
