@@ -3220,7 +3220,9 @@ btc_pool_on_getblocks(btc_pool_t *pool,
     entry = entry->next;
   }
 
-  btc_peer_send_inv(peer, &blocks);
+  if (blocks.length > 0)
+    btc_peer_send_inv(peer, &blocks);
+
   btc_zinv_clear(&blocks);
 }
 

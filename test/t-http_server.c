@@ -57,9 +57,10 @@ get_recv(btc_mutex_t *lock) {
 
 static void
 request_thread(void *lock) {
-  http_msg_t *msg = http_get("localhost.", 1337, "/", BTC_AF_INET);
+  http_msg_t *msg = http_get("localhost", 1337, "/", BTC_AF_INET);
 
   ASSERT(msg != NULL);
+  ASSERT(msg->status == 200);
   ASSERT(strcmp(msg->body.data, "Hello world\n") == 0);
 
   http_msg_destroy(msg);

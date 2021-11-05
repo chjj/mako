@@ -9,9 +9,12 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
+
 #include <io/core.h>
 #include <io/http.h>
 #include <io/loop.h>
+
 #include "http_common.h"
 #include "http_parser.h"
 
@@ -155,18 +158,50 @@ http_res_header(http_res_t *res, const char *field, const char *value) {
   http_head_push_item(&res->headers, field, value);
 }
 
+static int
+http_gmt_date(char *str, size_t max) {
+  /* Required by the HTTP standard. */
+  time_t ts = time(NULL);
+  struct tm *gmt;
+#ifndef _WIN32
+  struct tm tmp;
+#endif
+
+  if (ts == (time_t)-1)
+    return 0;
+
+  /* Could check TIMER_ABSTIME
+     instead of _WIN32 here. */
+#if defined(_WIN32)
+  gmt = gmtime(&ts);
+#else
+  gmt = gmtime_r(&ts, &tmp);
+#endif
+
+  if (gmt == NULL)
+    return 0;
+
+  /* Example: Fri, 05 Nov 2021 06:42:12 GMT */
+  return strftime(str, max, "%a, %d %b %Y %H:%M:%S GMT", gmt) != 0;
+}
+
 static void
 http_res_write_head(http_res_t *res,
                     unsigned int status,
                     const char *type,
                     unsigned int length) {
   const char *desc = http_status_str(status);
+  char date[64];
   size_t i;
 
   http_res_print(res, "HTTP/1.1 %u %s\r\n", status, desc);
-  http_res_print(res, "Connection: keep-alive\r\n");
+
+  if (http_gmt_date(date, sizeof(date)))
+    http_res_print(res, "Date: %s\r\n", date);
+
   http_res_print(res, "Content-Type: %s\r\n", type);
   http_res_print(res, "Content-Length: %lu\r\n", length);
+  http_res_print(res, "Connection: keep-alive\r\n");
 
   for (i = 0; i < res->headers.length; i++) {
     http_header_t *hdr = res->headers.items[i];

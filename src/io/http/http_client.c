@@ -282,6 +282,7 @@ http_client_reset(http_client_t *client) {
 static int
 http_client_abort(http_client_t *client) {
   http_client_reset(client);
+  client->done = 1;
   return 1;
 }
 
