@@ -208,14 +208,23 @@ http_client_create(void);
 BTC_EXTERN void
 http_client_destroy(http_client_t *client);
 
+BTC_EXTERN const char *
+http_client_strerror(http_client_t *client);
+
 BTC_EXTERN int
-http_client_open(http_client_t *client, const char *hostname, int port);
+http_client_open(http_client_t *client,
+                 const char *hostname,
+                 int port,
+                 int family);
 
 BTC_EXTERN void
 http_client_close(http_client_t *client);
 
 BTC_EXTERN http_msg_t *
 http_client_request(http_client_t *client, const http_options_t *options);
+
+BTC_EXTERN http_msg_t *
+http_get(const char *hostname, int port, const char *path, int family);
 
 #ifdef __cplusplus
 }

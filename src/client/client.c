@@ -46,9 +46,17 @@ btc_client_destroy(btc_client_t *client) {
   btc_free(client);
 }
 
+const char *
+btc_client_strerror(btc_client_t *client) {
+  return http_client_strerror(client->http);
+}
+
 int
-btc_client_open(btc_client_t *client, const char *hostname, int port) {
-  return http_client_open(client->http, hostname, port);
+btc_client_open(btc_client_t *client,
+                const char *hostname,
+                int port,
+                int family) {
+  return http_client_open(client->http, hostname, port, family);
 }
 
 void

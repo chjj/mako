@@ -4,70 +4,30 @@
  * https://github.com/chjj/libsatoshi
  */
 
-#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 
-#if defined(_WIN32)
-#  include <winsock2.h>
-#  include <ws2tcpip.h>
-#  ifndef __MINGW32__
-#    pragma comment(lib, "ws2_32.lib")
-#  endif
-#else
-#  include <sys/types.h>
-#  include <sys/time.h>
-#  include <sys/socket.h>
-#  include <netinet/in.h>
-#  include <arpa/inet.h>
-#  include <sys/un.h>
-#  include <fcntl.h>
-#  include <unistd.h>
-#endif
-
 #include <io/core.h>
 #include <io/http.h>
+#include <io/loop.h>
 
 #include "http_common.h"
 #include "http_parser.h"
-
-/*
- * Compat
- */
-
-#if defined(_WIN32)
-typedef SOCKET btc_sockfd_t;
-#  define BTC_INVALID_SOCKET INVALID_SOCKET
-#  define BTC_SOCKET_ERROR SOCKET_ERROR
-#  define BTC_NOSIGNAL 0
-#  define btc_errno (WSAGetLastError())
-#  define BTC_EINTR WSAEINTR
-#  define btc_closesocket closesocket
-#else
-typedef int btc_sockfd_t;
-#  define BTC_INVALID_SOCKET -1
-#  define BTC_SOCKET_ERROR -1
-#  if defined(MSG_NOSIGNAL)
-#    define BTC_NOSIGNAL MSG_NOSIGNAL
-#  else
-#    define BTC_NOSIGNAL 0
-#  endif
-#  define btc_errno errno
-#  define BTC_EINTR EINTR
-#  define btc_closesocket close
-#endif
 
 /*
  * Types
  */
 
 struct http_client {
+  btc_loop_t *loop;
+  btc_socket_t *socket;
   char hostname[1024];
   int port;
-  btc_sockfd_t fd;
+  btc_sockaddr_t addr;
+  int connected;
   struct http_parser parser;
   struct http_parser_settings settings;
   http_msg_t *msg;
@@ -130,6 +90,9 @@ http_client_init(http_client_t *client);
 
 static void
 http_client_clear(http_client_t *client) {
+  btc_loop_close(client->loop);
+  btc_loop_destroy(client->loop);
+
   if (client->msg != NULL)
     http_msg_destroy(client->msg);
 }
@@ -147,112 +110,162 @@ http_client_destroy(http_client_t *client) {
   free(client);
 }
 
+const char *
+http_client_strerror(http_client_t *client) {
+  return btc_loop_strerror(client->loop);
+}
+
+static void
+on_connect(btc_socket_t *socket) {
+  http_client_t *client = btc_socket_get_data(socket);
+  client->connected = 1;
+}
+
+static void
+on_close(btc_socket_t *socket) {
+  http_client_t *client = btc_socket_get_data(socket);
+  client->socket = NULL;
+  client->connected = 0;
+}
+
+static void
+on_error(btc_socket_t *socket) {
+  btc_socket_close(socket);
+}
+
 static int
-http_resolve(struct sockaddr *addr, const char *hostname, int port) {
-  btc_sockaddr_t host;
+on_data(btc_socket_t *socket, const void *data, size_t size) {
+  http_client_t *client = btc_socket_get_data(socket);
 
-  if (!btc_sockaddr_import(&host, hostname, port)) {
-    btc_sockaddr_t *r, *p;
+  size_t nparsed = http_parser_execute(&client->parser,
+                                       &client->settings,
+                                       data,
+                                       size);
 
-    if (!btc_getaddrinfo(&r, hostname))
-      return 0;
-
-    for (p = r; p != NULL; p = p->next) {
-      if (p->family == BTC_AF_INET)
-        break;
-    }
-
-    if (p == NULL) {
-      for (p = r; p != NULL; p = p->next) {
-        if (p->family == BTC_AF_INET6)
-          break;
-      }
-
-      if (p == NULL) {
-        btc_freeaddrinfo(r);
-        return 0;
-      }
-    }
-
-    host = *p;
-    host.port = port;
-
-    btc_freeaddrinfo(r);
-  }
-
-  return btc_sockaddr_get(addr, &host);
-}
-
-static btc_sockfd_t
-http_connect(const struct sockaddr *addr) {
-  int domain, addrlen;
-  btc_sockfd_t fd;
-
-  switch (addr->sa_family) {
-    case AF_INET:
-      domain = PF_INET;
-      addrlen = sizeof(struct sockaddr_in);
-      break;
-    case AF_INET6:
-      domain = PF_INET6;
-      addrlen = sizeof(struct sockaddr_in6);
-      break;
-    default:
-      return BTC_INVALID_SOCKET;
-  }
-
-  fd = socket(domain, SOCK_STREAM, 0);
-
-  if (fd == BTC_INVALID_SOCKET)
-    return BTC_INVALID_SOCKET;
-
-#ifdef SO_NOSIGPIPE
-  {
-    int yes = 1;
-    setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &yes, sizeof(yes));
-  }
-#endif
-
-  if (connect(fd, addr, addrlen) == BTC_SOCKET_ERROR) {
-    btc_closesocket(fd);
-    return BTC_INVALID_SOCKET;
-  }
-
-  return fd;
-}
-
-int
-http_client_open(http_client_t *client, const char *hostname, int port) {
-  struct sockaddr_storage storage;
-  struct sockaddr *addr = (struct sockaddr *)&storage;
-  size_t len = strlen(hostname);
-  btc_sockfd_t fd;
-
-  if (len + 1 > sizeof(client->hostname))
-    return 0;
-
-  if (!http_resolve(addr, hostname, port))
-    return 0;
-
-  fd = http_connect(addr);
-
-  if (fd == BTC_INVALID_SOCKET)
-    return 0;
-
-  client->fd = fd;
-  client->port = port;
-
-  memcpy(client->hostname, hostname, len + 1);
+  if (client->parser.upgrade || nparsed != size || size == 0)
+    btc_socket_close(socket);
 
   return 1;
 }
 
+static int
+http_resolve(btc_sockaddr_t *addr, const char *hostname, int port, int family) {
+  btc_sockaddr_t *res, *it;
+  int total = 0;
+
+  if (btc_sockaddr_import(addr, hostname, port))
+    return 1;
+
+  if (!btc_getaddrinfo(&res, hostname))
+    return 0;
+
+  if (family == BTC_AF_UNSPEC) {
+    for (it = res; it != NULL; it = it->next)
+      total++;
+
+    if (total > 0)
+      total = (btc_time_usec() % total) + 1;
+
+    for (it = res; it != NULL; it = it->next) {
+      if (--total == 0)
+        break;
+    }
+  } else {
+    for (it = res; it != NULL; it = it->next) {
+      if (it->family == family)
+        total++;
+    }
+
+    if (total > 0)
+      total = (btc_time_usec() % total) + 1;
+
+    for (it = res; it != NULL; it = it->next) {
+      if (it->family == family && --total == 0)
+        break;
+    }
+  }
+
+  if (it == NULL) {
+    btc_freeaddrinfo(res);
+    return 0;
+  }
+
+  *addr = *it;
+  addr->port = port;
+
+  btc_freeaddrinfo(res);
+
+  return 1;
+}
+
+static int
+http_client_connect(http_client_t *client, const btc_sockaddr_t *addr) {
+  btc_socket_t *socket = btc_loop_connect(client->loop, addr);
+
+  if (socket == NULL)
+    return 0;
+
+  http_parser_init(&client->parser, HTTP_RESPONSE);
+
+  client->parser.data = client;
+
+  btc_socket_set_data(socket, client);
+  btc_socket_on_connect(socket, on_connect);
+  btc_socket_on_close(socket, on_close);
+  btc_socket_on_error(socket, on_error);
+  btc_socket_on_data(socket, on_data);
+
+  client->socket = socket;
+
+  btc_socket_complete(socket);
+
+  return 1;
+}
+
+int
+http_client_open(http_client_t *client,
+                 const char *hostname,
+                 int port,
+                 int family) {
+  size_t len = strlen(hostname);
+  btc_sockaddr_t addr;
+
+  if (len + 1 > sizeof(client->hostname))
+    return 0;
+
+  if (port <= 0 || port > 0xffff)
+    return 0;
+
+  if (!http_resolve(&addr, hostname, port, family))
+    return 0;
+
+  if (!http_client_connect(client, &addr))
+    return 0;
+
+  memcpy(client->hostname, hostname, len + 1);
+
+  client->port = port;
+  client->addr = addr;
+
+  return 1;
+}
+
+static int
+http_client_reopen(http_client_t *client) {
+  return http_client_connect(client, &client->addr);
+}
+
 void
 http_client_close(http_client_t *client) {
-  btc_closesocket(client->fd);
+  if (client->socket != NULL)
+    btc_socket_close(client->socket);
+
   client->hostname[0] = '\0';
   client->port = 0;
-  client->fd = BTC_INVALID_SOCKET;
+
+  btc_sockaddr_init(&client->addr);
+
+  client->connected = 0;
 }
 
 static void
@@ -381,9 +394,12 @@ on_message_complete(struct http_parser *parser) {
 
 static void
 http_client_init(http_client_t *client) {
+  client->loop = btc_loop_create();
+  client->socket = NULL;
   client->hostname[0] = '\0';
   client->port = 0;
-  client->fd = BTC_INVALID_SOCKET;
+  btc_sockaddr_init(&client->addr);
+  client->connected = 0;
 
   http_parser_init(&client->parser, HTTP_RESPONSE);
   http_parser_settings_init(&client->settings);
@@ -408,22 +424,34 @@ http_client_init(http_client_t *client) {
 }
 
 static int
-http_client_write(http_client_t *client, const char *buf, size_t len) {
-  int nwrite;
+http_client_write(http_client_t *client, void *data, size_t size) {
+  int rc = btc_socket_write(client->socket, data, size);
 
-  while (len > 0) {
-    do {
-      nwrite = send(client->fd, buf, len, BTC_NOSIGNAL);
-    } while (nwrite == BTC_SOCKET_ERROR && btc_errno == BTC_EINTR);
+  if (rc == -1) {
+    btc_socket_close(client->socket);
+    return 0;
+  }
 
-    if (nwrite == BTC_SOCKET_ERROR)
-      return 0;
-
-    buf += nwrite;
-    len -= nwrite;
+  if (rc == 0) {
+    if (btc_socket_buffered(client->socket) > HTTP_MAX_BUFFER)
+      btc_socket_close(client->socket);
   }
 
   return 1;
+}
+
+static int
+http_client_put(http_client_t *client, const char *str, size_t len) {
+  void *data;
+
+  if (len == 0)
+    return 1;
+
+  data = http_malloc(len);
+
+  memcpy(data, str, len);
+
+  return http_client_write(client, data, len);
 }
 
 static int
@@ -435,7 +463,7 @@ http_client_print(http_client_t *client, const char *fmt, ...) {
 
   va_start(ap, fmt);
 
-  rc = http_client_write(client, buf, vsprintf(buf, fmt, ap));
+  rc = http_client_put(client, buf, vsprintf(buf, fmt, ap));
 
   va_end(ap);
 
@@ -499,45 +527,36 @@ http_client_write_head(http_client_t *client, const http_options_t *opt) {
   return 1;
 }
 
-static int
-http_client_parse(http_client_t *client, const void *data, size_t size) {
-  size_t nparsed = http_parser_execute(&client->parser,
-                                       &client->settings,
-                                       data,
-                                       size);
-
-  return nparsed == size;
-}
-
 http_msg_t *
 http_client_request(http_client_t *client, const http_options_t *options) {
   http_msg_t *msg = NULL;
-  char buf[8192];
-  int nread;
+  int64_t start;
+
+  if (client->socket == NULL) {
+    if (!http_client_reopen(client))
+      return NULL;
+  }
 
   if (!http_client_write_head(client, options))
     return NULL;
 
   if (options->body != NULL) {
-    if (!http_client_write(client, options->body, strlen(options->body)))
+    if (!http_client_put(client, options->body, strlen(options->body)))
       return NULL;
   }
 
   http_client_reset(client);
 
+  start = btc_time_msec();
+
   while (!client->done) {
-    do {
-      nread = recv(client->fd, buf, sizeof(buf), 0);
-    } while (nread == BTC_SOCKET_ERROR && btc_errno == BTC_EINTR);
-
-    if (nread == BTC_SOCKET_ERROR)
+    if (client->socket == NULL)
       goto fail;
 
-    if (!http_client_parse(client, buf, nread))
+    if (btc_time_msec() > start + 10 * 1000)
       goto fail;
 
-    if (nread == 0)
-      break;
+    btc_loop_poll(client->loop);
   }
 
   msg = client->msg;
@@ -546,5 +565,26 @@ http_client_request(http_client_t *client, const http_options_t *options) {
 
 fail:
   http_client_reset(client);
+  return msg;
+}
+
+http_msg_t *
+http_get(const char *hostname, int port, const char *path, int family) {
+  http_client_t *client = http_client_create();
+  http_options_t options;
+  http_msg_t *msg = NULL;
+
+  if (!http_client_open(client, hostname, port, family))
+    goto fail;
+
+  http_options_init(&options);
+
+  options.path = path;
+
+  msg = http_client_request(client, &options);
+
+  http_client_close(client);
+fail:
+  http_client_destroy(client);
   return msg;
 }

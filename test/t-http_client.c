@@ -13,17 +13,13 @@
 #include "lib/tests.h"
 
 int main(void) {
-  http_client_t *client = http_client_create();
   btc_sockaddr_t addr;
-  http_options_t opt;
   http_msg_t *msg;
   char *s;
 
-  ASSERT(http_client_open(client, "icanhazip.com", 80));
+  btc_net_startup();
 
-  http_options_init(&opt);
-
-  msg = http_client_request(client, &opt);
+  msg = http_get("icanhazip.com", 80, "/", BTC_AF_INET);
 
   ASSERT(msg != NULL);
 
@@ -42,8 +38,8 @@ int main(void) {
   ASSERT(btc_sockaddr_import(&addr, msg->body.data, 0));
 
   http_msg_destroy(msg);
-  http_client_close(client);
-  http_client_destroy(client);
+
+  btc_net_cleanup();
 
   return 0;
 }
