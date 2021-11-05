@@ -31,7 +31,7 @@ struct btc_conf_s {
   int prune;
   int workers;
   int listen;
-  unsigned short port;
+  int port;
   btc_netaddr_t bind;
   btc_netaddr_t external;
   int no_connect;
@@ -48,7 +48,7 @@ struct btc_conf_s {
   int bip152;
   int bip157;
   enum btc_ipnet only_net;
-  unsigned short rpc_port;
+  int rpc_port;
   btc_netaddr_t rpc_bind;
   char rpc_connect[64];
   char rpc_user[64];

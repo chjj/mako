@@ -7,7 +7,6 @@
 #include <limits.h>
 #include <stdarg.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <satoshi/config.h>
@@ -58,35 +57,27 @@ btc_die(const char *fmt, ...) {
   return 0;
 }
 
-static size_t
+static void
 btc_join(char *zp, ...) {
   const char *xp;
-  size_t zn = 0;
   va_list ap;
 
   va_start(ap, zp);
 
   while ((xp = va_arg(ap, const char *))) {
-    while (*xp) {
+    while (*xp)
       *zp++ = *xp++;
-      zn++;
-    }
 
 #if defined(_WIN32)
     *zp++ = '\\';
 #else
     *zp++ = '/';
 #endif
-
-    zn++;
   }
 
   *--zp = '\0';
-  --zn;
 
   va_end(ap);
-
-  return zn;
 }
 
 static int
@@ -288,10 +279,10 @@ btc_match_argbool(int *z, const char *xp, const char *yp) {
 }
 
 static int
-btc_parse_integer(int64_t *z, const char *xp) {
-  uint64_t x = 0;
+btc_parse_int(int *z, const char *xp) {
   int neg = 0;
   int n = 0;
+  int x = 0;
 
   if (*xp == '+') {
     xp++;
@@ -309,7 +300,7 @@ btc_parse_integer(int64_t *z, const char *xp) {
     if (ch < '0' || ch > '9')
       return 0;
 
-    if (++n > 19)
+    if (++n > 9)
       return 0;
 
     x *= 10;
@@ -318,65 +309,37 @@ btc_parse_integer(int64_t *z, const char *xp) {
     xp++;
   }
 
-  if (x > INT64_MAX)
-    return 0;
+  if (neg)
+    x = -x;
 
   *z = x;
-
-  if (neg)
-    *z = -*z;
 
   return 1;
 }
 
 static int
-btc_match_integer(int64_t *z, const char *xp, const char *yp) {
+btc_match_int(int *z, const char *xp, const char *yp) {
   const char *val;
 
   if (!btc_match(&val, xp, yp))
     return 0;
 
-  if (!btc_parse_integer(z, val))
+  if (!btc_parse_int(z, val))
     return btc_die("Invalid value `%s`.", xp);
 
   return 1;
 }
 
-#define DEFINE_INT_MATCHER(name, int_t, MIN, MAX)            \
-BTC_UNUSED static int                                        \
-btc_match_##name(int_t *z, const char *xp, const char *yp) { \
-  int64_t n;                                                 \
-                                                             \
-  if (!btc_match_integer(&n, xp, yp))                        \
-    return 0;                                                \
-                                                             \
-  if (n < MIN || n > MAX)                                    \
-    return btc_die("Invalid value `%s`.", xp);               \
-                                                             \
-  *z = n;                                                    \
-                                                             \
-  return 1;                                                  \
-}                                                            \
-struct btc_empty_s
+static int
+btc_match_port(int *z, const char *xp, const char *yp) {
+  if (!btc_match_int(z, xp, yp))
+    return 0;
 
-/* DEFINE_INT_MATCHER(schar, signed char, SCHAR_MIN, SCHAR_MAX); */
-/* DEFINE_INT_MATCHER(uchar, unsigned char, 0, UCHAR_MAX); */
-/* DEFINE_INT_MATCHER(short, short, SHRT_MIN, SHRT_MAX); */
-DEFINE_INT_MATCHER(ushort, unsigned short, 0, USHRT_MAX);
-DEFINE_INT_MATCHER(int, int, INT_MIN, INT_MAX);
-/* DEFINE_INT_MATCHER(uint, unsigned int, 0, UINT_MAX); */
-/* DEFINE_INT_MATCHER(long, long, LONG_MIN, LONG_MAX); */
-/* DEFINE_INT_MATCHER(ulong, unsigned long, 0, ULONG_MAX); */
+  if (*z < 0 || *z > 0xffff)
+    return btc_die("Invalid value `%s`.", xp);
 
-/* DEFINE_INT_MATCHER(int8, int8_t, INT8_MIN, INT8_MAX); */
-/* DEFINE_INT_MATCHER(uint8, uint8_t, 0, UINT8_MAX); */
-/* DEFINE_INT_MATCHER(int16, int16_t, INT16_MIN, INT16_MAX); */
-/* DEFINE_INT_MATCHER(uint16, uint16_t, 0, UINT16_MAX); */
-/* DEFINE_INT_MATCHER(int32, int32_t, INT32_MIN, INT32_MAX); */
-/* DEFINE_INT_MATCHER(uint32, uint32_t, 0, UINT32_MAX); */
-/* DEFINE_INT_MATCHER(int64, int64_t, INT64_MIN, INT64_MAX); */
-/* DEFINE_INT_MATCHER(uint64, uint64_t, 0, UINT64_MAX); */
-/* DEFINE_INT_MATCHER(size, size_t, 0, SIZE_MAX); */
+  return 1;
+}
 
 static int
 btc_match_network(const btc_network_t **z, const char *xp, const char *yp) {
@@ -535,6 +498,7 @@ btc_conf_reset(btc_conf_t *conf) {
   conf->prune = -1;
   conf->workers = INT_MIN;
   conf->listen = -1;
+  conf->port = -1;
   conf->bind.port = -1;
   conf->external.port = -1;
   conf->no_connect = -1;
@@ -551,6 +515,7 @@ btc_conf_reset(btc_conf_t *conf) {
   conf->bip152 = -1;
   conf->bip157 = -1;
   conf->only_net = BTC_IPNET_NONE;
+  conf->rpc_port = -1;
   conf->rpc_bind.port = -1;
 }
 
@@ -600,7 +565,7 @@ btc_conf_parse(btc_conf_t *args,
     if (btc_match_argbool(&args->listen, arg, "-listen="))
       continue;
 
-    if (btc_match_ushort(&args->port, arg, "-port="))
+    if (btc_match_port(&args->port, arg, "-port="))
       continue;
 
     if (btc_match_netaddr(&args->bind, arg, "-bind="))
@@ -661,7 +626,7 @@ btc_conf_parse(btc_conf_t *args,
     if (btc_match_net(&args->only_net, arg, "-onlynet="))
       continue;
 
-    if (btc_match_ushort(&args->rpc_port, arg, "-rpcport="))
+    if (btc_match_port(&args->rpc_port, arg, "-rpcport="))
       continue;
 
     if (btc_match_netaddr(&args->rpc_bind, arg, "-rpcbind="))
@@ -760,7 +725,7 @@ btc_conf_read(btc_conf_t *conf, const char *file) {
     if (btc_match_bool(&conf->listen, zp, "listen="))
       continue;
 
-    if (btc_match_ushort(&conf->port, zp, "port="))
+    if (btc_match_port(&conf->port, zp, "port="))
       continue;
 
     if (btc_match_netaddr(&conf->bind, zp, "bind="))
@@ -821,7 +786,7 @@ btc_conf_read(btc_conf_t *conf, const char *file) {
     if (btc_match_net(&conf->only_net, zp, "onlynet="))
       continue;
 
-    if (btc_match_ushort(&conf->rpc_port, zp, "rpcport="))
+    if (btc_match_port(&conf->rpc_port, zp, "rpcport="))
       continue;
 
     if (btc_match_netaddr(&conf->rpc_bind, zp, "rpcbind="))
@@ -878,7 +843,7 @@ btc_conf_merge(btc_conf_t *args, const btc_conf_t *conf) {
   if (args->listen == -1 && conf->listen != -1)
     args->listen = conf->listen;
 
-  if (args->port == 0 && conf->port != 0)
+  if (args->port == -1 && conf->port != -1)
     args->port = conf->port;
 
   if (args->bind.port == -1 && conf->bind.port != -1)
@@ -929,7 +894,7 @@ btc_conf_merge(btc_conf_t *args, const btc_conf_t *conf) {
   if (args->only_net == BTC_IPNET_NONE && conf->only_net != BTC_IPNET_NONE)
     args->only_net = conf->only_net;
 
-  if (args->rpc_port == 0 && conf->rpc_port != 0)
+  if (args->rpc_port == -1 && conf->rpc_port != -1)
     args->rpc_port = conf->rpc_port;
 
   if (args->rpc_bind.port == -1 && conf->rpc_bind.port != -1)
@@ -965,8 +930,11 @@ btc_conf_finalize(btc_conf_t *args, const char *prefix) {
   if (args->disable_wallet == -1)
     args->disable_wallet = 0;
 
-  if (args->map_size <= 0 || args->map_size > 256)
+  if (args->map_size <= 0)
     args->map_size = 16;
+
+  if (args->map_size > 64)
+    args->map_size = 64;
 
   if (args->checkpoints == -1)
     args->checkpoints = 1;
@@ -980,7 +948,7 @@ btc_conf_finalize(btc_conf_t *args, const char *prefix) {
   if (args->listen == -1)
     args->listen = 1;
 
-  if (args->port == 0)
+  if (args->port == -1)
     args->port = network->port;
 
   if (args->bind.port == -1)
@@ -1048,7 +1016,7 @@ btc_conf_finalize(btc_conf_t *args, const char *prefix) {
 
   /* conf->only_net */
 
-  if (args->rpc_port == 0)
+  if (args->rpc_port == -1)
     args->rpc_port = network->rpc_port;
 
   if (args->rpc_bind.port == -1)
