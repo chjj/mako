@@ -1560,7 +1560,7 @@ handle_write(btc_loop_t *loop, btc_socket_t *socket) {
         socket->on_connect = NULL;
       }
 
-      break;
+      /* fall through */
     }
 
     case BTC_SOCKET_CONNECTED: {
@@ -1643,11 +1643,11 @@ retry:
     event = &loop->events[i];
     socket = (btc_socket_t *)event->data.ptr;
 
-    if (event->events & (EPOLLIN | EPOLLERR | EPOLLHUP))
-      handle_read(loop, socket);
-
     if (event->events & (EPOLLOUT | EPOLLERR | EPOLLHUP))
       handle_write(loop, socket);
+
+    if (event->events & (EPOLLIN | EPOLLERR | EPOLLHUP))
+      handle_read(loop, socket);
   }
 
   handle_ticks(loop);
@@ -1691,11 +1691,11 @@ retry:
         continue;
       }
 
-      if (pfd->revents & (POLLIN | POLLERR | POLLHUP))
-        handle_read(loop, socket);
-
       if (pfd->revents & (POLLOUT | POLLERR | POLLHUP))
         handle_write(loop, socket);
+
+      if (pfd->revents & (POLLIN | POLLERR | POLLHUP))
+        handle_read(loop, socket);
 
       pfd->revents = 0;
     }
@@ -1759,9 +1759,6 @@ retry:
       next = socket->next;
       fd = socket->fd;
 
-      if (FD_ISSET(fd, &loop->rfds))
-        handle_read(loop, socket);
-
 #if defined(_WIN32)
       if (FD_ISSET(fd, &loop->wfds) | FD_ISSET(fd, &loop->efds))
         handle_write(loop, socket);
@@ -1769,6 +1766,9 @@ retry:
       if (FD_ISSET(fd, &loop->wfds))
         handle_write(loop, socket);
 #endif
+
+      if (FD_ISSET(fd, &loop->rfds))
+        handle_read(loop, socket);
     }
   }
 
