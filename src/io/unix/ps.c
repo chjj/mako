@@ -7,7 +7,13 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
+
+#include <sys/types.h>
+#include <sys/stat.h> /* umask */
+#include <fcntl.h> /* open */
 #include <unistd.h>
+
 #include <io/core.h>
 
 /*
@@ -23,24 +29,29 @@ static void *global_arg = NULL;
 
 int
 btc_ps_cwd(char *buf, size_t size) {
+#if defined(__wasi__)
   if (size < 2)
     return 0;
 
-#if defined(__wasi__)
   buf[0] = '/';
   buf[1] = '\0';
+
+  return 1;
 #else
+  if (size < 2)
+    return 0;
+
   if (getcwd(buf, size) == NULL)
     return 0;
 
   buf[size - 1] = '\0';
-#endif
 
   return 1;
+#endif
 }
 
 int
-btc_ps_getenv(char *out, size_t size, const char *name) {
+btc_ps_getenv(char *buf, size_t size, const char *name) {
   char *value = getenv(name);
   size_t len;
 
@@ -52,7 +63,7 @@ btc_ps_getenv(char *out, size_t size, const char *name) {
   if (len + 1 > size)
     return 0;
 
-  memcpy(out, value, len + 1);
+  memcpy(buf, value, len + 1);
 
   return 1;
 }
@@ -69,7 +80,7 @@ btc_ps_daemon(void) {
 
   if (pid > 0) {
     exit(EXIT_SUCCESS);
-    return 1;
+    return 0;
   }
 
   if (setsid() < 0) {
@@ -77,9 +88,32 @@ btc_ps_daemon(void) {
     return 0;
   }
 
+  signal(SIGCHLD, SIG_IGN);
+  signal(SIGHUP, SIG_IGN);
+
+  pid = fork();
+
+  if (pid < 0) {
+    exit(EXIT_FAILURE);
+    return 0;
+  }
+
+  if (pid > 0) {
+    exit(EXIT_SUCCESS);
+    return 0;
+  }
+
+  umask(0);
+
+  chdir("/");
+
   close(STDIN_FILENO);
   close(STDOUT_FILENO);
   close(STDERR_FILENO);
+
+  open("/dev/null", O_RDONLY);
+  open("/dev/null", O_WRONLY);
+  open("/dev/null", O_WRONLY);
 
   return 1;
 #endif

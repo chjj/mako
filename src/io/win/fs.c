@@ -8,6 +8,7 @@
  *   https://github.com/libuv/libuv
  */
 
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -315,13 +316,13 @@ btc_fs_mkdir(const char *name, uint32_t mode) {
 
 int
 btc_fs_mkdirp(const char *name, uint32_t mode) {
-  char path[BTC_PATH_MAX + 1];
+  char path[MAX_PATH];
   size_t len = strlen(name);
   size_t i;
 
   (void)mode;
 
-  if (len > BTC_PATH_MAX)
+  if (len + 1 > sizeof(path))
     return 0;
 
   for (i = 0; i < len + 1; i++) {
@@ -333,7 +334,8 @@ btc_fs_mkdirp(const char *name, uint32_t mode) {
 
   i = 0;
 
-  if (path[0] >= 'A' && path[0] <= 'Z') {
+  if ((path[0] >= 'A' && path[0] <= 'Z')
+      || (path[0] >= 'a' && path[0] <= 'z')) {
     if (path[1] == ':' && path[2] == '\0')
       return 1;
 
@@ -380,16 +382,16 @@ btc__dirent_compare(const void *x, const void *y) {
 int
 btc_fs_scandir(const char *name, btc_dirent_t ***out, size_t *count) {
   HANDLE handle = INVALID_HANDLE_VALUE;
-  char buf[BTC_PATH_MAX + 1];
   btc_dirent_t **list = NULL;
   btc_dirent_t *item = NULL;
   size_t len = strlen(name);
   WIN32_FIND_DATAA fdata;
+  char buf[MAX_PATH];
   size_t size = 8;
   size_t i = 0;
   size_t j;
 
-  if (len + 3 > BTC_PATH_MAX)
+  if (len + 4 > sizeof(buf))
     goto fail;
 
   if (!(GetFileAttributesA(name) & FILE_ATTRIBUTE_DIRECTORY))
@@ -739,18 +741,74 @@ btc_fs_close(int fd) {
  * Path
  */
 
-size_t
-btc_path_resolve(char *out, const char *path) {
-  char buf[MAX_PATH + 1];
-  DWORD len = GetFullPathNameA(path, sizeof(buf), buf, NULL);
-
-  if (len < 1 || len > MAX_PATH)
+int
+btc_path_is_absolute(const char *path) {
+  if (path[0] == '\0')
     return 0;
 
-  if (len > BTC_PATH_MAX)
-    return 0;
+  if (path[0] == '/' || path[0] == '\\')
+    return 1;
 
-  memcpy(out, buf, len + 1);
+  if (path[0] >= 'A' && path[0] <= 'Z' && path[1] == ':')
+    return path[2] == '/' || path[2] == '\\';
 
-  return len;
+  if (path[0] >= 'a' && path[0] <= 'z' && path[1] == ':')
+    return path[2] == '/' || path[2] == '\\';
+
+  return 0;
+}
+
+int
+btc_path_absolute(char *path, size_t size) {
+  return btc_path_resolve(path, size, path, 0);
+}
+
+int
+btc_path_resolve(char *buf, size_t size, ...) {
+  char zp[2 * MAX_PATH];
+  const char *xp;
+  size_t zn = 0;
+  int ret = 0;
+  va_list ap;
+  DWORD len;
+
+  va_start(ap, size);
+
+  while ((xp = va_arg(ap, const char *))) {
+    size_t xn = strlen(xp);
+
+    if (xn == 0)
+      continue;
+
+    if (zn == 0 || btc_path_is_absolute(xp)) {
+      if (xn + 1 > sizeof(zp))
+        goto fail;
+
+      memcpy(zp, xp, xn + 1);
+
+      zn = xn;
+    } else {
+      if (zn + xn + 2 > sizeof(zp))
+        goto fail;
+
+      zp[zn++] = '\\';
+
+      memcpy(zp + zn, xp, xn + 1);
+
+      zn += xn;
+    }
+  }
+
+  if (zn == 0)
+    len = GetCurrentDirectoryA(size, buf);
+  else
+    len = GetFullPathNameA(zp, size, buf, NULL);
+
+  if (len < 1 || len >= size)
+    goto fail;
+
+  ret = 1;
+fail:
+  va_end(ap);
+  return ret;
 }

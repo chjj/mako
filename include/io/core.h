@@ -102,7 +102,7 @@ extern "C" {
 #define BTC_NSEC(ts) \
   (((ts)->tv_sec * 1000000000) + (ts)->tv_nsec)
 
-#define BTC_PATH_MAX 1023
+#define BTC_PATH_MAX 1024
 
 #if defined(_WIN32)
 #  define BTC_PATH_SEP '\\'
@@ -312,11 +312,17 @@ btc_net_external(btc_sockaddr_t *addr, int family, int port);
  * Path
  */
 
-BTC_EXTERN size_t
-btc_path_join(char *zp, ...);
+BTC_EXTERN int
+btc_path_is_absolute(const char *path);
 
-BTC_EXTERN size_t
-btc_path_resolve(char *out, const char *path);
+BTC_EXTERN int
+btc_path_absolute(char *path, size_t size);
+
+BTC_EXTERN int
+btc_path_resolve(char *buf, size_t size, ...);
+
+BTC_EXTERN int
+btc_path_join(char *buf, size_t size, ...);
 
 /*
  * Process
@@ -326,7 +332,7 @@ BTC_EXTERN int
 btc_ps_cwd(char *buf, size_t size);
 
 BTC_EXTERN int
-btc_ps_getenv(char *out, size_t size, const char *name);
+btc_ps_getenv(char *buf, size_t size, const char *name);
 
 BTC_EXTERN int
 btc_ps_daemon(void);
@@ -472,10 +478,10 @@ BTC_EXTERN int
 btc_sys_cpu_count(void);
 
 BTC_EXTERN int
-btc_sys_homedir(char *out, size_t size);
+btc_sys_homedir(char *buf, size_t size);
 
 BTC_EXTERN int
-btc_sys_datadir(char *out, size_t size, const char *name);
+btc_sys_datadir(char *buf, size_t size, const char *name);
 
 /*
  * Time

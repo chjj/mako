@@ -12,7 +12,7 @@
 
 static int
 btc_rmdir_r(const char *path) {
-  char file[BTC_PATH_MAX + 1];
+  char file[BTC_PATH_MAX];
   btc_dirent_t **list;
   size_t i, count;
   int ret = 1;
@@ -23,7 +23,7 @@ btc_rmdir_r(const char *path) {
   for (i = 0; i < count; i++) {
     const char *name = list[i]->d_name;
 
-    btc_path_join(file, path, name, 0);
+    ASSERT(btc_path_join(file, sizeof(file), path, name, 0));
 
     ret &= btc_fs_unlink(file);
 
@@ -39,18 +39,18 @@ btc_rmdir_r(const char *path) {
 
 int
 btc_clean(const char *prefix) {
-  char path[BTC_PATH_MAX + 1];
+  char path[BTC_PATH_MAX];
   int ret = 1;
 
-  btc_path_join(path, prefix, "blocks", 0);
+  ASSERT(btc_path_join(path, sizeof(path), prefix, "blocks", 0));
 
   ret &= btc_rmdir_r(path);
 
-  btc_path_join(path, prefix, "chain", 0);
+  ASSERT(btc_path_join(path, sizeof(path), prefix, "chain", 0));
 
   ret &= btc_rmdir_r(path);
 
-  btc_path_join(path, prefix, "debug.log", 0);
+  ASSERT(btc_path_join(path, sizeof(path), prefix, "debug.log", 0));
 
   ret &= btc_fs_unlink(path);
   ret &= btc_fs_rmdir(prefix);

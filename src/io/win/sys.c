@@ -28,8 +28,8 @@ btc_sys_cpu_count(void) {
 }
 
 int
-btc_sys_homedir(char *out, size_t size) {
-  DWORD len = GetEnvironmentVariableA("USERPROFILE", out, size);
+btc_sys_homedir(char *buf, size_t size) {
+  DWORD len = GetEnvironmentVariableA("USERPROFILE", buf, size);
   HANDLE token;
 
   if (len >= size)
@@ -43,11 +43,11 @@ btc_sys_homedir(char *out, size_t size) {
 
   len = size;
 
-  return GetUserProfileDirectoryA(token, out, &len) == TRUE;
+  return GetUserProfileDirectoryA(token, buf, &len) == TRUE;
 }
 
 int
-btc_sys_datadir(char *out, size_t size, const char *name) {
+btc_sys_datadir(char *buf, size_t size, const char *name) {
   char path[MAX_PATH];
 
   memset(path, 0, sizeof(path));
@@ -65,7 +65,7 @@ btc_sys_datadir(char *out, size_t size, const char *name) {
   if (strlen(path) + strlen(name) + 2 > size)
     return 0;
 
-  sprintf(out, "%s\\%c%s", path, name[0] & ~32, name + 1);
+  sprintf(buf, "%s\\%c%s", path, name[0] & ~32, name + 1);
 
   return 1;
 }

@@ -92,11 +92,11 @@ btc_sys_cpu_count(void) {
 }
 
 int
-btc_sys_homedir(char *out, size_t size) {
+btc_sys_homedir(char *buf, size_t size) {
   char *home = getenv("HOME");
   struct passwd *result;
   struct passwd pwd;
-  char buf[8192];
+  char slab[8192];
   size_t len;
   uid_t uid;
   int rc;
@@ -107,7 +107,7 @@ btc_sys_homedir(char *out, size_t size) {
     if (len + 1 > size)
       return 0;
 
-    memcpy(out, home, len + 1);
+    memcpy(buf, home, len + 1);
 
     return 1;
   }
@@ -115,7 +115,7 @@ btc_sys_homedir(char *out, size_t size) {
   uid = geteuid();
 
   do {
-    rc = getpwuid_r(uid, &pwd, buf, sizeof(buf), &result);
+    rc = getpwuid_r(uid, &pwd, slab, sizeof(slab), &result);
   } while (rc == EINTR);
 
   if (rc != 0 || result == NULL)
@@ -126,14 +126,14 @@ btc_sys_homedir(char *out, size_t size) {
   if (len + 1 > size)
     return 0;
 
-  memcpy(out, pwd.pw_dir, len + 1);
+  memcpy(buf, pwd.pw_dir, len + 1);
 
   return 1;
 }
 
 int
-btc_sys_datadir(char *out, size_t size, const char *name) {
-  char home[1024];
+btc_sys_datadir(char *buf, size_t size, const char *name) {
+  char home[BTC_PATH_MAX];
 
   if (!btc_sys_homedir(home, sizeof(home)))
     return 0;
@@ -142,13 +142,13 @@ btc_sys_datadir(char *out, size_t size, const char *name) {
   if (strlen(home) + strlen(name) + 30 > size)
     return 0;
 
-  sprintf(out, "%s/Library/Application Support/%c%s",
+  sprintf(buf, "%s/Library/Application Support/%c%s",
                home, name[0] & ~32, name + 1);
 #else
   if (strlen(home) + strlen(name) + 3 > size)
     return 0;
 
-  sprintf(out, "%s/.%s", home, name);
+  sprintf(buf, "%s/.%s", home, name);
 #endif
 
   return 1;

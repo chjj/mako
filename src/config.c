@@ -183,7 +183,7 @@ btc_match(const char **zp, const char *xp, const char *yp) {
 }
 
 static int
-btc_match_copy(char *zp, size_t zn, const char *xp, const char *yp) {
+btc_match__str(char *zp, size_t zn, const char *xp, const char *yp) {
   const char *val;
   size_t len;
 
@@ -200,7 +200,43 @@ btc_match_copy(char *zp, size_t zn, const char *xp, const char *yp) {
   return 1;
 }
 
-#define btc_match_str(zp, xp, yp) btc_match_copy(zp, sizeof(zp), xp, yp)
+#define btc_match_str(zp, xp, yp) btc_match__str(zp, sizeof(zp), xp, yp)
+
+static int
+btc_match__path(char *zp, size_t zn, const char *xp, const char *yp) {
+  const char *val;
+  size_t len;
+
+  if (!btc_match(&val, xp, yp))
+    return 0;
+
+#ifndef _WIN32
+  if (val[0] == '~' && val[1] == '/' && val[2] != '\0') {
+    char *home = getenv("HOME");
+
+    if (home == NULL)
+      home = "/";
+
+    if (strlen(home) + strlen(val) > zn)
+      return btc_die("Invalid value `%s`.", xp);
+
+    btc_join(zp, home, val + 2, 0);
+
+    return 1;
+  }
+#endif
+
+  len = strlen(val);
+
+  if (len + 1 > zn)
+    return btc_die("Invalid value `%s`.", xp);
+
+  memcpy(zp, val, len + 1);
+
+  return 1;
+}
+
+#define btc_match_path(zp, xp, yp) btc_match__path(zp, sizeof(zp), xp, yp)
 
 static int
 btc_match_bool(int *z, const char *xp, const char *yp) {
@@ -531,10 +567,10 @@ btc_conf_parse(btc_conf_t *args,
   for (i = 1; i < argc; i++) {
     const char *arg = argv[i];
 
-    if (btc_match_str(args->config, arg, "-conf="))
+    if (btc_match_path(args->config, arg, "-conf="))
       continue;
 
-    if (btc_match_str(args->prefix, arg, "-datadir="))
+    if (btc_match_path(args->prefix, arg, "-datadir="))
       continue;
 
     if (btc_match_network(&args->network, arg, "-chain="))
@@ -703,7 +739,7 @@ btc_conf_read(btc_conf_t *conf, const char *file) {
     return 1;
 
   while ((len = btc_getline(&zp, &zn, stream)) != -1) {
-    if (btc_match_str(conf->prefix, zp, "datadir="))
+    if (btc_match_path(conf->prefix, zp, "datadir="))
       continue;
 
     if (btc_match_bool(&conf->disable_wallet, zp, "disablewallet="))

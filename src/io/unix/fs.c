@@ -12,6 +12,7 @@
 
 #include <errno.h>
 #include <limits.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -489,12 +490,12 @@ btc_fs_mkdir(const char *name, uint32_t mode) {
 
 int
 btc_fs_mkdirp(const char *name, uint32_t mode) {
-  char path[BTC_PATH_MAX + 1];
+  char path[BTC_PATH_MAX];
   size_t len = strlen(name);
   struct stat st;
   size_t i = 0;
 
-  if (len > BTC_PATH_MAX)
+  if (len + 1 > sizeof(path))
     return 0;
 
   memcpy(path, name, len + 1);
@@ -982,38 +983,76 @@ btc_path_normalize(char *path) {
   return w;
 }
 
-size_t
-btc_path_resolve(char *out, const char *path) {
-  char buf[2 * BTC_PATH_MAX + 1];
-  size_t plen = path != NULL ? strlen(path) : 0;
-  size_t olen;
+int
+btc_path_is_absolute(const char *path) {
+  return path[0] == '/';
+}
 
-  if (plen > 0 && path[0] == '/') {
-    if (plen > 2 * BTC_PATH_MAX)
-      return 0;
+int
+btc_path_absolute(char *path, size_t size) {
+  return btc_path_resolve(path, size, path, 0);
+}
 
-    memcpy(buf, path, plen + 1);
-  } else {
-    if (!btc_ps_cwd(buf, sizeof(buf)))
-      return 0;
+int
+btc_path_resolve(char *buf, size_t size, ...) {
+  char zp[2 * BTC_PATH_MAX];
+  char tp[3 * BTC_PATH_MAX];
+  const char *xp;
+  size_t zn = 0;
+  int ret = 0;
+  va_list ap;
+  size_t tn;
 
-    olen = strlen(buf);
+  va_start(ap, size);
 
-    if (olen + 1 + plen > 2 * BTC_PATH_MAX)
-      return 0;
+  while ((xp = va_arg(ap, const char *))) {
+    size_t xn = strlen(xp);
 
-    if (plen != 0) {
-      buf[olen++] = '/';
-      memcpy(buf + olen, path, plen + 1);
+    if (xn == 0)
+      continue;
+
+    if (zn == 0 || xp[0] == '/') {
+      if (xn + 1 > sizeof(zp))
+        goto fail;
+
+      memcpy(zp, xp, xn + 1);
+
+      zn = xn;
+    } else {
+      if (zn + xn + 2 > sizeof(zp))
+        goto fail;
+
+      zp[zn++] = '/';
+
+      memcpy(zp + zn, xp, xn + 1);
+
+      zn += xn;
     }
   }
 
-  olen = btc_path_normalize(buf);
+  if (zn == 0) {
+    if (!btc_ps_cwd(tp, sizeof(tp)))
+      goto fail;
+  } else if (zp[0] == '/') {
+    memcpy(tp, zp, zn + 1);
+  } else {
+    char cwd[BTC_PATH_MAX];
 
-  if (olen > BTC_PATH_MAX)
-    return 0;
+    if (!btc_ps_cwd(cwd, sizeof(cwd)))
+      goto fail;
 
-  memcpy(out, buf, olen + 1);
+    sprintf(tp, "%s/%s", cwd, zp);
+  }
 
-  return olen;
+  tn = btc_path_normalize(tp);
+
+  if (tn + 1 > size)
+    goto fail;
+
+  memcpy(buf, tp, tn + 1);
+
+  ret = 1;
+fail:
+  va_end(ap);
+  return ret;
 }

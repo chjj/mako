@@ -35,6 +35,11 @@ get_config(btc_conf_t *args, int argc, char **argv) {
 
   btc_conf_finalize(args, prefix);
 
+  if (!btc_path_absolute(args->prefix, sizeof(args->prefix))) {
+    fprintf(stderr, "Path for datadir is too long!\n");
+    return 0;
+  }
+
   return 1;
 }
 

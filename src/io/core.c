@@ -8,6 +8,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <io/core.h>
 
 /*
@@ -124,28 +125,40 @@ btc_fs_close_lock(int fd) {
  * Path
  */
 
-size_t
-btc_path_join(char *zp, ...) {
-  const char *xp;
+int
+btc_path_join(char *buf, size_t size, ...) {
+  char *zp = buf;
   size_t zn = 0;
+  const char *xp;
   va_list ap;
 
-  va_start(ap, zp);
+  va_start(ap, size);
 
   while ((xp = va_arg(ap, const char *))) {
-    while (*xp) {
-      *zp++ = *xp++;
-      zn++;
+    size_t xn = strlen(xp);
+
+    if (xn == 0)
+      continue;
+
+    if (zn + xn + 1 > size) {
+      va_end(ap);
+      return 0;
     }
 
+    while (*xp)
+      *zp++ = *xp++;
+
     *zp++ = BTC_PATH_SEP;
-    zn++;
+
+    zn += (xn + 1);
   }
 
-  *--zp = '\0';
-  --zn;
+  if (zn > 0)
+    zp--;
+
+  *zp = '\0';
 
   va_end(ap);
 
-  return zn;
+  return 1;
 }

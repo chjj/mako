@@ -167,7 +167,7 @@ btc_chainfile_update(btc_chainfile_t *z, const btc_entry_t *entry) {
 
 struct btc_chaindb_s {
   const btc_network_t *network;
-  char prefix[BTC_PATH_MAX - 26 + 1];
+  char prefix[BTC_PATH_MAX - 26];
   int pruning_enabled;
   MDB_env *env;
   MDB_dbi db_meta;
@@ -238,23 +238,22 @@ btc_chaindb_destroy(btc_chaindb_t *db) {
 
 static int
 btc_chaindb_load_prefix(btc_chaindb_t *db, const char *prefix) {
-  char path[BTC_PATH_MAX + 1];
-  size_t len = btc_path_resolve(path, prefix);
+  char path[BTC_PATH_MAX];
 
-  if (len < 1 || len > sizeof(db->prefix) - 1)
+  if (!btc_path_resolve(db->prefix, sizeof(db->prefix), prefix, 0))
     return 0;
-
-  memcpy(db->prefix, path, len + 1);
 
   if (!btc_fs_mkdirp(db->prefix, 0755))
     return 0;
 
-  btc_path_join(path, db->prefix, "blocks", 0);
+  if (!btc_path_join(path, sizeof(path), db->prefix, "blocks", 0))
+    return 0;
 
   if (!btc_fs_exists(path) && !btc_fs_mkdir(path, 0755))
     return 0;
 
-  btc_path_join(path, db->prefix, "chain", 0);
+  if (!btc_path_join(path, sizeof(path), db->prefix, "chain", 0))
+    return 0;
 
   if (!btc_fs_exists(path) && !btc_fs_mkdir(path, 0755))
     return 0;
@@ -264,7 +263,7 @@ btc_chaindb_load_prefix(btc_chaindb_t *db, const char *prefix) {
 
 static int
 btc_chaindb_load_database(btc_chaindb_t *db, size_t map_size) {
-  char path[BTC_PATH_MAX + 1];
+  char path[BTC_PATH_MAX];
   unsigned int flags;
   MDB_txn *txn;
   int rc;
@@ -299,7 +298,11 @@ btc_chaindb_load_database(btc_chaindb_t *db, size_t map_size) {
     return 0;
   }
 
-  btc_path_join(path, db->prefix, "chain", 0);
+  if (!btc_path_join(path, sizeof(path), db->prefix, "chain", 0)) {
+    fprintf(stderr, "mdb_env_open: path too long\n");
+    mdb_env_close(db->env);
+    return 0;
+  }
 
   rc = mdb_env_open(db->env, path, flags, 0644);
 
@@ -385,7 +388,7 @@ btc_chaindb_unload_database(btc_chaindb_t *db) {
 
 static int
 btc_chaindb_load_files(btc_chaindb_t *db) {
-  char path[BTC_PATH_MAX + 1];
+  char path[BTC_PATH_MAX];
   btc_chainfile_t *file;
   MDB_val mkey, mval;
   MDB_cursor *cur;
@@ -755,7 +758,7 @@ btc_chaindb_read(btc_chaindb_t *db,
                  const btc_chainfile_t *file,
                  int id,
                  int pos) {
-  char path[BTC_PATH_MAX + 1];
+  char path[BTC_PATH_MAX];
   uint8_t *data = NULL;
   uint8_t tmp[4];
   size_t size;
@@ -858,7 +861,7 @@ btc_chaindb_alloc(btc_chaindb_t *db,
                   MDB_txn *txn,
                   btc_chainfile_t *file,
                   size_t len) {
-  char path[BTC_PATH_MAX + 1];
+  char path[BTC_PATH_MAX];
   MDB_val mkey, mval;
   uint8_t raw[37];
   uint8_t key[5];
@@ -1022,7 +1025,7 @@ btc_chaindb_prune_files(btc_chaindb_t *db,
                         MDB_txn *txn,
                         const btc_entry_t *entry) {
   btc_chainfile_t *file, *next;
-  char path[BTC_PATH_MAX + 1];
+  char path[BTC_PATH_MAX];
   int32_t target;
   uint8_t key[5];
   MDB_val mkey;
