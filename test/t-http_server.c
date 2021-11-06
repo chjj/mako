@@ -93,7 +93,7 @@ int main(void) {
   while (!get_recv(lock)) {
     ASSERT(btc_time_msec() < start + 10 * 1000);
 
-    btc_loop_poll(loop);
+    btc_loop_poll(loop, 1000);
   }
 
   btc_thread_join(thread);

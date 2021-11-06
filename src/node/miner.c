@@ -622,7 +622,7 @@ btc_cpuminer_start_job(btc_cpuminer_t *cpu) {
 
   btc_hash_copy(cpu->last_tip, cpu->job->prev_block);
 
-  cpu->last_job = btc_ms();
+  cpu->last_job = btc_time_msec();
 
   for (i = 0; i < cpu->length; i++) {
     thread = &cpu->threads[i];
@@ -745,16 +745,16 @@ static void
 on_tick(void *arg) {
   btc_cpuminer_t *cpu = arg;
   btc_miner_t *miner = cpu->miner;
+  int64_t now = btc_time_msec();
   btc_cputhread_t *thread;
   const btc_entry_t *tip;
   btc_blockproof_t proof;
   btc_block_t *block;
-  int64_t now = btc_ms();
   int i;
 
   CHECK(cpu->mining == 1);
 
-  if (now < cpu->last_check + 100)
+  if (now < cpu->last_check + 25)
     return;
 
   cpu->last_check = now;

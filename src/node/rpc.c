@@ -326,7 +326,7 @@ btc_rpc_getinfo(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
 
   result = json_object_new(1);
 
-  json_object_push(result, "time", json_integer_new(btc_ms()));
+  json_object_push(result, "time", json_integer_new(btc_time_msec()));
 
   res->result = result;
 }

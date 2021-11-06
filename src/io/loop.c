@@ -196,8 +196,6 @@ typedef long long btc_msec_t;
  * Constants
  */
 
-#define BTC_TICK_RATE 40
-
 enum btc_socket_state {
   BTC_SOCKET_DISCONNECTED,
   BTC_SOCKET_CONNECTING,
@@ -1605,8 +1603,10 @@ void
 btc_loop_start(btc_loop_t *loop) {
   loop->running = 1;
 
-  while (loop->running)
-    btc_loop_poll(loop);
+  while (loop->running) {
+    btc_loop_poll(loop, 25);
+    btc_time_sleep(1);
+  }
 
   btc_loop_close(loop);
 }
@@ -1616,21 +1616,15 @@ btc_loop_stop(btc_loop_t *loop) {
   loop->running = 0;
 }
 
-#if defined(BTC_USE_EPOLL)
 void
-btc_loop_poll(btc_loop_t *loop) {
+btc_loop_poll(btc_loop_t *loop, int timeout) {
+#if defined(BTC_USE_EPOLL)
   struct epoll_event *event;
-  btc_msec_t prev, diff;
   btc_socket_t *socket;
   int i, count;
 
 retry:
-  prev = btc_time_msec();
-  count = epoll_wait(loop->fd, loop->events, loop->max, BTC_TICK_RATE);
-  diff = btc_time_msec() - prev;
-
-  if (diff < 0)
-    diff = 0;
+  count = epoll_wait(loop->fd, loop->events, loop->max, timeout);
 
   if (count == -1) {
     if (errno == EINTR)
@@ -1641,7 +1635,7 @@ retry:
 
   for (i = 0; i < count; i++) {
     event = &loop->events[i];
-    socket = (btc_socket_t *)event->data.ptr;
+    socket = event->data.ptr;
 
     if (event->events & (EPOLLOUT | EPOLLERR | EPOLLHUP))
       handle_write(loop, socket);
@@ -1650,29 +1644,18 @@ retry:
       handle_read(loop, socket);
   }
 
-  handle_ticks(loop);
-  handle_closed(loop);
-
   if (count == loop->max)
     btc_loop_grow(loop, (count * 3) / 2);
 
-  btc_time_sleep(BTC_TICK_RATE - diff);
-}
+  handle_ticks(loop);
+  handle_closed(loop);
 #elif defined(BTC_USE_POLL)
-void
-btc_loop_poll(btc_loop_t *loop) {
   btc_socket_t *socket;
-  btc_msec_t prev, diff;
   struct pollfd *pfd;
   int count;
 
 retry:
-  prev = btc_time_msec();
-  count = poll(loop->pfds, loop->length, BTC_TICK_RATE);
-  diff = btc_time_msec() - prev;
-
-  if (diff < 0)
-    diff = 0;
+  count = poll(loop->pfds, loop->length, timeout);
 
   if (count == -1) {
     if (errno == EINTR)
@@ -1703,14 +1686,9 @@ retry:
 
   handle_ticks(loop);
   handle_closed(loop);
-
-  btc_time_sleep(BTC_TICK_RATE - diff);
-}
 #else /* BTC_USE_SELECT */
-void
-btc_loop_poll(btc_loop_t *loop) {
   btc_socket_t *socket, *next;
-  btc_msec_t prev, diff;
+  struct timeval *to;
   struct timeval tv;
   btc_sockfd_t fd;
   int count;
@@ -1721,22 +1699,23 @@ retry:
 #ifdef _WIN32
   memcpy(&loop->efds, &loop->fds, sizeof(loop->fds));
 #endif
-  memset(&tv, 0, sizeof(tv));
 
-  tv.tv_usec = BTC_TICK_RATE * 1000;
+  if (timeout >= 0) {
+    memset(&tv, 0, sizeof(tv));
 
-  prev = btc_time_msec();
+    tv.tv_sec = timeout / 1000;
+    tv.tv_usec = (timeout % 1000) * 1000;
+
+    to = &tv;
+  } else {
+    to = NULL;
+  }
 
 #if defined(_WIN32)
-  count = select(FD_SETSIZE, &loop->rfds, &loop->wfds, &loop->efds, &tv);
+  count = select(FD_SETSIZE, &loop->rfds, &loop->wfds, &loop->efds, to);
 #else
-  count = select(loop->nfds, &loop->rfds, &loop->wfds, NULL, &tv);
+  count = select(loop->nfds, &loop->rfds, &loop->wfds, NULL, to);
 #endif
-
-  diff = btc_time_msec() - prev;
-
-  if (diff < 0)
-    diff = 0;
 
   if (count == BTC_SOCKET_ERROR) {
     int error = btc_errno;
@@ -1747,6 +1726,9 @@ retry:
 #if defined(_WIN32)
     if (error != BTC_EINVAL)
       abort(); /* LCOV_EXCL_LINE */
+
+    if (timeout > 0)
+      Sleep(timeout);
 
     count = 0;
 #else
@@ -1774,10 +1756,8 @@ retry:
 
   handle_ticks(loop);
   handle_closed(loop);
-
-  btc_time_sleep(BTC_TICK_RATE - diff);
-}
 #endif /* BTC_USE_SELECT */
+}
 
 void
 btc_loop_close(btc_loop_t *loop) {

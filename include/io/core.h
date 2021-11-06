@@ -505,13 +505,6 @@ btc_time_nsec(void);
 BTC_EXTERN void
 btc_time_sleep(int64_t msec);
 
-/*
- * Temporary
- */
-
-#define btc_ms btc_time_msec
-#define btc_us btc_time_usec
-
 #ifdef __cplusplus
 }
 #endif

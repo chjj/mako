@@ -555,7 +555,7 @@ http_client_request(http_client_t *client, const http_options_t *options) {
     if (btc_time_msec() > start + 10 * 1000)
       goto fail;
 
-    btc_loop_poll(client->loop);
+    btc_loop_poll(client->loop, 1000);
   }
 
   msg = client->msg;

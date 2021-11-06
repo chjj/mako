@@ -136,7 +136,7 @@ BTC_EXTERN void
 btc_loop_stop(btc_loop_t *loop);
 
 BTC_EXTERN void
-btc_loop_poll(btc_loop_t *loop);
+btc_loop_poll(btc_loop_t *loop, int timeout);
 
 BTC_EXTERN void
 btc_loop_close(btc_loop_t *loop);
