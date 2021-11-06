@@ -102,11 +102,11 @@ extern "C" {
 #define BTC_NSEC(ts) \
   (((ts)->tv_sec * 1000000000) + (ts)->tv_nsec)
 
-#define BTC_PATH_MAX 1024
-
 #if defined(_WIN32)
+#  define BTC_PATH_MAX 260
 #  define BTC_PATH_SEP '\\'
 #else
+#  define BTC_PATH_MAX 1024
 #  define BTC_PATH_SEP '/'
 #endif
 
@@ -475,7 +475,7 @@ btc_sockaddr_export(char *zp, int *port, const btc_sockaddr_t *x);
  */
 
 BTC_EXTERN int
-btc_sys_cpu_count(void);
+btc_sys_numcpu(void);
 
 BTC_EXTERN int
 btc_sys_homedir(char *buf, size_t size);

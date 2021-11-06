@@ -56,7 +56,7 @@ try_sysctl(int name) {
 #endif
 
 int
-btc_sys_cpu_count(void) {
+btc_sys_numcpu(void) {
   /* https://stackoverflow.com/questions/150355 */
 #if defined(__linux__) || defined(__sun) || defined(_AIX)
   /* Linux, Solaris, AIX */

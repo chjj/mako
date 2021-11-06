@@ -21,7 +21,7 @@
  */
 
 int
-btc_sys_cpu_count(void) {
+btc_sys_numcpu(void) {
   SYSTEM_INFO info;
   GetSystemInfo(&info);
   return info.dwNumberOfProcessors;

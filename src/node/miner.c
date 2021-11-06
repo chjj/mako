@@ -928,7 +928,7 @@ btc_miner_create(const btc_network_t *network,
 
   btc_buffer_init(&miner->cbflags);
   btc_vector_init(&miner->addrs);
-  btc_cpuminer_init(&miner->cpu, miner, btc_sys_cpu_count());
+  btc_cpuminer_init(&miner->cpu, miner, btc_sys_numcpu());
 
   btc_buffer_set(&miner->cbflags, default_flags, sizeof(default_flags) - 1);
 

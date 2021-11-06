@@ -127,7 +127,7 @@ btc_node_log(btc_node_t *node, const char *fmt, ...) {
 
 int
 btc_node_open(btc_node_t *node, const char *prefix, size_t map_size) {
-  char path[BTC_PATH_MAX - 20];
+  char path[BTC_PATH_MAX];
   char file[BTC_PATH_MAX];
 
   if (!btc_path_resolve(path, sizeof(path), prefix, 0))
