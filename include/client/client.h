@@ -31,9 +31,6 @@ btc_client_create(void);
 BTC_EXTERN void
 btc_client_destroy(btc_client_t *client);
 
-BTC_EXTERN const char *
-btc_client_strerror(btc_client_t *client);
-
 BTC_EXTERN int
 btc_client_open(btc_client_t *client,
                 const char *hostname,

@@ -176,7 +176,7 @@ main(int argc, char **argv) {
   client = btc_client_create();
 
   if (!btc_client_open(client, args.rpc_connect, args.rpc_port, 0)) {
-    fprintf(stderr, "Could not connect to %s:%d.\n",
+    fprintf(stderr, "Could not connect (hostname=%s, port=%d).\n",
                     args.rpc_connect, args.rpc_port);
     goto fail;
   }

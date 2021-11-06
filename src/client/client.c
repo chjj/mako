@@ -46,11 +46,6 @@ btc_client_destroy(btc_client_t *client) {
   btc_free(client);
 }
 
-const char *
-btc_client_strerror(btc_client_t *client) {
-  return http_client_strerror(client->http);
-}
-
 int
 btc_client_open(btc_client_t *client,
                 const char *hostname,
@@ -98,12 +93,12 @@ btc_client_call(btc_client_t *client, const char *method, json_value *params) {
   btc_free(body);
 
   if (msg == NULL) {
-    fprintf(stderr, "Error while receiving/parsing HTTP response.\n");
+    fprintf(stderr, "Error: %s\n", http_client_strerror(client->http));
     return NULL;
   }
 
   if (msg->status != 200) {
-    fprintf(stderr, "HTTP Server responded with %u.\n", msg->status);
+    fprintf(stderr, "HTTP Error (status=%u).\n", msg->status);
     http_msg_destroy(msg);
     return NULL;
   }
@@ -131,8 +126,9 @@ btc_client_call(btc_client_t *client, const char *method, json_value *params) {
     if (code == NULL || code->type != json_integer)
       goto fail;
 
-    fprintf(stderr, "JSON RPC call failed with %d (%s).\n",
-                    (int)code->u.integer, message->u.string.ptr);
+    fprintf(stderr, "RPC Error: %s (code=%d).\n",
+                    message->u.string.ptr,
+                    (int)code->u.integer);
 
     json_builder_free(obj);
 
