@@ -95,7 +95,7 @@ json_object_get(const json_value *obj, const char *name) {
 }
 
 json_value *
-json_object_remove(json_value *obj, const char *name) {
+json_object_pluck(json_value *obj, const char *name) {
   json_object_entry *entry = json_object_find(obj, name);
   json_value *value, *sentinel;
 

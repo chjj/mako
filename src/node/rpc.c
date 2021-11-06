@@ -99,6 +99,7 @@ enum rpc_error {
 typedef struct {
   unsigned int length;
   json_value **values;
+  int help;
 } json_params;
 
 /*
@@ -305,9 +306,9 @@ btc_rpc_close(btc_rpc_t *rpc) {
   return;                                  \
 } while (0)
 
-#define THROW_TYPE(name, type) do {                                          \
-  rpc_res_error(res, RPC_TYPE_ERROR, "`" #name "` must be a(n) " #type "."); \
-  return;                                                                    \
+#define THROW_TYPE(name, type) do {                                      \
+  rpc_res_error(res, RPC_TYPE_ERROR, "`" #name "` must be a(n) " #type); \
+  return;                                                                \
 } while (0)
 
 /*
@@ -320,7 +321,7 @@ btc_rpc_getinfo(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
 
   (void)rpc;
 
-  if (params->length != 0)
+  if (params->help || params->length != 0)
     THROW_MISC("getinfo");
 
   result = json_object_new(1);
@@ -338,7 +339,7 @@ static void
 btc_rpc_getgenerate(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
   int mining;
 
-  if (params->length != 0)
+  if (params->help || params->length != 0)
     THROW_MISC("getgenerate");
 
   mining = btc_miner_getgenerate(rpc->miner);
@@ -351,7 +352,7 @@ btc_rpc_setgenerate(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
   int active = 1;
   int mine;
 
-  if (params->length < 1 || params->length > 2)
+  if (params->help || params->length < 1 || params->length > 2)
     THROW_MISC("setgenerate mine ( active )");
 
   if (!json_boolean_get(&mine, params->values[0]))
@@ -375,7 +376,7 @@ btc_rpc_generate(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
   const btc_entry_t *tip = btc_chain_tip(rpc->chain);
   int blocks;
 
-  if (params->length != 1)
+  if (params->help || params->length != 1)
     THROW_MISC("generate numblocks");
 
   if (!json_unsigned_get(&blocks, params->values[0]))
@@ -399,7 +400,7 @@ btc_rpc_generatetoaddress(btc_rpc_t *rpc,
   btc_address_t addr;
   int blocks;
 
-  if (params->length != 2)
+  if (params->help || params->length != 2)
     THROW_MISC("generatetoaddress numblocks address");
 
   if (!json_unsigned_get(&blocks, params->values[0]))
@@ -422,6 +423,9 @@ btc_rpc_generatetoaddress(btc_rpc_t *rpc,
  * Registry
  */
 
+static void
+btc_rpc_help(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res);
+
 static const struct {
   const char *method;
   void (*handler)(btc_rpc_t *,
@@ -432,6 +436,7 @@ static const struct {
   { "generatetoaddress", btc_rpc_generatetoaddress },
   { "getgenerate", btc_rpc_getgenerate },
   { "getinfo", btc_rpc_getinfo },
+  { "help", btc_rpc_help },
   { "setgenerate", btc_rpc_setgenerate }
 };
 
@@ -475,8 +480,33 @@ btc_rpc_handle(btc_rpc_t *rpc, const rpc_req_t *req, rpc_res_t *res) {
 
   params.length = req->params->u.array.length;
   params.values = req->params->u.array.values;
+  params.help = 0;
 
   btc_rpc_methods[index].handler(rpc, &params, res);
+}
+
+static void
+btc_rpc_help(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
+  const char *method;
+  json_params dummy;
+  int index;
+
+  if (params->length != 1 || params->values[0]->type != json_string)
+    THROW_MISC("help method");
+
+  method = params->values[0]->u.string.ptr;
+  index = btc_rpc_find_handler(method);
+
+  if (index < 0) {
+    rpc_res_error(res, RPC_METHOD_NOT_FOUND, "Method not found");
+    return;
+  }
+
+  dummy.length = 0;
+  dummy.values = NULL;
+  dummy.help = 1;
+
+  btc_rpc_methods[index].handler(rpc, &dummy, res);
 }
 
 static int
@@ -538,6 +568,7 @@ btc_rpc_call(btc_rpc_t *rpc, const char *method, const json_value *params) {
 
     parms.length = params->u.array.length;
     parms.values = params->u.array.values;
+    parms.help = 0;
 
     btc_rpc_methods[index].handler(rpc, &parms, &res);
   }

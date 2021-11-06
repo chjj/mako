@@ -40,6 +40,7 @@ static const struct {
   { "generatetoaddress", { json_integer, json_string } },
   { "getgenerate", { json_none } },
   { "getinfo", { json_none } },
+  { "help", { json_string } },
   { "sendtoaddress", { json_string, json_amount } },
   { "setgenerate", { json_boolean, json_integer } }
 };
@@ -176,7 +177,7 @@ main(int argc, char **argv) {
   client = btc_client_create();
 
   if (!btc_client_open(client, args.rpc_connect, args.rpc_port, 0)) {
-    fprintf(stderr, "Could not connect (hostname=%s, port=%d).\n",
+    fprintf(stderr, "Could not connect to %s (port=%d).\n",
                     args.rpc_connect, args.rpc_port);
     goto fail;
   }

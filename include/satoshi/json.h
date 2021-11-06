@@ -18,7 +18,7 @@
 #define json_signed_get btc_json_signed_get
 #define json_unsigned_get btc_json_unsigned_get
 #define json_object_get btc_json_object_get
-#define json_object_remove btc_json_object_remove
+#define json_object_pluck btc_json_object_pluck
 #define json_encode btc_json_encode
 #define json_encode_ex btc_json_encode_ex
 #define json_decode btc_json_decode
@@ -72,7 +72,7 @@ BTC_EXTERN json_value *
 json_object_get(const json_value *obj, const char *name);
 
 BTC_EXTERN json_value *
-json_object_remove(json_value *obj, const char *name);
+json_object_pluck(json_value *obj, const char *name);
 
 BTC_EXTERN json_char *
 json_encode(json_value *value);

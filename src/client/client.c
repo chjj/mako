@@ -126,16 +126,20 @@ btc_client_call(btc_client_t *client, const char *method, json_value *params) {
     if (code == NULL || code->type != json_integer)
       goto fail;
 
-    fprintf(stderr, "RPC Error: %s (code=%d).\n",
-                    message->u.string.ptr,
-                    (int)code->u.integer);
+    if (strcmp(method, "help") == 0 && code->u.integer == -1) {
+      fprintf(stderr, "Usage: %s\n", message->u.string.ptr);
+    } else {
+      fprintf(stderr, "RPC Error: %s (code=%d).\n",
+                      message->u.string.ptr,
+                      (int)code->u.integer);
+    }
 
     json_builder_free(obj);
 
     return NULL;
   }
 
-  result = json_object_remove(obj, "result");
+  result = json_object_pluck(obj, "result");
 
   json_builder_free(obj);
 
