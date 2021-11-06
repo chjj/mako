@@ -57,14 +57,23 @@ btc_die(const char *fmt, ...) {
   return 0;
 }
 
-static void
-btc_join(char *zp, ...) {
+static int
+btc_join(char *buf, size_t size, ...) {
+  char *zp = buf;
+  size_t zn = 0;
   const char *xp;
   va_list ap;
 
-  va_start(ap, zp);
+  va_start(ap, size);
 
   while ((xp = va_arg(ap, const char *))) {
+    zn += strlen(xp) + 1;
+
+    if (zn > size) {
+      va_end(ap);
+      return 0;
+    }
+
     while (*xp)
       *zp++ = *xp++;
 
@@ -75,9 +84,14 @@ btc_join(char *zp, ...) {
 #endif
   }
 
-  *--zp = '\0';
+  if (zn > 0)
+    zp--;
+
+  *zp = '\0';
 
   va_end(ap);
+
+  return 1;
 }
 
 static int
@@ -184,7 +198,7 @@ btc_match__str(char *zp, size_t zn, const char *xp, const char *yp) {
   len = strlen(val);
 
   if (len + 1 > zn)
-    return btc_die("Invalid value `%s`.", xp);
+    return btc_die("Invalid option: `%s`", xp);
 
   memcpy(zp, val, len + 1);
 
@@ -208,10 +222,8 @@ btc_match__path(char *zp, size_t zn, const char *xp, const char *yp) {
     if (home == NULL)
       home = "/";
 
-    if (strlen(home) + strlen(val) > zn)
-      return btc_die("Invalid value `%s`.", xp);
-
-    btc_join(zp, home, val + 2, 0);
+    if (!btc_join(zp, zn, home, val + 2, 0))
+      return btc_die("Invalid option: `%s`", xp);
 
     return 1;
   }
@@ -220,7 +232,7 @@ btc_match__path(char *zp, size_t zn, const char *xp, const char *yp) {
   len = strlen(val);
 
   if (len + 1 > zn)
-    return btc_die("Invalid value `%s`.", xp);
+    return btc_die("Invalid option: `%s`", xp);
 
   memcpy(zp, val, len + 1);
 
@@ -325,7 +337,29 @@ btc_match_int(int *z, const char *xp, const char *yp) {
     return 0;
 
   if (!btc_parse_int(z, val))
-    return btc_die("Invalid value `%s`.", xp);
+    return btc_die("Invalid option: `%s`", xp);
+
+  return 1;
+}
+
+static int
+btc_match_uint(int *z, const char *xp, const char *yp) {
+  if (!btc_match_int(z, xp, yp))
+    return 0;
+
+  if (*z < 0)
+    return btc_die("Invalid option: `%s`", xp);
+
+  return 1;
+}
+
+static int
+btc_match_range(int *z, const char *xp, const char *yp, int min, int max) {
+  if (!btc_match_int(z, xp, yp))
+    return 0;
+
+  if (*z < min || *z > max)
+    return btc_die("Invalid option: `%s`", xp);
 
   return 1;
 }
@@ -336,7 +370,7 @@ btc_match_port(int *z, const char *xp, const char *yp) {
     return 0;
 
   if (*z < 0 || *z > 0xffff)
-    return btc_die("Invalid value `%s`.", xp);
+    return btc_die("Invalid option: `%s`", xp);
 
   return 1;
 }
@@ -357,7 +391,7 @@ btc_match_network(const btc_network_t **z, const char *xp, const char *yp) {
   else if (strcmp(val, "simnet") == 0)
     *z = btc_simnet;
   else
-    return btc_die("Invalid value `%s`.", xp);
+    return btc_die("Invalid option: `%s`", xp);
 
   return 1;
 }
@@ -370,7 +404,7 @@ btc_match_netaddr(btc_netaddr_t *z, const char *xp, const char *yp) {
     return 0;
 
   if (!btc_netaddr_set_str(z, val))
-    return btc_die("Invalid value `%s`.", xp);
+    return btc_die("Invalid option: `%s`", xp);
 
   return 1;
 }
@@ -389,75 +423,35 @@ btc_match_net(enum btc_ipnet *z, const char *xp, const char *yp) {
   else if (strcmp(val, "onion") == 0)
     *z = BTC_IPNET_ONION;
   else
-    return btc_die("Invalid value `%s`.", xp);
+    return btc_die("Invalid option: `%s`", xp);
 
   return 1;
 }
 
 /*
- * Config
+ * Config Helpers
  */
 
-btc_conf_t *
-btc_conf_create(void) {
-  btc_conf_t *conf = btc_malloc(sizeof(btc_conf_t));
-  memset(conf, 0, sizeof(*conf));
-  return conf;
-}
-
-void
-btc_conf_destroy(btc_conf_t *conf) {
-  btc_free(conf);
-}
-
-void
-btc_conf_init(btc_conf_t *conf,
-              const btc_network_t *network,
-              const char *prefix) {
+static void
+conf_init(btc_conf_t *conf) {
   memset(conf, 0, sizeof(*conf));
 
-  if (network == NULL)
-    network = btc_mainnet;
-
-  conf->network = network;
-
-  if (prefix != NULL) {
-    if (network->type == BTC_NETWORK_MAINNET)
-      btc_str_set(conf->prefix, prefix);
-    else
-      btc_join(conf->prefix, prefix, network->name, 0);
-
-    btc_join(conf->config, conf->prefix, BTC_CONFIG_FILE, 0);
-  }
-
+  conf->network = btc_mainnet;
+  conf->prefix[0] = '\0';
   conf->daemon = 0;
   conf->network_active = 1;
   conf->disable_wallet = 0;
-
   conf->map_size = 16;
   conf->checkpoints = 1;
   conf->prune = 0;
   conf->workers = 0;
-
   conf->listen = 1;
-
-  conf->port = network->port;
-
-  btc_netaddr_set(&conf->bind, "0.0.0.0", network->port);
-  btc_netaddr_set(&conf->external, "0.0.0.0", network->port);
-
-  conf->external.time = btc_now();
-  conf->external.services = BTC_NET_LOCAL_SERVICES;
-
+  conf->port = 0;
+  btc_netaddr_set(&conf->bind, "0.0.0.0", 0);
+  btc_netaddr_set(&conf->external, "0.0.0.0", 0);
   conf->no_connect = 0;
-
-  btc_netaddr_set(&conf->connect, "0.0.0.0", network->port);
-
-  conf->connect.time = btc_now();
-  conf->connect.services = BTC_NET_DEFAULT_SERVICES;
-
-  btc_netaddr_set(&conf->proxy, "0.0.0.0", 1080);
-
+  btc_netaddr_set(&conf->connect, "0.0.0.0", 0);
+  btc_netaddr_set(&conf->proxy, "0.0.0.0", 0);
   conf->max_outbound = 8;
   conf->max_inbound = 8;
   conf->ban_time = 24 * 60 * 60;
@@ -469,248 +463,82 @@ btc_conf_init(btc_conf_t *conf,
   conf->bip152 = 1;
   conf->bip157 = 0;
   conf->only_net = BTC_IPNET_NONE;
-
-  conf->rpc_port = network->rpc_port;
-
-  btc_netaddr_set(&conf->rpc_bind, "127.0.0.1", network->rpc_port);
-
+  conf->rpc_port = 0;
+  btc_netaddr_set(&conf->rpc_bind, "127.0.0.1", 0);
   btc_str_assign(conf->rpc_connect, "127.0.0.1");
-
   btc_str_assign(conf->rpc_user, "bitcoinrpc");
   btc_str_assign(conf->rpc_pass, "");
-
   conf->version = 0;
   conf->help = 0;
   conf->method = NULL;
-  /* conf->params */
+  conf->params[0] = NULL;
   conf->length = 0;
 }
 
-static void
-btc_conf_reset(btc_conf_t *conf) {
-  memset(conf, 0, sizeof(*conf));
+static int
+conf_find_file(char *buf, size_t size,
+               int argc, char **argv,
+               const char *prefix) {
+  const btc_network_t *network = btc_mainnet;
+  char datadir[1024];
+  const char *dir;
+  int i, ret;
 
-  conf->daemon = -1;
-  conf->network_active = -1;
-  conf->disable_wallet = -1;
-  conf->map_size = -1;
-  conf->checkpoints = -1;
-  conf->prune = -1;
-  conf->workers = INT_MIN;
-  conf->listen = -1;
-  conf->port = -1;
-  conf->bind.port = -1;
-  conf->external.port = -1;
-  conf->no_connect = -1;
-  conf->connect.port = -1;
-  conf->proxy.port = -1;
-  conf->max_outbound = -1;
-  conf->max_inbound = -1;
-  conf->ban_time = -1;
-  conf->discover = -1;
-  conf->upnp = -1;
-  conf->onion = -1;
-  conf->blocks_only = -1;
-  conf->bip37 = -1;
-  conf->bip152 = -1;
-  conf->bip157 = -1;
-  conf->only_net = BTC_IPNET_NONE;
-  conf->rpc_port = -1;
-  conf->rpc_bind.port = -1;
-}
-
-int
-btc_conf_parse(btc_conf_t *args,
-               char **argv,
-               size_t argc,
-               const char *prefix,
-               int allow_params) {
-  size_t i;
-
-  btc_conf_reset(args);
+  datadir[0] = '\0';
 
   for (i = 1; i < argc; i++) {
     const char *arg = argv[i];
 
-    if (btc_match_path(args->config, arg, "-conf="))
+    if (btc_match__path(buf, size, arg, "-conf="))
+      return 1;
+
+    if (btc_match_path(datadir, arg, "-datadir="))
       continue;
 
-    if (btc_match_path(args->prefix, arg, "-datadir="))
+    if (btc_match_network(&network, arg, "-chain="))
       continue;
-
-    if (btc_match_network(&args->network, arg, "-chain="))
-      continue;
-
-    if (btc_match_argbool(&args->daemon, arg, "-daemon="))
-      continue;
-
-    if (btc_match_argbool(&args->network_active, arg, "-networkactive="))
-      continue;
-
-    if (btc_match_argbool(&args->disable_wallet, arg, "-disablewallet="))
-      continue;
-
-    if (btc_match_int(&args->map_size, arg, "-mapsize="))
-      continue;
-
-    if (btc_match_argbool(&args->checkpoints, arg, "-checkpoints="))
-      continue;
-
-    if (btc_match_argbool(&args->prune, arg, "-prune="))
-      continue;
-
-    if (btc_match_int(&args->workers, arg, "-par="))
-      continue;
-
-    if (btc_match_argbool(&args->listen, arg, "-listen="))
-      continue;
-
-    if (btc_match_port(&args->port, arg, "-port="))
-      continue;
-
-    if (btc_match_netaddr(&args->bind, arg, "-bind="))
-      continue;
-
-    if (btc_match_netaddr(&args->external, arg, "-externalip="))
-      continue;
-
-    if (btc_match_argbool(&args->no_connect, arg, "-connect=")) {
-      args->no_connect ^= 1;
-      continue;
-    }
-
-    if (btc_match_netaddr(&args->connect, arg, "-connect="))
-      continue;
-
-    if (btc_match_netaddr(&args->proxy, arg, "-proxy="))
-      continue;
-
-    if (btc_match_int(&args->max_outbound, arg, "-maxconnections="))
-      continue;
-
-    if (btc_match_int(&args->max_outbound, arg, "-maxoutbound="))
-      continue;
-
-    if (btc_match_int(&args->max_inbound, arg, "-maxinbound="))
-      continue;
-
-    if (btc_match_int(&args->ban_time, arg, "-bantime="))
-      continue;
-
-    if (btc_match_argbool(&args->discover, arg, "-discover="))
-      continue;
-
-    if (btc_match_argbool(&args->upnp, arg, "-upnp="))
-      continue;
-
-    if (btc_match_argbool(&args->onion, arg, "-onion="))
-      continue;
-
-    if (btc_match_netaddr(&args->proxy, arg, "-onion=")) {
-      args->onion = 1;
-      continue;
-    }
-
-    if (btc_match_argbool(&args->blocks_only, arg, "-blocksonly="))
-      continue;
-
-    if (btc_match_argbool(&args->bip37, arg, "-peerbloomfilters="))
-      continue;
-
-    if (btc_match_argbool(&args->bip152, arg, "-compactblocks="))
-      continue;
-
-    if (btc_match_argbool(&args->bip157, arg, "-peerblockfilters="))
-      continue;
-
-    if (btc_match_net(&args->only_net, arg, "-onlynet="))
-      continue;
-
-    if (btc_match_port(&args->rpc_port, arg, "-rpcport="))
-      continue;
-
-    if (btc_match_netaddr(&args->rpc_bind, arg, "-rpcbind="))
-      continue;
-
-    if (btc_match_str(args->rpc_connect, arg, "-rpcconnect="))
-      continue;
-
-    if (btc_match_str(args->rpc_user, arg, "-rpcuser="))
-      continue;
-
-    if (btc_match_str(args->rpc_pass, arg, "-rpcpassword="))
-      continue;
-
-    if (strcmp(arg, "-testnet") == 0) {
-      args->network = btc_testnet;
-      continue;
-    }
-
-    if (strcmp(arg, "-version") == 0) {
-      args->version = 1;
-      continue;
-    }
-
-    if (strcmp(arg, "-?") == 0) {
-      args->help = 1;
-      continue;
-    }
-
-    if (allow_params) {
-      if (arg[0] == '-' && arg[1] >= 'a' && arg[1] <= 'z')
-        return btc_die("Invalid option `%s`.", arg);
-
-      if (args->method == NULL) {
-        args->method = arg;
-        continue;
-      }
-
-      if (args->length == lengthof(args->params))
-        return btc_die("Too many parameters.");
-
-      args->params[args->length++] = arg;
-
-      continue;
-    }
-
-    return btc_die("Invalid option `%s`.", arg);
   }
 
-  if (args->network == NULL)
-    args->network = btc_mainnet;
+  dir = *datadir ? datadir : prefix;
 
-  if (!*args->config && (*args->prefix || prefix != NULL)) {
-    const char *dir = *args->prefix ? args->prefix : prefix;
+  if (network->type == BTC_NETWORK_MAINNET)
+    ret = btc_join(buf, size, dir, BTC_CONFIG_FILE, 0);
+  else
+    ret = btc_join(buf, size, dir, network->name, BTC_CONFIG_FILE, 0);
 
-    if (args->network->type == BTC_NETWORK_MAINNET)
-      btc_join(args->config, dir, BTC_CONFIG_FILE, 0);
-    else
-      btc_join(args->config, dir, args->network->name, BTC_CONFIG_FILE, 0);
-  }
+  if (ret == 0)
+    return btc_die("Invalid datadir: %s", dir);
 
-  return 1;
+  return 0;
 }
 
-int
-btc_conf_read(btc_conf_t *conf, const char *file) {
+static int
+conf_read_file(btc_conf_t *conf, const char *file) {
   FILE *stream = fopen(file, "r");
   char *zp = NULL;
   size_t zn = 0;
   int len;
 
-  btc_conf_reset(conf);
-
   if (stream == NULL)
-    return 1;
+    return 0;
 
   while ((len = btc_getline(&zp, &zn, stream)) != -1) {
     if (btc_match_path(conf->prefix, zp, "datadir="))
       continue;
 
+    if (btc_match_network(&conf->network, zp, "-chain="))
+      continue;
+
+    if (btc_match_bool(&conf->daemon, zp, "-daemon="))
+      continue;
+
+    if (btc_match_bool(&conf->network_active, zp, "-networkactive="))
+      continue;
+
     if (btc_match_bool(&conf->disable_wallet, zp, "disablewallet="))
       continue;
 
-    if (btc_match_int(&conf->map_size, zp, "mapsize="))
+    if (btc_match_range(&conf->map_size, zp, "mapsize=", 1, 64))
       continue;
 
     if (btc_match_bool(&conf->checkpoints, zp, "checkpoints="))
@@ -719,7 +547,7 @@ btc_conf_read(btc_conf_t *conf, const char *file) {
     if (btc_match_bool(&conf->prune, zp, "prune="))
       continue;
 
-    if (btc_match_int(&conf->workers, zp, "par="))
+    if (btc_match_range(&conf->workers, zp, "par=", -6, 15))
       continue;
 
     if (btc_match_bool(&conf->listen, zp, "listen="))
@@ -745,16 +573,16 @@ btc_conf_read(btc_conf_t *conf, const char *file) {
     if (btc_match_netaddr(&conf->proxy, zp, "proxy="))
       continue;
 
-    if (btc_match_int(&conf->max_outbound, zp, "maxconnections="))
+    if (btc_match_uint(&conf->max_outbound, zp, "maxconnections="))
       continue;
 
-    if (btc_match_int(&conf->max_outbound, zp, "maxoutbound="))
+    if (btc_match_uint(&conf->max_outbound, zp, "maxoutbound="))
       continue;
 
-    if (btc_match_int(&conf->max_inbound, zp, "maxinbound="))
+    if (btc_match_uint(&conf->max_inbound, zp, "maxinbound="))
       continue;
 
-    if (btc_match_int(&conf->ban_time, zp, "bantime="))
+    if (btc_match_uint(&conf->ban_time, zp, "bantime="))
       continue;
 
     if (btc_match_bool(&conf->discover, zp, "discover="))
@@ -805,13 +633,8 @@ btc_conf_read(btc_conf_t *conf, const char *file) {
 
     fclose(stream);
 
-    return btc_die("Invalid option `%s`.", zp);
+    return btc_die("Invalid option: `%s`", zp);
   }
-
-  if (conf->network == NULL)
-    conf->network = btc_mainnet;
-
-  btc_str_set(conf->config, file);
 
   btc_free(zp);
 
@@ -820,221 +643,239 @@ btc_conf_read(btc_conf_t *conf, const char *file) {
   return 1;
 }
 
-void
-btc_conf_merge(btc_conf_t *args, const btc_conf_t *conf) {
-  if (!*args->prefix && *conf->prefix)
-    btc_str_assign(args->prefix, conf->prefix);
+static int
+conf_parse_args(btc_conf_t *conf, int argc, char **argv, int allow_params) {
+  const char *ret;
+  int i;
 
-  if (args->disable_wallet == -1 && conf->disable_wallet != -1)
-    args->disable_wallet = conf->disable_wallet;
+  for (i = 1; i < argc; i++) {
+    const char *arg = argv[i];
 
-  if (args->map_size == -1 && conf->map_size != -1)
-    args->map_size = conf->map_size;
+    if (btc_match(&ret, arg, "-conf="))
+      continue;
 
-  if (args->checkpoints == -1 && conf->checkpoints != -1)
-    args->checkpoints = conf->checkpoints;
+    if (btc_match_path(conf->prefix, arg, "-datadir="))
+      continue;
 
-  if (args->prune == -1 && conf->prune != -1)
-    args->prune = conf->prune;
+    if (btc_match_network(&conf->network, arg, "-chain="))
+      continue;
 
-  if (args->workers == INT_MIN && conf->workers != INT_MIN)
-    args->workers = conf->workers;
+    if (btc_match_argbool(&conf->daemon, arg, "-daemon="))
+      continue;
 
-  if (args->listen == -1 && conf->listen != -1)
-    args->listen = conf->listen;
+    if (btc_match_argbool(&conf->network_active, arg, "-networkactive="))
+      continue;
 
-  if (args->port == -1 && conf->port != -1)
-    args->port = conf->port;
+    if (btc_match_argbool(&conf->disable_wallet, arg, "-disablewallet="))
+      continue;
 
-  if (args->bind.port == -1 && conf->bind.port != -1)
-    btc_netaddr_copy(&args->bind, &conf->bind);
+    if (btc_match_range(&conf->map_size, arg, "-mapsize=", 1, 64))
+      continue;
 
-  if (args->external.port == -1 && conf->external.port != -1)
-    btc_netaddr_copy(&args->external, &conf->external);
+    if (btc_match_argbool(&conf->checkpoints, arg, "-checkpoints="))
+      continue;
 
-  if (args->no_connect == -1 && conf->no_connect != -1)
-    args->no_connect = conf->no_connect;
+    if (btc_match_argbool(&conf->prune, arg, "-prune="))
+      continue;
 
-  if (args->connect.port == -1 && conf->connect.port != -1)
-    btc_netaddr_copy(&args->connect, &conf->connect);
+    if (btc_match_range(&conf->workers, arg, "-par=", -6, 15))
+      continue;
 
-  if (args->proxy.port == -1 && conf->proxy.port != -1)
-    btc_netaddr_copy(&args->proxy, &conf->proxy);
+    if (btc_match_argbool(&conf->listen, arg, "-listen="))
+      continue;
 
-  if (args->max_outbound == -1 && conf->max_outbound != -1)
-    args->max_outbound = conf->max_outbound;
+    if (btc_match_port(&conf->port, arg, "-port="))
+      continue;
 
-  if (args->max_inbound == -1 && conf->max_inbound != -1)
-    args->max_inbound = conf->max_inbound;
+    if (btc_match_netaddr(&conf->bind, arg, "-bind="))
+      continue;
 
-  if (args->ban_time == -1 && conf->ban_time != -1)
-    args->ban_time = conf->ban_time;
+    if (btc_match_netaddr(&conf->external, arg, "-externalip="))
+      continue;
 
-  if (args->discover == -1 && conf->discover != -1)
-    args->discover = conf->discover;
+    if (btc_match_argbool(&conf->no_connect, arg, "-connect=")) {
+      conf->no_connect ^= 1;
+      continue;
+    }
 
-  if (args->upnp == -1 && conf->upnp != -1)
-    args->upnp = conf->upnp;
+    if (btc_match_netaddr(&conf->connect, arg, "-connect="))
+      continue;
 
-  if (args->onion == -1 && conf->onion != -1)
-    args->onion = conf->onion;
+    if (btc_match_netaddr(&conf->proxy, arg, "-proxy="))
+      continue;
 
-  if (args->blocks_only == -1 && conf->blocks_only != -1)
-    args->blocks_only = conf->blocks_only;
+    if (btc_match_uint(&conf->max_outbound, arg, "-maxconnections="))
+      continue;
 
-  if (args->bip37 == -1 && conf->bip37 != -1)
-    args->bip37 = conf->bip37;
+    if (btc_match_uint(&conf->max_outbound, arg, "-maxoutbound="))
+      continue;
 
-  if (args->bip152 == -1 && conf->bip152 != -1)
-    args->bip152 = conf->bip152;
+    if (btc_match_uint(&conf->max_inbound, arg, "-maxinbound="))
+      continue;
 
-  if (args->bip157 == -1 && conf->bip157 != -1)
-    args->bip157 = conf->bip157;
+    if (btc_match_uint(&conf->ban_time, arg, "-bantime="))
+      continue;
 
-  if (args->only_net == BTC_IPNET_NONE && conf->only_net != BTC_IPNET_NONE)
-    args->only_net = conf->only_net;
+    if (btc_match_argbool(&conf->discover, arg, "-discover="))
+      continue;
 
-  if (args->rpc_port == -1 && conf->rpc_port != -1)
-    args->rpc_port = conf->rpc_port;
+    if (btc_match_argbool(&conf->upnp, arg, "-upnp="))
+      continue;
 
-  if (args->rpc_bind.port == -1 && conf->rpc_bind.port != -1)
-    btc_netaddr_copy(&args->rpc_bind, &conf->rpc_bind);
+    if (btc_match_argbool(&conf->onion, arg, "-onion="))
+      continue;
 
-  if (!*args->rpc_connect && *conf->rpc_connect)
-    btc_str_assign(args->rpc_connect, conf->rpc_connect);
+    if (btc_match_netaddr(&conf->proxy, arg, "-onion=")) {
+      conf->onion = 1;
+      continue;
+    }
 
-  if (!*args->rpc_user && *conf->rpc_user)
-    btc_str_assign(args->rpc_user, conf->rpc_user);
+    if (btc_match_argbool(&conf->blocks_only, arg, "-blocksonly="))
+      continue;
 
-  if (!*args->rpc_pass && *conf->rpc_pass)
-    btc_str_assign(args->rpc_pass, conf->rpc_pass);
-}
+    if (btc_match_argbool(&conf->bip37, arg, "-peerbloomfilters="))
+      continue;
 
-void
-btc_conf_finalize(btc_conf_t *args, const char *prefix) {
-  const btc_network_t *network = args->network;
+    if (btc_match_argbool(&conf->bip152, arg, "-compactblocks="))
+      continue;
 
-  if (!*args->prefix && prefix != NULL) {
-    if (network->type == BTC_NETWORK_MAINNET)
-      btc_str_set(args->prefix, prefix);
-    else
-      btc_join(args->prefix, prefix, network->name, 0);
+    if (btc_match_argbool(&conf->bip157, arg, "-peerblockfilters="))
+      continue;
+
+    if (btc_match_net(&conf->only_net, arg, "-onlynet="))
+      continue;
+
+    if (btc_match_port(&conf->rpc_port, arg, "-rpcport="))
+      continue;
+
+    if (btc_match_netaddr(&conf->rpc_bind, arg, "-rpcbind="))
+      continue;
+
+    if (btc_match_str(conf->rpc_connect, arg, "-rpcconnect="))
+      continue;
+
+    if (btc_match_str(conf->rpc_user, arg, "-rpcuser="))
+      continue;
+
+    if (btc_match_str(conf->rpc_pass, arg, "-rpcpassword="))
+      continue;
+
+    if (strcmp(arg, "-testnet") == 0) {
+      conf->network = btc_testnet;
+      continue;
+    }
+
+    if (strcmp(arg, "-version") == 0) {
+      conf->version = 1;
+      continue;
+    }
+
+    if (strcmp(arg, "-?") == 0) {
+      conf->help = 1;
+      continue;
+    }
+
+    if (allow_params) {
+      if (arg[0] == '-' && arg[1] >= 'a' && arg[1] <= 'z')
+        return btc_die("Invalid option: `%s`", arg);
+
+      if (conf->method == NULL) {
+        conf->method = arg;
+        continue;
+      }
+
+      if (conf->length == lengthof(conf->params))
+        return btc_die("Too many parameters.");
+
+      conf->params[conf->length++] = arg;
+
+      continue;
+    }
+
+    return btc_die("Invalid option: `%s`", arg);
   }
 
-  if (args->daemon == -1)
-    args->daemon = 0;
+  return 1;
+}
 
-  if (args->network_active == -1)
-    args->network_active = 1;
+static void
+conf_finalize(btc_conf_t *conf, const char *prefix) {
+  const btc_network_t *network = conf->network;
+  size_t size = sizeof(conf->prefix);
+  char *path = conf->prefix;
 
-  if (args->disable_wallet == -1)
-    args->disable_wallet = 0;
+  if (!*conf->prefix)
+    btc_str_set(conf->prefix, prefix);
 
-  if (args->map_size <= 0)
-    args->map_size = 16;
+  if (network->type != BTC_NETWORK_MAINNET) {
+    if (!btc_join(path, size, path, network->name, 0)) {
+      btc_die("Invalid datadir: %s", path);
+      return;
+    }
+  }
 
-  if (args->map_size > 64)
-    args->map_size = 64;
+  if (conf->port == 0)
+    conf->port = network->port;
 
-  if (args->checkpoints == -1)
-    args->checkpoints = 1;
+  if (conf->bind.port == 0)
+    conf->bind.port = conf->port;
 
-  if (args->prune == -1)
-    args->prune = 0;
+  if (conf->external.port == 0)
+    conf->external.port = conf->port;
 
-  if (args->workers == INT_MIN)
-    args->workers = 0;
+  if (conf->connect.port == 0)
+    conf->connect.port = network->port;
 
-  if (args->listen == -1)
-    args->listen = 1;
+  if (conf->proxy.port == 0)
+    conf->proxy.port = 1080;
 
-  if (args->port == -1)
-    args->port = network->port;
+  if (conf->rpc_port == 0)
+    conf->rpc_port = network->rpc_port;
 
-  if (args->bind.port == -1)
-    btc_netaddr_set(&args->bind, "0.0.0.0", 0);
+  if (conf->rpc_bind.port == 0)
+    conf->rpc_bind.port = conf->rpc_port;
 
-  if (args->bind.port == 0)
-    args->bind.port = args->port;
+  if (!btc_netaddr_is_null(&conf->proxy))
+    conf->discover = 0;
 
-  if (args->external.port == -1)
-    btc_netaddr_set(&args->external, "0.0.0.0", 0);
+  conf->external.time = btc_now();
+  conf->external.services = BTC_NET_LOCAL_SERVICES;
 
-  if (args->external.port == 0)
-    args->external.port = args->port;
+  conf->connect.time = btc_now();
+  conf->connect.services = BTC_NET_DEFAULT_SERVICES;
+}
 
-  args->external.time = btc_now();
-  args->external.services = BTC_NET_LOCAL_SERVICES;
+/*
+ * Config
+ */
 
-  if (args->no_connect == -1)
-    args->no_connect = 0;
+void
+btc_conf_init(btc_conf_t *conf,
+              int argc,
+              char **argv,
+              const char *prefix,
+              int allow_params) {
+  char file[1024];
+  int explicit;
 
-  if (args->connect.port == -1)
-    btc_netaddr_set(&args->connect, "0.0.0.0", 0);
+  /* Initialize. */
+  conf_init(conf);
 
-  if (args->connect.port == 0)
-    args->connect.port = network->port;
+  /* First pass to find config file location. */
+  explicit = conf_find_file(file, sizeof(file), argc, argv, prefix);
 
-  args->connect.time = btc_now();
-  args->connect.services = BTC_NET_DEFAULT_SERVICES;
+  /* Try to read the config file. Only fail
+     if the user explicitly passed one. */
+  if (!conf_read_file(conf, file)) {
+    if (explicit) {
+      btc_die("Could not read file: %s", file);
+      return;
+    }
+  }
 
-  if (args->proxy.port == -1)
-    btc_netaddr_set(&args->proxy, "0.0.0.0", 0);
+  /* Second pass: parse all arguments (ignoring conf=). */
+  conf_parse_args(conf, argc, argv, allow_params);
 
-  if (args->proxy.port == 0)
-    args->proxy.port = 1080;
-
-  if (args->max_outbound < 0)
-    args->max_outbound = 8;
-
-  if (args->max_inbound < 0)
-    args->max_inbound = 8;
-
-  if (args->ban_time < 0)
-    args->ban_time = 24 * 60 * 60;
-
-  if (args->discover == -1)
-    args->discover = 1;
-
-  if (args->upnp == -1)
-    args->upnp = 0;
-
-  if (args->onion == -1)
-    args->onion = 0;
-
-  if (args->blocks_only == -1)
-    args->blocks_only = 0;
-
-  if (args->bip37 == -1)
-    args->bip37 = 0;
-
-  if (args->bip152 == -1)
-    args->bip152 = 1;
-
-  if (args->bip157 == -1)
-    args->bip157 = 0;
-
-  /* conf->only_net */
-
-  if (args->rpc_port == -1)
-    args->rpc_port = network->rpc_port;
-
-  if (args->rpc_bind.port == -1)
-    btc_netaddr_set(&args->rpc_bind, "127.0.0.1", 0);
-
-  if (args->rpc_bind.port == 0)
-    args->rpc_bind.port = args->rpc_port;
-
-  if (!*args->rpc_connect)
-    btc_netaddr_get(args->rpc_connect, &args->rpc_bind);
-
-  if (!*args->rpc_user)
-    btc_str_assign(args->rpc_user, "bitcoinrpc");
-
-  /* conf->rpc_pass */
-  /* conf->version */
-  /* conf->help */
-  /* conf->method */
-  /* conf->params */
-  /* conf->length */
+  /* Finalize. */
+  conf_finalize(conf, prefix);
 }

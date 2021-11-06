@@ -21,8 +21,7 @@ extern "C" {
 
 struct btc_conf_s {
   const btc_network_t *network;
-  char prefix[768];
-  char config[1024];
+  char prefix[1024];
   int daemon;
   int network_active;
   int disable_wallet;
@@ -64,32 +63,12 @@ struct btc_conf_s {
  * Config
  */
 
-BTC_EXTERN btc_conf_t *
-btc_conf_create(void);
-
-BTC_EXTERN void
-btc_conf_destroy(btc_conf_t *conf);
-
 BTC_EXTERN void
 btc_conf_init(btc_conf_t *conf,
-              const btc_network_t *network,
-              const char *prefix);
-
-BTC_EXTERN int
-btc_conf_parse(btc_conf_t *args,
-               char **argv,
-               size_t argc,
-               const char *prefix,
-               int allow_params);
-
-BTC_EXTERN int
-btc_conf_read(btc_conf_t *conf, const char *file);
-
-BTC_EXTERN void
-btc_conf_merge(btc_conf_t *args, const btc_conf_t *conf);
-
-BTC_EXTERN void
-btc_conf_finalize(btc_conf_t *args, const char *prefix);
+              int argc,
+              char **argv,
+              const char *prefix,
+              int allow_params);
 
 #ifdef __cplusplus
 }

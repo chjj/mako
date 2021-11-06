@@ -72,22 +72,14 @@ find_schema(const char *method) {
 
 static int
 get_config(btc_conf_t *args, int argc, char **argv) {
-  char prefix[700];
-  btc_conf_t conf;
+  char prefix[BTC_PATH_MAX];
 
   if (!btc_sys_datadir(prefix, sizeof(prefix), "satoshi")) {
     fprintf(stderr, "Could not find suitable datadir.\n");
     return 0;
   }
 
-  btc_conf_parse(args, argv, argc, prefix, 1);
-
-  if (!args->help && !args->version) {
-    btc_conf_read(&conf, args->config);
-    btc_conf_merge(args, &conf);
-  }
-
-  btc_conf_finalize(args, prefix);
+  btc_conf_init(args, argc, argv, prefix, 1);
 
   return 1;
 }

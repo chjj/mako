@@ -4,9 +4,9 @@
  * https://github.com/chjj/libsatoshi
  */
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 #include <io/core.h>
 #include <node/node.h>
@@ -18,23 +18,16 @@
 
 static int
 get_config(btc_conf_t *args, int argc, char **argv) {
-  char prefix[700];
-  btc_conf_t conf;
+  char prefix[BTC_PATH_MAX];
 
   if (!btc_sys_datadir(prefix, sizeof(prefix), "satoshi")) {
     fprintf(stderr, "Could not find suitable datadir.\n");
     return 0;
   }
 
-  btc_conf_parse(args, argv, argc, prefix, 0);
+  btc_conf_init(args, argc, argv, prefix, 0);
 
-  if (!args->help && !args->version) {
-    btc_conf_read(&conf, args->config);
-    btc_conf_merge(args, &conf);
-  }
-
-  btc_conf_finalize(args, prefix);
-
+  /* Absolute-ify path before we daemonize and call chdir("/"). */
   if (!btc_path_absolute(args->prefix, sizeof(args->prefix))) {
     fprintf(stderr, "Path for datadir is too long!\n");
     return 0;

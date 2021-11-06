@@ -135,12 +135,9 @@ btc_path_join(char *buf, size_t size, ...) {
   va_start(ap, size);
 
   while ((xp = va_arg(ap, const char *))) {
-    size_t xn = strlen(xp);
+    zn += strlen(xp) + 1;
 
-    if (xn == 0)
-      continue;
-
-    if (zn + xn + 1 > size) {
+    if (zn > size) {
       va_end(ap);
       return 0;
     }
@@ -149,8 +146,6 @@ btc_path_join(char *buf, size_t size, ...) {
       *zp++ = *xp++;
 
     *zp++ = BTC_PATH_SEP;
-
-    zn += (xn + 1);
   }
 
   if (zn > 0)
