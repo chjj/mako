@@ -481,10 +481,7 @@ conf_find_file(char *buf, size_t size,
                const char *prefix) {
   const btc_network_t *network = btc_mainnet;
   char datadir[1024];
-  const char *dir;
   int i, ret;
-
-  datadir[0] = '\0';
 
   for (i = 1; i < argc; i++) {
     const char *arg = argv[i];
@@ -492,22 +489,27 @@ conf_find_file(char *buf, size_t size,
     if (btc_match__path(buf, size, arg, "-conf="))
       return 1;
 
-    if (btc_match_path(datadir, arg, "-datadir="))
+    if (btc_match_path(datadir, arg, "-datadir=")) {
+      prefix = datadir;
       continue;
+    }
 
     if (btc_match_network(&network, arg, "-chain="))
       continue;
+
+    if (strcmp(arg, "-testnet") == 0) {
+      network = btc_testnet;
+      continue;
+    }
   }
 
-  dir = *datadir ? datadir : prefix;
-
   if (network->type == BTC_NETWORK_MAINNET)
-    ret = btc_join(buf, size, dir, BTC_CONFIG_FILE, 0);
+    ret = btc_join(buf, size, prefix, BTC_CONFIG_FILE, 0);
   else
-    ret = btc_join(buf, size, dir, network->name, BTC_CONFIG_FILE, 0);
+    ret = btc_join(buf, size, prefix, network->name, BTC_CONFIG_FILE, 0);
 
   if (ret == 0)
-    return btc_die("Invalid datadir: %s", dir);
+    return btc_die("Invalid datadir: %s", prefix);
 
   return 0;
 }
