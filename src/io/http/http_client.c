@@ -435,8 +435,10 @@ http_client_write(http_client_t *client, void *data, size_t size) {
   }
 
   if (rc == 0) {
-    if (btc_socket_buffered(client->socket) > HTTP_MAX_BUFFER)
+    if (btc_socket_buffered(client->socket) > HTTP_MAX_BUFFER) {
       btc_socket_close(client->socket);
+      return 0;
+    }
   }
 
   return 1;
@@ -604,7 +606,7 @@ btc_net_external(btc_sockaddr_t *addr, int family, int port) {
 
   *xp = '\0';
 
-  ret = btc_sockaddr_import(addr, xp, port);
+  ret = btc_sockaddr_import(addr, msg->body.data, port);
 
   http_msg_destroy(msg);
 

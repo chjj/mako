@@ -37,6 +37,9 @@ btc_mnemonic_clear(btc_mnemonic_t *mn);
 BTC_EXTERN void
 btc_mnemonic_copy(btc_mnemonic_t *z, const btc_mnemonic_t *x);
 
+BTC_EXTERN int
+btc_mnemonic_equal(const btc_mnemonic_t *x, const btc_mnemonic_t *y);
+
 BTC_EXTERN void
 btc_mnemonic_set(btc_mnemonic_t *mn, const uint8_t *entropy, size_t length);
 

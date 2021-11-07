@@ -44,6 +44,201 @@ btc_address_copy(btc_address_t *z, const btc_address_t *x) {
   memcpy(z->hash, x->hash, 40);
 }
 
+int
+btc_address_equal(const btc_address_t *x, const btc_address_t *y) {
+  if (x->type != y->type)
+    return 0;
+
+  if (x->version != y->version)
+    return 0;
+
+  if (x->length != y->length)
+    return 0;
+
+  return memcmp(x->hash, y->hash, y->length) == 0;
+}
+
+int
+btc_address_is_p2pkh(const btc_address_t *addr) {
+  return addr->type == BTC_ADDRESS_P2PKH;
+}
+
+int
+btc_address_is_p2sh(const btc_address_t *addr) {
+  return addr->type == BTC_ADDRESS_P2SH;
+}
+
+int
+btc_address_is_p2wpkh(const btc_address_t *addr) {
+  return addr->type == BTC_ADDRESS_WITNESS
+      && addr->version == 0
+      && addr->length == 20;
+}
+
+int
+btc_address_is_p2wsh(const btc_address_t *addr) {
+  return addr->type == BTC_ADDRESS_WITNESS
+      && addr->version == 0
+      && addr->length == 32;
+}
+
+int
+btc_address_is_program(const btc_address_t *addr) {
+  return addr->type == BTC_ADDRESS_WITNESS;
+}
+
+void
+btc_address_set_p2pk(btc_address_t *addr, const uint8_t *key, size_t length) {
+  uint8_t hash[20];
+
+  CHECK(length == 33 || length == 65);
+
+  btc_hash160(hash, key, length);
+
+  btc_address_set_p2pkh(addr, hash);
+}
+
+void
+btc_address_set_p2pkh(btc_address_t *addr, const uint8_t *hash) {
+  addr->type = BTC_ADDRESS_P2PKH;
+  addr->version = 0;
+  addr->length = 20;
+
+  memset(addr->hash, 0, 40);
+  memcpy(addr->hash, hash, 20);
+}
+
+void
+btc_address_set_p2sh(btc_address_t *addr, const uint8_t *hash) {
+  addr->type = BTC_ADDRESS_P2SH;
+  addr->version = 0;
+  addr->length = 20;
+
+  memset(addr->hash, 0, 40);
+  memcpy(addr->hash, hash, 20);
+}
+
+void
+btc_address_set_p2wpk(btc_address_t *addr, const uint8_t *key, size_t length) {
+  uint8_t hash[20];
+
+  CHECK(length == 33 || length == 65);
+
+  btc_hash160(hash, key, length);
+
+  btc_address_set_p2wpkh(addr, hash);
+}
+
+void
+btc_address_set_p2wpkh(btc_address_t *addr, const uint8_t *hash) {
+  addr->type = BTC_ADDRESS_WITNESS;
+  addr->version = 0;
+  addr->length = 20;
+
+  memset(addr->hash, 0, 40);
+  memcpy(addr->hash, hash, 20);
+}
+
+void
+btc_address_set_p2wsh(btc_address_t *addr, const uint8_t *hash) {
+  addr->type = BTC_ADDRESS_WITNESS;
+  addr->version = 0;
+  addr->length = 32;
+
+  memset(addr->hash, 0, 40);
+  memcpy(addr->hash, hash, 32);
+}
+
+int
+btc_address_set_program(btc_address_t *addr, const btc_program_t *program) {
+  if (program->version == 0) {
+    if (program->length != 20 && program->length != 32)
+      return 0;
+  }
+
+  addr->type = BTC_ADDRESS_WITNESS;
+  addr->version = program->version;
+  addr->length = program->length;
+
+  memset(addr->hash, 0, 40);
+  memcpy(addr->hash, program->data, program->length);
+
+  return 1;
+}
+
+void
+btc_address_get_program(btc_program_t *program, const btc_address_t *addr) {
+  CHECK(addr->type == BTC_ADDRESS_WITNESS);
+
+  program->version = addr->version;
+  program->length = addr->length;
+
+  memset(program->data, 0, 40);
+  memcpy(program->data, addr->hash, addr->length);
+}
+
+int
+btc_address_set_script(btc_address_t *addr, const btc_script_t *script) {
+  btc_program_t program;
+  uint8_t pub[65];
+  size_t len;
+
+  btc_address_init(addr);
+
+  if (btc_script_get_program(&program, script))
+    return btc_address_set_program(addr, &program);
+
+  if (btc_script_get_p2sh(addr->hash, script)) {
+    addr->type = BTC_ADDRESS_P2SH;
+    return 1;
+  }
+
+  if (btc_script_get_p2pkh(addr->hash, script))
+    return 1;
+
+  if (btc_script_get_p2pk(pub, &len, script)) {
+    btc_hash160(addr->hash, pub, len);
+    return 1;
+  }
+
+  if (btc_script_is_multisig(script)) {
+    addr->type = BTC_ADDRESS_P2SH;
+    btc_hash160(addr->hash, script->data, script->length);
+    return 1;
+  }
+
+  return 0;
+}
+
+void
+btc_address_get_script(btc_script_t *script, const btc_address_t *addr) {
+  switch (addr->type) {
+    case BTC_ADDRESS_P2PKH: {
+      CHECK(addr->length == 20);
+      btc_script_set_p2pkh(script, addr->hash);
+      break;
+    }
+
+    case BTC_ADDRESS_P2SH: {
+      CHECK(addr->length == 20);
+      btc_script_set_p2sh(script, addr->hash);
+      break;
+    }
+
+    case BTC_ADDRESS_WITNESS: {
+      btc_program_t program;
+      btc_address_get_program(&program, addr);
+      btc_script_set_program(script, &program);
+      break;
+    }
+
+    default: {
+      btc_abort(); /* LCOV_EXCL_LINE */
+      break;
+    }
+  }
+}
+
 static int
 set_base58(btc_address_t *addr, const char *str, const btc_network_t *network) {
   size_t len = btc_strnlen(str, 56);
@@ -156,94 +351,4 @@ btc_address_get_str(char *str,
       break;
     }
   }
-}
-
-int
-btc_address_set_script(btc_address_t *addr, const btc_script_t *script) {
-  btc_program_t program;
-  uint8_t pub[65];
-  size_t len;
-
-  btc_address_init(addr);
-
-  if (btc_script_get_program(&program, script))
-    return btc_address_set_program(addr, &program);
-
-  if (btc_script_get_p2sh(addr->hash, script)) {
-    addr->type = BTC_ADDRESS_P2SH;
-    return 1;
-  }
-
-  if (btc_script_get_p2pkh(addr->hash, script))
-    return 1;
-
-  if (btc_script_get_p2pk(pub, &len, script)) {
-    btc_hash160(addr->hash, pub, len);
-    return 1;
-  }
-
-  if (btc_script_is_multisig(script)) {
-    addr->type = BTC_ADDRESS_P2SH;
-    btc_hash160(addr->hash, script->data, script->length);
-    return 1;
-  }
-
-  return 0;
-}
-
-void
-btc_address_get_script(btc_script_t *script, const btc_address_t *addr) {
-  switch (addr->type) {
-    case BTC_ADDRESS_P2PKH: {
-      CHECK(addr->length == 20);
-      btc_script_set_p2pkh(script, addr->hash);
-      break;
-    }
-
-    case BTC_ADDRESS_P2SH: {
-      CHECK(addr->length == 20);
-      btc_script_set_p2sh(script, addr->hash);
-      break;
-    }
-
-    case BTC_ADDRESS_WITNESS: {
-      btc_program_t program;
-      btc_address_get_program(&program, addr);
-      btc_script_set_program(script, &program);
-      break;
-    }
-
-    default: {
-      btc_abort(); /* LCOV_EXCL_LINE */
-      break;
-    }
-  }
-}
-
-int
-btc_address_set_program(btc_address_t *addr, const btc_program_t *program) {
-  if (program->version == 0) {
-    if (program->length != 20 && program->length != 32)
-      return 0;
-  }
-
-  addr->type = BTC_ADDRESS_WITNESS;
-  addr->version = program->version;
-  addr->length = program->length;
-
-  memset(addr->hash, 0, 40);
-  memcpy(addr->hash, program->data, program->length);
-
-  return 1;
-}
-
-void
-btc_address_get_program(btc_program_t *program, const btc_address_t *addr) {
-  CHECK(addr->type == BTC_ADDRESS_WITNESS);
-
-  program->version = addr->version;
-  program->length = addr->length;
-
-  memset(program->data, 0, 40);
-  memcpy(program->data, addr->hash, addr->length);
 }

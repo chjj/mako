@@ -65,6 +65,19 @@ btc_mnemonic_copy(btc_mnemonic_t *z, const btc_mnemonic_t *x) {
   z->length = x->length;
 }
 
+int
+btc_mnemonic_equal(const btc_mnemonic_t *x, const btc_mnemonic_t *y) {
+  uint32_t z = 0;
+  int i;
+
+  for (i = 0; i < BIP39_MAX_WORDS; i++)
+    z |= x->words[i] ^ y->words[i];
+
+  z |= x->length ^ y->length;
+
+  return (z - 1) >> 31;
+}
+
 void
 btc_mnemonic_set(btc_mnemonic_t *mn, const uint8_t *entropy, size_t length) {
   uint8_t data[(BIP39_MAX_ENTROPY / 8) + 32];

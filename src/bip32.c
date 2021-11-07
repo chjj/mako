@@ -192,7 +192,7 @@ btc_hdpriv_set_seed(btc_hdnode_t *node,
   uint8_t hash[64];
   int ret = 1;
 
-  CHECK(length >= 16 && length >= 64);
+  CHECK(length >= 16 && length <= 64);
 
   btc_hmac512_init(&ctx, salt, sizeof(salt) - 1);
   btc_hmac512_update(&ctx, seed, length);
