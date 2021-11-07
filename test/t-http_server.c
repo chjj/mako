@@ -16,29 +16,6 @@
 static int g_sent = 0;
 static int g_recv = 0;
 
-static int
-on_request(http_server_t *server, http_req_t *req, http_res_t *res) {
-  size_t i;
-
-  (void)server;
-
-  printf("Path: %s\n", req->path.data);
-
-  printf("Headers:\n");
-
-  for (i = 0; i < req->headers.length; i++) {
-    http_header_t *hdr = req->headers.items[i];
-
-    printf("  %s: %s\n", hdr->field.data, hdr->value.data);
-  }
-
-  http_res_send(res, 200, "text/plain", "Hello world\n");
-
-  g_sent = 1;
-
-  return 1;
-}
-
 static void
 set_recv(btc_mutex_t *lock, int value) {
   btc_mutex_lock(lock);
@@ -55,12 +32,49 @@ get_recv(btc_mutex_t *lock) {
   return value;
 }
 
+static int
+on_request(http_server_t *server, http_req_t *req, http_res_t *res) {
+  (void)server;
+
+  ASSERT(req->method == HTTP_METHOD_GET);
+  ASSERT(strcmp(req->path.data, "/") == 0);
+  ASSERT(req->headers.length == 3);
+
+  ASSERT(strcmp(req->headers.items[0]->field.data, "host") == 0);
+  ASSERT(strcmp(req->headers.items[0]->value.data, "localhost:1337") == 0);
+
+  ASSERT(strcmp(req->headers.items[1]->field.data, "user-agent") == 0);
+  ASSERT(strcmp(req->headers.items[1]->value.data, "libio 0.0") == 0);
+
+  ASSERT(strcmp(req->headers.items[2]->field.data, "accept") == 0);
+  ASSERT(strcmp(req->headers.items[2]->value.data, "*/*") == 0);
+
+  http_res_send(res, 200, "text/plain", "Hello world\n");
+
+  g_sent = 1;
+
+  return 1;
+}
+
 static void
-request_thread(void *lock) {
+send_request(void *lock) {
   http_msg_t *msg = http_get("localhost", 1337, "/", BTC_AF_INET);
 
   ASSERT(msg != NULL);
   ASSERT(msg->status == 200);
+  ASSERT(msg->headers.length == 4);
+
+  ASSERT(strcmp(msg->headers.items[0]->field.data, "date") == 0);
+
+  ASSERT(strcmp(msg->headers.items[1]->field.data, "content-type") == 0);
+  ASSERT(strcmp(msg->headers.items[1]->value.data, "text/plain") == 0);
+
+  ASSERT(strcmp(msg->headers.items[2]->field.data, "content-length") == 0);
+  ASSERT(strcmp(msg->headers.items[2]->value.data, "12") == 0);
+
+  ASSERT(strcmp(msg->headers.items[3]->field.data, "connection") == 0);
+  ASSERT(strcmp(msg->headers.items[3]->value.data, "keep-alive") == 0);
+
   ASSERT(strcmp(msg->body.data, "Hello world\n") == 0);
 
   http_msg_destroy(msg);
@@ -86,7 +100,7 @@ int main(void) {
 
   ASSERT(http_server_open(server, &addr));
 
-  btc_thread_create(thread, request_thread, lock);
+  btc_thread_create(thread, send_request, lock);
 
   start = btc_time_msec();
 
