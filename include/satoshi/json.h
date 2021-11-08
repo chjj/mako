@@ -51,6 +51,12 @@
 #define json_entry_new_ex btc_json_entry_new_ex
 #define json_block_new_ex btc_json_block_new_ex
 
+#define json_tx_base btc_json_tx_base
+#define json_tx_raw btc_json_tx_raw
+#define json_header_raw btc_json_header_raw
+#define json_block_base btc_json_block_base
+#define json_block_raw btc_json_block_raw
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -195,6 +201,25 @@ json_block_new_ex(const btc_block_t *block,
                   const uint8_t *next,
                   int details,
                   const btc_network_t *network);
+
+/*
+ * Hexification
+ */
+
+BTC_EXTERN json_value *
+json_tx_base(const btc_tx_t *tx);
+
+BTC_EXTERN json_value *
+json_tx_raw(const btc_tx_t *tx);
+
+BTC_EXTERN json_value *
+json_header_raw(const btc_header_t *hdr);
+
+BTC_EXTERN json_value *
+json_block_base(const btc_block_t *block);
+
+BTC_EXTERN json_value *
+json_block_raw(const btc_block_t *block);
 
 #ifdef __cplusplus
 }

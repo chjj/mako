@@ -301,15 +301,40 @@ btc_rpc_close(btc_rpc_t *rpc) {
  * Macros
  */
 
-#define THROW_MISC(msg) do {               \
-  rpc_res_error(res, RPC_MISC_ERROR, msg); \
-  return;                                  \
+#define THROW(code, msg) do {    \
+  rpc_res_error(res, code, msg); \
+  return;                        \
 } while (0)
 
-#define THROW_TYPE(name, type) do {                                      \
-  rpc_res_error(res, RPC_TYPE_ERROR, "`" #name "` must be a(n) " #type); \
-  return;                                                                \
-} while (0)
+#define THROW_MISC(msg) THROW(RPC_MISC_ERROR, msg)
+
+#define THROW_TYPE(name, type) \
+  THROW(RPC_TYPE_ERROR, "`" #name "` must be a(n) " #type)
+
+/*
+ * Call Helpers
+ */
+
+static int32_t
+btc_rpc_get_depth(btc_rpc_t *rpc,
+                  const btc_entry_t *entry,
+                  const uint8_t **next) {
+  const btc_entry_t *tip = btc_chain_tip(rpc->chain);
+
+  if (entry == tip) {
+    *next = NULL;
+    return 1;
+  }
+
+  if (entry->next != NULL) {
+    *next = entry->next->hash;
+    return tip->height - entry->height + 1;
+  }
+
+  *next = NULL;
+
+  return -1;
+}
 
 /*
  * Info
@@ -329,6 +354,204 @@ btc_rpc_getinfo(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
   json_object_push(result, "time", json_integer_new(btc_time_msec()));
 
   res->result = result;
+}
+
+/*
+ * Blockchain
+ */
+
+static void
+btc_rpc_getblockchaininfo(btc_rpc_t *rpc,
+                          const json_params *params,
+                          rpc_res_t *res) {
+  const btc_network_t *network = rpc->network;
+  const btc_entry_t *tip = btc_chain_tip(rpc->chain);
+  double diff, prog;
+  json_value *obj;
+  int64_t mtp;
+
+  if (params->help || params->length != 0)
+    THROW_MISC("getblockchaininfo");
+
+  diff = btc_difficulty(tip->header.bits);
+  prog = btc_chain_progress(rpc->chain);
+  mtp = btc_entry_median_time(tip);
+
+  obj = json_object_new(7);
+
+  json_object_push(obj, "chain", json_string_new(network->name));
+  json_object_push(obj, "blocks", json_integer_new(tip->height));
+  json_object_push(obj, "bestblockhash", json_hash_new(tip->hash));
+  json_object_push(obj, "difficulty", json_double_new(diff));
+  json_object_push(obj, "mediantime", json_integer_new(mtp));
+  json_object_push(obj, "verificationprogress", json_double_new(prog));
+  json_object_push(obj, "chainwork", json_hash_new(tip->chainwork));
+
+  res->result = obj;
+}
+
+static void
+btc_rpc_getbestblockhash(btc_rpc_t *rpc,
+                         const json_params *params,
+                         rpc_res_t *res) {
+  const btc_entry_t *tip = btc_chain_tip(rpc->chain);
+
+  if (params->help || params->length != 0)
+    THROW_MISC("getbestblockhash");
+
+  res->result = json_hash_new(tip->hash);
+}
+
+static void
+btc_rpc_getblockcount(btc_rpc_t *rpc,
+                      const json_params *params,
+                      rpc_res_t *res) {
+  const btc_entry_t *tip = btc_chain_tip(rpc->chain);
+
+  if (params->help || params->length != 0)
+    THROW_MISC("getblockcount");
+
+  res->result = json_integer_new(tip->height);
+}
+
+static void
+btc_rpc_getdifficulty(btc_rpc_t *rpc,
+                      const json_params *params,
+                      rpc_res_t *res) {
+  const btc_entry_t *tip = btc_chain_tip(rpc->chain);
+  double diff;
+
+  if (params->help || params->length != 0)
+    THROW_MISC("getdifficulty");
+
+  diff = btc_difficulty(tip->header.bits);
+
+  res->result = json_double_new(diff);
+}
+
+static void
+btc_rpc_getblockhash(btc_rpc_t *rpc,
+                     const json_params *params,
+                     rpc_res_t *res) {
+  const btc_entry_t *entry;
+  int height;
+
+  if (params->help || params->length != 1)
+    THROW_MISC("getblockhash index");
+
+  if (!json_unsigned_get(&height, params->values[0]))
+    THROW_TYPE(index, integer);
+
+  entry = btc_chain_by_height(rpc->chain, height);
+
+  if (entry == NULL)
+    THROW(RPC_INVALID_PARAMETER, "Block height out of range");
+
+  res->result = json_hash_new(entry->hash);
+}
+
+static void
+btc_rpc_getblockheader(btc_rpc_t *rpc,
+                       const json_params *params,
+                       rpc_res_t *res) {
+  const btc_entry_t *entry;
+  int32_t confirmations;
+  const uint8_t *next;
+  uint8_t hash[32];
+  int verbose = 1;
+  int height;
+
+  if (params->help || params->length < 1 || params->length > 2)
+    THROW_MISC("getblockheader hash ( verbose )");
+
+  if (params->values[0]->type == json_integer) {
+    if (!json_unsigned_get(&height, params->values[0]))
+      THROW(RPC_INVALID_PARAMETER, "Target block height out of range");
+
+    entry = btc_chain_by_height(rpc->chain, height);
+
+    if (entry == NULL)
+      THROW(RPC_INVALID_PARAMETER, "Target block height after current tip");
+  } else {
+    if (!json_hash_get(hash, params->values[0]))
+      THROW_TYPE(hash, hash_or_height);
+
+    entry = btc_chain_by_hash(rpc->chain, hash);
+
+    if (entry == NULL)
+      THROW(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+  }
+
+  if (params->length > 1) {
+    if (!json_boolean_get(&verbose, params->values[1]))
+      THROW_TYPE(verbose, boolean);
+  }
+
+  if (verbose) {
+    confirmations = btc_rpc_get_depth(rpc, entry, &next);
+
+    res->result = json_entry_new_ex(entry, confirmations, next);
+  } else {
+    res->result = json_header_raw(&entry->header);
+  }
+}
+
+static void
+btc_rpc_getblock(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
+  const btc_entry_t *entry;
+  int32_t confirmations;
+  const uint8_t *next;
+  btc_block_t *block;
+  int verbosity = 1;
+  uint8_t hash[32];
+  int height;
+
+  if (params->help || params->length < 1 || params->length > 2)
+    THROW_MISC("getblock hash ( verbosity )");
+
+  if (params->values[0]->type == json_integer) {
+    if (!json_unsigned_get(&height, params->values[0]))
+      THROW(RPC_INVALID_PARAMETER, "Target block height out of range");
+
+    entry = btc_chain_by_height(rpc->chain, height);
+
+    if (entry == NULL)
+      THROW(RPC_INVALID_PARAMETER, "Target block height after current tip");
+  } else {
+    if (!json_hash_get(hash, params->values[0]))
+      THROW_TYPE(hash, hash_or_height);
+
+    entry = btc_chain_by_hash(rpc->chain, hash);
+
+    if (entry == NULL)
+      THROW(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+  }
+
+  if (params->length > 1) {
+    if (!json_unsigned_get(&verbosity, params->values[1]))
+      THROW_TYPE(verbosity, integer);
+  }
+
+  block = btc_chain_get_block(rpc->chain, entry);
+
+  if (block == NULL)
+    THROW_MISC("Can't read block from disk");
+
+  if (verbosity > 0) {
+    confirmations = btc_rpc_get_depth(rpc, entry, &next);
+
+    res->result = json_block_new_ex(block,
+                                    entry,
+                                    NULL,
+                                    confirmations,
+                                    next,
+                                    verbosity > 1,
+                                    rpc->network);
+  } else {
+    res->result = json_block_raw(block);
+  }
+
+  btc_block_destroy(block);
 }
 
 /*
@@ -434,6 +657,13 @@ static const struct {
 } btc_rpc_methods[] = {
   { "generate", btc_rpc_generate },
   { "generatetoaddress", btc_rpc_generatetoaddress },
+  { "getbestblockhash", btc_rpc_getbestblockhash },
+  { "getblock", btc_rpc_getblock },
+  { "getblockchaininfo", btc_rpc_getblockchaininfo },
+  { "getblockcount", btc_rpc_getblockcount },
+  { "getblockhash", btc_rpc_getblockhash },
+  { "getblockheader", btc_rpc_getblockheader },
+  { "getdifficulty", btc_rpc_getdifficulty },
   { "getgenerate", btc_rpc_getgenerate },
   { "getinfo", btc_rpc_getinfo },
   { "help", btc_rpc_help },

@@ -379,32 +379,6 @@ json_tx_new(const btc_tx_t *tx,
   return obj;
 }
 
-BTC_UNUSED static json_value *
-json_txbase_new(const btc_tx_t *tx) {
-  size_t size = btc_tx_base_size(tx);
-  uint8_t *raw = btc_malloc(size);
-  char *str = btc_malloc(size * 2 + 1);
-
-  btc_tx_base_write(raw, tx);
-  btc_base16_encode(str, raw, size);
-  btc_free(raw);
-
-  return json_string_new_nocopy(size * 2, str);
-}
-
-static json_value *
-json_txraw_new(const btc_tx_t *tx) {
-  size_t size = btc_tx_size(tx);
-  uint8_t *raw = btc_malloc(size);
-  char *str = btc_malloc(size * 2 + 1);
-
-  btc_tx_write(raw, tx);
-  btc_base16_encode(str, raw, size);
-  btc_free(raw);
-
-  return json_string_new_nocopy(size * 2, str);
-}
-
 json_value *
 json_tx_new_ex(const btc_tx_t *tx,
                const btc_view_t *view,
@@ -417,7 +391,7 @@ json_tx_new_ex(const btc_tx_t *tx,
     json_object_push(obj, "blockhash", json_hash_new(block));
 
   if (include_hex)
-    json_object_push(obj, "hex", json_txraw_new(tx));
+    json_object_push(obj, "hex", json_tx_raw(tx));
 
   return obj;
 }
@@ -531,4 +505,71 @@ json_block_new_ex(const btc_block_t *block,
   json_object_push(obj, "tx", txs);
 
   return obj;
+}
+
+/*
+ * Hexification
+ */
+
+json_value *
+json_tx_base(const btc_tx_t *tx) {
+  size_t size = btc_tx_base_size(tx);
+  uint8_t *raw = btc_malloc(size);
+  char *str = btc_malloc(size * 2 + 1);
+
+  btc_tx_base_write(raw, tx);
+  btc_base16_encode(str, raw, size);
+  btc_free(raw);
+
+  return json_string_new_nocopy(size * 2, str);
+}
+
+json_value *
+json_tx_raw(const btc_tx_t *tx) {
+  size_t size = btc_tx_size(tx);
+  uint8_t *raw = btc_malloc(size);
+  char *str = btc_malloc(size * 2 + 1);
+
+  btc_tx_write(raw, tx);
+  btc_base16_encode(str, raw, size);
+  btc_free(raw);
+
+  return json_string_new_nocopy(size * 2, str);
+}
+
+json_value *
+json_header_raw(const btc_header_t *hdr) {
+  char str[80 * 2 + 1];
+  uint8_t raw[80];
+
+  btc_header_write(raw, hdr);
+  btc_base16_encode(str, raw, 80);
+
+  return json_string_new_length(80 * 2, str);
+}
+
+json_value *
+json_block_base(const btc_block_t *block) {
+  size_t size = btc_block_base_size(block);
+  uint8_t *raw = btc_malloc(size);
+  char *str = btc_malloc(size * 2 + 1);
+
+  btc_block_base_write(raw, block);
+  btc_base16_encode(str, raw, size);
+  btc_free(raw);
+
+  return json_string_new_nocopy(size * 2, str);
+}
+
+json_value *
+json_block_raw(const btc_block_t *block) {
+  size_t size = btc_block_size(block);
+  uint8_t *raw = btc_malloc(size);
+  char *str = btc_malloc(size * 2 + 1);
+
+  btc_block_write(raw, block);
+  btc_base16_encode(str, raw, size);
+  btc_free(raw);
+
+  return json_string_new_nocopy(size * 2, str);
 }

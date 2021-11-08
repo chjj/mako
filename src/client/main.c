@@ -38,6 +38,13 @@ static const struct {
 } rpc_methods[] = {
   { "generate", { json_integer } },
   { "generatetoaddress", { json_integer, json_string } },
+  { "getbestblockhash", { json_none } },
+  { "getblock", { json_null, json_integer } },
+  { "getblockchaininfo", { json_none } },
+  { "getblockcount", { json_none } },
+  { "getblockhash", { json_integer } },
+  { "getblockheader", { json_null, json_boolean } },
+  { "getdifficulty", { json_none } },
   { "getgenerate", { json_none } },
   { "getinfo", { json_none } },
   { "help", { json_string } },
@@ -143,6 +150,12 @@ main(int argc, char **argv) {
 
     obj = json_decode(param, strlen(param));
 
+    /* json_null = string or integer */
+    if (type == json_null && obj == NULL) {
+      json_array_push(params, json_string_new(param));
+      continue;
+    }
+
     if (obj != NULL) {
       json_array_push(params, obj);
 
@@ -150,10 +163,13 @@ main(int argc, char **argv) {
         case json_object:
         case json_array:
         case json_integer:
-        case json_null:
           if (obj->type == type)
             continue;
           break;
+        case json_null:
+          /* json_null = string or integer */
+          if (obj->type == json_integer)
+            continue;
         case json_boolean:
           if (obj->type == json_integer || obj->type == json_boolean)
             continue;
@@ -190,7 +206,11 @@ main(int argc, char **argv) {
   if (result == NULL)
     goto fail;
 
-  json_print_ex(result, puts, json_options);
+  if (result->type == json_string)
+    puts(result->u.string.ptr);
+  else
+    json_print_ex(result, puts, json_options);
+
   json_builder_free(result);
 
   ret = EXIT_SUCCESS;
