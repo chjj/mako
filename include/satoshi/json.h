@@ -17,6 +17,7 @@
 #define json_boolean_get btc_json_boolean_get
 #define json_signed_get btc_json_signed_get
 #define json_unsigned_get btc_json_unsigned_get
+#define json_double_get btc_json_double_get
 #define json_object_get btc_json_object_get
 #define json_object_pluck btc_json_object_pluck
 #define json_encode btc_json_encode
@@ -73,6 +74,9 @@ json_signed_get(int *z, const json_value *obj);
 
 BTC_EXTERN int
 json_unsigned_get(int *z, const json_value *obj);
+
+BTC_EXTERN int
+json_double_get(double *z, const json_value *obj);
 
 BTC_EXTERN json_value *
 json_object_get(const json_value *obj, const char *name);

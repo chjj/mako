@@ -833,7 +833,25 @@ json_value * json_parse_ex (json_settings * settings,
                         goto e_failed;
                      }
 
-                     top->u.dbl += num_fraction / pow (10.0, num_digits);
+                     if ((state.settings.settings & json_enable_amounts) &&
+                         (top->u.dbl <= 21e6 && num_digits <= 8) &&
+                         (b != 'e' && b != 'E'))
+                     {
+                        json_int_t hi = (json_int_t) top->u.dbl;
+                        json_int_t lo = (json_int_t) num_fraction;
+
+                        if (lo != 0) {
+                           while (num_digits++ < 8)
+                              lo *= 10;
+                        }
+
+                        top->type = json_amount;
+                        top->u.integer = hi * 100000000 + lo;
+                     }
+                     else
+                     {
+                        top->u.dbl += num_fraction / pow (10.0, num_digits);
+                     }
                   }
 
                   if (b == 'e' || b == 'E')
@@ -864,7 +882,7 @@ json_value * json_parse_ex (json_settings * settings,
 
                if (flags & flag_num_negative)
                {
-                  if (top->type == json_integer)
+                  if (top->type == json_integer || top->type == json_amount)
                      top->u.integer = - top->u.integer;
                   else
                      top->u.dbl = - top->u.dbl;

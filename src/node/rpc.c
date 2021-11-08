@@ -643,6 +643,35 @@ btc_rpc_generatetoaddress(btc_rpc_t *rpc,
 }
 
 /*
+ * Wallet
+ */
+
+static void
+btc_rpc_sendtoaddress(btc_rpc_t *rpc,
+                      const json_params *params,
+                      rpc_res_t *res) {
+  btc_address_t addr;
+  json_value *obj;
+  int64_t value;
+
+  if (params->help || params->length != 2)
+    THROW_MISC("sendtoaddress address amount");
+
+  if (!json_address_get(&addr, params->values[0], rpc->network))
+    THROW(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+
+  if (!json_amount_get(&value, params->values[1]))
+    THROW_TYPE(amount, amount);
+
+  obj = json_object_new(2);
+
+  json_object_push(obj, "address", json_address_new(&addr, rpc->network));
+  json_object_push(obj, "amount", json_amount_new(value));
+
+  res->result = obj;
+}
+
+/*
  * Registry
  */
 
@@ -667,6 +696,7 @@ static const struct {
   { "getgenerate", btc_rpc_getgenerate },
   { "getinfo", btc_rpc_getinfo },
   { "help", btc_rpc_help },
+  { "sendtoaddress", btc_rpc_sendtoaddress },
   { "setgenerate", btc_rpc_setgenerate }
 };
 
@@ -742,6 +772,7 @@ btc_rpc_help(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
 static int
 on_request(http_server_t *server, http_req_t *req, http_res_t *res) {
   btc_rpc_t *rpc = server->data;
+  json_settings settings;
   json_value *obj;
   rpc_req_t rreq;
   rpc_res_t rres;
@@ -759,7 +790,11 @@ on_request(http_server_t *server, http_req_t *req, http_res_t *res) {
   rpc_req_init(&rreq);
   rpc_res_init(&rres);
 
-  obj = json_parse(req->body.data, req->body.length);
+  memset(&settings, 0, sizeof(settings));
+
+  settings.settings = json_enable_amounts;
+
+  obj = json_parse_ex(&settings, req->body.data, req->body.length, NULL);
 
   if (!rpc_req_set(&rreq, obj))
     rpc_res_error(&rres, RPC_INVALID_REQUEST, "Invalid request");

@@ -66,6 +66,26 @@ json_unsigned_get(int *z, const json_value *obj) {
   return 0;
 }
 
+int
+json_double_get(double *z, const json_value *obj) {
+  if (obj->type == json_double) {
+    *z = obj->u.dbl;
+    return 1;
+  }
+
+  if (obj->type == json_integer) {
+    *z = (double)obj->u.integer;
+    return 1;
+  }
+
+  if (obj->type == json_amount) {
+    *z = (double)obj->u.integer / 100000000.0;
+    return 1;
+  }
+
+  return 0;
+}
+
 static json_object_entry *
 json_object_find(const json_value *obj, const char *name) {
   const json_object_entry *entry;
@@ -148,6 +168,7 @@ json_decode(const json_char *json, size_t length) {
 
   memset(&settings, 0, sizeof(settings));
 
+  settings.settings = json_enable_amounts;
   settings.value_extra = json_builder_extra;
 
   return json_parse_ex(&settings, json, length, NULL);
@@ -158,6 +179,7 @@ json_decode_ex(json_settings *settings,
                const json_char *json,
                size_t length,
                char *error_buf) {
+  settings->settings |= json_enable_amounts;
   settings->value_extra = json_builder_extra;
   return json_parse_ex(settings, json, length, error_buf);
 }

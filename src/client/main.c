@@ -143,7 +143,7 @@ main(int argc, char **argv) {
       goto fail;
     }
 
-    if (type == json_string || type == json_amount) {
+    if (type == json_string) {
       json_array_push(params, json_string_new(param));
       continue;
     }
@@ -160,25 +160,35 @@ main(int argc, char **argv) {
       json_array_push(params, obj);
 
       switch (type) {
+        case json_none:
+          break;
         case json_object:
         case json_array:
         case json_integer:
           if (obj->type == type)
             continue;
           break;
+        case json_amount:
+          if (obj->type == json_amount || obj->type == json_integer)
+            continue;
+          break;
+        case json_double:
+          if (obj->type == json_double
+              || obj->type == json_integer
+              || obj->type == json_amount) {
+            continue;
+          }
+          break;
+        case json_string:
+          break;
+        case json_boolean:
+          if (obj->type == json_boolean || obj->type == json_integer)
+            continue;
+          break;
         case json_null:
           /* json_null = string or integer */
           if (obj->type == json_integer)
             continue;
-        case json_boolean:
-          if (obj->type == json_integer || obj->type == json_boolean)
-            continue;
-          break;
-        case json_double:
-          if (obj->type == json_integer || obj->type == json_double)
-            continue;
-          break;
-        default:
           break;
       }
     }

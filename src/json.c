@@ -32,7 +32,7 @@ json_value *
 json_hash_new(const uint8_t *hash) {
   char str[64 + 1];
 
-  if (hash == NULL || btc_hash_is_null(hash))
+  if (hash == NULL)
     return json_null_new();
 
   btc_hash_export(str, hash);
@@ -53,6 +53,17 @@ json_hash_get(uint8_t *hash, const json_value *obj) {
 
 int
 json_amount_get(int64_t *z, const json_value *obj) {
+  if (obj->type == json_amount) {
+    int64_t x = obj->u.integer;
+
+    if (x < 0 || x > BTC_MAX_MONEY)
+      return 0;
+
+    *z = x;
+
+    return 1;
+  }
+
   if (obj->type == json_integer) {
     int64_t x = obj->u.integer;
 
@@ -97,12 +108,7 @@ json_amount_get(int64_t *z, const json_value *obj) {
 
 json_value *
 json_buffer_new(const btc_buffer_t *item) {
-  char *str;
-
-  if (item->length == 0)
-    return json_string_new_length(0, "");
-
-  str = btc_malloc(item->length * 2 + 1);
+  char *str = btc_malloc(item->length * 2 + 1);
 
   btc_base16_encode(str, item->data, item->length);
 
