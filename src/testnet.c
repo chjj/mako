@@ -389,16 +389,6 @@ static const btc_deployment_t testnet_deployments[] = {
     /* .force = */ 0
   },
   {
-    /* .name = */ "segsignal",
-    /* .bit = */ 4,
-    /* .start_time = */ 0xffffffff,
-    /* .timeout = */ 0xffffffff,
-    /* .threshold = */ 269, /* 80% */
-    /* .window = */ 336, /* ~2.33 days */
-    /* .required = */ 0,
-    /* .force = */ 0
-  },
-  {
     /* .name = */ "testdummy",
     /* .bit = */ 28,
     /* .start_time = */ 1199145601, /* January 1, 2008 */

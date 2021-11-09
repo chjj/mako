@@ -24,8 +24,6 @@ enum btc_node_flags {
    */
   BTC_CHAIN_CHECKPOINTS = 1 << 0,
   BTC_CHAIN_PRUNE = 1 << 1,
-  BTC_CHAIN_BIP91 = 0,
-  BTC_CHAIN_BIP148 = 0,
   BTC_CHAIN_DEFAULT_FLAGS = BTC_CHAIN_CHECKPOINTS,
 
   /*

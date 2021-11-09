@@ -48,8 +48,6 @@ btc_deployment_state_init(btc_deployment_state_t *state) {
   state->flags &= ~BTC_SCRIPT_VERIFY_P2SH;
   state->lock_flags = BTC_MANDATORY_LOCKTIME_FLAGS;
   state->bip34 = 0;
-  state->bip91 = 0;
-  state->bip148 = 0;
 }
 
 /*
@@ -959,7 +957,6 @@ btc_chain_get_deployments(btc_chain_t *chain,
   const btc_network_t *network = chain->network;
   int32_t height = prev->height + 1;
   const btc_deployment_t *deploy;
-  int witness;
 
   btc_deployment_state_init(state);
 
@@ -998,43 +995,13 @@ btc_chain_get_deployments(btc_chain_t *chain,
     state->lock_flags |= BTC_LOCKTIME_MEDIAN_TIME_PAST;
   }
 
-  /* Check the state of the segwit deployment. */
-  deploy = btc_network_deployment(network, "segwit");
-  witness = btc_chain_get_state(chain, prev, deploy);
-
   /* Segregrated witness (bip141) is now usable.
      along with SCRIPT_VERIFY_NULLDUMMY (bip147). */
-  if (witness == BTC_STATE_ACTIVE) {
+  deploy = btc_network_deployment(network, "segwit");
+
+  if (btc_chain_is_active(chain, prev, deploy)) {
     state->flags |= BTC_SCRIPT_VERIFY_WITNESS;
     state->flags |= BTC_SCRIPT_VERIFY_NULLDUMMY;
-  }
-
-  /* Segsignal is now enforced (bip91). */
-  if (chain->flags & BTC_CHAIN_BIP91) {
-    if (witness == BTC_STATE_STARTED) {
-      deploy = btc_network_deployment(network, "segsignal");
-
-      if (btc_chain_is_active(chain, prev, deploy))
-        state->bip91 = 1;
-    }
-  }
-
-  /* UASF is now enforced (bip148) (mainnet-only). */
-  if ((chain->flags & BTC_CHAIN_BIP148)
-      && network->type == BTC_NETWORK_MAINNET) {
-    if (witness != BTC_STATE_LOCKED_IN && witness != BTC_STATE_ACTIVE) {
-      /* The BIP148 MTP check is nonsensical in
-         that it includes the _current_ entry's
-         timestamp. This requires some hackery,
-         since we only operate on the sane
-         assumption that deployment checks should
-         only ever examine the values of the
-         previous block (necessary for mining). */
-      int64_t mtp = btc_entry_bip148_time(prev, time);
-
-      if (mtp >= 1501545600 && mtp <= 1510704000)
-        state->bip148 = 1;
-    }
   }
 }
 
@@ -1170,14 +1137,6 @@ btc_chain_verify(btc_chain_t *chain,
 
   /* Get the new deployment state. */
   btc_chain_get_deployments(chain, state, hdr->time, prev);
-
-  /* Enforce BIP91/BIP148. */
-  if (state->bip91 || state->bip148) {
-    const btc_deployment_t *segwit = btc_network_deployment(network, "segwit");
-
-    if (!btc_has_versionbit(hdr->version, segwit->bit))
-      return btc_chain_throw(chain, hdr, "invalid", "bad-no-segwit", 0, 0);
-  }
 
   /* Get timestamp for tx.isFinal(). */
   time = hdr->time;

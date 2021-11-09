@@ -191,21 +191,3 @@ btc_entry_median_time(const btc_entry_t *entry) {
 
   return tvec[len >> 1];
 }
-
-int64_t
-btc_entry_bip148_time(const btc_entry_t *prev, int64_t ts) {
-  int64_t tvec[BTC_MEDIAN_TIMESPAN];
-  int len = 0;
-  int i;
-
-  tvec[len++] = ts;
-
-  for (i = 1; i < BTC_MEDIAN_TIMESPAN && prev != NULL; i++) {
-    tvec[len++] = prev->header.time;
-    prev = prev->prev;
-  }
-
-  qsort(tvec, len, sizeof(int64_t), cmptime);
-
-  return tvec[len >> 1];
-}

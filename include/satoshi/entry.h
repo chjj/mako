@@ -65,9 +65,6 @@ btc_entry_set_block(btc_entry_t *entry,
 BTC_EXTERN int64_t
 btc_entry_median_time(const btc_entry_t *entry);
 
-BTC_EXTERN int64_t
-btc_entry_bip148_time(const btc_entry_t *prev, int64_t ts);
-
 BTC_EXTERN void
 btc_entry_inspect(const btc_entry_t *entry);
 
