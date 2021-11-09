@@ -9,6 +9,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <io/core.h>
+
 #include <node/chain.h>
 #include <node/logger.h>
 #include <node/mempool.h>
@@ -222,7 +224,8 @@ struct btc_mempool_s {
   btc_outmap_t *spents;
   btc_filter_t rejects;
   btc_verify_error_t error;
-  int paranoid_checks;
+  unsigned int flags;
+  char file[BTC_PATH_MAX];
   btc_mempool_tx_cb *on_tx;
   btc_mempool_badorphan_cb *on_badorphan;
   void *arg;
@@ -240,6 +243,8 @@ btc_mempool_create(const btc_network_t *network, btc_chain_t *chain) {
   mp->waiting = btc_hashmap_create(); /* orphan prevout hashes */
   mp->orphans = btc_hashmap_create();
   mp->spents = btc_outmap_create(); /* mempool entry's outpoints */
+  mp->flags = BTC_MEMPOOL_DEFAULT_FLAGS;
+  mp->file[0] = '\0';
 
   btc_filter_init(&mp->rejects);
   btc_filter_set(&mp->rejects, 120000, 0.000001);
@@ -310,8 +315,16 @@ btc_mempool_log(btc_mempool_t *mp, const char *fmt, ...) {
 }
 
 int
-btc_mempool_open(btc_mempool_t *mp) {
+btc_mempool_open(btc_mempool_t *mp, const char *prefix, unsigned int flags) {
+  mp->flags = flags;
+
+  if (prefix != NULL) {
+    if (!btc_path_resolve(mp->file, sizeof(mp->file), prefix, "mempool.dat", 0))
+      return 0;
+  }
+
   btc_mempool_log(mp, "Opening mempool.");
+
   return 1;
 }
 
@@ -974,7 +987,7 @@ static int
 btc_mempool_verify(btc_mempool_t *mp,
                    const btc_mpentry_t *entry,
                    const btc_view_t *view) {
-  unsigned int lock_flags = BTC_CHAIN_STANDARD_LOCKTIME_FLAGS;
+  unsigned int lock_flags = BTC_STANDARD_LOCKTIME_FLAGS;
   const btc_deployment_state_t *state = btc_chain_state(mp->chain);
   const btc_entry_t *tip = btc_chain_tip(mp->chain);
   int32_t height = tip->height + 1;
@@ -1091,7 +1104,7 @@ btc_mempool_verify(btc_mempool_t *mp,
   }
 
   /* Paranoid checks. */
-  if (mp->paranoid_checks)
+  if (mp->flags & BTC_MEMPOOL_PARANOID)
     CHECK(btc_tx_verify(tx, view, BTC_SCRIPT_MANDATORY_VERIFY_FLAGS));
 
   return 1;
@@ -1100,7 +1113,7 @@ btc_mempool_verify(btc_mempool_t *mp,
 static int
 btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   const btc_deployment_state_t *state = btc_chain_state(mp->chain);
-  unsigned int lock_flags = BTC_CHAIN_STANDARD_LOCKTIME_FLAGS;
+  unsigned int lock_flags = BTC_STANDARD_LOCKTIME_FLAGS;
   const btc_entry_t *tip = btc_chain_tip(mp->chain);
   int32_t height = tip->height;
   btc_verify_error_t err;
@@ -1332,7 +1345,7 @@ btc_mempool_remove_block(btc_mempool_t *mp,
 
 void
 btc_mempool_handle_reorg(btc_mempool_t *mp) {
-  unsigned int flags = BTC_CHAIN_STANDARD_LOCKTIME_FLAGS;
+  unsigned int flags = BTC_STANDARD_LOCKTIME_FLAGS;
   const btc_entry_t *tip = btc_chain_tip(mp->chain);
   int64_t mtp = btc_entry_median_time(tip);
   int32_t height = tip->height + 1;

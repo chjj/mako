@@ -15,6 +15,58 @@ extern "C" {
 #include <stdint.h>
 
 /*
+ * Flags
+ */
+
+enum btc_node_flags {
+  /*
+   * Chain
+   */
+  BTC_CHAIN_CHECKPOINTS = 1 << 0,
+  BTC_CHAIN_PRUNE = 1 << 1,
+  BTC_CHAIN_BIP91 = 0,
+  BTC_CHAIN_BIP148 = 0,
+  BTC_CHAIN_DEFAULT_FLAGS = BTC_CHAIN_CHECKPOINTS,
+
+  /*
+   * Mempool
+   */
+  BTC_MEMPOOL_PARANOID = 1 << 2,
+  BTC_MEMPOOL_PERSISTENT = 1 << 3,
+  BTC_MEMPOOL_DEFAULT_FLAGS = 0,
+
+  /*
+   * Pool
+   */
+  BTC_POOL_LISTEN = 1 << 4,
+  BTC_POOL_CHECKPOINTS = 1 << 5,
+  BTC_POOL_NOCONNECT = 1 << 6,
+  BTC_POOL_CONNECT = 1 << 7,
+  BTC_POOL_PROXY = 1 << 8,
+  BTC_POOL_DISCOVER = 1 << 9,
+  BTC_POOL_UPNP = 1 << 10,
+  BTC_POOL_ONION = 1 << 11,
+  BTC_POOL_BLOCKSONLY = 1 << 12,
+  BTC_POOL_BIP37 = 1 << 13,
+  BTC_POOL_BIP152 = 1 << 14,
+  BTC_POOL_BIP157 = 1 << 15,
+  BTC_POOL_DEFAULT_FLAGS = BTC_POOL_LISTEN
+                         | BTC_POOL_CHECKPOINTS
+                         | BTC_POOL_DISCOVER
+                         | BTC_POOL_BIP152,
+
+  /*
+   * Miner
+   */
+  BTC_MINER_DEFAULT_FLAGS = 0,
+
+  /*
+   * RPC
+   */
+  BTC_RPC_DEFAULT_FLAGS = 0
+};
+
+/*
  * Types
  */
 
@@ -31,6 +83,7 @@ typedef struct btc_deployment_state_s {
   int bip148;
 } btc_deployment_state_t;
 
+typedef struct btc_chaindb_s btc_chaindb_t;
 typedef struct btc_chain_s btc_chain_t;
 
 typedef struct btc_logger_s btc_logger_t;

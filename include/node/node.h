@@ -27,7 +27,7 @@ BTC_EXTERN void
 btc_node_destroy(btc_node_t *node);
 
 BTC_EXTERN int
-btc_node_open(btc_node_t *node, const char *prefix, size_t map_size);
+btc_node_open(btc_node_t *node, const char *prefix, unsigned int flags);
 
 BTC_EXTERN void
 btc_node_close(btc_node_t *node);

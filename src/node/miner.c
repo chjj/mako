@@ -92,6 +92,7 @@ struct btc_miner_s {
   const btc_timedata_t *timedata;
   btc_chain_t *chain;
   btc_mempool_t *mempool;
+  unsigned int flags;
   btc_buffer_t cbflags;
   btc_vector_t addrs;
   btc_cpuminer_t cpu;
@@ -800,7 +801,7 @@ on_tick(void *arg) {
 
       btc_mutex_unlock(cpu->lock);
 
-      CHECK(btc_chain_add(miner->chain, block, BTC_CHAIN_DEFAULT_FLAGS, 0));
+      CHECK(btc_chain_add(miner->chain, block, BTC_BLOCK_DEFAULT_FLAGS, 0));
 
       btc_block_destroy(block);
 
@@ -925,6 +926,7 @@ btc_miner_create(const btc_network_t *network,
   miner->timedata = NULL;
   miner->chain = chain;
   miner->mempool = mempool;
+  miner->flags = BTC_MINER_DEFAULT_FLAGS;
 
   btc_buffer_init(&miner->cbflags);
   btc_vector_init(&miner->addrs);
@@ -968,13 +970,18 @@ btc_miner_log(btc_miner_t *miner, const char *fmt, ...) {
 }
 
 int
-btc_miner_open(btc_miner_t *miner) {
+btc_miner_open(btc_miner_t *miner, unsigned int flags) {
   btc_miner_log(miner, "Opening miner.");
+
+  miner->flags = flags;
+
   return 1;
 }
 
 void
 btc_miner_close(btc_miner_t *miner) {
+  btc_miner_log(miner, "Closing miner.");
+
   if (miner->cpu.mining)
     btc_cpuminer_stop(&miner->cpu);
 }
@@ -1189,7 +1196,7 @@ btc_miner_generate(btc_miner_t *miner, int blocks, const btc_address_t *addr) {
 
     block = btc_tmpl_mine(bt);
 
-    CHECK(btc_chain_add(miner->chain, block, BTC_CHAIN_DEFAULT_FLAGS, 0));
+    CHECK(btc_chain_add(miner->chain, block, BTC_BLOCK_DEFAULT_FLAGS, 0));
 
     btc_block_destroy(block);
     btc_tmpl_destroy(bt);

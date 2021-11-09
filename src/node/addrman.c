@@ -238,8 +238,12 @@ struct btc_addrman_s {
   const btc_network_t *network;
   btc_logger_t *logger;
   const btc_timedata_t *timedata;
+  char file[BTC_PATH_MAX];
+  unsigned int flags;
   btc_netaddr_t addr;
   uint64_t services;
+  btc_sockaddr_t proxy;
+  int64_t ban_time;
   uint8_t key[32];
   btc_addrmap_t *map;
   btc_vector_t fresh;
@@ -249,7 +253,6 @@ struct btc_addrman_s {
   btc_addrmap_t *local;
   btc_addrmap_t *banned;
   int needs_flush;
-  int flushing;
 };
 
 btc_addrman_t *
@@ -262,11 +265,14 @@ btc_addrman_create(const btc_network_t *network) {
   man->network = network;
   man->logger = NULL;
   man->timedata = NULL;
-  btc_netaddr_init(&man->addr);
-  btc_netaddr_localize(&man->addr);
+  man->file[0] = '\0';
+  man->flags = BTC_POOL_DEFAULT_FLAGS;
+  btc_netaddr_set(&man->addr, "127.0.0.1", network->port);
   man->addr.services = BTC_NET_LOCAL_SERVICES;
   man->addr.time = btc_now();
   man->services = BTC_NET_LOCAL_SERVICES;
+  btc_sockaddr_import(&man->proxy, "0.0.0.0", 0);
+  man->ban_time = 24 * 60 * 60;
   btc_getrandom(man->key, 32);
   man->map = btc_addrmap_create();
   btc_vector_init(&man->fresh);
@@ -276,7 +282,6 @@ btc_addrman_create(const btc_network_t *network) {
   man->local = btc_addrmap_create();
   man->banned = btc_addrmap_create();
   man->needs_flush = 0;
-  man->flushing = 0;
 
   for (i = 0; i < MAX_FRESH_BUCKETS; i++)
     btc_vector_push(&man->fresh, btc_addrmap_create());
@@ -329,6 +334,22 @@ btc_addrman_set_logger(btc_addrman_t *man, btc_logger_t *logger) {
 void
 btc_addrman_set_timedata(btc_addrman_t *man, const btc_timedata_t *td) {
   man->timedata = td;
+}
+
+void
+btc_addrman_set_external(btc_addrman_t *man, const btc_netaddr_t *addr) {
+  if (!btc_netaddr_is_null(addr))
+    btc_netaddr_copy(&man->addr, addr);
+}
+
+void
+btc_addrman_set_proxy(btc_addrman_t *man, const btc_netaddr_t *addr) {
+  btc_netaddr_get_sockaddr(&man->proxy, addr);
+}
+
+void
+btc_addrman_set_bantime(btc_addrman_t *man, int64_t ban_time) {
+  man->ban_time = ban_time;
 }
 
 static void
@@ -403,12 +424,19 @@ btc_addrman_resolve(btc_addrman_t *man) {
 }
 
 int
-btc_addrman_open(btc_addrman_t *man, const char *file) {
+btc_addrman_open(btc_addrman_t *man, const char *file, unsigned int flags) {
+  man->flags = flags;
+
   if (file != NULL) {
-    if (btc_addrman_read_file(man, file))
+    if (!btc_path_resolve(man->file, sizeof(man->file), file, 0))
+      return 0;
+
+    if (btc_addrman_read_file(man, man->file))
       return 1;
 
-    btc_addrman_log(man, "Could not read %s.", file);
+    btc_addrman_log(man, "Could not read %s.", man->file);
+  } else {
+    man->file[0] = '\0';
   }
 
   if (man->network->seeds.length == 0) {
@@ -448,10 +476,10 @@ btc_addrman_write_file(btc_addrman_t *man, const char *file) {
 }
 
 void
-btc_addrman_flush(btc_addrman_t *man, const char *file) {
+btc_addrman_flush(btc_addrman_t *man) {
   /* TODO: Put this on a worker thread. */
-  if (man->needs_flush) {
-    btc_addrman_write_file(man, file);
+  if (man->needs_flush && *man->file) {
+    btc_addrman_write_file(man, man->file);
     man->needs_flush = 0;
   }
 }
@@ -522,7 +550,7 @@ btc_addrman_is_banned(btc_addrman_t *man, const btc_netaddr_t *addr) {
   if (entry == NULL)
     return 0;
 
-  if (btc_now() > entry->time + 24 * 60 * 60) {
+  if (btc_now() > entry->time + man->ban_time) {
     btc_addrmap_del(man->banned, &key);
     btc_netaddr_destroy(entry);
     return 0;

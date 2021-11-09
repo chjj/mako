@@ -59,7 +59,7 @@ BTC_EXTERN void
 btc_mempool_set_context(btc_mempool_t *mp, void *arg);
 
 BTC_EXTERN int
-btc_mempool_open(btc_mempool_t *mp);
+btc_mempool_open(btc_mempool_t *mp, const char *prefix, unsigned int flags);
 
 BTC_EXTERN void
 btc_mempool_close(btc_mempool_t *mp);

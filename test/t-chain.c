@@ -13,7 +13,7 @@
 #include "data/chain_vectors_main.h"
 
 int main(void) {
-  unsigned int flags = BTC_CHAIN_DEFAULT_FLAGS;
+  unsigned int flags = BTC_BLOCK_DEFAULT_FLAGS;
   btc_chain_t *chain = btc_chain_create(btc_mainnet);
   unsigned char data[4096];
   btc_block_t block;
@@ -21,7 +21,9 @@ int main(void) {
 
   btc_clean(BTC_PREFIX);
 
-  ASSERT(btc_chain_open(chain, BTC_PREFIX, 20 << 20));
+  btc_chain_set_mapsize(chain, 20 << 20);
+
+  ASSERT(btc_chain_open(chain, BTC_PREFIX, BTC_CHAIN_DEFAULT_FLAGS));
 
   for (i = 0; i < lengthof(chain_vectors_main); i++) {
     size_t size = sizeof(data);

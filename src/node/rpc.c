@@ -233,6 +233,9 @@ struct btc_rpc_s {
   btc_miner_t *miner;
   btc_pool_t *pool;
   http_server_t *http;
+  unsigned int flags;
+  btc_sockaddr_t bind;
+  uint8_t auth_hash[32];
 };
 
 static int
@@ -240,8 +243,8 @@ on_request(http_server_t *server, http_req_t *req, http_res_t *res);
 
 btc_rpc_t *
 btc_rpc_create(btc_node_t *node) {
-  btc_rpc_t *rpc =
-    (btc_rpc_t *)btc_malloc(sizeof(btc_rpc_t));
+  const btc_network_t *network = node->network;
+  btc_rpc_t *rpc = btc_malloc(sizeof(btc_rpc_t));
 
   memset(rpc, 0, sizeof(*rpc));
 
@@ -255,6 +258,9 @@ btc_rpc_create(btc_node_t *node) {
   rpc->miner = node->miner;
   rpc->pool = node->pool;
   rpc->http = http_server_create(node->loop);
+  rpc->flags = BTC_RPC_DEFAULT_FLAGS;
+
+  btc_sockaddr_import(&rpc->bind, "127.0.0.1", network->rpc_port);
 
   rpc->http->on_request = on_request;
   rpc->http->data = rpc;
@@ -268,6 +274,24 @@ btc_rpc_destroy(btc_rpc_t *rpc) {
   btc_free(rpc);
 }
 
+void
+btc_rpc_set_bind(btc_rpc_t *rpc, const btc_netaddr_t *addr) {
+  btc_netaddr_get_sockaddr(&rpc->bind, addr);
+}
+
+void
+btc_rpc_set_credentials(btc_rpc_t *rpc, const char *user, const char *pass) {
+  btc_hmac256_t hmac;
+
+  if (pass == NULL || *pass == '\0') {
+    btc_hash_init(rpc->auth_hash);
+  } else {
+    btc_hmac256_init(&hmac, (const uint8_t *)user, strlen(user));
+    btc_hmac256_update(&hmac, (const uint8_t *)pass, strlen(pass));
+    btc_hmac256_final(&hmac, rpc->auth_hash);
+  }
+}
+
 static void
 btc_rpc_log(btc_rpc_t *rpc, const char *fmt, ...) {
   va_list ap;
@@ -277,23 +301,23 @@ btc_rpc_log(btc_rpc_t *rpc, const char *fmt, ...) {
 }
 
 int
-btc_rpc_open(btc_rpc_t *rpc) {
-  btc_sockaddr_t addr;
+btc_rpc_open(btc_rpc_t *rpc, unsigned int flags) {
+  rpc->flags = flags;
 
-  CHECK(btc_sockaddr_import(&addr, "127.0.0.1", rpc->network->rpc_port));
+  btc_rpc_log(rpc, "Opening RPC.");
 
-  btc_rpc_log(rpc, "Opening rpc.");
-
-  if (!http_server_open(rpc->http, &addr))
+  if (!http_server_open(rpc->http, &rpc->bind))
     return 0;
 
-  btc_rpc_log(rpc, "RPC listening on %S.", &addr);
+  btc_rpc_log(rpc, "RPC listening on %S.", &rpc->bind);
 
   return 1;
 }
 
 void
 btc_rpc_close(btc_rpc_t *rpc) {
+  btc_rpc_log(rpc, "Closing RPC.");
+
   http_server_close(rpc->http);
 }
 

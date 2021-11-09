@@ -46,7 +46,7 @@ btc_deployment_state_init(btc_deployment_state_t *state) {
 
   state->flags = BTC_SCRIPT_MANDATORY_VERIFY_FLAGS;
   state->flags &= ~BTC_SCRIPT_VERIFY_P2SH;
-  state->lock_flags = BTC_CHAIN_MANDATORY_LOCKTIME_FLAGS;
+  state->lock_flags = BTC_MANDATORY_LOCKTIME_FLAGS;
   state->bip34 = 0;
   state->bip91 = 0;
   state->bip148 = 0;
@@ -266,15 +266,14 @@ struct btc_chain_s {
   btc_deployment_state_t state;
   btc_verify_error_t error;
   int synced;
+  unsigned int flags;
+  int threads;
   btc_chain_block_cb *on_block;
   btc_chain_connect_cb *on_connect;
   btc_chain_connect_cb *on_disconnect;
   btc_chain_reorganize_cb *on_reorganize;
   btc_chain_badorphan_cb *on_badorphan;
   void *arg;
-  int checkpoints_enabled;
-  int bip91_enabled;
-  int bip148_enabled;
 };
 
 btc_chain_t *
@@ -287,9 +286,6 @@ btc_chain_create(const btc_network_t *network) {
   chain->logger = NULL;
   chain->db = btc_chaindb_create(network);
   chain->timedata = NULL;
-#ifdef USE_WORKERS
-  chain->workers = btc_workers_create(4, 128);
-#endif
   chain->invalid = btc_hashset_create();
   chain->orphan_map = btc_hashmap_create();
   chain->orphan_prev = btc_hashmap_create();
@@ -298,6 +294,10 @@ btc_chain_create(const btc_network_t *network) {
   chain->height = -1;
 
   btc_deployment_state_init(&chain->state);
+
+  chain->flags = BTC_CHAIN_DEFAULT_FLAGS;
+
+  btc_chain_set_threads(chain, 0);
 
   return chain;
 }
@@ -322,10 +322,6 @@ btc_chain_destroy(btc_chain_t *chain) {
   btc_hashmap_destroy(chain->orphan_prev);
   btc_statecache_clear(&chain->cache);
 
-#ifdef USE_WORKERS
-  btc_workers_destroy(chain->workers);
-#endif
-
   btc_chaindb_destroy(chain->db);
 
   btc_free(chain);
@@ -339,6 +335,30 @@ btc_chain_set_logger(btc_chain_t *chain, btc_logger_t *logger) {
 void
 btc_chain_set_timedata(btc_chain_t *chain, const btc_timedata_t *td) {
   chain->timedata = td;
+}
+
+void
+btc_chain_set_mapsize(btc_chain_t *chain, size_t map_size) {
+  btc_chaindb_set_mapsize(chain->db, map_size);
+}
+
+void
+btc_chain_set_threads(btc_chain_t *chain, int threads) {
+  if (threads <= 0) {
+    int num = btc_sys_numcpu();
+
+    if (num < 1)
+      num = 1;
+
+    threads += num;
+  }
+
+  if (threads <= 1)
+    threads = 0;
+  else if (threads > 16)
+    threads = 16;
+
+  chain->threads = threads;
 }
 
 void
@@ -374,11 +394,6 @@ btc_chain_set_context(btc_chain_t *chain, void *arg) {
   chain->arg = arg;
 }
 
-void
-btc_chain_set_checkpoints(btc_chain_t *chain, int value) {
-  chain->checkpoints_enabled = value;
-}
-
 static void
 btc_chain_log(btc_chain_t *chain, const char *fmt, ...) {
   va_list ap;
@@ -410,7 +425,7 @@ btc_chain_maybe_sync(btc_chain_t *chain) {
   if (chain->synced)
     return;
 
-  if (chain->checkpoints_enabled) {
+  if (chain->flags & BTC_CHAIN_CHECKPOINTS) {
     if (chain->height < network->last_checkpoint)
       return;
   }
@@ -429,20 +444,27 @@ btc_chain_maybe_sync(btc_chain_t *chain) {
 }
 
 int
-btc_chain_open(btc_chain_t *chain, const char *prefix, size_t map_size) {
+btc_chain_open(btc_chain_t *chain, const char *prefix, unsigned int flags) {
   btc_chain_log(chain, "Chain is loading.");
 
-  if (chain->checkpoints_enabled)
-    btc_chain_log(chain, "Checkpoints are enabled.");
+  chain->flags = flags;
 
-  if (!btc_chaindb_open(chain->db, prefix, map_size))
+  if (!btc_chaindb_open(chain->db, prefix, flags))
     return 0;
+
+#ifdef USE_WORKERS
+  if (chain->threads > 0)
+    chain->workers = btc_workers_create(chain->threads, 128);
+#endif
 
   chain->tip = (btc_entry_t *)btc_chaindb_tail(chain->db);
   chain->height = chain->tip->height;
   chain->synced = 0;
 
   btc_chain_get_deployment_state(chain, &chain->state);
+
+  if (chain->flags & BTC_CHAIN_CHECKPOINTS)
+    btc_chain_log(chain, "Checkpoints are enabled.");
 
   btc_chain_log(chain, "Chain Height: %d", chain->height);
 
@@ -453,6 +475,15 @@ btc_chain_open(btc_chain_t *chain, const char *prefix, size_t map_size) {
 
 void
 btc_chain_close(btc_chain_t *chain) {
+  btc_chain_log(chain, "Closing chain.");
+
+#ifdef USE_WORKERS
+  if (chain->workers != NULL) {
+    btc_workers_destroy(chain->workers);
+    chain->workers = NULL;
+  }
+#endif
+
   btc_chaindb_close(chain->db);
 }
 
@@ -636,7 +667,7 @@ btc_chain_verify_checkpoint(btc_chain_t *chain,
   int32_t height = prev->height + 1;
   const btc_checkpoint_t *chk;
 
-  if (!chain->checkpoints_enabled)
+  if (!(chain->flags & BTC_CHAIN_CHECKPOINTS))
     return 1;
 
   chk = btc_network_checkpoint(network, height);
@@ -667,7 +698,7 @@ btc_chain_verify_checkpoint(btc_chain_t *chain,
 
 static int
 btc_chain_is_historical(btc_chain_t *chain, const btc_entry_t *prev) {
-  if (chain->checkpoints_enabled) {
+  if (chain->flags & BTC_CHAIN_CHECKPOINTS) {
     if (prev->height + 1 <= chain->network->last_checkpoint)
       return 1;
   }
@@ -807,14 +838,14 @@ btc_chain_get_state(btc_chain_t *chain,
     prev = btc_chain_get_ancestor(chain, prev, height);
 
     if (prev == NULL)
-      return BTC_CHAIN_DEFINED;
+      return BTC_STATE_DEFINED;
 
     CHECK(prev->height == height);
     CHECK(((prev->height + 1) % window) == 0);
   }
 
   entry = prev;
-  state = BTC_CHAIN_DEFINED;
+  state = BTC_STATE_DEFINED;
 
   btc_vector_init(&compute);
 
@@ -829,7 +860,7 @@ btc_chain_get_state(btc_chain_t *chain,
     time = btc_entry_median_time(entry);
 
     if (time < deployment->start_time) {
-      state = BTC_CHAIN_DEFINED;
+      state = BTC_STATE_DEFINED;
       btc_statecache_set(&chain->cache, bit, entry, state);
       break;
     }
@@ -845,27 +876,27 @@ btc_chain_get_state(btc_chain_t *chain,
     entry = (const btc_entry_t *)btc_vector_pop(&compute);
 
     switch (state) {
-      case BTC_CHAIN_DEFINED: {
+      case BTC_STATE_DEFINED: {
         time = btc_entry_median_time(entry);
 
         if (time >= deployment->timeout) {
-          state = BTC_CHAIN_FAILED;
+          state = BTC_STATE_FAILED;
           break;
         }
 
         if (time >= deployment->start_time) {
-          state = BTC_CHAIN_STARTED;
+          state = BTC_STATE_STARTED;
           break;
         }
 
         break;
       }
 
-      case BTC_CHAIN_STARTED: {
+      case BTC_STATE_STARTED: {
         time = btc_entry_median_time(entry);
 
         if (time >= deployment->timeout) {
-          state = BTC_CHAIN_FAILED;
+          state = BTC_STATE_FAILED;
           break;
         }
 
@@ -877,7 +908,7 @@ btc_chain_get_state(btc_chain_t *chain,
             count++;
 
           if (count >= threshold) {
-            state = BTC_CHAIN_LOCKED_IN;
+            state = BTC_STATE_LOCKED_IN;
             break;
           }
 
@@ -889,13 +920,13 @@ btc_chain_get_state(btc_chain_t *chain,
         break;
       }
 
-      case BTC_CHAIN_LOCKED_IN: {
-        state = BTC_CHAIN_ACTIVE;
+      case BTC_STATE_LOCKED_IN: {
+        state = BTC_STATE_ACTIVE;
         break;
       }
 
-      case BTC_CHAIN_FAILED:
-      case BTC_CHAIN_ACTIVE: {
+      case BTC_STATE_FAILED:
+      case BTC_STATE_ACTIVE: {
         break;
       }
 
@@ -917,7 +948,7 @@ static int
 btc_chain_is_active(btc_chain_t *chain,
                     const btc_entry_t *prev,
                     const btc_deployment_t *deployment) {
-  return btc_chain_get_state(chain, prev, deployment) == BTC_CHAIN_ACTIVE;
+  return btc_chain_get_state(chain, prev, deployment) == BTC_STATE_ACTIVE;
 }
 
 void
@@ -963,8 +994,8 @@ btc_chain_get_deployments(btc_chain_t *chain,
 
   if (btc_chain_is_active(chain, prev, deploy)) {
     state->flags |= BTC_SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
-    state->lock_flags |= BTC_CHAIN_VERIFY_SEQUENCE;
-    state->lock_flags |= BTC_CHAIN_MEDIAN_TIME_PAST;
+    state->lock_flags |= BTC_LOCKTIME_VERIFY_SEQUENCE;
+    state->lock_flags |= BTC_LOCKTIME_MEDIAN_TIME_PAST;
   }
 
   /* Check the state of the segwit deployment. */
@@ -973,14 +1004,14 @@ btc_chain_get_deployments(btc_chain_t *chain,
 
   /* Segregrated witness (bip141) is now usable.
      along with SCRIPT_VERIFY_NULLDUMMY (bip147). */
-  if (witness == BTC_CHAIN_ACTIVE) {
+  if (witness == BTC_STATE_ACTIVE) {
     state->flags |= BTC_SCRIPT_VERIFY_WITNESS;
     state->flags |= BTC_SCRIPT_VERIFY_NULLDUMMY;
   }
 
   /* Segsignal is now enforced (bip91). */
-  if (chain->bip91_enabled) {
-    if (witness == BTC_CHAIN_STARTED) {
+  if (chain->flags & BTC_CHAIN_BIP91) {
+    if (witness == BTC_STATE_STARTED) {
       deploy = btc_network_deployment(network, "segsignal");
 
       if (btc_chain_is_active(chain, prev, deploy))
@@ -989,8 +1020,9 @@ btc_chain_get_deployments(btc_chain_t *chain,
   }
 
   /* UASF is now enforced (bip148) (mainnet-only). */
-  if (chain->bip148_enabled && network->type == BTC_NETWORK_MAINNET) {
-    if (witness != BTC_CHAIN_LOCKED_IN && witness != BTC_CHAIN_ACTIVE) {
+  if ((chain->flags & BTC_CHAIN_BIP148)
+      && network->type == BTC_NETWORK_MAINNET) {
+    if (witness != BTC_STATE_LOCKED_IN && witness != BTC_STATE_ACTIVE) {
       /* The BIP148 MTP check is nonsensical in
          that it includes the _current_ entry's
          timestamp. This requires some hackery,
@@ -1068,7 +1100,7 @@ btc_chain_verify(btc_chain_t *chain,
      validated outside in the header chain. */
   if (btc_chain_is_historical(chain, prev)) {
     /* Check merkle root. */
-    if (flags & BTC_CHAIN_VERIFY_BODY) {
+    if (flags & BTC_BLOCK_VERIFY_BODY) {
       int rc = btc_block_merkle_root(root, block);
 
       if (rc == 0 || !btc_hash_equal(hdr->merkle_root, root)) {
@@ -1079,7 +1111,7 @@ btc_chain_verify(btc_chain_t *chain,
                                1);
       }
 
-      flags &= ~BTC_CHAIN_VERIFY_BODY;
+      flags &= ~BTC_BLOCK_VERIFY_BODY;
     }
 
     /* Once segwit is active, we will still
@@ -1093,7 +1125,7 @@ btc_chain_verify(btc_chain_t *chain,
   }
 
   /* Non-contextual checks. */
-  if (flags & BTC_CHAIN_VERIFY_BODY) {
+  if (flags & BTC_BLOCK_VERIFY_BODY) {
     btc_verify_error_t err;
 
     if (!btc_block_check_body(&err, block))
@@ -1150,7 +1182,7 @@ btc_chain_verify(btc_chain_t *chain,
   /* Get timestamp for tx.isFinal(). */
   time = hdr->time;
 
-  if (state->lock_flags & BTC_CHAIN_MEDIAN_TIME_PAST)
+  if (state->lock_flags & BTC_LOCKTIME_MEDIAN_TIME_PAST)
     time = mtp;
 
   /* Transactions must be finalized with
@@ -1303,7 +1335,7 @@ btc_chain_verify_final(btc_chain_t *chain,
   if (tx->locktime < BTC_LOCKTIME_THRESHOLD)
     return btc_tx_is_final(tx, height, -1);
 
-  if (flags & BTC_CHAIN_MEDIAN_TIME_PAST) {
+  if (flags & BTC_LOCKTIME_MEDIAN_TIME_PAST) {
     int64_t ts = btc_entry_median_time(prev);
     return btc_tx_is_final(tx, height, ts);
   }
@@ -1321,7 +1353,7 @@ btc_chain_verify_locks(btc_chain_t *chain,
   int64_t min_time = -1;
   size_t i;
 
-  if (!(flags & BTC_CHAIN_VERIFY_SEQUENCE))
+  if (!(flags & BTC_LOCKTIME_VERIFY_SEQUENCE))
     return 1;
 
   if (btc_tx_is_coinbase(tx) || tx->version < 2)
@@ -1544,7 +1576,7 @@ btc_chain_verify_context(btc_chain_t *chain,
 static int
 btc_chain_reconnect(btc_chain_t *chain, btc_entry_t *entry) {
   const btc_header_t *hdr = &entry->header;
-  unsigned int flags = BTC_CHAIN_VERIFY_NONE;
+  unsigned int flags = BTC_BLOCK_VERIFY_NONE;
   btc_deployment_state_t state;
   btc_entry_t *prev;
   btc_block_t *block;
@@ -1793,7 +1825,7 @@ btc_chain_save_alternate(btc_chain_t *chain,
   btc_deployment_state_t state;
 
   /* Do not accept forked chain older than the last checkpoint. */
-  if (chain->checkpoints_enabled) {
+  if (chain->flags & BTC_CHAIN_CHECKPOINTS) {
     if (entry->height < chain->network->last_checkpoint) {
       return btc_chain_throw(chain, hdr,
                              "checkpoint",
@@ -2004,7 +2036,7 @@ btc_chain_add(btc_chain_t *chain,
   }
 
   /* Check the PoW before doing anything. */
-  if (flags & BTC_CHAIN_VERIFY_POW) {
+  if (flags & BTC_BLOCK_VERIFY_POW) {
     if (!btc_header_verify(hdr))
       return btc_chain_throw(chain, hdr, "invalid", "high-hash", 50, 0);
   }
@@ -2080,6 +2112,11 @@ btc_chain_progress(btc_chain_t *chain) {
 int
 btc_chain_synced(btc_chain_t *chain) {
   return chain->synced;
+}
+
+int
+btc_chain_pruned(btc_chain_t *chain) {
+  return (chain->flags & BTC_CHAIN_PRUNE) != 0;
 }
 
 int
@@ -2214,8 +2251,8 @@ btc_chain_compute_version(btc_chain_t *chain, const btc_entry_t *prev) {
     deploy = &network->deployments.items[i];
     state = btc_chain_get_state(chain, prev, deploy);
 
-    if (state == BTC_CHAIN_LOCKED_IN
-        || (state == BTC_CHAIN_STARTED && deploy->force)) {
+    if (state == BTC_STATE_LOCKED_IN
+        || (state == BTC_STATE_STARTED && deploy->force)) {
       version |= (UINT32_C(1) << deploy->bit);
     }
   }

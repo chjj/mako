@@ -175,9 +175,15 @@ struct btc_pool_s {
   btc_hashset_t *block_map;
   btc_hashset_t *tx_map;
   btc_hashset_t *compact_map;
-  int checkpoints_enabled;
-  int bip37_enabled;
-  int bip152_enabled;
+
+  unsigned int flags;
+  btc_sockaddr_t bind;
+  btc_netaddr_t connect;
+  btc_sockaddr_t proxy;
+  size_t max_outbound;
+  size_t max_inbound;
+  enum btc_ipnet only_net;
+
   int block_mode;
   int checkpoints;
   int listening;
@@ -188,8 +194,6 @@ struct btc_pool_s {
   int64_t refill_timer;
   unsigned int id;
   uint64_t required_services;
-  size_t max_outbound;
-  size_t max_inbound;
   int synced;
 };
 
@@ -1049,7 +1053,7 @@ btc_peer_has_compact(btc_peer_t *peer) {
 
 static uint32_t
 btc_peer_block_type(btc_peer_t *peer) {
-  if (peer->pool->bip152_enabled
+  if ((peer->pool->flags & BTC_POOL_BIP152)
       && btc_peer_has_compact_support(peer)
       && btc_peer_has_compact(peer)) {
     return BTC_INV_CMPCT_BLOCK;
@@ -1307,7 +1311,7 @@ btc_peer_on_version(btc_peer_t *peer, const btc_version_t *msg) {
       return;
     }
 
-    if (peer->pool->checkpoints_enabled) {
+    if (peer->pool->flags & BTC_POOL_CHECKPOINTS) {
       if (peer->version < BTC_NET_HEADERS_VERSION) {
         btc_peer_log(peer, "Peer does not support getheaders (%N).",
                            &peer->addr);
@@ -1323,7 +1327,7 @@ btc_peer_on_version(btc_peer_t *peer, const btc_version_t *msg) {
       return;
     }
 
-    if (peer->pool->bip152_enabled) {
+    if (peer->pool->flags & BTC_POOL_BIP152) {
       if (!btc_peer_has_compact_support(peer)) {
         btc_peer_log(peer, "Peer does not support compact blocks (%N).",
                            &peer->addr);
@@ -1958,7 +1962,7 @@ btc_peers_close(btc_peers_t *list) {
  */
 
 static btc_hdrnode_t *
-btc_hdrentry_create(const uint8_t *hash, int32_t height) {
+btc_hdrnode_create(const uint8_t *hash, int32_t height) {
   btc_hdrnode_t *node = (btc_hdrnode_t *)btc_malloc(sizeof(btc_hdrnode_t));
 
   btc_hash_copy(node->hash, hash);
@@ -1970,7 +1974,7 @@ btc_hdrentry_create(const uint8_t *hash, int32_t height) {
 }
 
 static void
-btc_hdrentry_destroy(btc_hdrnode_t *node) {
+btc_hdrnode_destroy(btc_hdrnode_t *node) {
   btc_free(node);
 }
 
@@ -2000,9 +2004,15 @@ btc_pool_create(const btc_network_t *network,
   pool->block_map = btc_hashset_create();
   pool->tx_map = btc_hashset_create();
   pool->compact_map = btc_hashset_create();
-  pool->checkpoints_enabled = 1;
-  pool->bip37_enabled = 0;
-  pool->bip152_enabled = 0;
+
+  pool->flags = BTC_POOL_DEFAULT_FLAGS;
+  btc_sockaddr_import(&pool->bind, "::", network->port);
+  btc_netaddr_set(&pool->connect, "0.0.0.0", 0);
+  btc_sockaddr_import(&pool->proxy, "0.0.0.0", 0);
+  pool->max_outbound = 8;
+  pool->max_inbound = 8;
+  pool->only_net = BTC_IPNET_NONE;
+
   pool->block_mode = 0;
   pool->checkpoints = 0;
   pool->header_tip = NULL;
@@ -2012,8 +2022,6 @@ btc_pool_create(const btc_network_t *network,
   pool->refill_timer = 0;
   pool->id = 0;
   pool->required_services = BTC_NET_LOCAL_SERVICES;
-  pool->max_outbound = 8;
-  pool->max_inbound = 8;
   pool->synced = 0;
 
   return pool;
@@ -2042,6 +2050,53 @@ btc_pool_set_timedata(btc_pool_t *pool, btc_timedata_t *td) {
   btc_addrman_set_timedata(pool->addrman, td);
 }
 
+void
+btc_pool_set_bind(btc_pool_t *pool, const btc_netaddr_t *addr) {
+  btc_netaddr_get_sockaddr(&pool->bind, addr);
+
+  if (!btc_netaddr_is_null(addr))
+    btc_addrman_add_local(pool->addrman, addr, BTC_SCORE_BIND);
+}
+
+void
+btc_pool_set_external(btc_pool_t *pool, const btc_netaddr_t *addr) {
+  btc_addrman_set_external(pool->addrman, addr);
+
+  if (!btc_netaddr_is_null(addr))
+    btc_addrman_add_local(pool->addrman, addr, BTC_SCORE_MANUAL);
+}
+
+void
+btc_pool_set_connect(btc_pool_t *pool, const btc_netaddr_t *addr) {
+  btc_netaddr_copy(&pool->connect, addr);
+}
+
+void
+btc_pool_set_proxy(btc_pool_t *pool, const btc_netaddr_t *addr) {
+  btc_netaddr_get_sockaddr(&pool->proxy, addr);
+  btc_addrman_set_proxy(pool->addrman, addr);
+}
+
+void
+btc_pool_set_maxoutbound(btc_pool_t *pool, size_t max_outbound) {
+  pool->max_outbound = max_outbound;
+}
+
+void
+btc_pool_set_maxinbound(btc_pool_t *pool, size_t max_inbound) {
+  pool->max_inbound = max_inbound;
+}
+
+void
+btc_pool_set_bantime(btc_pool_t *pool, int64_t ban_time) {
+  btc_addrman_set_bantime(pool->addrman, ban_time);
+}
+
+void
+btc_pool_set_onlynet(btc_pool_t *pool, enum btc_ipnet only_net) {
+  pool->only_net = only_net;
+}
+
 static void
 btc_pool_log(btc_pool_t *pool, const char *fmt, ...) {
   va_list ap;
@@ -2053,19 +2108,13 @@ btc_pool_log(btc_pool_t *pool, const char *fmt, ...) {
 static int
 btc_pool_listen(btc_pool_t *pool) {
   btc_socket_t *server;
-  btc_sockaddr_t addr;
 
-  btc_sockaddr_init(&addr);
-
-  addr.family = BTC_AF_INET6;
-  addr.port = pool->network->port;
-
-  server = btc_loop_listen(pool->loop, &addr, pool->max_inbound);
+  server = btc_loop_listen(pool->loop, &pool->bind, pool->max_inbound);
 
   if (server == NULL) {
     const char *msg = btc_loop_strerror(pool->loop);
 
-    btc_pool_log(pool, "Could not listen on %S: %s.", &addr, msg);
+    btc_pool_log(pool, "Could not listen on %S: %s.", &pool->bind, msg);
 
     return 0;
   }
@@ -2076,7 +2125,7 @@ btc_pool_listen(btc_pool_t *pool) {
 
   pool->server = server;
 
-  btc_pool_log(pool, "Listening on %S.", &addr);
+  btc_pool_log(pool, "Listening on %S.", &pool->bind);
 
   return 1;
 }
@@ -2105,7 +2154,7 @@ btc_pool_clear_chain(btc_pool_t *pool) {
 
   for (node = pool->header_head; node != NULL; node = next) {
     next = node->next;
-    btc_hdrentry_destroy(node);
+    btc_hdrnode_destroy(node);
   }
 
   pool->checkpoints = 0;
@@ -2120,7 +2169,7 @@ btc_pool_reset_chain(btc_pool_t *pool) {
   const btc_network_t *network = pool->network;
   const btc_entry_t *tip;
 
-  if (!pool->checkpoints_enabled)
+  if (!(pool->flags & BTC_POOL_CHECKPOINTS))
     return;
 
   if (network->checkpoints.length == 0)
@@ -2133,7 +2182,7 @@ btc_pool_reset_chain(btc_pool_t *pool) {
   if (tip->height < network->last_checkpoint) {
     pool->checkpoints = 1;
     pool->header_tip = btc_pool_next_tip(pool, tip->height);
-    pool->header_head = btc_hdrentry_create(tip->hash, tip->height);
+    pool->header_head = btc_hdrnode_create(tip->hash, tip->height);
     pool->header_tail = pool->header_head;
 
     btc_pool_log(pool,
@@ -2143,15 +2192,24 @@ btc_pool_reset_chain(btc_pool_t *pool) {
 }
 
 int
-btc_pool_open(btc_pool_t *pool) {
+btc_pool_open(btc_pool_t *pool, const char *prefix, unsigned int flags) {
+  char file[BTC_PATH_MAX];
+
+  pool->flags = flags;
+
   btc_pool_log(pool, "Opening pool.");
 
-  if (!btc_addrman_open(pool->addrman, NULL))
+  if (!btc_path_resolve(file, sizeof(file), prefix, "peers.dat", 0))
     return 0;
 
-  if (!btc_pool_listen(pool)) {
-    btc_addrman_close(pool->addrman);
+  if (!btc_addrman_open(pool->addrman, file, flags))
     return 0;
+
+  if (pool->flags & BTC_POOL_LISTEN) {
+    if (!btc_pool_listen(pool)) {
+      btc_addrman_close(pool->addrman);
+      return 0;
+    }
   }
 
   pool->synced = btc_chain_synced(pool->chain);
@@ -2165,6 +2223,8 @@ btc_pool_open(btc_pool_t *pool) {
 
 void
 btc_pool_close(btc_pool_t *pool) {
+  btc_pool_log(pool, "Closing pool.");
+
   btc_loop_off_tick(pool->loop, on_tick, pool);
 
   if (pool->server != NULL)
@@ -2475,7 +2535,7 @@ btc_pool_on_complete(btc_pool_t *pool, btc_peer_t *peer) {
   }
 
   /* We want compact blocks! */
-  if (pool->bip152_enabled)
+  if (pool->flags & BTC_POOL_BIP152)
     btc_peer_send_sendcmpct(peer, pool->block_mode);
 
   if (peer->outbound) {
@@ -3187,10 +3247,8 @@ btc_pool_on_getblocks(btc_pool_t *pool,
   if (!btc_chain_synced(pool->chain))
     return;
 
-#if 0
   if (btc_chain_pruned(pool->chain))
     return;
-#endif
 
   entry = btc_chain_find_locator(pool->chain, &msg->locator);
 
@@ -3232,10 +3290,8 @@ btc_pool_on_getheaders(btc_pool_t *pool,
   if (!btc_chain_synced(pool->chain))
     return;
 
-#if 0
   if (btc_chain_pruned(pool->chain))
     return;
-#endif
 
   if (msg->locator.length > 0) {
     entry = btc_chain_find_locator(pool->chain, &msg->locator);
@@ -3297,7 +3353,7 @@ btc_pool_shift_header(btc_pool_t *pool) {
 
   pool->header_head = node->next;
 
-  btc_hdrentry_destroy(node);
+  btc_hdrnode_destroy(node);
 
   if (pool->header_head == NULL) {
     pool->header_tail = NULL;
@@ -3417,7 +3473,7 @@ btc_pool_on_headers(btc_pool_t *pool,
       checkpoint = 1;
     }
 
-    node = btc_hdrentry_create(hash, height);
+    node = btc_hdrnode_create(hash, height);
 
     if (pool->header_next == NULL)
       pool->header_next = node;
@@ -3555,13 +3611,13 @@ static void
 btc_pool_on_block(btc_pool_t *pool,
                   btc_peer_t *peer,
                   const btc_block_t *block) {
-  btc_pool_add_block(pool, peer, block, BTC_CHAIN_DEFAULT_FLAGS);
+  btc_pool_add_block(pool, peer, block, BTC_BLOCK_DEFAULT_FLAGS);
 }
 
 static void
 btc_pool_on_tx(btc_pool_t *pool, btc_peer_t *peer, const btc_tx_t *tx) {
   if (!btc_pool_resolve_tx(pool, peer, tx->hash)) {
-    btc_pool_log(pool, "Peer sent unrequested tx: %x (%s).",
+    btc_pool_log(pool, "Peer sent unrequested tx: %H (%N).",
                        tx->hash, &peer->addr);
     btc_peer_close(peer);
     return;
@@ -3608,7 +3664,7 @@ btc_pool_on_mempool(btc_pool_t *pool, btc_peer_t *peer) {
   if (!btc_chain_synced(pool->chain))
     return;
 
-  if (!pool->bip37_enabled) {
+  if (!(pool->flags & BTC_POOL_BIP37)) {
     btc_pool_log(pool, "Peer requested mempool without bip37 enabled (%N).",
                        &peer->addr);
     btc_peer_close(peer);
@@ -3662,7 +3718,7 @@ btc_pool_on_cmpctblock(btc_pool_t *pool,
   btc_mpiter_t iter;
   int rc;
 
-  if (!pool->bip152_enabled) {
+  if (!(pool->flags & BTC_POOL_BIP152)) {
     btc_pool_log(pool, "Peer sent unsolicited cmpctblock (%N).",
                        &peer->addr);
     btc_peer_close(peer);
@@ -3749,7 +3805,7 @@ btc_pool_on_cmpctblock(btc_pool_t *pool,
       block->hash, &peer->addr);
 
     btc_cmpct_finalize(blk, block);
-    btc_pool_add_block(pool, peer, blk, BTC_CHAIN_VERIFY_BODY);
+    btc_pool_add_block(pool, peer, blk, BTC_BLOCK_VERIFY_BODY);
     btc_block_destroy(blk);
 
     return;
@@ -3780,10 +3836,8 @@ btc_pool_on_getblocktxn(btc_pool_t *pool,
   const btc_entry_t *entry;
   btc_block_t *block;
 
-#if 0
   if (btc_chain_pruned(pool->chain))
     return;
-#endif
 
   entry = btc_chain_by_hash(pool->chain, req->hash);
 
@@ -3848,7 +3902,7 @@ btc_pool_on_blocktxn(btc_pool_t *pool,
   blk = btc_block_create();
 
   btc_cmpct_finalize(blk, block);
-  btc_pool_add_block(pool, peer, blk, BTC_CHAIN_VERIFY_BODY);
+  btc_pool_add_block(pool, peer, blk, BTC_BLOCK_VERIFY_BODY);
   btc_block_destroy(blk);
   btc_cmpct_destroy(block);
 }

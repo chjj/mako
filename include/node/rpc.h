@@ -26,18 +26,20 @@ btc_rpc_create(btc_node_t *node);
 BTC_EXTERN void
 btc_rpc_destroy(btc_rpc_t *rpc);
 
+BTC_EXTERN void
+btc_rpc_set_bind(btc_rpc_t *rpc, const btc_netaddr_t *addr);
+
+BTC_EXTERN void
+btc_rpc_set_credentials(btc_rpc_t *rpc, const char *user, const char *pass);
+
 BTC_EXTERN int
-btc_rpc_open(btc_rpc_t *rpc);
+btc_rpc_open(btc_rpc_t *rpc, unsigned int flags);
 
 BTC_EXTERN void
 btc_rpc_close(btc_rpc_t *rpc);
 
-struct _json_value;
-
-BTC_EXTERN struct _json_value *
-btc_rpc_call(btc_rpc_t *rpc,
-             const char *method,
-             const struct _json_value *params);
+BTC_EXTERN btc_json_t *
+btc_rpc_call(btc_rpc_t *rpc, const char *method, const btc_json_t *params);
 
 #ifdef __cplusplus
 }

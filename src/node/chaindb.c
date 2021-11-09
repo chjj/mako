@@ -168,7 +168,8 @@ btc_chainfile_update(btc_chainfile_t *z, const btc_entry_t *entry) {
 struct btc_chaindb_s {
   const btc_network_t *network;
   char prefix[BTC_PATH_MAX - 26];
-  int pruning_enabled;
+  unsigned int flags;
+  size_t map_size;
   MDB_env *env;
   MDB_dbi db_meta;
   MDB_dbi db_coin;
@@ -202,13 +203,15 @@ btc_chaindb_path(btc_chaindb_t *db, char *path, int type, int id) {
 
 static void
 btc_chaindb_init(btc_chaindb_t *db, const btc_network_t *network) {
+  uint64_t gb = sizeof(void *) >= 8 ? 16 : 1;
+
   memset(db, 0, sizeof(*db));
 
   db->network = network;
   db->prefix[0] = '/';
-  db->pruning_enabled = 0;
-
   db->hashes = btc_hashmap_create();
+  db->flags = BTC_CHAIN_DEFAULT_FLAGS;
+  db->map_size = (size_t)(gb << 30);
 
   btc_vector_init(&db->heights);
 
@@ -234,6 +237,11 @@ void
 btc_chaindb_destroy(btc_chaindb_t *db) {
   btc_chaindb_clear(db);
   btc_free(db);
+}
+
+void
+btc_chaindb_set_mapsize(btc_chaindb_t *db, size_t map_size) {
+  db->map_size = map_size;
 }
 
 static int
@@ -262,7 +270,7 @@ btc_chaindb_load_prefix(btc_chaindb_t *db, const char *prefix) {
 }
 
 static int
-btc_chaindb_load_database(btc_chaindb_t *db, size_t map_size) {
+btc_chaindb_load_database(btc_chaindb_t *db) {
   char path[BTC_PATH_MAX];
   unsigned int flags;
   MDB_txn *txn;
@@ -282,7 +290,7 @@ btc_chaindb_load_database(btc_chaindb_t *db, size_t map_size) {
     return 0;
   }
 
-  rc = mdb_env_set_mapsize(db->env, map_size);
+  rc = mdb_env_set_mapsize(db->env, db->map_size);
 
   if (rc != 0) {
     fprintf(stderr, "mdb_env_set_mapsize: %s\n", mdb_strerror(rc));
@@ -618,11 +626,13 @@ btc_chaindb_unload_index(btc_chaindb_t *db) {
 int
 btc_chaindb_open(btc_chaindb_t *db,
                  const char *prefix,
-                 size_t map_size) {
+                 unsigned int flags) {
+  db->flags = flags;
+
   if (!btc_chaindb_load_prefix(db, prefix))
     return 0;
 
-  if (!btc_chaindb_load_database(db, map_size))
+  if (!btc_chaindb_load_database(db))
     return 0;
 
   if (!btc_chaindb_load_files(db))
@@ -1030,7 +1040,7 @@ btc_chaindb_prune_files(btc_chaindb_t *db,
   uint8_t key[5];
   MDB_val mkey;
 
-  if (!db->pruning_enabled)
+  if (!(db->flags & BTC_CHAIN_PRUNE))
     return 1;
 
   if (entry->height < db->network->block.keep_blocks)

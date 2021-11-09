@@ -126,9 +126,11 @@ btc_node_log(btc_node_t *node, const char *fmt, ...) {
 }
 
 int
-btc_node_open(btc_node_t *node, const char *prefix, size_t map_size) {
+btc_node_open(btc_node_t *node, const char *prefix, unsigned int flags) {
   char path[BTC_PATH_MAX];
   char file[BTC_PATH_MAX];
+
+  btc_node_log(node, "Opening node.");
 
   if (!btc_path_resolve(path, sizeof(path), prefix, 0))
     return 0;
@@ -144,19 +146,19 @@ btc_node_open(btc_node_t *node, const char *prefix, size_t map_size) {
 
   btc_node_log(node, "Opening node.");
 
-  if (!btc_chain_open(node->chain, path, map_size))
+  if (!btc_chain_open(node->chain, path, flags))
     goto fail1;
 
-  if (!btc_mempool_open(node->mempool))
+  if (!btc_mempool_open(node->mempool, path, flags))
     goto fail2;
 
-  if (!btc_miner_open(node->miner))
+  if (!btc_miner_open(node->miner, flags))
     goto fail3;
 
-  if (!btc_pool_open(node->pool))
+  if (!btc_pool_open(node->pool, path, flags))
     goto fail4;
 
-  if (!btc_rpc_open(node->rpc))
+  if (!btc_rpc_open(node->rpc, flags))
     goto fail5;
 
   return 1;
@@ -175,6 +177,8 @@ fail1:
 
 void
 btc_node_close(btc_node_t *node) {
+  btc_node_log(node, "Closing node.");
+
   btc_rpc_close(node->rpc);
   btc_pool_close(node->pool);
   btc_miner_close(node->miner);

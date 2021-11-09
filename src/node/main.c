@@ -8,9 +8,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include <io/core.h>
+
+#include <node/chain.h>
 #include <node/node.h>
+#include <node/pool.h>
+#include <node/rpc.h>
+
 #include <satoshi/config.h>
+#include <satoshi/netaddr.h>
 
 /*
  * Config
@@ -36,6 +43,73 @@ get_config(btc_conf_t *args, int argc, char **argv) {
   return 1;
 }
 
+static void
+set_config(btc_node_t *node, const btc_conf_t *conf) {
+  btc_chain_set_mapsize(node->chain, (size_t)conf->map_size << 30);
+  btc_chain_set_threads(node->chain, conf->workers);
+
+  btc_pool_set_bind(node->pool, &conf->bind);
+  btc_pool_set_external(node->pool, &conf->external);
+  btc_pool_set_connect(node->pool, &conf->connect);
+  btc_pool_set_proxy(node->pool, &conf->proxy);
+  btc_pool_set_maxoutbound(node->pool, conf->max_outbound);
+  btc_pool_set_maxinbound(node->pool, conf->max_inbound);
+  btc_pool_set_bantime(node->pool, conf->ban_time);
+  btc_pool_set_onlynet(node->pool, conf->only_net);
+
+  btc_rpc_set_bind(node->rpc, &conf->rpc_bind);
+  btc_rpc_set_credentials(node->rpc, conf->rpc_user, conf->rpc_pass);
+}
+
+static unsigned int
+get_node_flags(const btc_conf_t *conf) {
+  unsigned int flags = 0;
+
+  if (conf->checkpoints)
+    flags |= BTC_CHAIN_CHECKPOINTS;
+
+  if (conf->prune)
+    flags |= BTC_CHAIN_PRUNE;
+
+  if (conf->listen)
+    flags |= BTC_POOL_LISTEN;
+
+  if (conf->checkpoints)
+    flags |= BTC_POOL_CHECKPOINTS;
+
+  if (conf->no_connect)
+    flags |= BTC_POOL_NOCONNECT;
+
+  if (!btc_netaddr_is_null(&conf->connect))
+    flags |= BTC_POOL_CONNECT;
+
+  if (!btc_netaddr_is_null(&conf->proxy))
+    flags |= BTC_POOL_PROXY;
+
+  if (conf->discover)
+    flags |= BTC_POOL_DISCOVER;
+
+  if (conf->upnp)
+    flags |= BTC_POOL_UPNP;
+
+  if (conf->onion)
+    flags |= BTC_POOL_ONION;
+
+  if (conf->blocks_only)
+    flags |= BTC_POOL_BLOCKSONLY;
+
+  if (conf->bip37)
+    flags |= BTC_POOL_BIP37;
+
+  if (conf->bip152)
+    flags |= BTC_POOL_BIP152;
+
+  if (conf->bip157)
+    flags |= BTC_POOL_BIP157;
+
+  return flags;
+}
+
 /*
  * Signal Handling
  */
@@ -51,7 +125,6 @@ on_sigterm(void *arg) {
 
 int
 main(int argc, char **argv) {
-  uint64_t map_size;
   btc_node_t *node;
   btc_conf_t args;
 
@@ -78,9 +151,10 @@ main(int argc, char **argv) {
   btc_net_startup();
 
   node = btc_node_create(args.network);
-  map_size = (uint64_t)args.map_size << 30;
 
-  if (!btc_node_open(node, args.prefix, map_size)) {
+  set_config(node, &args);
+
+  if (!btc_node_open(node, args.prefix, get_node_flags(&args))) {
     btc_node_destroy(node);
     btc_net_cleanup();
     return EXIT_FAILURE;

@@ -20,27 +20,27 @@ extern "C" {
  * Constants
  */
 
-enum btc_chain_flags {
-  BTC_CHAIN_VERIFY_NONE = 0,
-  BTC_CHAIN_VERIFY_POW  = 1 << 0,
-  BTC_CHAIN_VERIFY_BODY = 1 << 1,
-  BTC_CHAIN_DEFAULT_FLAGS = BTC_CHAIN_VERIFY_POW | BTC_CHAIN_VERIFY_BODY
+enum btc_block_flags {
+  BTC_BLOCK_VERIFY_NONE = 0,
+  BTC_BLOCK_VERIFY_POW  = 1 << 0,
+  BTC_BLOCK_VERIFY_BODY = 1 << 1,
+  BTC_BLOCK_DEFAULT_FLAGS = BTC_BLOCK_VERIFY_POW | BTC_BLOCK_VERIFY_BODY
 };
 
 enum btc_lock_flags {
-  BTC_CHAIN_VERIFY_SEQUENCE  = 1 << 0,
-  BTC_CHAIN_MEDIAN_TIME_PAST = 1 << 1,
-  BTC_CHAIN_MANDATORY_LOCKTIME_FLAGS = 0,
-  BTC_CHAIN_STANDARD_LOCKTIME_FLAGS = BTC_CHAIN_VERIFY_SEQUENCE
-                                    | BTC_CHAIN_MEDIAN_TIME_PAST
+  BTC_LOCKTIME_VERIFY_SEQUENCE = 1 << 0,
+  BTC_LOCKTIME_MEDIAN_TIME_PAST = 1 << 1,
+  BTC_MANDATORY_LOCKTIME_FLAGS = 0,
+  BTC_STANDARD_LOCKTIME_FLAGS = BTC_LOCKTIME_VERIFY_SEQUENCE
+                              | BTC_LOCKTIME_MEDIAN_TIME_PAST
 };
 
 enum btc_threshold_state {
-  BTC_CHAIN_DEFINED,
-  BTC_CHAIN_STARTED,
-  BTC_CHAIN_LOCKED_IN,
-  BTC_CHAIN_ACTIVE,
-  BTC_CHAIN_FAILED
+  BTC_STATE_DEFINED,
+  BTC_STATE_STARTED,
+  BTC_STATE_LOCKED_IN,
+  BTC_STATE_ACTIVE,
+  BTC_STATE_FAILED
 };
 
 /*
@@ -81,6 +81,12 @@ BTC_EXTERN void
 btc_chain_set_timedata(btc_chain_t *chain, const btc_timedata_t *td);
 
 BTC_EXTERN void
+btc_chain_set_mapsize(btc_chain_t *chain, size_t map_size);
+
+BTC_EXTERN void
+btc_chain_set_threads(btc_chain_t *chain, int threads);
+
+BTC_EXTERN void
 btc_chain_on_block(btc_chain_t *chain, btc_chain_block_cb *handler);
 
 BTC_EXTERN void
@@ -98,11 +104,8 @@ btc_chain_on_badorphan(btc_chain_t *chain, btc_chain_badorphan_cb *handler);
 BTC_EXTERN void
 btc_chain_set_context(btc_chain_t *chain, void *arg);
 
-BTC_EXTERN void
-btc_chain_set_checkpoints(btc_chain_t *chain, int value);
-
 BTC_EXTERN int
-btc_chain_open(btc_chain_t *chain, const char *prefix, size_t map_size);
+btc_chain_open(btc_chain_t *chain, const char *prefix, unsigned int flags);
 
 BTC_EXTERN void
 btc_chain_close(btc_chain_t *chain);
@@ -163,6 +166,9 @@ btc_chain_progress(btc_chain_t *chain);
 
 BTC_EXTERN int
 btc_chain_synced(btc_chain_t *chain);
+
+BTC_EXTERN int
+btc_chain_pruned(btc_chain_t *chain);
 
 BTC_EXTERN int
 btc_chain_has_hash(btc_chain_t *chain, const uint8_t *hash);

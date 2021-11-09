@@ -441,7 +441,7 @@ conf_init(btc_conf_t *conf) {
   conf->daemon = 0;
   conf->network_active = 1;
   conf->disable_wallet = 0;
-  conf->map_size = 16;
+  conf->map_size = sizeof(void *) >= 8 ? 16 : 1;
   conf->checkpoints = 1;
   conf->prune = 0;
   conf->workers = 0;
@@ -814,6 +814,11 @@ conf_finalize(btc_conf_t *conf, const char *prefix) {
       btc_die("Invalid datadir: %s", path);
       return;
     }
+  }
+
+  if (sizeof(void *) < 8) {
+    if (conf->map_size > 1)
+      conf->map_size = 1;
   }
 
   if (conf->port == 0)

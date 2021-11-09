@@ -12,14 +12,9 @@ extern "C" {
 #endif
 
 #include <stddef.h>
+#include "types.h"
 #include "../satoshi/common.h"
 #include "../satoshi/types.h"
-
-/*
- * Types
- */
-
-typedef struct btc_chaindb_s btc_chaindb_t;
 
 /*
  * Chain Database
@@ -31,10 +26,11 @@ btc_chaindb_create(const btc_network_t *network);
 BTC_EXTERN void
 btc_chaindb_destroy(btc_chaindb_t *db);
 
+BTC_EXTERN void
+btc_chaindb_set_mapsize(btc_chaindb_t *db, size_t map_size);
+
 BTC_EXTERN int
-btc_chaindb_open(btc_chaindb_t *db,
-                 const char *prefix,
-                 size_t map_size);
+btc_chaindb_open(btc_chaindb_t *db, const char *prefix, unsigned int flags);
 
 BTC_EXTERN void
 btc_chaindb_close(btc_chaindb_t *db);

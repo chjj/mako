@@ -145,7 +145,7 @@ btc_tmpl_add(btc_tmpl_t *bt, const btc_tx_t *tx, const btc_view_t *view);
 
 BTC_EXTERN btc_miner_t *
 btc_miner_create(const btc_network_t *network,
-                 btc_loop_t *loop,
+                 struct btc_loop_s *loop,
                  btc_chain_t *chain,
                  btc_mempool_t *mempool);
 
@@ -159,7 +159,7 @@ BTC_EXTERN void
 btc_miner_set_timedata(btc_miner_t *miner, const btc_timedata_t *td);
 
 BTC_EXTERN int
-btc_miner_open(btc_miner_t *miner);
+btc_miner_open(btc_miner_t *miner, unsigned int flags);
 
 BTC_EXTERN void
 btc_miner_close(btc_miner_t *miner);

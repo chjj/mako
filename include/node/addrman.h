@@ -65,14 +65,23 @@ btc_addrman_set_logger(btc_addrman_t *man, btc_logger_t *logger);
 BTC_EXTERN void
 btc_addrman_set_timedata(btc_addrman_t *man, const btc_timedata_t *td);
 
+BTC_EXTERN void
+btc_addrman_set_external(btc_addrman_t *man, const btc_netaddr_t *addr);
+
+BTC_EXTERN void
+btc_addrman_set_proxy(btc_addrman_t *man, const btc_netaddr_t *addr);
+
+BTC_EXTERN void
+btc_addrman_set_bantime(btc_addrman_t *man, int64_t ban_time);
+
 BTC_EXTERN int
-btc_addrman_open(btc_addrman_t *man, const char *file);
+btc_addrman_open(btc_addrman_t *man, const char *file, unsigned int flags);
 
 BTC_EXTERN void
 btc_addrman_close(btc_addrman_t *man);
 
 BTC_EXTERN void
-btc_addrman_flush(btc_addrman_t *man, const char *file);
+btc_addrman_flush(btc_addrman_t *man);
 
 BTC_EXTERN size_t
 btc_addrman_total(btc_addrman_t *man);
