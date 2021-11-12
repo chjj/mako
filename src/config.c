@@ -530,13 +530,13 @@ conf_read_file(btc_conf_t *conf, const char *file) {
     if (btc_match_path(conf->prefix, zp, "datadir="))
       continue;
 
-    if (btc_match_network(&conf->network, zp, "-chain="))
+    if (btc_match_network(&conf->network, zp, "chain="))
       continue;
 
-    if (btc_match_bool(&conf->daemon, zp, "-daemon="))
+    if (btc_match_bool(&conf->daemon, zp, "daemon="))
       continue;
 
-    if (btc_match_bool(&conf->network_active, zp, "-networkactive="))
+    if (btc_match_bool(&conf->network_active, zp, "networkactive="))
       continue;
 
     if (btc_match_bool(&conf->disable_wallet, zp, "disablewallet="))

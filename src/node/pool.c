@@ -3120,6 +3120,10 @@ btc_pool_has_tx(btc_pool_t *pool, const uint8_t *hash) {
   if (btc_mempool_has(pool->mempool, hash))
     return 1;
 
+  /* Check for orphans. */
+  if (btc_mempool_has_orphan(pool->mempool, hash))
+    return 1;
+
   /* If we recently rejected this item. Ignore. */
   if (btc_mempool_has_reject(pool->mempool, hash)) {
     btc_pool_log(pool, "Saw known reject of %H.", hash);

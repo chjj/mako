@@ -264,7 +264,7 @@ static const btc_network_t signet = {
   /* .challenge = */ {
     /* .data = */ signet_challenge,
     /* .alloc = */ 0,
-    /* .length = */ lengthof(signet_challenge),
+    /* .length = */ sizeof(signet_challenge),
     /* ._refs = */ 0
   },
   /* .key = */ {
