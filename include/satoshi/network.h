@@ -24,7 +24,8 @@ enum btc_network_type {
   BTC_NETWORK_MAINNET,
   BTC_NETWORK_TESTNET,
   BTC_NETWORK_REGTEST,
-  BTC_NETWORK_SIMNET
+  BTC_NETWORK_SIMNET,
+  BTC_NETWORK_SIGNET
 };
 
 /*
@@ -206,6 +207,16 @@ struct btc_network_s {
      * Block which activated bip66.
      */
     btc_checkpoint_t bip66;
+
+    /**
+     * Block which activated bip112.
+     */
+    btc_checkpoint_t csv;
+
+    /**
+     * Block which activated bip141.
+     */
+    btc_checkpoint_t segwit;
   } softforks;
 
   /**
@@ -225,6 +236,11 @@ struct btc_network_s {
     const btc_deployment_t *items;
     size_t length;
   } deployments;
+
+  /**
+   * Signet challenge.
+   */
+  btc_script_t challenge;
 
   /**
    * Key prefixes.
@@ -303,6 +319,7 @@ BTC_EXTERN extern const btc_network_t *btc_mainnet;
 BTC_EXTERN extern const btc_network_t *btc_testnet;
 BTC_EXTERN extern const btc_network_t *btc_regtest;
 BTC_EXTERN extern const btc_network_t *btc_simnet;
+BTC_EXTERN extern const btc_network_t *btc_signet;
 
 #ifdef __cplusplus
 }

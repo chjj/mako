@@ -93,6 +93,7 @@ list(APPEND satoshi_sources src/crypto/chacha20.c
                             src/printf_core.c
                             src/regtest.c
                             src/script.c
+                            src/signet.c
                             src/simnet.c
                             src/sprintf.c
                             src/testnet.c

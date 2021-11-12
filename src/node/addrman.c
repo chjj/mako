@@ -389,6 +389,22 @@ btc_addrman_resolve(btc_addrman_t *man) {
   for (i = 0; i < network->seeds.length; i++) {
     const char *seed = network->seeds.items[i];
 
+    if (btc_netaddr_set_str(&addr, seed)) {
+      addr.time = now;
+      addr.services = BTC_NET_DEFAULT_SERVICES;
+
+      if (addr.port == 0)
+        addr.port = network->port;
+
+      btc_addrman_add(man, &addr, NULL);
+
+      continue;
+    }
+
+    /* Temporary. */
+    if (btc_addrmap_size(man->map) >= 10)
+      continue;
+
     btc_addrman_log(man, "Resolving %s...", seed);
 
     if (btc_getaddrinfo(&res, seed)) {
@@ -412,10 +428,6 @@ btc_addrman_resolve(btc_addrman_t *man) {
     } else {
       btc_addrman_log(man, "Could not resolve %s.", seed);
     }
-
-    /* Temporary. */
-    if (btc_addrmap_size(man->map) >= 10)
-      break;
   }
 
   btc_addrman_log(man, "Resolved %zu seeds.", btc_addrman_total(man));
@@ -437,19 +449,6 @@ btc_addrman_open(btc_addrman_t *man, const char *file, unsigned int flags) {
     btc_addrman_log(man, "Could not read %s.", man->file);
   } else {
     man->file[0] = '\0';
-  }
-
-  if (man->network->seeds.length == 0) {
-    btc_netaddr_t addr;
-
-    btc_netaddr_set(&addr, "127.0.0.1", man->network->port);
-
-    addr.time = btc_now();
-    addr.services = BTC_NET_LOCAL_SERVICES;
-
-    btc_addrman_add(man, &addr, NULL);
-
-    return 1;
   }
 
   return btc_addrman_resolve(man);

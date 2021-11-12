@@ -957,6 +957,7 @@ btc_chain_get_deployments(btc_chain_t *chain,
   const btc_network_t *network = chain->network;
   int32_t height = prev->height + 1;
   const btc_deployment_t *deploy;
+  int active;
 
   btc_deployment_state_init(state);
 
@@ -989,7 +990,12 @@ btc_chain_get_deployments(btc_chain_t *chain,
      past locktimes are now usable (bip9 & bip113). */
   deploy = btc_network_deployment(network, "csv");
 
-  if (btc_chain_is_active(chain, prev, deploy)) {
+  if (deploy != NULL)
+    active = btc_chain_is_active(chain, prev, deploy);
+  else
+    active = (height >= network->softforks.csv.height);
+
+  if (active) {
     state->flags |= BTC_SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
     state->lock_flags |= BTC_LOCKTIME_VERIFY_SEQUENCE;
     state->lock_flags |= BTC_LOCKTIME_MEDIAN_TIME_PAST;
@@ -999,7 +1005,12 @@ btc_chain_get_deployments(btc_chain_t *chain,
      along with SCRIPT_VERIFY_NULLDUMMY (bip147). */
   deploy = btc_network_deployment(network, "segwit");
 
-  if (btc_chain_is_active(chain, prev, deploy)) {
+  if (deploy != NULL)
+    active = btc_chain_is_active(chain, prev, deploy);
+  else
+    active = (height >= network->softforks.segwit.height);
+
+  if (active) {
     state->flags |= BTC_SCRIPT_VERIFY_WITNESS;
     state->flags |= BTC_SCRIPT_VERIFY_NULLDUMMY;
   }

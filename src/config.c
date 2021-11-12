@@ -390,6 +390,8 @@ btc_match_network(const btc_network_t **z, const char *xp, const char *yp) {
     *z = btc_regtest;
   else if (strcmp(val, "simnet") == 0)
     *z = btc_simnet;
+  else if (strcmp(val, "signet") == 0)
+    *z = btc_signet;
   else
     return btc_die("Invalid option: `%s`", xp);
 
