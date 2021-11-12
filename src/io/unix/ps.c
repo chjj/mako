@@ -120,7 +120,7 @@ btc_ps_daemon(void) {
 }
 
 static void
-btc_signal(int signal, void (*handler)(int)) {
+btc_signal(int signum, void (*handler)(int)) {
   struct sigaction sa;
 
   sa.sa_handler = handler;
@@ -129,7 +129,7 @@ btc_signal(int signal, void (*handler)(int)) {
 
   sa.sa_flags = 0;
 
-  sigaction(signal, &sa, NULL);
+  sigaction(signum, &sa, NULL);
 }
 
 static void
