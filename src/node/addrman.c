@@ -477,8 +477,8 @@ btc_addrman_write_file(btc_addrman_t *man, const char *file) {
 
 void
 btc_addrman_flush(btc_addrman_t *man) {
-  /* TODO: Put this on a worker thread. */
   if (man->needs_flush && *man->file) {
+    btc_addrman_log(man, "Flushing.");
     btc_addrman_write_file(man, man->file);
     man->needs_flush = 0;
   }
@@ -1293,7 +1293,7 @@ btc_addrman_read(btc_addrman_t *man, const uint8_t **xp, size_t *xn) {
       goto fail; /* Bucket size mismatch. */
   }
 
-  if (*xn == 0)
+  if (*xn != 0)
     goto fail;
 
   btc_addrmap_iterate(&iter, man->map);

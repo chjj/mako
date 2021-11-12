@@ -816,9 +816,9 @@ conf_finalize(btc_conf_t *conf, const char *prefix) {
     }
   }
 
-  if (sizeof(void *) < 8) {
-    if (conf->map_size > 1)
-      conf->map_size = 1;
+  if (sizeof(void *) < 8 && conf->map_size > 1) {
+    btc_die("Map size (%dgb) too large for 32-bit.", conf->map_size);
+    return;
   }
 
   if (conf->port == 0)

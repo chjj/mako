@@ -169,13 +169,6 @@ struct btc_pool_s {
   btc_addrman_t *addrman;
   btc_chain_t *chain;
   btc_mempool_t *mempool;
-  btc_socket_t *server;
-  btc_peers_t peers;
-  btc_nonces_t nonces;
-  btc_hashset_t *block_map;
-  btc_hashset_t *tx_map;
-  btc_hashset_t *compact_map;
-
   unsigned int flags;
   btc_sockaddr_t bind;
   btc_netaddr_t connect;
@@ -183,7 +176,12 @@ struct btc_pool_s {
   size_t max_outbound;
   size_t max_inbound;
   enum btc_ipnet only_net;
-
+  btc_socket_t *server;
+  btc_peers_t peers;
+  btc_nonces_t nonces;
+  btc_hashset_t *block_map;
+  btc_hashset_t *tx_map;
+  btc_hashset_t *compact_map;
   int block_mode;
   int checkpoints;
   int listening;
@@ -192,6 +190,7 @@ struct btc_pool_s {
   btc_hdrnode_t *header_tail;
   btc_hdrnode_t *header_next;
   int64_t refill_timer;
+  int64_t flush_timer;
   unsigned int id;
   uint64_t required_services;
   int synced;
@@ -1998,13 +1997,6 @@ btc_pool_create(const btc_network_t *network,
   pool->addrman = btc_addrman_create(network);
   pool->chain = chain;
   pool->mempool = mempool;
-  pool->server = NULL;
-  btc_peers_init(&pool->peers);
-  btc_nonces_init(&pool->nonces);
-  pool->block_map = btc_hashset_create();
-  pool->tx_map = btc_hashset_create();
-  pool->compact_map = btc_hashset_create();
-
   pool->flags = BTC_POOL_DEFAULT_FLAGS;
   btc_sockaddr_import(&pool->bind, "::", network->port);
   btc_netaddr_set(&pool->connect, "0.0.0.0", 0);
@@ -2012,7 +2004,12 @@ btc_pool_create(const btc_network_t *network,
   pool->max_outbound = 8;
   pool->max_inbound = 8;
   pool->only_net = BTC_IPNET_NONE;
-
+  pool->server = NULL;
+  btc_peers_init(&pool->peers);
+  btc_nonces_init(&pool->nonces);
+  pool->block_map = btc_hashset_create();
+  pool->tx_map = btc_hashset_create();
+  pool->compact_map = btc_hashset_create();
   pool->block_mode = 0;
   pool->checkpoints = 0;
   pool->header_tip = NULL;
@@ -2020,6 +2017,7 @@ btc_pool_create(const btc_network_t *network,
   pool->header_tail = NULL;
   pool->header_next = NULL;
   pool->refill_timer = 0;
+  pool->flush_timer = 0;
   pool->id = 0;
   pool->required_services = BTC_NET_LOCAL_SERVICES;
   pool->synced = 0;
@@ -2242,6 +2240,13 @@ btc_pool_get_addr(btc_pool_t *pool) {
   const btc_netaddr_t *addr;
   int i;
 
+  if (pool->flags & BTC_POOL_CONNECT) {
+    if (btc_peers_has(&pool->peers, &pool->connect))
+      return NULL;
+
+    return &pool->connect;
+  }
+
   for (i = 0; i < 100; i++) {
     entry = btc_addrman_get(pool->addrman);
 
@@ -2454,10 +2459,16 @@ btc_pool_fill_outbound(btc_pool_t *pool) {
   size_t total = btc_addrman_total(pool->addrman);
   size_t i, need;
 
+  if (pool->flags & BTC_POOL_NOCONNECT)
+    return 0;
+
   if (pool->peers.load == NULL) {
     if (!btc_pool_add_loader(pool))
       return 0;
   }
+
+  if (pool->flags & BTC_POOL_CONNECT)
+    return 0;
 
   if (pool->peers.outbound >= pool->max_outbound)
     return 1;
@@ -2485,21 +2496,26 @@ btc_pool_on_tick(btc_pool_t *pool, int64_t now) {
     btc_pool_fill_outbound(pool);
     pool->refill_timer = now;
   }
+
+  if (now >= pool->flush_timer + 10 * 60 * 1000) {
+    btc_addrman_flush(pool->addrman);
+    pool->flush_timer = now;
+  }
 }
 
 static void
 btc_pool_on_socket(btc_pool_t *pool, btc_socket_t *socket) {
   btc_peer_t *peer = btc_peer_create(pool);
-  btc_sockaddr_t sa;
+  btc_sockaddr_t addr;
 
-  btc_socket_address(&sa, socket);
+  btc_socket_address(&addr, socket);
 
-  btc_pool_log(pool, "Accepting inbound peer (%S).", &sa);
+  btc_pool_log(pool, "Accepting inbound peer (%S).", &addr);
 
   if (!btc_peer_accept(peer, socket)) {
     const char *msg = btc_loop_strerror(pool->loop);
 
-    btc_pool_log(pool, "Connection failed: %s (%S).", msg, &sa);
+    btc_pool_log(pool, "Connection failed: %s (%S).", msg, &addr);
     btc_peer_destroy(peer);
 
     return;

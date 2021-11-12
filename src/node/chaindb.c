@@ -1118,22 +1118,24 @@ btc_chaindb_disconnect_block(btc_chaindb_t *db,
                              MDB_txn *txn,
                              const btc_entry_t *entry,
                              const btc_block_t *block) {
-  btc_view_t *view = btc_view_create();
   btc_undo_t *undo = btc_chaindb_read_undo(db, entry);
   const btc_input_t *input;
   const btc_tx_t *tx;
   btc_coin_t *coin;
+  btc_view_t *view;
   size_t i, j;
 
   if (undo == NULL)
     return NULL;
+
+  view = btc_view_create();
 
   /* Disconnect all transactions. */
   for (i = block->txs.length - 1; i != (size_t)-1; i--) {
     tx = block->txs.items[i];
 
     for (j = tx->inputs.length - 1; j != (size_t)-1; j--) {
-      input = tx->inputs.items[i];
+      input = tx->inputs.items[j];
       coin = btc_undo_pop(undo);
 
       btc_view_put(view, &input->prevout, coin);

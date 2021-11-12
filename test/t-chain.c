@@ -23,7 +23,7 @@ int main(void) {
 
   btc_chain_set_mapsize(chain, 20 << 20);
 
-  ASSERT(btc_chain_open(chain, BTC_PREFIX, BTC_CHAIN_DEFAULT_FLAGS));
+  ASSERT(btc_chain_open(chain, BTC_PREFIX, 0));
 
   for (i = 0; i < lengthof(chain_vectors_main); i++) {
     size_t size = sizeof(data);
