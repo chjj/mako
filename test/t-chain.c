@@ -11,11 +11,13 @@
 #include <satoshi/network.h>
 #include "lib/tests.h"
 #include "data/chain_vectors_main.h"
+#include "data/chain_vectors_testnet.h"
 
-int main(void) {
+static void
+test_chain(const btc_network_t *network, const char **vectors, size_t length) {
   unsigned int flags = BTC_BLOCK_DEFAULT_FLAGS;
-  btc_chain_t *chain = btc_chain_create(btc_mainnet);
-  unsigned char data[4096];
+  btc_chain_t *chain = btc_chain_create(network);
+  unsigned char data[65536];
   btc_block_t block;
   size_t i;
 
@@ -25,10 +27,10 @@ int main(void) {
 
   ASSERT(btc_chain_open(chain, BTC_PREFIX, 0));
 
-  for (i = 0; i < lengthof(chain_vectors_main); i++) {
+  for (i = 0; i < length; i++) {
     size_t size = sizeof(data);
 
-    hex_decode(data, &size, chain_vectors_main[i]);
+    hex_decode(data, &size, vectors[i]);
 
     btc_block_init(&block);
 
@@ -42,6 +44,15 @@ int main(void) {
   btc_chain_destroy(chain);
 
   btc_clean(BTC_PREFIX);
+}
+
+int
+main(void) {
+  test_chain(btc_mainnet, chain_vectors_main,
+                          lengthof(chain_vectors_main));
+
+  test_chain(btc_testnet, chain_vectors_testnet,
+                          lengthof(chain_vectors_testnet));
 
   return 0;
 }
