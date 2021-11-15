@@ -1768,7 +1768,6 @@ btc_loop_close(btc_loop_t *loop) {
   handle_closed(loop);
 
   loop->index = 0;
-}
 #else /* !BTC_USE_POLL */
   while (loop->length > 0)
     btc_socket_close(loop->head);
