@@ -1,16 +1,16 @@
 /*!
- * t-bip32.c - bip32 tests for libsatoshi
+ * t-bip32.c - bip32 tests for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <satoshi/bip32.h>
-#include <satoshi/encoding.h>
-#include <satoshi/network.h>
-#include <satoshi/util.h>
+#include <mako/bip32.h>
+#include <mako/encoding.h>
+#include <mako/network.h>
+#include <mako/util.h>
 #include "lib/tests.h"
 #include "data/bip32_vectors.h"
 

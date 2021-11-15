@@ -1,7 +1,7 @@
 /*!
- * main.c - cli interface for libsatoshi
+ * main.c - cli interface for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdint.h>
@@ -13,8 +13,8 @@
 
 #include <io/core.h>
 
-#include <satoshi/config.h>
-#include <satoshi/json.h>
+#include <mako/config.h>
+#include <mako/json.h>
 
 #include "../internal.h"
 
@@ -82,7 +82,7 @@ static int
 get_config(btc_conf_t *args, int argc, char **argv) {
   char prefix[BTC_PATH_MAX];
 
-  if (!btc_sys_datadir(prefix, sizeof(prefix), "satoshi")) {
+  if (!btc_sys_datadir(prefix, sizeof(prefix), "mako")) {
     fprintf(stderr, "Could not find suitable datadir.\n");
     return 0;
   }
@@ -110,7 +110,7 @@ main(int argc, char **argv) {
     return EXIT_FAILURE;
 
   if (args.help) {
-    puts("Usage: satoshi [options] <command> [params]");
+    puts("Usage: mako [options] <command> [params]");
     return EXIT_SUCCESS;
   }
 

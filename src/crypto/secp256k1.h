@@ -1,7 +1,7 @@
 /*!
- * secp256k1.h - secp256k1 data for libsatoshi
+ * secp256k1.h - secp256k1 data for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_SECP256K1_H

@@ -1,7 +1,7 @@
 /*!
- * miner.h - miner for libsatoshi
+ * miner.h - miner for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_MINER_H
@@ -13,9 +13,9 @@ extern "C" {
 
 #include <stddef.h>
 #include "types.h"
-#include "../satoshi/common.h"
-#include "../satoshi/impl.h"
-#include "../satoshi/types.h"
+#include "../mako/common.h"
+#include "../mako/impl.h"
+#include "../mako/types.h"
 
 /*
  * Types

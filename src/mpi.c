@@ -1,7 +1,7 @@
 /*!
- * mpi.c - multi-precision integers for libsatoshi
+ * mpi.c - multi-precision integers for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  *
  * A from-scratch reimplementation of GMP.
  *
@@ -45,7 +45,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include <satoshi/mpi.h>
+#include <mako/mpi.h>
 
 #include "internal.h"
 

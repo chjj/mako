@@ -1,7 +1,7 @@
 /*!
- * thread.c - posix threads for libsatoshi
+ * thread.c - posix threads for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <errno.h>

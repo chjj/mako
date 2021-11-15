@@ -1,7 +1,7 @@
 /*!
- * logger.h - logger for libsatoshi
+ * logger.h - logger for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_LOGGER_H
@@ -14,7 +14,7 @@ extern "C" {
 #include <stdarg.h>
 #include <stddef.h>
 #include "types.h"
-#include "../satoshi/common.h"
+#include "../mako/common.h"
 
 /*
  * Logger

@@ -1,7 +1,7 @@
 /*!
- * timedata.h - timedata for libsatoshi
+ * timedata.h - timedata for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_TIMEDATA_H
@@ -14,8 +14,8 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 #include "types.h"
-#include "../satoshi/common.h"
-#include "../satoshi/impl.h"
+#include "../mako/common.h"
+#include "../mako/impl.h"
 
 /*
  * Time Data

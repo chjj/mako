@@ -1,13 +1,13 @@
 /*!
- * internal.h - internal utils for libsatoshi
+ * internal.h - internal utils for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_INTERNAL_H
 #define BTC_INTERNAL_H
 
-#include <satoshi/common.h>
+#include <mako/common.h>
 
 /*
  * Language Standard

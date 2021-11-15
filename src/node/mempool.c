@@ -1,7 +1,7 @@
 /*!
- * mempool.c - mempool for libsatoshi
+ * mempool.c - mempool for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdarg.h>
@@ -16,22 +16,22 @@
 #include <node/mempool.h>
 #include <node/timedata.h>
 
-#include <satoshi/block.h>
-#include <satoshi/bloom.h>
-#include <satoshi/coins.h>
-#include <satoshi/consensus.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/crypto/rand.h>
-#include <satoshi/entry.h>
-#include <satoshi/header.h>
-#include <satoshi/heap.h>
-#include <satoshi/map.h>
-#include <satoshi/network.h>
-#include <satoshi/policy.h>
-#include <satoshi/script.h>
-#include <satoshi/tx.h>
-#include <satoshi/util.h>
-#include <satoshi/vector.h>
+#include <mako/block.h>
+#include <mako/bloom.h>
+#include <mako/coins.h>
+#include <mako/consensus.h>
+#include <mako/crypto/hash.h>
+#include <mako/crypto/rand.h>
+#include <mako/entry.h>
+#include <mako/header.h>
+#include <mako/heap.h>
+#include <mako/map.h>
+#include <mako/network.h>
+#include <mako/policy.h>
+#include <mako/script.h>
+#include <mako/tx.h>
+#include <mako/util.h>
+#include <mako/vector.h>
 
 #include "../impl.h"
 #include "../internal.h"

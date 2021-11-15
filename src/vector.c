@@ -1,12 +1,12 @@
 /*!
- * vector.c - shallow vector for libsatoshi
+ * vector.c - shallow vector for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdlib.h>
 #include <string.h>
-#include <satoshi/vector.h>
+#include <mako/vector.h>
 #include "impl.h"
 #include "internal.h"
 

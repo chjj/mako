@@ -1,7 +1,7 @@
 /*!
- * ecc.c - elliptic curves for libsatoshi
+ * ecc.c - elliptic curves for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  *
  * Formulas from DJB and Tanja Lange [EFD].
  *
@@ -82,11 +82,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <satoshi/crypto/drbg.h>
-#include <satoshi/crypto/ecc.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/mpi.h>
-#include <satoshi/util.h>
+#include <mako/crypto/drbg.h>
+#include <mako/crypto/ecc.h>
+#include <mako/crypto/hash.h>
+#include <mako/mpi.h>
+#include <mako/util.h>
 
 #include "asn1.h"
 #include "../internal.h"

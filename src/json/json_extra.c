@@ -1,13 +1,13 @@
 /*!
- * json_extra.c - extra json functions for libsatoshi
+ * json_extra.c - extra json functions for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
-#include <satoshi/json.h>
+#include <mako/json.h>
 
 /*
  * JSON Extras

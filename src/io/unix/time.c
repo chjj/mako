@@ -1,7 +1,7 @@
 /*!
- * time.c - unix time for libsatoshi
+ * time.c - unix time for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <errno.h>

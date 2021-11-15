@@ -1,13 +1,13 @@
 /*!
- * printf.c - printf for libsatoshi
+ * printf.c - printf for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <satoshi/printf.h>
+#include <mako/printf.h>
 #include "printf_core.h"
 
 /*

@@ -1,14 +1,14 @@
 /*!
- * t-ecdsa.c - ecdsa test for libsatoshi
+ * t-ecdsa.c - ecdsa test for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stddef.h>
 #include <string.h>
-#include <satoshi/crypto/drbg.h>
-#include <satoshi/crypto/ecc.h>
-#include <satoshi/util.h>
+#include <mako/crypto/drbg.h>
+#include <mako/crypto/ecc.h>
+#include <mako/util.h>
 #include "data/ecdsa_vectors.h"
 #include "lib/tests.h"
 

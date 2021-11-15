@@ -1,7 +1,7 @@
 /*!
- * miner.c - miner for libsatoshi
+ * miner.c - miner for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdarg.h>
@@ -18,27 +18,27 @@
 #include <node/miner.h>
 #include <node/timedata.h>
 
-#include <satoshi/address.h>
-#include <satoshi/block.h>
-#include <satoshi/buffer.h>
-#include <satoshi/coins.h>
-#include <satoshi/consensus.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/crypto/merkle.h>
-#include <satoshi/crypto/rand.h>
-#include <satoshi/entry.h>
-#include <satoshi/header.h>
-#include <satoshi/heap.h>
-#include <satoshi/map.h>
-#include <satoshi/net.h>
-#include <satoshi/netaddr.h>
-#include <satoshi/netmsg.h>
-#include <satoshi/network.h>
-#include <satoshi/policy.h>
-#include <satoshi/script.h>
-#include <satoshi/tx.h>
-#include <satoshi/util.h>
-#include <satoshi/vector.h>
+#include <mako/address.h>
+#include <mako/block.h>
+#include <mako/buffer.h>
+#include <mako/coins.h>
+#include <mako/consensus.h>
+#include <mako/crypto/hash.h>
+#include <mako/crypto/merkle.h>
+#include <mako/crypto/rand.h>
+#include <mako/entry.h>
+#include <mako/header.h>
+#include <mako/heap.h>
+#include <mako/map.h>
+#include <mako/net.h>
+#include <mako/netaddr.h>
+#include <mako/netmsg.h>
+#include <mako/network.h>
+#include <mako/policy.h>
+#include <mako/script.h>
+#include <mako/tx.h>
+#include <mako/util.h>
+#include <mako/vector.h>
 
 #include "../bio.h"
 #include "../impl.h"
@@ -49,7 +49,7 @@
  */
 
 static const uint8_t zero_nonce[32] = {0};
-static const uint8_t default_flags[] = "mined by libsatoshi";
+static const uint8_t default_flags[] = "mined by mako";
 
 /*
  * Types

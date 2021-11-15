@@ -1,7 +1,7 @@
 /*!
- * addrman.c - address manager for libsatoshi
+ * addrman.c - address manager for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <math.h>
@@ -16,15 +16,15 @@
 #include <node/logger.h>
 #include <node/timedata.h>
 
-#include <satoshi/crypto/hash.h>
-#include <satoshi/crypto/rand.h>
-#include <satoshi/list.h>
-#include <satoshi/map.h>
-#include <satoshi/net.h>
-#include <satoshi/netaddr.h>
-#include <satoshi/network.h>
-#include <satoshi/util.h>
-#include <satoshi/vector.h>
+#include <mako/crypto/hash.h>
+#include <mako/crypto/rand.h>
+#include <mako/list.h>
+#include <mako/map.h>
+#include <mako/net.h>
+#include <mako/netaddr.h>
+#include <mako/network.h>
+#include <mako/util.h>
+#include <mako/vector.h>
 
 #include "../bio.h"
 #include "../impl.h"

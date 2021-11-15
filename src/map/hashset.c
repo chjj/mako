@@ -1,10 +1,10 @@
 /*!
- * hashset.c - hash set for libsatoshi
+ * hashset.c - hash set for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
-#include <satoshi/map.h>
+#include <mako/map.h>
 #include "map.h"
 
 /*

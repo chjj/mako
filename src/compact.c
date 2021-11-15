@@ -1,14 +1,14 @@
 /*!
- * compact.c - compact for libsatoshi
+ * compact.c - compact for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/coins.h>
-#include <satoshi/mpi.h>
+#include <mako/coins.h>
+#include <mako/mpi.h>
 #include "impl.h"
 #include "internal.h"
 

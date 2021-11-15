@@ -1,7 +1,7 @@
 /*!
- * main.c - main entry point for libsatoshi
+ * main.c - main entry point for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdarg.h>
@@ -22,20 +22,20 @@
 #include <node/rpc.h>
 #include <node/timedata.h>
 
-#include <satoshi/block.h>
-#include <satoshi/coins.h>
-#include <satoshi/consensus.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/entry.h>
-#include <satoshi/header.h>
-#include <satoshi/net.h>
-#include <satoshi/netaddr.h>
-#include <satoshi/netmsg.h>
-#include <satoshi/network.h>
-#include <satoshi/script.h>
-#include <satoshi/tx.h>
-#include <satoshi/util.h>
-#include <satoshi/vector.h>
+#include <mako/block.h>
+#include <mako/coins.h>
+#include <mako/consensus.h>
+#include <mako/crypto/hash.h>
+#include <mako/entry.h>
+#include <mako/header.h>
+#include <mako/net.h>
+#include <mako/netaddr.h>
+#include <mako/netmsg.h>
+#include <mako/network.h>
+#include <mako/script.h>
+#include <mako/tx.h>
+#include <mako/util.h>
+#include <mako/vector.h>
 
 #include "../internal.h"
 

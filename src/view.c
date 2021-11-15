@@ -1,15 +1,15 @@
 /*!
- * view.c - view for libsatoshi
+ * view.c - view for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/coins.h>
-#include <satoshi/script.h>
-#include <satoshi/tx.h>
+#include <mako/coins.h>
+#include <mako/script.h>
+#include <mako/tx.h>
 #include "impl.h"
 #include "internal.h"
 #include "map/map.h"

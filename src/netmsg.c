@@ -1,23 +1,23 @@
 /*!
- * netmsg.c - network messages for libsatoshi
+ * netmsg.c - network messages for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/bip37.h>
-#include <satoshi/bip152.h>
-#include <satoshi/block.h>
-#include <satoshi/bloom.h>
-#include <satoshi/header.h>
-#include <satoshi/netaddr.h>
-#include <satoshi/netmsg.h>
-#include <satoshi/net.h>
-#include <satoshi/tx.h>
-#include <satoshi/util.h>
-#include <satoshi/vector.h>
+#include <mako/bip37.h>
+#include <mako/bip152.h>
+#include <mako/block.h>
+#include <mako/bloom.h>
+#include <mako/header.h>
+#include <mako/netaddr.h>
+#include <mako/netmsg.h>
+#include <mako/net.h>
+#include <mako/tx.h>
+#include <mako/util.h>
+#include <mako/vector.h>
 #include "bio.h"
 #include "impl.h"
 #include "internal.h"

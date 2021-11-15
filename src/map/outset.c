@@ -1,11 +1,11 @@
 /*!
- * outset.c - outpoint set for libsatoshi
+ * outset.c - outpoint set for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
-#include <satoshi/map.h>
-#include <satoshi/tx.h>
+#include <mako/map.h>
+#include <mako/tx.h>
 #include "map.h"
 
 /*

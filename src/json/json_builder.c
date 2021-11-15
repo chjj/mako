@@ -28,7 +28,7 @@
  * SUCH DAMAGE.
  */
 
-#include <satoshi/json/json_builder.h>
+#include <mako/json/json_builder.h>
 
 #include <string.h>
 #include <assert.h>

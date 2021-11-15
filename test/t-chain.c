@@ -1,14 +1,14 @@
 /*!
- * t-chain.c - chain test for libsatoshi
+ * t-chain.c - chain test for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stddef.h>
 #include <string.h>
 #include <node/chain.h>
-#include <satoshi/block.h>
-#include <satoshi/network.h>
+#include <mako/block.h>
+#include <mako/network.h>
 #include "lib/tests.h"
 #include "data/chain_vectors_main.h"
 #include "data/chain_vectors_testnet.h"

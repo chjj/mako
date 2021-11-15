@@ -1,7 +1,7 @@
 /*!
- * pbkdf512.c - sha512 pbkdf2 implementation for libsatoshi
+ * pbkdf512.c - sha512 pbkdf2 implementation for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  *
  * Resources:
  *   https://en.wikipedia.org/wiki/PBKDF2
@@ -15,8 +15,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/util.h>
+#include <mako/crypto/hash.h>
+#include <mako/util.h>
 #include "../bio.h"
 #include "../internal.h"
 

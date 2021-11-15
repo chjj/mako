@@ -1,11 +1,11 @@
 /*!
- * addrmap.c - network address map for libsatoshi
+ * addrmap.c - network address map for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
-#include <satoshi/map.h>
-#include <satoshi/netaddr.h>
+#include <mako/map.h>
+#include <mako/netaddr.h>
 #include "map.h"
 
 /*

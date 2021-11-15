@@ -1,7 +1,7 @@
 /*!
- * bloom.c - bloom filters for libsatoshi
+ * bloom.c - bloom filters for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  *
  * Based on the bcoin code (which was based on bitcoin core).
  */
@@ -10,10 +10,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/bloom.h>
-#include <satoshi/crypto/rand.h>
-#include <satoshi/types.h>
-#include <satoshi/util.h>
+#include <mako/bloom.h>
+#include <mako/crypto/rand.h>
+#include <mako/types.h>
+#include <mako/util.h>
 #include "impl.h"
 #include "internal.h"
 

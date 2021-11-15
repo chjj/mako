@@ -1,7 +1,7 @@
 /*!
- * client.h - rpc client for libsatoshi
+ * client.h - rpc client for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_CLIENT_H
@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#include "../satoshi/common.h"
+#include "../mako/common.h"
 
 /*
  * Types

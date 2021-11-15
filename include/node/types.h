@@ -1,7 +1,7 @@
 /*!
- * types.h - node types for libsatoshi
+ * types.h - node types for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_NODE_TYPES_H

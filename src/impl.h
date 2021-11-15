@@ -1,7 +1,7 @@
 /*!
- * impl.h - internal utils for libsatoshi
+ * impl.h - internal utils for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_IMPL_INTERNAL_H
@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/crypto/hash.h>
+#include <mako/crypto/hash.h>
 #include "internal.h"
 
 /*

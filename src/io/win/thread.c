@@ -1,7 +1,7 @@
 /*!
- * thread.c - windows threads for libsatoshi
+ * thread.c - windows threads for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  *
  * Parts of this software are based on libuv/libuv:
  *   Copyright (c) 2015-2020, libuv project contributors (MIT License).

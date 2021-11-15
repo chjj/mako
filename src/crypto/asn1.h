@@ -1,7 +1,7 @@
 /*!
- * asn1.h - asn1 for libsatoshi
+ * asn1.h - asn1 for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_ASN1_H

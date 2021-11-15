@@ -1,7 +1,7 @@
 /*!
- * printf_core.h - printf for libsatoshi
+ * printf_core.h - printf for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_PRINTF_CORE_H

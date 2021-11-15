@@ -1,7 +1,7 @@
 /*!
- * http.h - http server for libsatoshi
+ * http.h - http server for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_IO_HTTP_H
@@ -14,7 +14,7 @@ extern "C" {
 #include <stddef.h>
 #include "core.h"
 #include "loop.h"
-#include "../satoshi/common.h"
+#include "../mako/common.h"
 
 /*
  * Constants

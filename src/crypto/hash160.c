@@ -1,7 +1,7 @@
 /*!
- * hash160.c - hash160 function for libsatoshi
+ * hash160.c - hash160 function for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  *
  * Resources:
  *   https://github.com/bitcoin/bitcoin/blob/master/src/hash.h
@@ -9,8 +9,8 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/util.h>
+#include <mako/crypto/hash.h>
+#include <mako/util.h>
 
 /*
  * Hash160

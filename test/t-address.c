@@ -1,16 +1,16 @@
 /*!
- * t-address.c - address tests for libsatoshi
+ * t-address.c - address tests for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <satoshi/address.h>
-#include <satoshi/network.h>
-#include <satoshi/script.h>
-#include <satoshi/util.h>
+#include <mako/address.h>
+#include <mako/network.h>
+#include <mako/script.h>
+#include <mako/util.h>
 #include "lib/tests.h"
 
 /*

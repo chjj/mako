@@ -1,20 +1,20 @@
 /*!
- * block.c - block for libsatoshi
+ * block.c - block for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/block.h>
-#include <satoshi/consensus.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/crypto/merkle.h>
-#include <satoshi/header.h>
-#include <satoshi/script.h>
-#include <satoshi/tx.h>
-#include <satoshi/util.h>
+#include <mako/block.h>
+#include <mako/consensus.h>
+#include <mako/crypto/hash.h>
+#include <mako/crypto/merkle.h>
+#include <mako/header.h>
+#include <mako/script.h>
+#include <mako/tx.h>
+#include <mako/util.h>
 #include "impl.h"
 #include "internal.h"
 

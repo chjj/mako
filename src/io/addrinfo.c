@@ -1,7 +1,7 @@
 /*!
- * addrinfo.c - dns resolution for libsatoshi
+ * addrinfo.c - dns resolution for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdint.h>

@@ -1,18 +1,18 @@
 /*!
- * address.c - address for libsatoshi
+ * address.c - address for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/address.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/encoding.h>
-#include <satoshi/network.h>
-#include <satoshi/script.h>
-#include <satoshi/util.h>
+#include <mako/address.h>
+#include <mako/crypto/hash.h>
+#include <mako/encoding.h>
+#include <mako/network.h>
+#include <mako/script.h>
+#include <mako/util.h>
 #include "bio.h"
 #include "impl.h"
 #include "internal.h"

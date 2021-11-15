@@ -1,7 +1,7 @@
 /*!
- * sysrand.c - os/system entropy for libsatoshi
+ * sysrand.c - os/system entropy for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  *
  * Resources:
  *   https://en.wikipedia.org/wiki//dev/random

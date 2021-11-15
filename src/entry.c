@@ -1,17 +1,17 @@
 /*!
- * entry.c - entry for libsatoshi
+ * entry.c - entry for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/consensus.h>
-#include <satoshi/entry.h>
-#include <satoshi/header.h>
-#include <satoshi/mpi.h>
-#include <satoshi/util.h>
+#include <mako/consensus.h>
+#include <mako/entry.h>
+#include <mako/header.h>
+#include <mako/mpi.h>
+#include <mako/util.h>
 #include "impl.h"
 #include "internal.h"
 

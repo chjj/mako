@@ -1,16 +1,16 @@
 /*!
- * t-sighash.c - sighash test for libsatoshi
+ * t-sighash.c - sighash test for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
-#include <satoshi/coins.h>
-#include <satoshi/script.h>
-#include <satoshi/tx.h>
-#include <satoshi/util.h>
+#include <mako/coins.h>
+#include <mako/script.h>
+#include <mako/tx.h>
+#include <mako/util.h>
 #include "data/sighash_vectors.h"
 #include "lib/tests.h"
 

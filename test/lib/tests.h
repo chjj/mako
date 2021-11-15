@@ -1,7 +1,7 @@
 /*!
- * tests.h - test utils for libsatoshi
+ * tests.h - test utils for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/bcoin-org/libsatoshi
+ * https://github.com/bcoin-org/mako
  */
 
 #ifndef BTC_TESTS_H

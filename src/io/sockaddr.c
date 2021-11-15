@@ -1,7 +1,7 @@
 /*!
- * sockaddr.c - socket address for libsatoshi
+ * sockaddr.c - socket address for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdint.h>

@@ -1,7 +1,7 @@
 /*!
- * client.c - rpc client for libsatoshi
+ * client.c - rpc client for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdint.h>
@@ -11,7 +11,7 @@
 
 #include <client/client.h>
 #include <io/http.h>
-#include <satoshi/json.h>
+#include <mako/json.h>
 
 #include "../internal.h"
 
@@ -83,7 +83,7 @@ btc_client_call(btc_client_t *client, const char *method, json_value *params) {
   options.method = HTTP_METHOD_POST;
   options.path = "/";
   options.headers = NULL;
-  options.agent = "libsatoshi";
+  options.agent = "mako";
   options.accept = "application/json";
   options.type = "application/json";
   options.body = body;

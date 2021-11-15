@@ -1,17 +1,17 @@
 /*!
- * bip39.c - bip39 for libsatoshi
+ * bip39.c - bip39 for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/bip32.h>
-#include <satoshi/bip39.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/crypto/rand.h>
-#include <satoshi/util.h>
+#include <mako/bip32.h>
+#include <mako/bip39.h>
+#include <mako/crypto/hash.h>
+#include <mako/crypto/rand.h>
+#include <mako/util.h>
 #include "impl.h"
 #include "internal.h"
 #include "words.h"

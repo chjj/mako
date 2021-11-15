@@ -1,17 +1,17 @@
 /*!
- * output.c - output for libsatoshi
+ * output.c - output for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/consensus.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/policy.h>
-#include <satoshi/script.h>
-#include <satoshi/tx.h>
+#include <mako/consensus.h>
+#include <mako/crypto/hash.h>
+#include <mako/policy.h>
+#include <mako/script.h>
+#include <mako/tx.h>
 #include "impl.h"
 #include "internal.h"
 

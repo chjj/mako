@@ -1,7 +1,7 @@
 /*!
- * pool.h - p2p pool for libsatoshi
+ * pool.h - p2p pool for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_POOL_H
@@ -13,8 +13,8 @@ extern "C" {
 
 #include <stddef.h>
 #include "types.h"
-#include "../satoshi/common.h"
-#include "../satoshi/types.h"
+#include "../mako/common.h"
+#include "../mako/types.h"
 
 BTC_EXTERN btc_pool_t *
 btc_pool_create(const btc_network_t *network,

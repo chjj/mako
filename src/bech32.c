@@ -1,7 +1,7 @@
 /*!
- * bech32.c - bech32 encoding for libsatoshi
+ * bech32.c - bech32 encoding for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  *
  * Parts of this software are based on sipa/bech32:
  *   Copyright (c) 2017, Pieter Wuille (MIT License).
@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/encoding.h>
+#include <mako/encoding.h>
 #include "internal.h"
 
 /*

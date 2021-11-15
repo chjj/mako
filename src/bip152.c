@@ -1,25 +1,25 @@
 /*!
- * bip152.c - compact blocks for libsatoshi
+ * bip152.c - compact blocks for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <satoshi/array.h>
-#include <satoshi/bip152.h>
-#include <satoshi/block.h>
-#include <satoshi/consensus.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/crypto/rand.h>
-#include <satoshi/crypto/siphash.h>
-#include <satoshi/header.h>
-#include <satoshi/map.h>
-#include <satoshi/tx.h>
-#include <satoshi/util.h>
-#include <satoshi/vector.h>
+#include <mako/array.h>
+#include <mako/bip152.h>
+#include <mako/block.h>
+#include <mako/consensus.h>
+#include <mako/crypto/hash.h>
+#include <mako/crypto/rand.h>
+#include <mako/crypto/siphash.h>
+#include <mako/header.h>
+#include <mako/map.h>
+#include <mako/tx.h>
+#include <mako/util.h>
+#include <mako/vector.h>
 
 #include "impl.h"
 #include "internal.h"

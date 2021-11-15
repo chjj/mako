@@ -1,7 +1,7 @@
 /*!
- * http_client.c - http client for libsatoshi
+ * http_client.c - http client for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdarg.h>

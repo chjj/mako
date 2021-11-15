@@ -1,7 +1,7 @@
 /*!
- * map.h - map for libsatoshi
+ * map.h - map for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_MAP_INTERNAL_H
@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <satoshi/util.h>
+#include <mako/util.h>
 #include "../internal.h"
 
 #define MAP_STATIC BTC_UNUSED static

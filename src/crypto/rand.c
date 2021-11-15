@@ -1,7 +1,7 @@
 /*!
- * rand.c - RNG for libsatoshi
+ * rand.c - RNG for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 /**
@@ -23,7 +23,7 @@
  * pthread and deal with other OS compat issues.
  *
  * The RNG below is not used anywhere internally,
- * and as such, libsatoshi can build without it (in
+ * and as such, mako can build without it (in
  * the case that more portability is desired).
  *
  * [1] https://github.com/jedisct1/libsodium/blob/master/src/libsodium
@@ -34,9 +34,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/crypto/rand.h>
-#include <satoshi/crypto/stream.h>
-#include <satoshi/util.h>
+#include <mako/crypto/rand.h>
+#include <mako/crypto/stream.h>
+#include <mako/util.h>
 #include "sysrand.h"
 #include "../internal.h"
 

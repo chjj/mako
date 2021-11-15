@@ -1,7 +1,7 @@
 /*!
- * murmur3.c - murmur3 for libsatoshi
+ * murmur3.c - murmur3 for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  *
  * Resources:
  *   https://en.wikipedia.org/wiki/MurmurHash
@@ -10,7 +10,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <satoshi/util.h>
+#include <mako/util.h>
 #include "bio.h"
 
 /*

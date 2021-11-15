@@ -1,7 +1,7 @@
 /*!
- * internal.c - internal utils for libsatoshi
+ * internal.c - internal utils for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <limits.h>

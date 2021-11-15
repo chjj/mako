@@ -1,14 +1,14 @@
 /*!
- * logger.c - logger for libsatoshi
+ * logger.c - logger for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <node/logger.h>
-#include <satoshi/printf.h>
+#include <mako/printf.h>
 #include "../internal.h"
 
 /*

@@ -1,13 +1,13 @@
 /*!
- * t-bip340.c - bip340 test for libsatoshi
+ * t-bip340.c - bip340 test for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stddef.h>
 #include <string.h>
-#include <satoshi/crypto/drbg.h>
-#include <satoshi/crypto/ecc.h>
+#include <mako/crypto/drbg.h>
+#include <mako/crypto/ecc.h>
 #include "data/bip340_vectors.h"
 #include "lib/tests.h"
 

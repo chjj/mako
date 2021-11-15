@@ -1,7 +1,7 @@
 /*!
- * core.h - core io functions for libsatoshi
+ * core.h - core io functions for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_IO_CORE_H
@@ -17,7 +17,7 @@ extern "C" {
 #include <pthread.h>
 #endif
 
-#include "../satoshi/common.h"
+#include "../mako/common.h"
 
 /*
  * Constants

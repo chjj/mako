@@ -1,7 +1,7 @@
 /*!
- * printf_core.c - printf for libsatoshi
+ * printf_core.c - printf for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <errno.h>
@@ -11,8 +11,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <satoshi/netaddr.h>
-#include <satoshi/printf.h>
+#include <mako/netaddr.h>
+#include <mako/printf.h>
 #include "printf_core.h"
 
 /*

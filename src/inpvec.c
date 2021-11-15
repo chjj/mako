@@ -1,14 +1,14 @@
 /*!
- * inpvec.c - input vector for libsatoshi
+ * inpvec.c - input vector for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/tx.h>
-#include <satoshi/crypto/hash.h>
+#include <mako/tx.h>
+#include <mako/crypto/hash.h>
 #include "impl.h"
 #include "internal.h"
 

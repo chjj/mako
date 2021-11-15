@@ -1,7 +1,7 @@
 /*!
- * loop.h - event loop for libsatoshi
+ * loop.h - event loop for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_LOOP_H
@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 #include <stddef.h>
-#include "../satoshi/common.h"
+#include "../mako/common.h"
 
 /*
  * Types

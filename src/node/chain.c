@@ -1,7 +1,7 @@
 /*!
- * chain.c - chain for libsatoshi
+ * chain.c - chain for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdarg.h>
@@ -18,20 +18,20 @@
 #include <node/logger.h>
 #include <node/timedata.h>
 
-#include <satoshi/block.h>
-#include <satoshi/coins.h>
-#include <satoshi/consensus.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/entry.h>
-#include <satoshi/header.h>
-#include <satoshi/list.h>
-#include <satoshi/map.h>
-#include <satoshi/mpi.h>
-#include <satoshi/network.h>
-#include <satoshi/script.h>
-#include <satoshi/tx.h>
-#include <satoshi/util.h>
-#include <satoshi/vector.h>
+#include <mako/block.h>
+#include <mako/coins.h>
+#include <mako/consensus.h>
+#include <mako/crypto/hash.h>
+#include <mako/entry.h>
+#include <mako/header.h>
+#include <mako/list.h>
+#include <mako/map.h>
+#include <mako/mpi.h>
+#include <mako/network.h>
+#include <mako/script.h>
+#include <mako/tx.h>
+#include <mako/util.h>
+#include <mako/vector.h>
 
 #include "../impl.h"
 #include "../internal.h"

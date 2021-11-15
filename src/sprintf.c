@@ -1,14 +1,14 @@
 /*!
- * sprintf.c - sprintf for libsatoshi
+ * sprintf.c - sprintf for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <satoshi/printf.h>
+#include <mako/printf.h>
 #include "printf_core.h"
 
 /*

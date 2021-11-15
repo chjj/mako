@@ -1,7 +1,7 @@
 /*!
- * base58.c - base58 encoding for libsatoshi
+ * base58.c - base58 encoding for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  *
  * Resources:
  *   https://github.com/bitcoin/bitcoin/blob/master/src/base58.cpp
@@ -10,8 +10,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/encoding.h>
-#include <satoshi/util.h>
+#include <mako/encoding.h>
+#include <mako/util.h>
 #include "internal.h"
 
 /*

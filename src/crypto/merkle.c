@@ -1,14 +1,14 @@
 /*!
- * merkle.c - merkle trees for libsatoshi
+ * merkle.c - merkle trees for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/crypto/merkle.h>
+#include <mako/crypto/hash.h>
+#include <mako/crypto/merkle.h>
 
 /* Notes about unbalanced merkle trees:
  *

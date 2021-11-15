@@ -1,13 +1,13 @@
 /*!
- * undo.c - undo coins for libsatoshi
+ * undo.c - undo coins for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/coins.h>
+#include <mako/coins.h>
 #include "impl.h"
 #include "internal.h"
 

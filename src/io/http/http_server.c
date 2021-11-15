@@ -1,7 +1,7 @@
 /*!
- * http_server.c - http server for libsatoshi
+ * http_server.c - http server for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdarg.h>

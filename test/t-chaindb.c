@@ -1,13 +1,13 @@
 /*!
- * t-chaindb.c - chaindb test for libsatoshi
+ * t-chaindb.c - chaindb test for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stddef.h>
 #include <string.h>
 #include <node/chaindb.h>
-#include <satoshi/network.h>
+#include <mako/network.h>
 #include "lib/tests.h"
 
 int main(void) {

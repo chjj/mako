@@ -1,13 +1,13 @@
 /*!
- * heap.c - heap functions for libsatoshi
+ * heap.c - heap functions for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <limits.h>
 #include <stddef.h>
-#include <satoshi/heap.h>
-#include <satoshi/vector.h>
+#include <mako/heap.h>
+#include <mako/vector.h>
 #include "internal.h"
 
 /*

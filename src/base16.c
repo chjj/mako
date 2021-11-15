@@ -1,7 +1,7 @@
 /*!
- * base16.c - base16 encoding for libsatoshi
+ * base16.c - base16 encoding for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  *
  * Resources:
  *   https://tools.ietf.org/html/rfc4648
@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/encoding.h>
+#include <mako/encoding.h>
 #include "internal.h"
 
 /*

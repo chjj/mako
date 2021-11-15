@@ -1,7 +1,7 @@
 /*!
- * words.h - bip39 words for libsatoshi
+ * words.h - bip39 words for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_BIP39_WORDS_H

@@ -1,7 +1,7 @@
 /*!
- * core.c - core io functions for libsatoshi
+ * core.c - core io functions for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdarg.h>

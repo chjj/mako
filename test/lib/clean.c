@@ -1,7 +1,7 @@
 /*!
- * clean.c - datadir cleaner for libsatoshi
+ * clean.c - datadir cleaner for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdint.h>

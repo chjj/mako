@@ -1,23 +1,23 @@
 /*!
- * script.c - script for libsatoshi
+ * script.c - script for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <limits.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/array.h>
-#include <satoshi/buffer.h>
-#include <satoshi/consensus.h>
-#include <satoshi/encoding.h>
-#include <satoshi/crypto/ecc.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/policy.h>
-#include <satoshi/script.h>
-#include <satoshi/tx.h>
-#include <satoshi/vector.h>
+#include <mako/array.h>
+#include <mako/buffer.h>
+#include <mako/consensus.h>
+#include <mako/encoding.h>
+#include <mako/crypto/ecc.h>
+#include <mako/crypto/hash.h>
+#include <mako/policy.h>
+#include <mako/script.h>
+#include <mako/tx.h>
+#include <mako/vector.h>
 #include "impl.h"
 #include "internal.h"
 

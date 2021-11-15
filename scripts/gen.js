@@ -577,9 +577,9 @@ const desc = {
 };
 
 console.log('/*!');
-console.log(' * secp256k1.h - secp256k1 data for libsatoshi');
+console.log(' * secp256k1.h - secp256k1 data for mako');
 console.log(' * Copyright (c) 2020, Christopher Jeffrey (MIT License).');
-console.log(' * https://github.com/chjj/libsatoshi');
+console.log(' * https://github.com/chjj/mako');
 console.log(' */');
 console.log('');
 console.log('#ifndef BTC_SECP256K1_H');

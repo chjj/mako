@@ -1,7 +1,7 @@
 /*!
- * bio.h - binary parsing & serialization for libsatoshi
+ * bio.h - binary parsing & serialization for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_BIO_H

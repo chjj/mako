@@ -1,18 +1,18 @@
 /*!
- * t-tx.c - tx test for libsatoshi
+ * t-tx.c - tx test for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <satoshi/coins.h>
-#include <satoshi/network.h>
-#include <satoshi/script.h>
-#include <satoshi/tx.h>
-#include <satoshi/util.h>
+#include <mako/coins.h>
+#include <mako/network.h>
+#include <mako/script.h>
+#include <mako/tx.h>
+#include <mako/util.h>
 #include "data/tx_valid_vectors.h"
 #include "data/tx_invalid_vectors.h"
 #include "lib/tests.h"

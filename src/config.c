@@ -1,7 +1,7 @@
 /*!
- * config.c - config for libsatoshi
+ * config.c - config for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <limits.h>
@@ -9,18 +9,18 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <satoshi/config.h>
-#include <satoshi/net.h>
-#include <satoshi/netaddr.h>
-#include <satoshi/network.h>
-#include <satoshi/util.h>
+#include <mako/config.h>
+#include <mako/net.h>
+#include <mako/netaddr.h>
+#include <mako/network.h>
+#include <mako/util.h>
 #include "internal.h"
 
 /*
  * Constants
  */
 
-#define BTC_CONFIG_FILE "satoshi.conf"
+#define BTC_CONFIG_FILE "mako.conf"
 
 /*
  * Macros

@@ -1,7 +1,7 @@
 /*!
- * chaindb.c - chaindb for libsatoshi
+ * chaindb.c - chaindb for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdlib.h>
@@ -13,17 +13,17 @@
 
 #include <io/core.h>
 #include <node/chaindb.h>
-#include <satoshi/block.h>
-#include <satoshi/coins.h>
-#include <satoshi/consensus.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/entry.h>
-#include <satoshi/list.h>
-#include <satoshi/map.h>
-#include <satoshi/network.h>
-#include <satoshi/tx.h>
-#include <satoshi/util.h>
-#include <satoshi/vector.h>
+#include <mako/block.h>
+#include <mako/coins.h>
+#include <mako/consensus.h>
+#include <mako/crypto/hash.h>
+#include <mako/entry.h>
+#include <mako/list.h>
+#include <mako/map.h>
+#include <mako/network.h>
+#include <mako/tx.h>
+#include <mako/util.h>
+#include <mako/vector.h>
 
 #include "../bio.h"
 #include "../impl.h"

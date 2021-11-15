@@ -1,13 +1,13 @@
 /*!
- * tests.c - test utils for libsatoshi
+ * tests.c - test utils for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/bcoin-org/libsatoshi
+ * https://github.com/bcoin-org/mako
  */
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <satoshi/encoding.h>
+#include <mako/encoding.h>
 #include "tests.h"
 
 TEST_NORETURN void

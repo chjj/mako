@@ -1,19 +1,19 @@
-# CMakeLists.txt - cmake build for libsatoshi
+# CMakeLists.txt - cmake build for mako
 # Copyright (c) 2020, Christopher Jeffrey (MIT License).
-# https://github.com/chjj/libsatoshi
+# https://github.com/chjj/mako
 
 cmake_minimum_required(VERSION 3.4)
-project(satoshi LANGUAGES C)
+project(mako LANGUAGES C)
 
 include(CTest)
 include(TestBigEndian)
 
-set(satoshi_sources)
-set(satoshi_defines)
-set(satoshi_cflags)
-set(satoshi_includes)
-set(satoshi_ldflags)
-set(satoshi_libs)
+set(mako_sources)
+set(mako_defines)
+set(mako_cflags)
+set(mako_includes)
+set(mako_ldflags)
+set(mako_libs)
 set(io_sources)
 set(node_sources)
 set(client_sources)
@@ -23,85 +23,85 @@ set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD_REQUIRED OFF)
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 
-list(APPEND satoshi_sources src/crypto/chacha20.c
-                            src/crypto/drbg.c
-                            src/crypto/ecc.c
-                            src/crypto/hash160.c
-                            src/crypto/hash256.c
-                            src/crypto/hmac256.c
-                            src/crypto/hmac512.c
-                            src/crypto/merkle.c
-                            src/crypto/pbkdf256.c
-                            src/crypto/pbkdf512.c
-                            src/crypto/rand.c
-                            src/crypto/ripemd160.c
-                            src/crypto/sha1.c
-                            src/crypto/sha256.c
-                            src/crypto/sha512.c
-                            src/crypto/siphash.c
-                            src/crypto/sysrand.c
-                            src/json/json_builder.c
-                            src/json/json_extra.c
-                            src/json/json_parser.c
-                            src/map/addrmap.c
-                            src/map/hashmap.c
-                            src/map/hashset.c
-                            src/map/hashtab.c
-                            src/map/intmap.c
-                            src/map/longmap.c
-                            src/map/longset.c
-                            src/map/longtab.c
-                            src/map/outmap.c
-                            src/map/outset.c
-                            src/address.c
-                            src/amount.c
-                            src/array.c
-                            src/base16.c
-                            src/base58.c
-                            src/bech32.c
-                            src/bip32.c
-                            src/bip37.c
-                            src/bip39.c
-                            src/bip152.c
-                            src/block.c
-                            src/bloom.c
-                            src/buffer.c
-                            src/coin.c
-                            src/compact.c
-                            src/compress.c
-                            src/config.c
-                            src/consensus.c
-                            src/entry.c
-                            src/header.c
-                            src/heap.c
-                            src/input.c
-                            src/inpvec.c
-                            src/inspect.c
-                            src/internal.c
-                            src/json.c
-                            src/mainnet.c
-                            src/mpi.c
-                            src/murmur3.c
-                            src/netaddr.c
-                            src/netmsg.c
-                            src/network.c
-                            src/outpoint.c
-                            src/output.c
-                            src/outvec.c
-                            src/policy.c
-                            src/printf.c
-                            src/printf_core.c
-                            src/regtest.c
-                            src/script.c
-                            src/signet.c
-                            src/simnet.c
-                            src/sprintf.c
-                            src/testnet.c
-                            src/tx.c
-                            src/undo.c
-                            src/util.c
-                            src/vector.c
-                            src/view.c)
+list(APPEND mako_sources src/crypto/chacha20.c
+                         src/crypto/drbg.c
+                         src/crypto/ecc.c
+                         src/crypto/hash160.c
+                         src/crypto/hash256.c
+                         src/crypto/hmac256.c
+                         src/crypto/hmac512.c
+                         src/crypto/merkle.c
+                         src/crypto/pbkdf256.c
+                         src/crypto/pbkdf512.c
+                         src/crypto/rand.c
+                         src/crypto/ripemd160.c
+                         src/crypto/sha1.c
+                         src/crypto/sha256.c
+                         src/crypto/sha512.c
+                         src/crypto/siphash.c
+                         src/crypto/sysrand.c
+                         src/json/json_builder.c
+                         src/json/json_extra.c
+                         src/json/json_parser.c
+                         src/map/addrmap.c
+                         src/map/hashmap.c
+                         src/map/hashset.c
+                         src/map/hashtab.c
+                         src/map/intmap.c
+                         src/map/longmap.c
+                         src/map/longset.c
+                         src/map/longtab.c
+                         src/map/outmap.c
+                         src/map/outset.c
+                         src/address.c
+                         src/amount.c
+                         src/array.c
+                         src/base16.c
+                         src/base58.c
+                         src/bech32.c
+                         src/bip32.c
+                         src/bip37.c
+                         src/bip39.c
+                         src/bip152.c
+                         src/block.c
+                         src/bloom.c
+                         src/buffer.c
+                         src/coin.c
+                         src/compact.c
+                         src/compress.c
+                         src/config.c
+                         src/consensus.c
+                         src/entry.c
+                         src/header.c
+                         src/heap.c
+                         src/input.c
+                         src/inpvec.c
+                         src/inspect.c
+                         src/internal.c
+                         src/json.c
+                         src/mainnet.c
+                         src/mpi.c
+                         src/murmur3.c
+                         src/netaddr.c
+                         src/netmsg.c
+                         src/network.c
+                         src/outpoint.c
+                         src/output.c
+                         src/outvec.c
+                         src/policy.c
+                         src/printf.c
+                         src/printf_core.c
+                         src/regtest.c
+                         src/script.c
+                         src/signet.c
+                         src/simnet.c
+                         src/sprintf.c
+                         src/testnet.c
+                         src/tx.c
+                         src/undo.c
+                         src/util.c
+                         src/vector.c
+                         src/view.c)
 
 list(APPEND io_sources src/io/http/http_client.c
                        src/io/http/http_common.c
@@ -143,42 +143,42 @@ list(APPEND node_sources src/node/addrman.c
 list(APPEND client_sources src/client/client.c)
 
 if(WIN32)
-  list(APPEND satoshi_defines _WIN32_WINNT=0x501)
+  list(APPEND mako_defines _WIN32_WINNT=0x501)
 endif()
 
 if(WIN32 AND NOT MINGW)
-  list(APPEND satoshi_defines "BTC_TLS=__declspec(thread)")
+  list(APPEND mako_defines "BTC_TLS=__declspec(thread)")
 else()
-  list(APPEND satoshi_defines BTC_HAVE_ASM)
-  list(APPEND satoshi_defines BTC_HAVE_INT128)
+  list(APPEND mako_defines BTC_HAVE_ASM)
+  list(APPEND mako_defines BTC_HAVE_INT128)
   if(NOT MINGW)
-    list(APPEND satoshi_defines BTC_HAVE_CLOCK)
-    list(APPEND satoshi_defines BTC_HAVE_PTHREAD)
-    list(APPEND satoshi_defines BTC_TLS=__thread)
-    list(APPEND satoshi_defines _GNU_SOURCE)
+    list(APPEND mako_defines BTC_HAVE_CLOCK)
+    list(APPEND mako_defines BTC_HAVE_PTHREAD)
+    list(APPEND mako_defines BTC_TLS=__thread)
+    list(APPEND mako_defines _GNU_SOURCE)
   endif()
 endif()
 
 test_big_endian(BTC_BIGENDIAN)
 
 if(BTC_BIGENDIAN)
-  list(APPEND satoshi_defines BTC_BIGENDIAN)
+  list(APPEND mako_defines BTC_BIGENDIAN)
 endif()
 
 if(NOT CMAKE_CROSSCOMPILING)
   if(WIN32)
     string(REPLACE "/" "\\" srcdir "${PROJECT_SOURCE_DIR}")
-    list(APPEND satoshi_defines BTC_PREFIX="${srcdir}\\tmp")
+    list(APPEND mako_defines BTC_PREFIX="${srcdir}\\tmp")
   else()
-    list(APPEND satoshi_defines BTC_PREFIX="${PROJECT_SOURCE_DIR}/tmp")
+    list(APPEND mako_defines BTC_PREFIX="${PROJECT_SOURCE_DIR}/tmp")
   endif()
 endif()
 
 if(MSVC)
-  list(APPEND satoshi_cflags /wd4244
+  list(APPEND mako_cflags /wd4244
                              /wd4267)
 else()
-  list(APPEND satoshi_cflags -pedantic
+  list(APPEND mako_cflags -pedantic
                              -Wall
                              -Wextra
                              -Wcast-align
@@ -188,72 +188,63 @@ else()
                              -Wshadow)
 endif()
 
-list(APPEND satoshi_includes ${PROJECT_SOURCE_DIR}/include)
+list(APPEND mako_includes ${PROJECT_SOURCE_DIR}/include)
 
 if(WIN32)
-  list(APPEND satoshi_libs shell32 userenv ws2_32)
+  list(APPEND mako_libs shell32 userenv ws2_32)
 else()
-  list(APPEND satoshi_libs m)
+  list(APPEND mako_libs m)
 endif()
 
 add_subdirectory(deps/lmdb)
 
-add_library(satoshi_static STATIC ${satoshi_sources})
-target_compile_definitions(satoshi_static PUBLIC ${satoshi_defines})
-target_compile_options(satoshi_static PUBLIC ${satoshi_cflags})
-target_include_directories(satoshi_static PUBLIC ${satoshi_includes})
-target_link_options(satoshi_static INTERFACE ${satoshi_ldflags})
-target_link_libraries(satoshi_static PRIVATE ${satoshi_libs})
-set_property(TARGET satoshi_static PROPERTY OUTPUT_NAME satoshi)
+add_library(mako_lib STATIC ${mako_sources})
+target_compile_definitions(mako_lib PUBLIC ${mako_defines})
+target_compile_options(mako_lib PUBLIC ${mako_cflags})
+target_include_directories(mako_lib PUBLIC ${mako_includes})
+target_link_options(mako_lib INTERFACE ${mako_ldflags})
+target_link_libraries(mako_lib PRIVATE ${mako_libs})
+set_property(TARGET mako_lib PROPERTY OUTPUT_NAME mako)
 
-# add_library(satoshi_shared SHARED ${satoshi_sources})
-# target_compile_definitions(satoshi_shared PUBLIC ${satoshi_defines}
-#                                           PRIVATE BTC_EXPORT)
-# target_compile_options(satoshi_shared PUBLIC ${satoshi_cflags})
-# target_include_directories(satoshi_shared PUBLIC ${satoshi_includes})
-# target_link_options(satoshi_shared PUBLIC ${satoshi_ldflags})
-# target_link_libraries(satoshi_shared PRIVATE ${satoshi_libs})
-# set_property(TARGET satoshi_shared PROPERTY OUTPUT_NAME satoshi)
+add_library(mako_io STATIC ${io_sources})
+target_compile_definitions(mako_io PUBLIC ${mako_defines})
+target_compile_options(mako_io PUBLIC ${mako_cflags})
+target_include_directories(mako_io PUBLIC ${mako_includes})
+target_link_options(mako_io INTERFACE ${mako_ldflags})
+target_link_libraries(mako_io PRIVATE pthread)
+set_property(TARGET mako_io PROPERTY OUTPUT_NAME io)
 
-add_library(satoshi_io STATIC ${io_sources})
-target_compile_definitions(satoshi_io PUBLIC ${satoshi_defines})
-target_compile_options(satoshi_io PUBLIC ${satoshi_cflags})
-target_include_directories(satoshi_io PUBLIC ${satoshi_includes})
-target_link_options(satoshi_io INTERFACE ${satoshi_ldflags})
-target_link_libraries(satoshi_io PRIVATE pthread)
-set_property(TARGET satoshi_io PROPERTY OUTPUT_NAME io)
+add_library(mako_node STATIC ${node_sources})
+target_compile_definitions(mako_node PUBLIC ${mako_defines})
+target_compile_options(mako_node PUBLIC ${mako_cflags})
+target_include_directories(mako_node PUBLIC ${mako_includes})
+target_link_options(mako_node INTERFACE ${mako_ldflags})
+target_link_libraries(mako_node PRIVATE lmdb)
+set_property(TARGET mako_node PROPERTY OUTPUT_NAME node)
 
-add_library(satoshi_node STATIC ${node_sources})
-target_compile_definitions(satoshi_node PUBLIC ${satoshi_defines})
-target_compile_options(satoshi_node PUBLIC ${satoshi_cflags})
-target_include_directories(satoshi_node PUBLIC ${satoshi_includes})
-target_link_options(satoshi_node INTERFACE ${satoshi_ldflags})
-target_link_libraries(satoshi_node PRIVATE lmdb)
-set_property(TARGET satoshi_node PROPERTY OUTPUT_NAME node)
+add_library(mako_client STATIC ${client_sources})
+target_compile_definitions(mako_client PUBLIC ${mako_defines})
+target_compile_options(mako_client PUBLIC ${mako_cflags})
+target_include_directories(mako_client PUBLIC ${mako_includes})
+target_link_options(mako_client INTERFACE ${mako_ldflags})
+set_property(TARGET mako_client PROPERTY OUTPUT_NAME client)
 
-add_library(satoshi_client STATIC ${client_sources})
-target_compile_definitions(satoshi_client PUBLIC ${satoshi_defines})
-target_compile_options(satoshi_client PUBLIC ${satoshi_cflags})
-target_include_directories(satoshi_client PUBLIC ${satoshi_includes})
-target_link_options(satoshi_client INTERFACE ${satoshi_ldflags})
-set_property(TARGET satoshi_client PROPERTY OUTPUT_NAME client)
+add_library(mako_tests STATIC test/lib/tests.c test/lib/clean.c)
+target_compile_definitions(mako_tests PUBLIC ${mako_defines})
+target_compile_options(mako_tests PUBLIC ${mako_cflags})
+target_include_directories(mako_tests PUBLIC ${mako_includes})
+target_link_options(mako_tests INTERFACE ${mako_ldflags})
+set_property(TARGET mako_tests PROPERTY OUTPUT_NAME tests)
 
-add_library(satoshi_tests STATIC test/lib/tests.c test/lib/clean.c)
-target_compile_definitions(satoshi_tests PUBLIC ${satoshi_defines})
-target_compile_options(satoshi_tests PUBLIC ${satoshi_cflags})
-target_include_directories(satoshi_tests PUBLIC ${satoshi_includes})
-target_link_options(satoshi_tests INTERFACE ${satoshi_ldflags})
-set_property(TARGET satoshi_tests PROPERTY OUTPUT_NAME tests)
+add_executable(makod src/node/main.c)
+target_link_libraries(makod PRIVATE mako_node
+                                       mako_io
+                                       mako_lib)
 
-add_executable(satoshid src/node/main.c)
-target_link_libraries(satoshid PRIVATE satoshi_node
-                                       satoshi_io
-                                       satoshi_static)
-
-add_executable(satoshi src/client/main.c)
-target_link_libraries(satoshi PRIVATE satoshi_client
-                                      satoshi_io
-                                      satoshi_static)
+add_executable(mako src/client/main.c)
+target_link_libraries(mako PRIVATE mako_client
+                                      mako_io
+                                      mako_lib)
 
 set(tests # crypto
           bip340
@@ -323,19 +314,19 @@ set(tests # crypto
 
 foreach(name ${tests})
   add_executable(t-${name} test/t-${name}.c)
-  target_link_libraries(t-${name} PRIVATE satoshi_tests
-                                          satoshi_node
-                                          satoshi_client
-                                          satoshi_io
-                                          satoshi_static)
+  target_link_libraries(t-${name} PRIVATE mako_tests
+                                          mako_node
+                                          mako_client
+                                          mako_io
+                                          mako_lib)
   add_test(NAME ${name} COMMAND t-${name})
 endforeach()
 
 foreach(name http_server)
   add_executable(t-${name} test/t-${name}.c)
-  target_link_libraries(t-${name} PRIVATE satoshi_tests
-                                          satoshi_node
-                                          satoshi_client
-                                          satoshi_io
-                                          satoshi_static)
+  target_link_libraries(t-${name} PRIVATE mako_tests
+                                          mako_node
+                                          mako_client
+                                          mako_io
+                                          mako_lib)
 endforeach()

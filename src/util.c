@@ -1,7 +1,7 @@
 /*!
- * util.c - utils for libsatoshi
+ * util.c - utils for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stddef.h>
@@ -11,8 +11,8 @@
 #ifdef _WIN32
 #  include <windows.h> /* SecureZeroMemory */
 #endif
-#include <satoshi/encoding.h>
-#include <satoshi/util.h>
+#include <mako/encoding.h>
+#include <mako/util.h>
 #include "internal.h"
 
 /*

@@ -1,7 +1,7 @@
 /*!
- * workers.c - thread pool for libsatoshi
+ * workers.c - thread pool for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  *
  * Resources:
  *   https://nachtimwald.com/2019/04/12/thread-pool-in-c/

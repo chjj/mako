@@ -1,7 +1,7 @@
 /*!
- * rpc.c - rpc for libsatoshi
+ * rpc.c - rpc for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdarg.h>
@@ -24,24 +24,24 @@
 #include <node/rpc.h>
 #include <node/timedata.h>
 
-#include <satoshi/address.h>
-#include <satoshi/block.h>
-#include <satoshi/coins.h>
-#include <satoshi/consensus.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/encoding.h>
-#include <satoshi/entry.h>
-#include <satoshi/header.h>
-#include <satoshi/json.h>
-#include <satoshi/map.h>
-#include <satoshi/net.h>
-#include <satoshi/netaddr.h>
-#include <satoshi/netmsg.h>
-#include <satoshi/network.h>
-#include <satoshi/script.h>
-#include <satoshi/tx.h>
-#include <satoshi/util.h>
-#include <satoshi/vector.h>
+#include <mako/address.h>
+#include <mako/block.h>
+#include <mako/coins.h>
+#include <mako/consensus.h>
+#include <mako/crypto/hash.h>
+#include <mako/encoding.h>
+#include <mako/entry.h>
+#include <mako/header.h>
+#include <mako/json.h>
+#include <mako/map.h>
+#include <mako/net.h>
+#include <mako/netaddr.h>
+#include <mako/netmsg.h>
+#include <mako/network.h>
+#include <mako/script.h>
+#include <mako/tx.h>
+#include <mako/util.h>
+#include <mako/vector.h>
 
 #include "../internal.h"
 

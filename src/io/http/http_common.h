@@ -1,7 +1,7 @@
 /*!
- * http_common.h - http utils for libsatoshi
+ * http_common.h - http utils for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef HTTP_COMMON_H

@@ -1,7 +1,7 @@
 /*!
- * main.c - main entry point for libsatoshi
+ * main.c - main entry point for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdint.h>
@@ -16,8 +16,8 @@
 #include <node/pool.h>
 #include <node/rpc.h>
 
-#include <satoshi/config.h>
-#include <satoshi/netaddr.h>
+#include <mako/config.h>
+#include <mako/netaddr.h>
 
 /*
  * Config
@@ -27,7 +27,7 @@ static int
 get_config(btc_conf_t *args, int argc, char **argv) {
   char prefix[BTC_PATH_MAX];
 
-  if (!btc_sys_datadir(prefix, sizeof(prefix), "satoshi")) {
+  if (!btc_sys_datadir(prefix, sizeof(prefix), "mako")) {
     fprintf(stderr, "Could not find suitable datadir.\n");
     return 0;
   }
@@ -132,7 +132,7 @@ main(int argc, char **argv) {
     return EXIT_FAILURE;
 
   if (args.help) {
-    puts("Usage: satoshid [options]");
+    puts("Usage: makod [options]");
     return EXIT_SUCCESS;
   }
 

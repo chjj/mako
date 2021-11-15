@@ -1,7 +1,7 @@
 /*!
- * siphash.c - siphash for libsatoshi
+ * siphash.c - siphash for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  *
  * Parts of this software are based on bitcoin/bitcoin:
  *   Copyright (c) 2009-2019, The Bitcoin Core Developers (MIT License).
@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <satoshi/crypto/siphash.h>
+#include <mako/crypto/siphash.h>
 
 #include "../bio.h"
 #include "../internal.h"

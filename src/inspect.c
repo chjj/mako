@@ -1,7 +1,7 @@
 /*!
- * inspect.c - inspect functions for libsatoshi
+ * inspect.c - inspect functions for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdint.h>
@@ -9,19 +9,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <satoshi/address.h>
-#include <satoshi/block.h>
-#include <satoshi/buffer.h>
-#include <satoshi/coins.h>
-#include <satoshi/encoding.h>
-#include <satoshi/entry.h>
-#include <satoshi/header.h>
-#include <satoshi/json.h>
-#include <satoshi/netaddr.h>
-#include <satoshi/network.h>
-#include <satoshi/script.h>
-#include <satoshi/tx.h>
-#include <satoshi/util.h>
+#include <mako/address.h>
+#include <mako/block.h>
+#include <mako/buffer.h>
+#include <mako/coins.h>
+#include <mako/encoding.h>
+#include <mako/entry.h>
+#include <mako/header.h>
+#include <mako/json.h>
+#include <mako/netaddr.h>
+#include <mako/network.h>
+#include <mako/script.h>
+#include <mako/tx.h>
+#include <mako/util.h>
 
 #include "internal.h"
 

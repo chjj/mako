@@ -1,12 +1,12 @@
 /*!
- * simnet.c - simnet for libsatoshi
+ * simnet.c - simnet for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stddef.h>
 #include <stdint.h>
-#include <satoshi/network.h>
+#include <mako/network.h>
 #include "internal.h"
 
 static const char *simnet_seeds[] = {

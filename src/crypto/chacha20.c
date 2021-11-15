@@ -1,7 +1,7 @@
 /*!
- * chacha20.c - chacha20 for libsatoshi
+ * chacha20.c - chacha20 for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  *
  * Resources:
  *   https://en.wikipedia.org/wiki/Chacha20
@@ -12,8 +12,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <satoshi/crypto/stream.h>
-#include <satoshi/util.h>
+#include <mako/crypto/stream.h>
+#include <mako/util.h>
 #include "../bio.h"
 #include "../internal.h"
 

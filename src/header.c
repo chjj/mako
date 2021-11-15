@@ -1,15 +1,15 @@
 /*!
- * header.c - header for libsatoshi
+ * header.c - header for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/crypto/hash.h>
-#include <satoshi/header.h>
-#include <satoshi/util.h>
+#include <mako/crypto/hash.h>
+#include <mako/header.h>
+#include <mako/util.h>
 #include "impl.h"
 #include "internal.h"
 

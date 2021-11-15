@@ -1,7 +1,7 @@
 /*!
- * net.c - network functions for libsatoshi
+ * net.c - network functions for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <signal.h>

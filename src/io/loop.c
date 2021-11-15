@@ -1,7 +1,7 @@
 /*!
- * loop.c - event loop for libsatoshi
+ * loop.c - event loop for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #if defined(_WIN32) && !defined(FD_SETSIZE)

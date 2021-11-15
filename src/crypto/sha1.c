@@ -1,7 +1,7 @@
 /*!
- * sha1.c - sha1 for libsatoshi
+ * sha1.c - sha1 for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  *
  * Resources:
  *   https://en.wikipedia.org/wiki/SHA-1
@@ -15,7 +15,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include <satoshi/crypto/hash.h>
+#include <mako/crypto/hash.h>
 #include "../bio.h"
 
 /*

@@ -1,17 +1,17 @@
 /*!
- * t-bip39.c - bip39 test for libsatoshi
+ * t-bip39.c - bip39 test for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <satoshi/bip32.h>
-#include <satoshi/bip39.h>
-#include <satoshi/encoding.h>
-#include <satoshi/network.h>
-#include <satoshi/util.h>
+#include <mako/bip32.h>
+#include <mako/bip39.h>
+#include <mako/encoding.h>
+#include <mako/network.h>
+#include <mako/util.h>
 #include "lib/tests.h"
 #include "data/bip39_vectors.h"
 

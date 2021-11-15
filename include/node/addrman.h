@@ -1,7 +1,7 @@
 /*!
- * addrman.h - address manager for libsatoshi
+ * addrman.h - address manager for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
- * https://github.com/chjj/libsatoshi
+ * https://github.com/chjj/mako
  */
 
 #ifndef BTC_ADDRMAN_H
@@ -14,8 +14,8 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 #include "types.h"
-#include "../satoshi/common.h"
-#include "../satoshi/types.h"
+#include "../mako/common.h"
+#include "../mako/types.h"
 
 /**
  * Local address scores.
