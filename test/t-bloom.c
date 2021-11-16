@@ -112,6 +112,8 @@ test_bloom2(void) {
 
   ASSERT(bloom.size == sizeof(expect));
   ASSERT(memcmp(bloom.data, expect, sizeof(expect)) == 0);
+
+  btc_bloom_clear(&bloom);
 }
 
 static void
@@ -137,6 +139,8 @@ test_bloom3(void) {
       ASSERT(!btc_bloom_has(&bloom, (uint8_t *)&k, sizeof(k)));
     } while (j--);
   }
+
+  btc_bloom_clear(&bloom);
 }
 
 /*
@@ -166,6 +170,8 @@ test_filter1(void) {
       ASSERT(!btc_filter_has(&filter, (uint8_t *)&k, sizeof(k)));
     } while (j--);
   }
+
+  btc_filter_clear(&filter);
 }
 
 static void
@@ -218,6 +224,8 @@ test_filter2(void) {
 
     ASSERT(!btc_filter_has(&filter, (uint8_t *)&j, sizeof(j)));
   }
+
+  btc_filter_clear(&filter);
 }
 
 /*
