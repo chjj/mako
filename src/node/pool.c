@@ -3373,6 +3373,9 @@ btc_pool_shift_header(btc_pool_t *pool) {
 
   pool->header_head = node->next;
 
+  if (node == pool->header_next)
+    pool->header_next = NULL;
+
   btc_hdrnode_destroy(node);
 
   if (pool->header_head == NULL) {
@@ -3421,8 +3424,8 @@ btc_pool_resolve_chain(btc_pool_t *pool,
       return;
     }
 
-    btc_pool_shift_header(pool);
     btc_pool_resolve_headers(pool, peer);
+    btc_pool_shift_header(pool);
 
     return;
   }
@@ -3516,8 +3519,8 @@ btc_pool_on_headers(btc_pool_t *pool,
 
   /* Request the blocks we just added. */
   if (checkpoint) {
-    btc_pool_shift_header(pool);
     btc_pool_resolve_headers(pool, peer);
+    btc_pool_shift_header(pool);
     return;
   }
 
