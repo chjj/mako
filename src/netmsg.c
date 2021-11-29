@@ -338,7 +338,6 @@ btc_invitem_type(const btc_invitem_t *x) {
 
   switch (type) {
     case BTC_INV_TX:
-    case BTC_INV_WTX:
       return BTC_INV_TX;
     case BTC_INV_BLOCK:
     case BTC_INV_FILTERED_BLOCK:
