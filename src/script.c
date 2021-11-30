@@ -472,7 +472,7 @@ btc_opcode_set_num(btc_opcode_t *z, int64_t value, uint8_t *scratch) {
     btc_opcode_set_push(z, scratch, btc_scriptnum_export(scratch, value));
 }
 
-int64_t
+int
 btc_opcode_get_num(int64_t *z,
                    const btc_opcode_t *x,
                    int minimal,

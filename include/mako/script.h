@@ -361,7 +361,7 @@ btc_opcode_set_data(btc_opcode_t *z, const uint8_t *data, size_t length);
 BTC_EXTERN void
 btc_opcode_set_num(btc_opcode_t *z, int64_t value, uint8_t *scratch);
 
-BTC_EXTERN int64_t
+BTC_EXTERN int
 btc_opcode_get_num(int64_t *z,
                    const btc_opcode_t *x,
                    int minimal,
