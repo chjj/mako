@@ -8,6 +8,8 @@ project(mako LANGUAGES C)
 include(CTest)
 include(TestBigEndian)
 
+option(USE_LSM1 "Use sqlite4 lsm extension" OFF)
+
 set(mako_sources)
 set(mako_defines)
 set(mako_cflags)
@@ -129,9 +131,15 @@ else()
                          src/io/unix/time.c)
 endif()
 
+if(USE_LSM1)
+  set(chaindb chaindb-lsm1)
+else()
+  set(chaindb chaindb)
+endif()
+
 list(APPEND node_sources src/node/addrman.c
                          src/node/chain.c
-                         src/node/chaindb.c
+                         src/node/${chaindb}.c
                          src/node/logger.c
                          src/node/mempool.c
                          src/node/miner.c
@@ -176,16 +184,16 @@ endif()
 
 if(MSVC)
   list(APPEND mako_cflags /wd4244
-                             /wd4267)
+                          /wd4267)
 else()
   list(APPEND mako_cflags -pedantic
-                             -Wall
-                             -Wextra
-                             -Wcast-align
-                             -Wno-implicit-fallthrough
-                             -Wno-long-long
-                             -Wno-overlength-strings
-                             -Wshadow)
+                          -Wall
+                          -Wextra
+                          -Wcast-align
+                          -Wno-implicit-fallthrough
+                          -Wno-long-long
+                          -Wno-overlength-strings
+                          -Wshadow)
 endif()
 
 list(APPEND mako_includes ${PROJECT_SOURCE_DIR}/include)
@@ -196,8 +204,11 @@ else()
   list(APPEND mako_libs m)
 endif()
 
-add_subdirectory(deps/lmdb)
-add_subdirectory(deps/lsm1)
+if(USE_LSM1)
+  add_subdirectory(deps/lsm1)
+else()
+  add_subdirectory(deps/lmdb)
+endif()
 
 add_library(mako_lib STATIC ${mako_sources})
 target_compile_definitions(mako_lib PUBLIC ${mako_defines})
@@ -220,7 +231,13 @@ target_compile_definitions(mako_node PUBLIC ${mako_defines})
 target_compile_options(mako_node PUBLIC ${mako_cflags})
 target_include_directories(mako_node PUBLIC ${mako_includes})
 target_link_options(mako_node INTERFACE ${mako_ldflags})
-target_link_libraries(mako_node PRIVATE lmdb lsm1)
+
+if(USE_LSM1)
+  target_link_libraries(mako_node PRIVATE lsm1)
+else()
+  target_link_libraries(mako_node PRIVATE lmdb)
+endif()
+
 set_property(TARGET mako_node PROPERTY OUTPUT_NAME node)
 
 add_library(mako_client STATIC ${client_sources})
