@@ -197,6 +197,7 @@ else()
 endif()
 
 add_subdirectory(deps/lmdb)
+add_subdirectory(deps/lsm1)
 
 add_library(mako_lib STATIC ${mako_sources})
 target_compile_definitions(mako_lib PUBLIC ${mako_defines})
@@ -219,7 +220,7 @@ target_compile_definitions(mako_node PUBLIC ${mako_defines})
 target_compile_options(mako_node PUBLIC ${mako_cflags})
 target_include_directories(mako_node PUBLIC ${mako_includes})
 target_link_options(mako_node INTERFACE ${mako_ldflags})
-target_link_libraries(mako_node PRIVATE lmdb)
+target_link_libraries(mako_node PRIVATE lmdb lsm1)
 set_property(TARGET mako_node PROPERTY OUTPUT_NAME node)
 
 add_library(mako_client STATIC ${client_sources})
