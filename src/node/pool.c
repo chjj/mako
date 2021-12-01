@@ -3355,7 +3355,7 @@ btc_pool_resolve_headers(btc_pool_t *pool, btc_peer_t *peer) {
   btc_vector_init(&items);
 
   for (node = pool->header_next; node != NULL; node = node->next) {
-    pool->header_next = node;
+    pool->header_next = node->next;
 
     btc_vector_push(&items, node->hash);
 
