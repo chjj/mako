@@ -5522,7 +5522,7 @@ static int fileToString(
     i += strlen(&aBuf[i]);
     lsmFree(pDb->pEnv, zSeg);
 #endif
-    aBuf[nBuf] = 0;
+    aBuf[nBuf-1] = 0;
   }else{
     aBuf[0] = '\0';
   }

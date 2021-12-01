@@ -113,7 +113,7 @@ void lsmStringVAppendf(
   }
 
   pStr->n += nWrite;
-  pStr->z[pStr->n] = 0;
+  if( pStr->z ) pStr->z[pStr->n] = 0;
 }
 
 void lsmStringAppendf(LsmString *pStr, const char *zFormat, ...){
