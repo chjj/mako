@@ -339,12 +339,12 @@ struct btc_chaindb_s {
 
 static void
 btc_chaindb_path(btc_chaindb_t *db, char *path, int type, int id) {
-  const char *str = (type == 0 ? "blk" : "rev");
+  const char *tag = (type == 0 ? "blk" : "rev");
 
 #if defined(_WIN32)
-  sprintf(path, "%s\\blocks\\%s%.5d.dat", db->prefix, str, id);
+  sprintf(path, "%s\\blocks\\%s%.5d.dat", db->prefix, tag, id);
 #else
-  sprintf(path, "%s/blocks/%s%.5d.dat", db->prefix, str, id);
+  sprintf(path, "%s/blocks/%s%.5d.dat", db->prefix, tag, id);
 #endif
 }
 
@@ -427,26 +427,10 @@ btc_chaindb_load_database(btc_chaindb_t *db) {
     return 0;
   }
 
-  rc = lsm_setopt(lsm, LSM_CONFIG_AUTOFLUSH, (32 << 20) / 1024);
+  rc = lsm_setopt(lsm, LSM_CONFIG_MMAP, 0);
 
   if (rc != 0) {
-    fprintf(stderr, "lsm_config(autoflush): %s\n", lsm_strerror(rc));
-    lsm_close(lsm);
-    return 0;
-  }
-
-  rc = lsm_setopt(lsm, LSM_CONFIG_AUTOCHECKPOINT, 0);
-
-  if (rc != 0) {
-    fprintf(stderr, "lsm_config(autocheckpoint): %s\n", lsm_strerror(rc));
-    lsm_close(lsm);
-    return 0;
-  }
-
-  rc = lsm_setopt(lsm, LSM_CONFIG_USE_LOG, 0);
-
-  if (rc != 0) {
-    fprintf(stderr, "lsm_config(use_log): %s\n", lsm_strerror(rc));
+    fprintf(stderr, "lsm_config(mmap): %s\n", lsm_strerror(rc));
     lsm_close(lsm);
     return 0;
   }
@@ -924,7 +908,7 @@ btc_chaindb_read_undo(btc_chaindb_t *db, const btc_entry_t *entry) {
 
 static int
 should_sync(const btc_entry_t *entry) {
-  if (btc_now() - entry->header.time <= 24 * 60 * 60)
+  if (entry->header.time >= btc_now() - 24 * 60 * 60)
     return 1;
 
   if ((entry->height % 20000) == 0)
@@ -987,8 +971,7 @@ btc_chaindb_write_block(btc_chaindb_t *db,
 
   btc_hash256(hash, db->slab + 24, len);
 
-  /* Store in network format, in case we ever want
-     to sendfile(2) blocks directly to a peer. */
+  /* Store in network format. */
   btc_uint32_write(db->slab +  0, db->network->magic);
   btc_uint32_write(db->slab +  4, 0x636f6c62);
   btc_uint32_write(db->slab +  8, 0x0000006b);
@@ -1269,12 +1252,6 @@ btc_chaindb_save(btc_chaindb_t *db,
   if (lsm_commit(db->lsm, 0) != 0)
     goto fail;
 
-  /* Flush OS buffers. */
-  if (should_sync(entry)) {
-    if (lsm_checkpoint(db->lsm, NULL) != 0)
-      return 0;
-  }
-
   /* Update hashes. */
   CHECK(btc_hashmap_put(db->hashes, entry->hash, entry));
 
@@ -1333,10 +1310,6 @@ btc_chaindb_reconnect(btc_chaindb_t *db,
   if (lsm_commit(db->lsm, 0) != 0)
     goto fail;
 
-  /* Flush OS buffers. */
-  if (lsm_checkpoint(db->lsm, NULL) != 0)
-    return 0;
-
   /* Set next pointer. */
   CHECK(entry->prev != NULL);
   CHECK(entry->next == NULL);
@@ -1378,12 +1351,6 @@ btc_chaindb_disconnect(btc_chaindb_t *db,
   /* Commit transaction. */
   if (lsm_commit(db->lsm, 0) != 0)
     goto fail;
-
-  /* Flush OS buffers. */
-  if (lsm_checkpoint(db->lsm, NULL) != 0) {
-    btc_view_destroy(view);
-    return NULL;
-  }
 
   /* Set next pointer. */
   CHECK(entry->prev != NULL);

@@ -192,12 +192,12 @@ struct btc_chaindb_s {
 
 static void
 btc_chaindb_path(btc_chaindb_t *db, char *path, int type, int id) {
-  const char *str = (type == 0 ? "blk" : "rev");
+  const char *tag = (type == 0 ? "blk" : "rev");
 
 #if defined(_WIN32)
-  sprintf(path, "%s\\blocks\\%s%.5d.dat", db->prefix, str, id);
+  sprintf(path, "%s\\blocks\\%s%.5d.dat", db->prefix, tag, id);
 #else
-  sprintf(path, "%s/blocks/%s%.5d.dat", db->prefix, str, id);
+  sprintf(path, "%s/blocks/%s%.5d.dat", db->prefix, tag, id);
 #endif
 }
 
@@ -857,7 +857,7 @@ btc_chaindb_read_undo(btc_chaindb_t *db, const btc_entry_t *entry) {
 
 static int
 should_sync(const btc_entry_t *entry) {
-  if (btc_now() - entry->header.time <= 24 * 60 * 60)
+  if (entry->header.time >= btc_now() - 24 * 60 * 60)
     return 1;
 
   if ((entry->height % 20000) == 0)
@@ -930,8 +930,7 @@ btc_chaindb_write_block(btc_chaindb_t *db,
 
   btc_hash256(hash, db->slab + 24, len);
 
-  /* Store in network format, in case we ever want
-     to sendfile(2) blocks directly to a peer. */
+  /* Store in network format. */
   btc_uint32_write(db->slab +  0, db->network->magic);
   btc_uint32_write(db->slab +  4, 0x636f6c62);
   btc_uint32_write(db->slab +  8, 0x0000006b);
