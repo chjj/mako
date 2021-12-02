@@ -98,13 +98,13 @@ lsm_connect(lsm_db **lsm, const char *path) {
 
   if (rc != LSM_OK)
     goto done;
-#endif
 
   op = 2; /* default = 4 */
   rc = lsm_config(db, LSM_CONFIG_AUTOMERGE, &op);
 
   if (rc != LSM_OK)
     goto done;
+#endif
 
   op = 0; /* default = 1 */
   rc = lsm_config(db, LSM_CONFIG_MMAP, &op);
@@ -317,7 +317,7 @@ lsm_worker_wait(lsm_worker *w, lsm_db *db) {
     rc = lsm_info(db, LSM_INFO_TREE_SIZE, &old, &new);
 
     if (rc != LSM_OK)
-      return rc;
+      break;
 
     if (old == 0 || new < (limit / 2))
       break;
@@ -327,7 +327,7 @@ lsm_worker_wait(lsm_worker *w, lsm_db *db) {
     btc_time_sleep(5);
   }
 
-  return LSM_OK;
+  return rc;
 }
 
 static void
@@ -726,8 +726,6 @@ fail:
 static void
 btc_chaindb_unload_database(btc_chaindb_t *db) {
 #ifdef USE_WORKER
-  CHECK(lsm_worker_wait(&db->worker, db->lsm) == 0);
-
   lsm_worker_stop(&db->worker);
   lsm_worker_stop(&db->ckptr);
 #endif
