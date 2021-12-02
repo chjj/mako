@@ -150,8 +150,10 @@ typedef struct lsm_worker_s {
   btc_thread_t *thread;
   btc_cond_t *cond;
   btc_mutex_t *lock;
+  int autockpt;
   int work;
   int stop;
+  struct lsm_worker_s *ckptr;
 } lsm_worker;
 
 static void
@@ -160,8 +162,10 @@ lsm_worker_init(lsm_worker *w) {
   w->thread = btc_thread_alloc();
   w->cond = btc_cond_create();
   w->lock = btc_mutex_create();
+  w->autockpt = -1;
   w->work = 0;
   w->stop = 0;
+  w->ckptr = NULL;
 }
 
 static void
@@ -171,15 +175,17 @@ lsm_worker_clear(lsm_worker *w) {
   btc_mutex_destroy(w->lock);
 }
 
-static void
-lsm_worker_main(void *arg);
-
 static int
-lsm_worker_start(lsm_worker *w, const char *path) {
+lsm_worker_start(lsm_worker *w, const char *path, void (*start)(void *)) {
   int rc = lsm_connect(&w->conn, path);
 
-  if (rc == LSM_OK)
-    btc_thread_create(w->thread, lsm_worker_main, w);
+  if (rc == LSM_OK) {
+    w->autockpt = -1;
+
+    CHECK(lsm_config(w->conn, LSM_CONFIG_AUTOCHECKPOINT, &w->autockpt) == 0);
+
+    btc_thread_create(w->thread, start, w);
+  }
 
   return rc;
 }
@@ -209,21 +215,81 @@ lsm_worker_signal(lsm_worker *w) {
 }
 
 static void
-lsm_worker_main(void *arg) {
+lsm_worker_ckpt(void *arg) {
   lsm_worker *w = (lsm_worker *)arg;
-  int nwrite, rc;
+  int kb, rc;
 
   btc_mutex_lock(w->lock);
 
   while (!w->stop) {
     btc_mutex_unlock(w->lock);
 
+    kb = 0;
+    rc = lsm_info(w->conn, LSM_INFO_CHECKPOINT_SIZE, &kb);
+
+    if (rc == LSM_OK && kb >= (w->autockpt / 4))
+      rc = lsm_checkpoint(w->conn, 0);
+
+    if (rc != LSM_OK && rc != LSM_BUSY)
+      btc_abort(); /* LCOV_EXCL_LINE */
+
+    btc_mutex_lock(w->lock);
+
+    if (!w->stop && !w->work)
+      btc_cond_wait(w->cond, w->lock);
+
+    w->work = 0;
+  }
+
+  btc_mutex_unlock(w->lock);
+}
+
+static int
+lsm_worker_barrier(lsm_worker *w, lsm_db *db) {
+  int kb, rc;
+
+  for (;;) {
+    kb = 0;
+    rc = lsm_info(db, LSM_INFO_CHECKPOINT_SIZE, &kb);
+
+    if (rc != LSM_OK || kb < w->autockpt)
+      break;
+
+    lsm_worker_signal(w);
+
+    btc_time_sleep(5);
+  }
+
+  return rc;
+}
+
+static void
+lsm_worker_work(void *arg) {
+  lsm_worker *w = (lsm_worker *)arg;
+  int ckpt = (w->ckptr != NULL);
+  int nwrite, rc;
+  int val = 0;
+
+  btc_mutex_lock(w->lock);
+
+  if (ckpt)
+    CHECK(lsm_config(w->conn, LSM_CONFIG_AUTOCHECKPOINT, &val) == 0);
+
+  while (!w->stop) {
+    btc_mutex_unlock(w->lock);
+
     do {
+      if (ckpt)
+        lsm_worker_barrier(w->ckptr, w->conn);
+
       nwrite = 0;
-      rc = lsm_work(w->conn, 0, 1024, &nwrite);
+      rc = lsm_work(w->conn, 0, 256, &nwrite);
 
       if (rc != LSM_OK && rc != LSM_BUSY)
         btc_abort(); /* LCOV_EXCL_LINE */
+
+      if (ckpt && nwrite > 0)
+        lsm_worker_signal(w->ckptr);
     } while (nwrite > 0);
 
     btc_mutex_lock(w->lock);
@@ -238,17 +304,17 @@ lsm_worker_main(void *arg) {
 }
 
 static int
-lsm_worker_wait(lsm_worker *w, lsm_db *lsm) {
-  int ret, rc, old, new;
+lsm_worker_wait(lsm_worker *w, lsm_db *db) {
+  int rc, old, new;
   int limit = -1;
 
-  ret = lsm_config(lsm, LSM_CONFIG_AUTOFLUSH, &limit);
+  rc = lsm_config(db, LSM_CONFIG_AUTOFLUSH, &limit);
 
-  if (ret != LSM_OK)
-    return ret;
+  if (rc != LSM_OK)
+    return rc;
 
   for (;;) {
-    rc = lsm_info(lsm, LSM_INFO_TREE_SIZE, &old, &new);
+    rc = lsm_info(db, LSM_INFO_TREE_SIZE, &old, &new);
 
     if (rc != LSM_OK)
       return rc;
@@ -509,6 +575,7 @@ struct btc_chaindb_s {
   lsm_db *lsm;
 #ifdef USE_WORKER
   lsm_worker worker;
+  lsm_worker ckptr;
 #endif
   btc_hashmap_t *hashes;
   btc_vector_t heights;
@@ -546,6 +613,9 @@ btc_chaindb_init(btc_chaindb_t *db, const btc_network_t *network) {
 
 #ifdef USE_WORKER
   lsm_worker_init(&db->worker);
+  lsm_worker_init(&db->ckptr);
+
+  db->worker.ckptr = &db->ckptr;
 #endif
 
   btc_vector_init(&db->heights);
@@ -559,6 +629,7 @@ btc_chaindb_clear(btc_chaindb_t *db) {
   btc_vector_clear(&db->heights);
 #ifdef USE_WORKER
   lsm_worker_clear(&db->worker);
+  lsm_worker_clear(&db->ckptr);
 #endif
   btc_free(db->slab);
   memset(db, 0, sizeof(*db));
@@ -626,22 +697,30 @@ btc_chaindb_load_database(btc_chaindb_t *db) {
   }
 
 #ifdef USE_WORKER
-  rc = lsm_worker_start(&db->worker, path);
+  rc = lsm_worker_start(&db->ckptr, path, lsm_worker_ckpt);
 
-  if (rc != 0) {
-    fprintf(stderr, "lsm_worker_start: %s\n", lsm_strerror(rc));
+  if (rc != 0)
+    goto fail;
 
-    CHECK(lsm_close(db->lsm) == 0);
+  rc = lsm_worker_start(&db->worker, path, lsm_worker_work);
 
-    db->lsm = NULL;
-
-    return 0;
-  }
+  if (rc != 0)
+    goto fail;
 
   lsm_config_work_hook(db->lsm, lsm_worker_hook, &db->worker);
 #endif
 
   return 1;
+#ifdef USE_WORKER
+fail:
+  fprintf(stderr, "lsm_worker_start: %s\n", lsm_strerror(rc));
+
+  CHECK(lsm_close(db->lsm) == 0);
+
+  db->lsm = NULL;
+
+  return 0;
+#endif
 }
 
 static void
@@ -650,6 +729,7 @@ btc_chaindb_unload_database(btc_chaindb_t *db) {
   CHECK(lsm_worker_wait(&db->worker, db->lsm) == 0);
 
   lsm_worker_stop(&db->worker);
+  lsm_worker_stop(&db->ckptr);
 #endif
 
   CHECK(lsm_close(db->lsm) == 0);
