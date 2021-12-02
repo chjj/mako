@@ -30,13 +30,23 @@
 #include "../internal.h"
 
 /*
+ * Options
+ */
+
+#undef USE_WORKER
+#undef USE_CKPTR
+
+#if defined(USE_CKPTR) && !defined(USE_WORKER)
+#  error "invalid options"
+#endif
+
+/*
  * Constants
  */
 
 #define WRITE_FLAGS (BTC_O_RDWR | BTC_O_CREAT | BTC_O_APPEND)
 #define READ_FLAGS (BTC_O_RDONLY | BTC_O_RANDOM)
 #define MAX_FILE_SIZE (128 << 20)
-#define USE_WORKER
 
 /*
  * LSM Helpers
@@ -575,6 +585,8 @@ struct btc_chaindb_s {
   lsm_db *lsm;
 #ifdef USE_WORKER
   lsm_worker worker;
+#endif
+#ifdef USE_CKPTR
   lsm_worker ckptr;
 #endif
   btc_hashmap_t *hashes;
@@ -613,6 +625,9 @@ btc_chaindb_init(btc_chaindb_t *db, const btc_network_t *network) {
 
 #ifdef USE_WORKER
   lsm_worker_init(&db->worker);
+#endif
+
+#ifdef USE_CKPTR
   lsm_worker_init(&db->ckptr);
 
   db->worker.ckptr = &db->ckptr;
@@ -629,6 +644,8 @@ btc_chaindb_clear(btc_chaindb_t *db) {
   btc_vector_clear(&db->heights);
 #ifdef USE_WORKER
   lsm_worker_clear(&db->worker);
+#endif
+#ifdef USE_CKPTR
   lsm_worker_clear(&db->ckptr);
 #endif
   btc_free(db->slab);
@@ -696,12 +713,14 @@ btc_chaindb_load_database(btc_chaindb_t *db) {
     return 0;
   }
 
-#ifdef USE_WORKER
+#ifdef USE_CKPTR
   rc = lsm_worker_start(&db->ckptr, path, lsm_worker_ckpt);
 
   if (rc != 0)
     goto fail;
+#endif
 
+#ifdef USE_WORKER
   rc = lsm_worker_start(&db->worker, path, lsm_worker_work);
 
   if (rc != 0)
@@ -727,6 +746,9 @@ static void
 btc_chaindb_unload_database(btc_chaindb_t *db) {
 #ifdef USE_WORKER
   lsm_worker_stop(&db->worker);
+#endif
+
+#ifdef USE_CKPTR
   lsm_worker_stop(&db->ckptr);
 #endif
 
