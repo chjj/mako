@@ -701,10 +701,17 @@ btc_chaindb_load_database(btc_chaindb_t *db) {
   char path[BTC_PATH_MAX];
   int rc;
 
+#if defined(LSM_LEVELDB)
+  if (!btc_path_join(path, sizeof(path), db->prefix, "chain", 0)) {
+    fprintf(stderr, "lsm_open: path too long\n");
+    return 0;
+  }
+#else
   if (!btc_path_join(path, sizeof(path), db->prefix, "chain", "data.lsm", 0)) {
     fprintf(stderr, "lsm_open: path too long\n");
     return 0;
   }
+#endif
 
   rc = lsm_connect(&db->lsm, path);
 
