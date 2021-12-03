@@ -163,7 +163,7 @@ lsm_connect(lsm_db **lsm, const char *path) {
 
 done:
   if (rc != LSM_OK)
-    lsm_close(db);
+    CHECK(lsm_close(db) == 0);
 
   return rc;
 }
@@ -229,7 +229,7 @@ lsm_worker_stop(lsm_worker *w) {
 
   btc_thread_join(w->thread);
 
-  lsm_close(w->conn);
+  CHECK(lsm_close(w->conn) == 0);
 }
 
 static void
