@@ -5,7 +5,6 @@
  */
 
 #include <stdarg.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <leveldb/c.h>
@@ -37,6 +36,55 @@ struct lsm_cursor {
 };
 
 /*
+ * Error Handling
+ */
+
+static int
+convert_error(char *err) {
+  /* https://github.com/google/leveldb/blob/f57513a/include/leveldb/status.h */
+  /* https://github.com/google/leveldb/blob/f57513a/util/status.cc#L38 */
+  char *p;
+
+  if (err == NULL)
+    return LSM_OK;
+
+  p = strchr(err, ':');
+
+  if (p != NULL)
+    *p = '\0';
+
+  if (strcmp(err, "OK") == 0)
+    return LSM_OK;
+
+  if (strcmp(err, "NotFound") == 0)
+    return LSM_CANTOPEN; /* LSM_IOERR_NOENT */
+
+  if (strcmp(err, "Corruption") == 0)
+    return LSM_CORRUPT;
+
+  if (strcmp(err, "Not implemented") == 0)
+    return LSM_PROTOCOL;
+
+  if (strcmp(err, "Invalid argument") == 0)
+    return LSM_MISUSE;
+
+  if (strcmp(err, "IO error") == 0)
+    return LSM_IOERR;
+
+  return LSM_ERROR;
+}
+
+static int
+handle_error(char *err) {
+  int rc = convert_error(err);
+
+  if (err != NULL)
+    free(err);
+
+  return rc;
+}
+
+/*
  * Database
  */
 
@@ -52,7 +100,7 @@ lsm_new(lsm_env *env, lsm_db **lsm) {
   if (env != NULL)
     return LSM_MISUSE;
 
-  db = (lsm_db *)malloc(sizeof(lsm_db));
+  db = malloc(sizeof(lsm_db));
 
   if (db == NULL)
     return LSM_NOMEM;
@@ -109,19 +157,7 @@ lsm_open(lsm_db *db, const char *file) {
 
   db->level = leveldb_open(db->options, path, &err);
 
-  if (err != NULL) {
-    CHECK(db->level == NULL);
-
-    fprintf(stderr, "leveldb_open: %s\n", err);
-
-    free(err);
-
-    return LSM_ERROR;
-  }
-
-  CHECK(db->level != NULL);
-
-  return LSM_OK;
+  return handle_error(err);
 }
 
 int
@@ -243,6 +279,20 @@ lsm_config(lsm_db *db, int param, ...) {
         db->cache = leveldb_cache_create_lru(val * 1024);
 
         leveldb_options_set_cache(db->options, db->cache);
+      }
+
+      break;
+    }
+
+    case LSM_CONFIG_BLOOM_BITS: {
+      int val = *va_arg(ap, int *);
+
+      if (val >= 0 && db->level == NULL) {
+        leveldb_filterpolicy_destroy(db->bloom);
+
+        db->bloom = leveldb_filterpolicy_create_bloom(val);
+
+        leveldb_options_set_filter_policy(db->options, db->bloom);
       }
 
       break;
@@ -371,22 +421,20 @@ lsm_default_env(void) {
 
 int
 lsm_get_user_version(lsm_db *db, unsigned int *ptr) {
+  unsigned char *vp;
   char *err = NULL;
   char key = 0;
-  char *vp;
   size_t vn;
 
-  vp = leveldb_get(db->level,
-                   db->read_options,
-                   &key,
-                   sizeof(key),
-                   &vn,
-                   &err);
+  vp = (unsigned char *)leveldb_get(db->level,
+                                    db->read_options,
+                                    &key,
+                                    sizeof(key),
+                                    &vn,
+                                    &err);
 
-  if (err != NULL) {
-    free(err);
-    return LSM_ERROR;
-  }
+  if (err != NULL)
+    return handle_error(err);
 
   if (vp != NULL) {
     if (vn != 4) {
@@ -426,12 +474,7 @@ lsm_set_user_version(lsm_db *db, unsigned int val) {
               sizeof(vp),
               &err);
 
-  if (err != NULL) {
-    free(err);
-    return LSM_ERROR;
-  }
-
-  return LSM_OK;
+  return handle_error(err);
 }
 
 int
@@ -443,7 +486,7 @@ lsm_info(lsm_db *db, int param, ...) {
 }
 
 /*
- * Comparator
+ * Iterator Helpers
  */
 
 static int
@@ -468,6 +511,15 @@ iter_compare(leveldb_iterator_t *it, const void *yp, int yn) {
   xp = leveldb_iter_key(it, &xn);
 
   return compare4(xp, xn, yp, yn);
+}
+
+static int
+iter_status(leveldb_iterator_t *it) {
+  char *err = NULL;
+
+  leveldb_iter_get_error(it, &err);
+
+  return handle_error(err);
 }
 
 /*
@@ -510,6 +562,7 @@ lsm_delete_range(lsm_db *db, const void *xp, int xn,
   leveldb_iterator_t *it;
   const void *kp;
   size_t kn;
+  int rc;
 
   if (db->batch == NULL)
     return LSM_MISUSE;
@@ -518,6 +571,9 @@ lsm_delete_range(lsm_db *db, const void *xp, int xn,
 
   leveldb_iter_seek(it, xp, xn);
 
+  if (leveldb_iter_valid(it) && iter_compare(it, xp, xn) == 0)
+    leveldb_iter_next(it);
+
   while (leveldb_iter_valid(it)) {
     if (iter_compare(it, yp, yn) >= 0)
       break;
@@ -525,11 +581,15 @@ lsm_delete_range(lsm_db *db, const void *xp, int xn,
     kp = leveldb_iter_key(it, &kn);
 
     leveldb_writebatch_delete(db->batch, kp, kn);
+
+    leveldb_iter_next(it);
   }
+
+  rc = iter_status(it);
 
   leveldb_iter_destroy(it);
 
-  return LSM_OK;
+  return rc;
 }
 
 int
@@ -544,13 +604,7 @@ lsm_commit(lsm_db *db, int level) {
 
   db->batch = NULL;
 
-  if (err != NULL) {
-    fprintf(stderr, "leveldb_write: %s\n", err);
-    free(err);
-    return LSM_ERROR;
-  }
-
-  return LSM_OK;
+  return handle_error(err);
 }
 
 int
@@ -571,7 +625,7 @@ lsm_rollback(lsm_db *db, int level) {
 
 int
 lsm_csr_open(lsm_db *db, lsm_cursor **csr) {
-  lsm_cursor *cur = (lsm_cursor *)malloc(sizeof(lsm_cursor));
+  lsm_cursor *cur = malloc(sizeof(lsm_cursor));
 
   if (cur == NULL)
     return LSM_NOMEM;
@@ -586,32 +640,42 @@ lsm_csr_open(lsm_db *db, lsm_cursor **csr) {
 
 int
 lsm_csr_close(lsm_cursor *cur) {
+  int rc = iter_status(cur->it);
   leveldb_iter_destroy(cur->it);
   free(cur);
-  return LSM_OK;
+  return rc;
 }
 
 int
 lsm_csr_seek(lsm_cursor *cur, const void *kp, int kn, int whence) {
   cur->invalid = 0;
 
-  leveldb_iter_seek(cur->it, kp, kn);
+  switch (whence) {
+    case LSM_SEEK_LE: {
+      leveldb_iter_seek(cur->it, kp, kn);
 
-  if (whence == LSM_SEEK_EQ) {
-    if (leveldb_iter_valid(cur->it) && iter_compare(cur->it, kp, kn) != 0)
-      cur->invalid = 1;
+      if (leveldb_iter_valid(cur->it) && iter_compare(cur->it, kp, kn) > 0)
+        leveldb_iter_prev(cur->it);
 
-    return LSM_OK;
+      return LSM_OK;
+    }
+
+    case LSM_SEEK_EQ: {
+      leveldb_iter_seek(cur->it, kp, kn);
+
+      if (leveldb_iter_valid(cur->it) && iter_compare(cur->it, kp, kn) != 0)
+        cur->invalid = 1;
+
+      return LSM_OK;
+    }
+
+    case LSM_SEEK_GE: {
+      leveldb_iter_seek(cur->it, kp, kn);
+      return LSM_OK;
+    }
   }
 
-  if (whence == LSM_SEEK_LE || whence == LSM_SEEK_LEFAST) {
-    while (leveldb_iter_valid(cur->it) && iter_compare(cur->it, kp, kn) > 0)
-      leveldb_iter_prev(cur->it);
-
-    return LSM_OK;
-  }
-
-  return LSM_OK;
+  return LSM_MISUSE;
 }
 
 int
@@ -692,5 +756,7 @@ lsm_realloc(lsm_env *env, void *ptr, size_t size) {
 void
 lsm_free(lsm_env *env, void *ptr) {
   CHECK(env == NULL);
-  free(ptr);
+
+  if (ptr != NULL)
+    free(ptr);
 }
