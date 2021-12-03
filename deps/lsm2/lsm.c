@@ -69,7 +69,7 @@ lsm_new(lsm_env *env, lsm_db **lsm) {
   leveldb_options_set_cache(options, cache);
   leveldb_options_set_write_buffer_size(options, 4 << 20);
   leveldb_options_set_block_size(options, 4096);
-  leveldb_options_set_max_open_files(options, 64);
+  leveldb_options_set_max_open_files(options, sizeof(void *) < 8 ? 64 : 1000);
   leveldb_options_set_block_restart_interval(options, 16);
   leveldb_options_set_max_file_size(options, 2 << 20);
   leveldb_options_set_filter_policy(options, bloom);
@@ -78,7 +78,7 @@ lsm_new(lsm_env *env, lsm_db **lsm) {
   leveldb_writeoptions_set_sync(write_options, 0);
 
   leveldb_readoptions_set_verify_checksums(iter_options, 0);
-  leveldb_readoptions_set_fill_cache(iter_options, 0);
+  leveldb_readoptions_set_fill_cache(iter_options, 1);
 
   db->options = options;
   db->cache = cache;
@@ -190,13 +190,8 @@ lsm_config(lsm_db *db, int param, ...) {
   switch (param) {
     case LSM_CONFIG_AUTOFLUSH: {
       int *ptr = va_arg(ap, int *);
-      int val = *ptr;
-
-      if (db->level == NULL && val >= 0 && val <= (1024 * 1024))
-        leveldb_options_set_write_buffer_size(db->options, val * 1024);
-      else
+      if (*ptr < 0)
         *ptr = 0;
-
       break;
     }
 
@@ -222,32 +217,18 @@ lsm_config(lsm_db *db, int param, ...) {
     }
 
     case LSM_CONFIG_BLOCK_SIZE: {
-      int *ptr = va_arg(ap, int *);
-      int val = *ptr;
+      int val = *va_arg(ap, int *);
 
-      if (db->level != NULL) {
-        *ptr = 0;
-      } else {
-        if (val >= 64 && val <= 65536 && (val & (val - 1)) == 0)
-          leveldb_options_set_block_size(db->options, val * 1024);
-        else
-          *ptr = 0;
-      }
+      if (val >= 0 && db->level == NULL)
+        leveldb_options_set_block_size(db->options, val * 1024);
 
       break;
     }
 
     case LSM_CONFIG_SAFETY: {
       int *ptr = va_arg(ap, int *);
-      int val = *ptr;
-
-      if (val >= 0) {
-        if (db->level == NULL)
-          leveldb_options_set_paranoid_checks(db->options, (val >= 2));
-      } else {
+      if (*ptr < 0)
         *ptr = 0;
-      }
-
       break;
     }
 
@@ -267,15 +248,15 @@ lsm_config(lsm_db *db, int param, ...) {
 
     case LSM_CONFIG_AUTOMERGE: {
       int *ptr = va_arg(ap, int *);
-      if (*ptr < 2)
-        *ptr = 2;
+      if (*ptr < 0)
+        *ptr = 0;
       break;
     }
 
     case LSM_CONFIG_MAX_FREELIST: {
       int *ptr = va_arg(ap, int *);
-      if (*ptr < 2)
-        *ptr = 2;
+      if (*ptr < 0)
+        *ptr = 0;
       break;
     }
 
@@ -287,9 +268,7 @@ lsm_config(lsm_db *db, int param, ...) {
     }
 
     case LSM_CONFIG_READONLY: {
-      int *ptr = va_arg(ap, int *);
-      if (*ptr < 0)
-        *ptr = 0;
+      rc = LSM_MISUSE;
       break;
     }
 
@@ -305,6 +284,110 @@ lsm_config(lsm_db *db, int param, ...) {
 
     case LSM_CONFIG_GET_COMPRESSION: {
       rc = LSM_MISUSE;
+      break;
+    }
+
+    case LSM_CONFIG_CREATE_IF_MISSING: {
+      int val = *va_arg(ap, int *);
+
+      if (val >= 0 && db->level == NULL)
+        leveldb_options_set_create_if_missing(db->options, val);
+
+      break;
+    }
+
+    case LSM_CONFIG_ERROR_IF_EXISTS: {
+      int val = *va_arg(ap, int *);
+
+      if (val >= 0 && db->level == NULL)
+        leveldb_options_set_error_if_exists(db->options, val);
+
+      break;
+    }
+
+    case LSM_CONFIG_CACHE_SIZE: {
+      int val = *va_arg(ap, int *);
+
+      if (val >= 0 && db->level == NULL) {
+        leveldb_cache_destroy(db->cache);
+
+        db->cache = leveldb_cache_create_lru(val * 1024);
+
+        leveldb_options_set_cache(db->options, db->cache);
+      }
+
+      break;
+    }
+
+    case LSM_CONFIG_BUFFER_SIZE: {
+      int val = *va_arg(ap, int *);
+
+      if (val >= 0 && db->level == NULL)
+        leveldb_options_set_write_buffer_size(db->options, val * 1024);
+
+      break;
+    }
+
+    case LSM_CONFIG_MAX_OPEN_FILES: {
+      int val = *va_arg(ap, int *);
+
+      if (val >= 0 && db->level == NULL)
+        leveldb_options_set_max_open_files(db->options, val);
+
+      break;
+    }
+
+    case LSM_CONFIG_RESTART_INTERVAL: {
+      int val = *va_arg(ap, int *);
+
+      if (val >= 0 && db->level == NULL)
+        leveldb_options_set_block_restart_interval(db->options, val);
+
+      break;
+    }
+
+    case LSM_CONFIG_MAX_FILE_SIZE: {
+      int val = *va_arg(ap, int *);
+
+      if (val >= 0 && db->level == NULL)
+        leveldb_options_set_max_file_size(db->options, val * 1024);
+
+      break;
+    }
+
+    case LSM_CONFIG_PARANOID_CHECKS: {
+      int val = *va_arg(ap, int *);
+
+      if (val >= 0 && db->level == NULL)
+        leveldb_options_set_paranoid_checks(db->options, val);
+
+      break;
+    }
+
+    case LSM_CONFIG_SYNC_WRITES: {
+      int val = *va_arg(ap, int *);
+
+      if (val >= 0)
+        leveldb_writeoptions_set_sync(db->write_options, val);
+
+      break;
+    }
+
+    case LSM_CONFIG_VERIFY_CHECKSUMS: {
+      int val = *va_arg(ap, int *);
+
+      if (val >= 0)
+        leveldb_readoptions_set_verify_checksums(db->iter_options, val);
+
+      break;
+    }
+
+    case LSM_CONFIG_FILL_CACHE: {
+      int val = *va_arg(ap, int *);
+
+      if (val >= 0)
+        leveldb_readoptions_set_fill_cache(db->iter_options, val);
+
       break;
     }
 

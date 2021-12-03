@@ -96,6 +96,20 @@ lsm_connect(lsm_db **lsm, const char *path) {
   if (rc != LSM_OK)
     return rc;
 
+#ifdef LSM_LEVELDB
+  op = 64 * 1024; /* default = 8mb */
+  rc = lsm_config(db, LSM_CONFIG_CACHE_SIZE, &op);
+
+  if (rc != LSM_OK)
+    goto done;
+
+  op = 32 * 1024; /* default = 4mb */
+  rc = lsm_config(db, LSM_CONFIG_BUFFER_SIZE, &op);
+
+  if (rc != LSM_OK)
+    goto done;
+#endif
+
 #ifdef USE_WORKER
   op = 4 * 1024; /* default = 1mb */
   rc = lsm_config(db, LSM_CONFIG_AUTOFLUSH, &op);
