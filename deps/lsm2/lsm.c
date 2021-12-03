@@ -95,9 +95,19 @@ lsm_new(lsm_env *env, lsm_db **lsm) {
 
 int
 lsm_open(lsm_db *db, const char *file) {
+  size_t len = strlen(file);
   char *err = NULL;
+  char path[1024];
 
-  db->level = leveldb_open(db->options, file, &err);
+  if (len + 1 > sizeof(path))
+    return LSM_MISUSE;
+
+  memcpy(path, file, len + 1);
+
+  if (len > 4 && strcmp(path + len - 4, ".dat") == 0)
+    path[len - 4] = '\0';
+
+  db->level = leveldb_open(db->options, path, &err);
 
   if (err != NULL) {
     CHECK(db->level == NULL);
