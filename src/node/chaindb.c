@@ -687,12 +687,6 @@ btc_chaindb_load_prefix(btc_chaindb_t *db, const char *prefix) {
   if (!btc_fs_exists(path) && !btc_fs_mkdir(path, 0755))
     return 0;
 
-  if (!btc_path_join(path, sizeof(path), db->prefix, "chain", 0))
-    return 0;
-
-  if (!btc_fs_exists(path) && !btc_fs_mkdir(path, 0755))
-    return 0;
-
   return 1;
 }
 
