@@ -45,7 +45,6 @@ get_config(btc_conf_t *args, int argc, char **argv) {
 
 static void
 set_config(btc_node_t *node, const btc_conf_t *conf) {
-  btc_chain_set_mapsize(node->chain, (size_t)conf->map_size << 30);
   btc_chain_set_threads(node->chain, conf->workers);
 
   btc_pool_set_bind(node->pool, &conf->bind);

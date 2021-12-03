@@ -443,7 +443,6 @@ conf_init(btc_conf_t *conf) {
   conf->daemon = 0;
   conf->network_active = 1;
   conf->disable_wallet = 0;
-  conf->map_size = sizeof(void *) >= 8 ? 16 : 1;
   conf->checkpoints = 1;
   conf->prune = 0;
   conf->workers = 0;
@@ -540,9 +539,6 @@ conf_read_file(btc_conf_t *conf, const char *file) {
       continue;
 
     if (btc_match_bool(&conf->disable_wallet, zp, "disablewallet="))
-      continue;
-
-    if (btc_match_range(&conf->map_size, zp, "mapsize=", 1, 64))
       continue;
 
     if (btc_match_bool(&conf->checkpoints, zp, "checkpoints="))
@@ -671,9 +667,6 @@ conf_parse_args(btc_conf_t *conf, int argc, char **argv, int allow_params) {
       continue;
 
     if (btc_match_argbool(&conf->disable_wallet, arg, "-disablewallet="))
-      continue;
-
-    if (btc_match_range(&conf->map_size, arg, "-mapsize=", 1, 64))
       continue;
 
     if (btc_match_argbool(&conf->checkpoints, arg, "-checkpoints="))
@@ -816,11 +809,6 @@ conf_finalize(btc_conf_t *conf, const char *prefix) {
       btc_die("Invalid datadir: %s", path);
       return;
     }
-  }
-
-  if (sizeof(void *) < 8 && conf->map_size > 1) {
-    btc_die("Map size (%dgb) too large for 32-bit.", conf->map_size);
-    return;
   }
 
   if (conf->port == 0)

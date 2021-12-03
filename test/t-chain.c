@@ -23,8 +23,6 @@ test_chain(const btc_network_t *network, const char **vectors, size_t length) {
 
   btc_clean(BTC_PREFIX);
 
-  btc_chain_set_mapsize(chain, 20 << 20);
-
   ASSERT(btc_chain_open(chain, BTC_PREFIX, 0));
 
   for (i = 0; i < length; i++) {

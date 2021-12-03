@@ -29,16 +29,6 @@ The node itself is currently incomplete for various reasons, including:
   passes all of the transaction and script test vectors from bitcoin core, but
   there's no telling what consensus issue may arise in its current state.
 
-Some caveats:
-
-- Mako uses LMDB for the utxo database: on boot, it will allocate a
-  16G sparse file (this will also use 16G of virtual memory). If you are on a
-  platform which does not support sparse files, 16G of actual disk space will be
-  used.
-- Because the mainnet utxo database is currently several gigs (>=5G), mako will
-  likely never be able to sync mainnet on a 32-bit machine as a 32-bit address
-  space lacks the ability to map a 5 gigabyte file into memory.
-
 ## Build & Usage (for experimentation only)
 
 Mako currently has a very simple CMake build which doesn't properly test for

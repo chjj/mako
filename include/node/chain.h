@@ -81,9 +81,6 @@ BTC_EXTERN void
 btc_chain_set_timedata(btc_chain_t *chain, const btc_timedata_t *td);
 
 BTC_EXTERN void
-btc_chain_set_mapsize(btc_chain_t *chain, size_t map_size);
-
-BTC_EXTERN void
 btc_chain_set_threads(btc_chain_t *chain, int threads);
 
 BTC_EXTERN void

@@ -671,12 +671,6 @@ btc_chaindb_destroy(btc_chaindb_t *db) {
   btc_free(db);
 }
 
-void
-btc_chaindb_set_mapsize(btc_chaindb_t *db, size_t map_size) {
-  (void)db;
-  (void)map_size;
-}
-
 static int
 btc_chaindb_load_prefix(btc_chaindb_t *db, const char *prefix) {
   char path[BTC_PATH_MAX];

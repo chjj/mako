@@ -301,11 +301,6 @@ btc_chain_set_timedata(btc_chain_t *chain, const btc_timedata_t *td) {
 }
 
 void
-btc_chain_set_mapsize(btc_chain_t *chain, size_t map_size) {
-  btc_chaindb_set_mapsize(chain->db, map_size);
-}
-
-void
 btc_chain_set_threads(btc_chain_t *chain, int threads) {
   if (threads <= 0) {
     int num = btc_sys_numcpu();

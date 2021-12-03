@@ -26,9 +26,6 @@ btc_chaindb_create(const btc_network_t *network);
 BTC_EXTERN void
 btc_chaindb_destroy(btc_chaindb_t *db);
 
-BTC_EXTERN void
-btc_chaindb_set_mapsize(btc_chaindb_t *db, size_t map_size);
-
 BTC_EXTERN int
 btc_chaindb_open(btc_chaindb_t *db, const char *prefix, unsigned int flags);
 
