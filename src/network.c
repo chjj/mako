@@ -17,16 +17,25 @@
 const btc_checkpoint_t *
 btc_network_checkpoint(const btc_network_t *network, int32_t height) {
   const btc_checkpoint_t *chk;
-  size_t i;
+  int start, end, pos;
 
   if (height > network->last_checkpoint)
     return NULL;
 
-  for (i = 0; i < network->checkpoints.length; i++) {
-    chk = &network->checkpoints.items[i];
+  start = 0;
+  end = (int)network->checkpoints.length - 1;
+
+  while (start <= end) {
+    pos = (start + end) >> 1;
+    chk = &network->checkpoints.items[pos];
 
     if (chk->height == height)
       return chk;
+
+    if (chk->height < height)
+      start = pos + 1;
+    else
+      end = pos - 1;
   }
 
   return NULL;

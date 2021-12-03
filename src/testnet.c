@@ -401,7 +401,7 @@ static const btc_network_t testnet = {
     /* .items = */ testnet_checkpoints,
     /* .length = */ lengthof(testnet_checkpoints)
   },
-  /* .last_checkpoint */ 1050000,
+  /* .last_checkpoint = */ 1050000,
   /* .halving_interval = */ 210000,
   /* .genesis = */ {
     /* .hash = */ {

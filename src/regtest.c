@@ -110,7 +110,7 @@ static const btc_network_t regtest = {
     /* .items = */ regtest_checkpoints,
     /* .length = */ lengthof(regtest_checkpoints)
   },
-  /* .last_checkpoint */ 0,
+  /* .last_checkpoint = */ 0,
   /* .halving_interval = */ 150,
   /* .genesis = */ {
     /* .hash = */ {

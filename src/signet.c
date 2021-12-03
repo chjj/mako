@@ -148,7 +148,7 @@ static const btc_network_t signet = {
     /* .items = */ signet_checkpoints,
     /* .length = */ lengthof(signet_checkpoints)
   },
-  /* .last_checkpoint */ 60000,
+  /* .last_checkpoint = */ 60000,
   /* .halving_interval = */ 210000,
   /* .genesis = */ {
     /* .hash = */ {

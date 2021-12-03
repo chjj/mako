@@ -110,7 +110,7 @@ static const btc_network_t simnet = {
     /* .items = */ simnet_checkpoints,
     /* .length = */ lengthof(simnet_checkpoints)
   },
-  /* .last_checkpoint */ 0,
+  /* .last_checkpoint = */ 0,
   /* .halving_interval = */ 210000,
   /* .genesis = */ {
     /* .hash = */ {
