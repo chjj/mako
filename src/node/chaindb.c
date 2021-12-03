@@ -886,7 +886,7 @@ btc_chaindb_load_index(btc_chaindb_t *db) {
     CHECK(lsm_csr_seek(cur, meta_key, 1, LSM_SEEK_EQ) == 0);
 
     if (!lsm_csr_valid(cur)) {
-      lsm_csr_close(cur);
+      CHECK(lsm_csr_close(cur) == 0);
       return btc_chaindb_init_index(db);
     }
 
@@ -910,7 +910,7 @@ btc_chaindb_load_index(btc_chaindb_t *db) {
     CHECK(lsm_csr_next(cur) == 0);
   }
 
-  lsm_csr_close(cur);
+  CHECK(lsm_csr_close(cur) == 0);
 
   /* Create `prev` links and retrieve genesis block. */
   btc_hashmap_iterate(&iter, db->hashes);
@@ -1050,7 +1050,7 @@ btc_chaindb_spend(btc_chaindb_t *db,
 
   rc = btc_view_spend(view, tx, read_coin, db, cur);
 
-  lsm_csr_close(cur);
+  CHECK(lsm_csr_close(cur) == 0);
 
   return rc;
 }
@@ -1071,7 +1071,7 @@ btc_chaindb_fill(btc_chaindb_t *db,
 
   rc = btc_view_fill(view, tx, read_coin, db, cur);
 
-  lsm_csr_close(cur);
+  CHECK(lsm_csr_close(cur) == 0);
 
   return rc;
 }
@@ -1736,7 +1736,7 @@ btc_chaindb_has_coins(btc_chaindb_t *db, const btc_tx_t *tx) {
 
   ret = lsm_csr_le(cur, max, sizeof(max));
 
-  lsm_csr_close(cur);
+  CHECK(lsm_csr_close(cur) == 0);
 
   return ret;
 }

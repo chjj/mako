@@ -712,8 +712,12 @@ lsm_csr_seek(lsm_cursor *cur, const void *kp, int kn, int whence) {
 
       leveldb_iter_seek(it, kp, kn);
 
-      if (leveldb_iter_valid(it) && iter_compare(it, kp, kn) > 0)
-        leveldb_iter_prev(it);
+      if (leveldb_iter_valid(it)) {
+        if (iter_compare(it, kp, kn) > 0)
+          leveldb_iter_prev(it);
+      } else {
+        leveldb_iter_seek_to_last(it);
+      }
 
       return LSM_OK;
     }
