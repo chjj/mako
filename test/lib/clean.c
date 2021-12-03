@@ -50,9 +50,22 @@ btc_clean(const char *prefix) {
 
   ret &= btc_rmdir_r(path);
 
+  ASSERT(btc_path_join(path, sizeof(path), prefix, "chain.dat", 0));
+
+  ret &= btc_fs_unlink(path);
+
   ASSERT(btc_path_join(path, sizeof(path), prefix, "debug.log", 0));
 
   ret &= btc_fs_unlink(path);
+
+  ASSERT(btc_path_join(path, sizeof(path), prefix, "wallet", 0));
+
+  ret &= btc_rmdir_r(path);
+
+  ASSERT(btc_path_join(path, sizeof(path), prefix, "wallet.dat", 0));
+
+  ret &= btc_fs_unlink(path);
+
   ret &= btc_fs_rmdir(prefix);
 
   return ret;
