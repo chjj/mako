@@ -23,7 +23,8 @@
 
 struct lsm_db {
   leveldb_options_t *options;
-  leveldb_readoptions_t *read_options;
+  leveldb_cache_t *cache;
+  leveldb_filterpolicy_t *bloom;
   leveldb_writeoptions_t *write_options;
   leveldb_readoptions_t *iter_options;
   leveldb_t *level;
@@ -44,7 +45,6 @@ lsm_new(lsm_env *env, lsm_db **lsm) {
   leveldb_options_t *options;
   leveldb_cache_t *cache;
   leveldb_filterpolicy_t *bloom;
-  leveldb_readoptions_t *read_options;
   leveldb_writeoptions_t *write_options;
   leveldb_readoptions_t *iter_options;
   lsm_db *db;
@@ -60,7 +60,6 @@ lsm_new(lsm_env *env, lsm_db **lsm) {
   options = leveldb_options_create();
   cache = leveldb_cache_create_lru(8 << 20);
   bloom = leveldb_filterpolicy_create_bloom(10);
-  read_options = leveldb_readoptions_create();
   write_options = leveldb_writeoptions_create();
   iter_options = leveldb_readoptions_create();
 
@@ -76,16 +75,14 @@ lsm_new(lsm_env *env, lsm_db **lsm) {
   leveldb_options_set_filter_policy(options, bloom);
   leveldb_options_set_paranoid_checks(options, 0);
 
-  leveldb_readoptions_set_verify_checksums(read_options, 0);
-  leveldb_readoptions_set_fill_cache(read_options, 1);
-
   leveldb_writeoptions_set_sync(write_options, 0);
 
   leveldb_readoptions_set_verify_checksums(iter_options, 0);
   leveldb_readoptions_set_fill_cache(iter_options, 0);
 
   db->options = options;
-  db->read_options = read_options;
+  db->cache = cache;
+  db->bloom = bloom;
   db->write_options = write_options;
   db->iter_options = iter_options;
   db->level = NULL;
@@ -130,7 +127,8 @@ lsm_close(lsm_db *db) {
   }
 
   leveldb_options_destroy(db->options);
-  leveldb_readoptions_destroy(db->read_options);
+  leveldb_cache_destroy(db->cache);
+  leveldb_filterpolicy_destroy(db->bloom);
   leveldb_writeoptions_destroy(db->write_options);
   leveldb_readoptions_destroy(db->iter_options);
 
@@ -148,6 +146,9 @@ lsm_flush(lsm_db *db) {
 int
 lsm_work(lsm_db *db, int merge, int kb, int *nwrite) {
   CHECK(db != NULL);
+
+  (void)merge;
+  (void)kb;
 
   if (nwrite != NULL)
     *nwrite = 0;
@@ -231,16 +232,8 @@ lsm_config(lsm_db *db, int param, ...) {
       int val = *ptr;
 
       if (val >= 0) {
-        leveldb_readoptions_set_verify_checksums(db->read_options, 0);
-
         if (db->level == NULL)
-          leveldb_options_set_paranoid_checks(db->options, 0);
-
-        if (val >= 1)
-          leveldb_readoptions_set_verify_checksums(db->read_options, 1);
-
-        if (val >= 2 && db->level == NULL)
-          leveldb_options_set_paranoid_checks(db->options, 1);
+          leveldb_options_set_paranoid_checks(db->options, (val >= 2));
       } else {
         *ptr = 0;
       }
@@ -465,10 +458,7 @@ lsm_set_user_version(lsm_db *db, unsigned int val) {
  */
 
 static int
-iter_compare(leveldb_iterator_t *it, const void *yp, int yn) {
-  size_t xs;
-  const void *xp = leveldb_iter_key(it, &xs);
-  int xn = xs;
+compare4(const void *xp, int xn, const void *yp, int yn) {
   int min = xn < yn ? xn : yn;
   int cmp = 0;
 
@@ -479,6 +469,16 @@ iter_compare(leveldb_iterator_t *it, const void *yp, int yn) {
     cmp = xn - yn;
 
   return cmp;
+}
+
+static int
+iter_compare(leveldb_iterator_t *it, const void *yp, int yn) {
+  const void *xp;
+  size_t xn;
+
+  xp = leveldb_iter_key(it, &xn);
+
+  return compare4(xp, xn, yp, yn);
 }
 
 /*
@@ -615,7 +615,7 @@ lsm_csr_seek(lsm_cursor *cur, const void *kp, int kn, int whence) {
     return LSM_OK;
   }
 
-  if (whence == LSM_SEEK_LE) {
+  if (whence == LSM_SEEK_LE || whence == LSM_SEEK_LEFAST) {
     while (leveldb_iter_valid(cur->it) && iter_compare(cur->it, kp, kn) > 0)
       leveldb_iter_prev(cur->it);
 
@@ -703,5 +703,5 @@ lsm_realloc(lsm_env *env, void *ptr, size_t size) {
 void
 lsm_free(lsm_env *env, void *ptr) {
   CHECK(env == NULL);
-  leveldb_free(ptr);
+  free(ptr);
 }
