@@ -40,6 +40,10 @@
 #  error "invalid options"
 #endif
 
+#if defined(USE_WORKER) && defined(LSM_LEVELDB)
+#  error "invalid options"
+#endif
+
 /*
  * Constants
  */

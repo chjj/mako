@@ -25,8 +25,8 @@ struct lsm_db {
   leveldb_options_t *options;
   leveldb_cache_t *cache;
   leveldb_filterpolicy_t *bloom;
+  leveldb_readoptions_t *read_options;
   leveldb_writeoptions_t *write_options;
-  leveldb_readoptions_t *iter_options;
   leveldb_t *level;
   leveldb_writebatch_t *batch;
 };
@@ -45,8 +45,8 @@ lsm_new(lsm_env *env, lsm_db **lsm) {
   leveldb_options_t *options;
   leveldb_cache_t *cache;
   leveldb_filterpolicy_t *bloom;
+  leveldb_readoptions_t *read_options;
   leveldb_writeoptions_t *write_options;
-  leveldb_readoptions_t *iter_options;
   lsm_db *db;
 
   if (env != NULL)
@@ -60,8 +60,8 @@ lsm_new(lsm_env *env, lsm_db **lsm) {
   options = leveldb_options_create();
   cache = leveldb_cache_create_lru(8 << 20);
   bloom = leveldb_filterpolicy_create_bloom(10);
+  read_options = leveldb_readoptions_create();
   write_options = leveldb_writeoptions_create();
-  iter_options = leveldb_readoptions_create();
 
   leveldb_options_set_create_if_missing(options, 1);
   leveldb_options_set_error_if_exists(options, 0);
@@ -75,16 +75,16 @@ lsm_new(lsm_env *env, lsm_db **lsm) {
   leveldb_options_set_filter_policy(options, bloom);
   leveldb_options_set_paranoid_checks(options, 0);
 
-  leveldb_writeoptions_set_sync(write_options, 0);
+  leveldb_readoptions_set_verify_checksums(read_options, 0);
+  leveldb_readoptions_set_fill_cache(read_options, 1);
 
-  leveldb_readoptions_set_verify_checksums(iter_options, 0);
-  leveldb_readoptions_set_fill_cache(iter_options, 1);
+  leveldb_writeoptions_set_sync(write_options, 0);
 
   db->options = options;
   db->cache = cache;
   db->bloom = bloom;
+  db->read_options = read_options;
   db->write_options = write_options;
-  db->iter_options = iter_options;
   db->level = NULL;
   db->batch = NULL;
 
@@ -139,8 +139,8 @@ lsm_close(lsm_db *db) {
   leveldb_options_destroy(db->options);
   leveldb_cache_destroy(db->cache);
   leveldb_filterpolicy_destroy(db->bloom);
+  leveldb_readoptions_destroy(db->read_options);
   leveldb_writeoptions_destroy(db->write_options);
-  leveldb_readoptions_destroy(db->iter_options);
 
   free(db);
 
@@ -188,102 +188,22 @@ lsm_config(lsm_db *db, int param, ...) {
   va_start(ap, param);
 
   switch (param) {
-    case LSM_CONFIG_AUTOFLUSH: {
-      int *ptr = va_arg(ap, int *);
-      if (*ptr < 0)
-        *ptr = 0;
-      break;
-    }
-
-    case LSM_CONFIG_AUTOWORK: {
-      int *ptr = va_arg(ap, int *);
-      if (*ptr < 0)
-        *ptr = 0;
-      break;
-    }
-
-    case LSM_CONFIG_AUTOCHECKPOINT: {
-      int *ptr = va_arg(ap, int *);
-      if (*ptr < 0)
-        *ptr = 0;
-      break;
-    }
-
-    case LSM_CONFIG_PAGE_SIZE: {
-      int *ptr = va_arg(ap, int *);
-      if (*ptr < 0)
-        *ptr = 0;
-      break;
-    }
-
-    case LSM_CONFIG_BLOCK_SIZE: {
-      int val = *va_arg(ap, int *);
-
-      if (val >= 0 && db->level == NULL)
-        leveldb_options_set_block_size(db->options, val * 1024);
-
-      break;
-    }
-
-    case LSM_CONFIG_SAFETY: {
-      int *ptr = va_arg(ap, int *);
-      if (*ptr < 0)
-        *ptr = 0;
-      break;
-    }
-
-    case LSM_CONFIG_MMAP: {
-      int *ptr = va_arg(ap, int *);
-      if (*ptr < 0)
-        *ptr = 0;
-      break;
-    }
-
-    case LSM_CONFIG_USE_LOG: {
-      int *ptr = va_arg(ap, int *);
-      if (*ptr < 0)
-        *ptr = 0;
-      break;
-    }
-
-    case LSM_CONFIG_AUTOMERGE: {
-      int *ptr = va_arg(ap, int *);
-      if (*ptr < 0)
-        *ptr = 0;
-      break;
-    }
-
-    case LSM_CONFIG_MAX_FREELIST: {
-      int *ptr = va_arg(ap, int *);
-      if (*ptr < 0)
-        *ptr = 0;
-      break;
-    }
-
-    case LSM_CONFIG_MULTIPLE_PROCESSES: {
-      int *ptr = va_arg(ap, int *);
-      if (*ptr < 0)
-        *ptr = 0;
-      break;
-    }
-
+    case LSM_CONFIG_AUTOFLUSH:
+    case LSM_CONFIG_AUTOWORK:
+    case LSM_CONFIG_AUTOCHECKPOINT:
+    case LSM_CONFIG_PAGE_SIZE:
+    case LSM_CONFIG_SAFETY:
+    case LSM_CONFIG_MMAP:
+    case LSM_CONFIG_USE_LOG:
+    case LSM_CONFIG_AUTOMERGE:
+    case LSM_CONFIG_MAX_FREELIST:
+    case LSM_CONFIG_MULTIPLE_PROCESSES:
     case LSM_CONFIG_READONLY: {
-      rc = LSM_MISUSE;
-      break;
-    }
+      int *ptr = va_arg(ap, int *);
 
-    case LSM_CONFIG_SET_COMPRESSION: {
-      rc = LSM_MISUSE;
-      break;
-    }
+      if (*ptr < 0)
+        *ptr = 0;
 
-    case LSM_CONFIG_SET_COMPRESSION_FACTORY: {
-      rc = LSM_MISUSE;
-      break;
-    }
-
-    case LSM_CONFIG_GET_COMPRESSION: {
-      rc = LSM_MISUSE;
       break;
     }
 
@@ -301,6 +221,15 @@ lsm_config(lsm_db *db, int param, ...) {
 
       if (val >= 0 && db->level == NULL)
         leveldb_options_set_error_if_exists(db->options, val);
+
+      break;
+    }
+
+    case LSM_CONFIG_COMPRESSION: {
+      int val = *va_arg(ap, int *);
+
+      if (val >= 0 && db->level == NULL)
+        leveldb_options_set_compression(db->options, (val != 0));
 
       break;
     }
@@ -324,6 +253,15 @@ lsm_config(lsm_db *db, int param, ...) {
 
       if (val >= 0 && db->level == NULL)
         leveldb_options_set_write_buffer_size(db->options, val * 1024);
+
+      break;
+    }
+
+    case LSM_CONFIG_BLOCK_SIZE: {
+      int val = *va_arg(ap, int *);
+
+      if (val >= 0 && db->level == NULL)
+        leveldb_options_set_block_size(db->options, val * 1024);
 
       break;
     }
@@ -364,20 +302,11 @@ lsm_config(lsm_db *db, int param, ...) {
       break;
     }
 
-    case LSM_CONFIG_SYNC_WRITES: {
-      int val = *va_arg(ap, int *);
-
-      if (val >= 0)
-        leveldb_writeoptions_set_sync(db->write_options, val);
-
-      break;
-    }
-
     case LSM_CONFIG_VERIFY_CHECKSUMS: {
       int val = *va_arg(ap, int *);
 
       if (val >= 0)
-        leveldb_readoptions_set_verify_checksums(db->iter_options, val);
+        leveldb_readoptions_set_verify_checksums(db->read_options, val);
 
       break;
     }
@@ -386,7 +315,16 @@ lsm_config(lsm_db *db, int param, ...) {
       int val = *va_arg(ap, int *);
 
       if (val >= 0)
-        leveldb_readoptions_set_fill_cache(db->iter_options, val);
+        leveldb_readoptions_set_fill_cache(db->read_options, val);
+
+      break;
+    }
+
+    case LSM_CONFIG_SYNC: {
+      int val = *va_arg(ap, int *);
+
+      if (val >= 0)
+        leveldb_writeoptions_set_sync(db->write_options, val);
 
       break;
     }
@@ -417,104 +355,6 @@ lsm_config_work_hook(lsm_db *db, void (*cb)(lsm_db *, void *), void *arg) {
 }
 
 /*
- * Info
- */
-
-int
-lsm_info(lsm_db *db, int param, ...) {
-  int rc = LSM_OK;
-  va_list ap;
-
-  va_start(ap, param);
-
-  switch (param) {
-    case LSM_INFO_NWRITE: {
-      int *ptr = va_arg(ap, int *);
-      *ptr = 0;
-      break;
-    }
-
-    case LSM_INFO_NREAD: {
-      int *ptr = va_arg(ap, int *);
-      *ptr = 0;
-      break;
-    }
-
-    case LSM_INFO_DB_STRUCTURE: {
-      char **ptr = va_arg(ap, char **);
-      *ptr = NULL;
-      break;
-    }
-
-    case LSM_INFO_ARRAY_STRUCTURE: {
-      lsm_i64 pgno = va_arg(ap, lsm_i64);
-      char **ptr = va_arg(ap, char **);
-      (void)pgno;
-      *ptr = NULL;
-      break;
-    }
-
-    case LSM_INFO_ARRAY_PAGES: {
-      lsm_i64 pgno = va_arg(ap, lsm_i64);
-      char **ptr = va_arg(ap, char **);
-      (void)pgno;
-      *ptr = NULL;
-      break;
-    }
-
-    case LSM_INFO_PAGE_HEX_DUMP:
-    case LSM_INFO_PAGE_ASCII_DUMP: {
-      lsm_i64 pgno = va_arg(ap, lsm_i64);
-      char **ptr = va_arg(ap, char **);
-      (void)pgno;
-      *ptr = NULL;
-      break;
-    }
-
-    case LSM_INFO_LOG_STRUCTURE: {
-      char **ptr = va_arg(ap, char **);
-      *ptr = NULL;
-      break;
-    }
-
-    case LSM_INFO_FREELIST: {
-      char **ptr = va_arg(ap, char **);
-      *ptr = NULL;
-      break;
-    }
-
-    case LSM_INFO_CHECKPOINT_SIZE: {
-      int *ptr = va_arg(ap, int *);
-      *ptr = 0;
-      break;
-    }
-
-    case LSM_INFO_TREE_SIZE: {
-      int *pold = va_arg(ap, int *);
-      int *pnew = va_arg(ap, int *);
-      *pold = 0;
-      *pnew = 0;
-      break;
-    }
-
-    case LSM_INFO_COMPRESSION_ID: {
-      unsigned int *ptr = va_arg(ap, unsigned int *);
-      *ptr = 0;
-      break;
-    }
-
-    default: {
-      rc = LSM_MISUSE;
-      break;
-    }
-  }
-
-  va_end(ap);
-
-  return rc;
-}
-
-/*
  * Meta
  */
 
@@ -531,19 +371,75 @@ lsm_default_env(void) {
 
 int
 lsm_get_user_version(lsm_db *db, unsigned int *ptr) {
-  CHECK(db != NULL);
-  *ptr = 0;
+  char *err = NULL;
+  char key = 0;
+  char *vp;
+  size_t vn;
+
+  vp = leveldb_get(db->level,
+                   db->read_options,
+                   &key,
+                   sizeof(key),
+                   &vn,
+                   &err);
+
+  if (err != NULL) {
+    free(err);
+    return LSM_ERROR;
+  }
+
+  if (vp != NULL) {
+    if (vn != 4) {
+      leveldb_free(vp);
+      return LSM_CORRUPT;
+    }
+
+    *ptr = ((unsigned int)vp[0] << 24)
+         | ((unsigned int)vp[1] << 16)
+         | ((unsigned int)vp[2] <<  8)
+         | ((unsigned int)vp[3] <<  0);
+
+    leveldb_free(vp);
+  } else {
+    *ptr = 0;
+  }
+
   return LSM_OK;
 }
 
 int
 lsm_set_user_version(lsm_db *db, unsigned int val) {
-  CHECK(db != NULL);
+  unsigned char vp[4];
+  char *err = NULL;
+  char key = 0;
 
-  if (val != 0)
-    return LSM_MISUSE;
+  vp[0] = (val >> 24) & 0xff;
+  vp[1] = (val >> 16) & 0xff;
+  vp[2] = (val >>  8) & 0xff;
+  vp[3] = (val >>  0) & 0xff;
+
+  leveldb_put(db->level,
+              db->write_options,
+              &key,
+              sizeof(key),
+              (const char *)vp,
+              sizeof(vp),
+              &err);
+
+  if (err != NULL) {
+    free(err);
+    return LSM_ERROR;
+  }
 
   return LSM_OK;
+}
+
+int
+lsm_info(lsm_db *db, int param, ...) {
+  va_list ap;
+  va_start(ap, param);
+  va_end(ap);
+  return LSM_MISUSE;
 }
 
 /*
@@ -618,7 +514,7 @@ lsm_delete_range(lsm_db *db, const void *xp, int xn,
   if (db->batch == NULL)
     return LSM_MISUSE;
 
-  it = leveldb_create_iterator(db->level, db->iter_options);
+  it = leveldb_create_iterator(db->level, db->read_options);
 
   leveldb_iter_seek(it, xp, xn);
 
@@ -680,7 +576,7 @@ lsm_csr_open(lsm_db *db, lsm_cursor **csr) {
   if (cur == NULL)
     return LSM_NOMEM;
 
-  cur->it = leveldb_create_iterator(db->level, db->iter_options);
+  cur->it = leveldb_create_iterator(db->level, db->read_options);
   cur->invalid = 0;
 
   *csr = cur;
