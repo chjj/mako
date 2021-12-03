@@ -8,8 +8,7 @@ project(mako LANGUAGES C)
 include(CTest)
 include(TestBigEndian)
 
-option(USE_LSM1 "Use sqlite4 lsm extension" OFF)
-option(USE_LEVELDB "Use leveldb" OFF)
+option(MAKO_USE_LEVELDB "Use leveldb" OFF)
 
 set(mako_sources)
 set(mako_defines)
@@ -132,15 +131,9 @@ else()
                          src/io/unix/time.c)
 endif()
 
-if(USE_LSM1 OR USE_LEVELDB)
-  set(chaindb chaindb-lsm1)
-else()
-  set(chaindb chaindb)
-endif()
-
 list(APPEND node_sources src/node/addrman.c
                          src/node/chain.c
-                         src/node/${chaindb}.c
+                         src/node/chaindb.c
                          src/node/logger.c
                          src/node/mempool.c
                          src/node/miner.c
@@ -205,12 +198,10 @@ else()
   list(APPEND mako_libs m)
 endif()
 
-if(USE_LEVELDB)
+if(MAKO_USE_LEVELDB)
   add_subdirectory(deps/lsm2)
-elseif(USE_LSM1)
-  add_subdirectory(deps/lsm1)
 else()
-  add_subdirectory(deps/lmdb)
+  add_subdirectory(deps/lsm1)
 endif()
 
 add_library(mako_lib STATIC ${mako_sources})
@@ -235,12 +226,10 @@ target_compile_options(mako_node PUBLIC ${mako_cflags})
 target_include_directories(mako_node PUBLIC ${mako_includes})
 target_link_options(mako_node INTERFACE ${mako_ldflags})
 
-if(USE_LEVELDB)
+if(MAKO_USE_LEVELDB)
   target_link_libraries(mako_node PRIVATE lsm2)
-elseif(USE_LSM1)
-  target_link_libraries(mako_node PRIVATE lsm1)
 else()
-  target_link_libraries(mako_node PRIVATE lmdb)
+  target_link_libraries(mako_node PRIVATE lsm1)
 endif()
 
 set_property(TARGET mako_node PROPERTY OUTPUT_NAME node)
@@ -261,13 +250,13 @@ set_property(TARGET mako_tests PROPERTY OUTPUT_NAME tests)
 
 add_executable(makod src/node/main.c)
 target_link_libraries(makod PRIVATE mako_node
-                                       mako_io
-                                       mako_lib)
+                                    mako_io
+                                    mako_lib)
 
 add_executable(mako src/client/main.c)
 target_link_libraries(mako PRIVATE mako_client
-                                      mako_io
-                                      mako_lib)
+                                   mako_io
+                                   mako_lib)
 
 set(tests # crypto
           bip340
