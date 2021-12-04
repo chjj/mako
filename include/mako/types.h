@@ -102,7 +102,7 @@ typedef struct btc_output_s {
 
 typedef struct btc_program_s {
   unsigned int version;
-  uint8_t data[40];
+  const uint8_t *data;
   size_t length;
 } btc_program_t;
 

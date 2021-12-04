@@ -467,13 +467,13 @@ btc_tx_sign_input(btc_tx_t *tx,
   btc_writer_t writer;
   btc_script_t redeem;
   btc_script_t program;
+  const uint8_t *hash;
+  const uint8_t *pub;
   uint8_t pub65[65];
   uint8_t pub33[33];
   uint8_t hash65[20];
   uint8_t hash33[20];
   uint8_t msg[32];
-  uint8_t hash[20];
-  uint8_t pub[65];
   uint8_t der[74];
   uint8_t sig[64];
   size_t der_len;
@@ -485,7 +485,7 @@ btc_tx_sign_input(btc_tx_t *tx,
   if (!btc_ecdsa_pubkey_convert(pub33, pub65, 65, 1))
     return 0;
 
-  if (btc_script_get_p2pk(pub, &len, script)) {
+  if (btc_script_get_p2pk(&pub, &len, script)) {
     if ((len == 33 && memcmp(pub, pub33, 33) == 0)
         || (len == 65 && memcmp(pub, pub65, 65) == 0)) {
       btc_tx_sighash(msg, tx, index, script,
@@ -512,7 +512,7 @@ btc_tx_sign_input(btc_tx_t *tx,
   btc_hash160(hash65, pub65, 65);
   btc_hash160(hash33, pub33, 33);
 
-  if (btc_script_get_p2pkh(hash, script)) {
+  if (btc_script_get_p2pkh(&hash, script)) {
     if (memcmp(hash, hash33, 20) == 0 || memcmp(hash, hash65, 20) == 0) {
       btc_tx_sighash(msg, tx, index, script,
                      value, type, 0, cache);
@@ -541,7 +541,7 @@ btc_tx_sign_input(btc_tx_t *tx,
     return 0;
   }
 
-  if (btc_script_get_p2wpkh(hash, script)) {
+  if (btc_script_get_p2wpkh(&hash, script)) {
     if (memcmp(hash, hash33, 20) != 0)
       return 0;
 
@@ -567,7 +567,7 @@ btc_tx_sign_input(btc_tx_t *tx,
     return 1;
   }
 
-  if (btc_script_get_p2sh(hash, script)) {
+  if (btc_script_get_p2sh(&hash, script)) {
     btc_script_init(&program);
     btc_script_set_p2wpkh(&program, hash33);
     btc_script_hash160(msg, &program);

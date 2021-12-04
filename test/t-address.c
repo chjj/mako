@@ -281,16 +281,20 @@ test_valid(void) {
     btc_script_clear(&script);
 
     if (addr.type == BTC_ADDRESS_WITNESS) {
-      btc_address_get_program(&program, &addr);
-
-      ASSERT(program.version == addr.version);
-      ASSERT(program.length == addr.length);
-      ASSERT(memcmp(program.data, addr.hash, addr.length) == 0);
-
       btc_address_init(&addr);
+
+      program.version = item->data.version;
+      program.length = item->data.length;
+      program.data = item->data.hash;
 
       ASSERT(btc_address_set_program(&addr, &program));
       ASSERT(btc_address_equal(&addr, &item->data));
+
+      btc_address_get_program(&program, &addr);
+
+      ASSERT(program.version == item->data.version);
+      ASSERT(program.length == item->data.length);
+      ASSERT(memcmp(program.data, item->data.hash, item->data.length) == 0);
     }
 
     btc_address_init(&addr);

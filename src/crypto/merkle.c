@@ -89,7 +89,6 @@ int
 btc_merkle_root(uint8_t *root, uint8_t *nodes, size_t size) {
   uint8_t *left, *right, *last;
   int malleated = 0;
-  btc_hash256_t ctx;
   size_t i;
 
   if (size == 0) {
@@ -113,10 +112,7 @@ btc_merkle_root(uint8_t *root, uint8_t *nodes, size_t size) {
 
       last = &nodes[(i / 2) * 32];
 
-      btc_hash256_init(&ctx);
-      btc_hash256_update(&ctx, left, 32);
-      btc_hash256_update(&ctx, right, 32);
-      btc_hash256_final(&ctx, last);
+      btc_hash256_root(last, left, right);
     }
 
     size = (size + 1) / 2;

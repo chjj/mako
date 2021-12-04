@@ -1003,11 +1003,11 @@ btc_chain_verify(btc_chain_t *chain,
                  unsigned int flags) {
   const btc_header_t *hdr = &block->header;
   const btc_network_t *network = chain->network;
+  const uint8_t *commit_hash = NULL;
   uint8_t hash[32];
   uint8_t root[32];
   int64_t time, mtp;
   int32_t height;
-  int has_commit;
   uint32_t bits;
   size_t i;
 
@@ -1051,7 +1051,7 @@ btc_chain_verify(btc_chain_t *chain,
     /* Once segwit is active, we will still
        need to check for block mutability. */
     if (!btc_block_has_witness(block)) {
-      if (!btc_block_get_commitment_hash(root, block)) {
+      if (!btc_block_get_commitment_hash(block)) {
         btc_deployment_state_init(state);
         return 1;
       }
@@ -1128,10 +1128,10 @@ btc_chain_verify(btc_chain_t *chain,
   }
 
   /* Check the commitment hash for segwit. */
-  has_commit = 0;
-
   if (state->flags & BTC_SCRIPT_VERIFY_WITNESS) {
-    if (btc_block_get_commitment_hash(hash, block)) {
+    commit_hash = btc_block_get_commitment_hash(block);
+
+    if (commit_hash) {
       /* These are totally malleable. Someone
          may have even accidentally sent us
          the non-witness version of the block.
@@ -1148,21 +1148,19 @@ btc_chain_verify(btc_chain_t *chain,
 
       CHECK(btc_block_create_commitment_hash(root, block));
 
-      if (!btc_hash_equal(hash, root)) {
+      if (!btc_hash_equal(commit_hash, root)) {
         return btc_chain_throw(chain, hdr,
                                "invalid",
                                "bad-witness-merkle-match",
                                100,
                                1);
       }
-
-      has_commit = 1;
     }
   }
 
   /* Blocks that do not commit to
      witness data cannot contain it. */
-  if (!has_commit) {
+  if (!commit_hash) {
     if (btc_block_has_witness(block)) {
       return btc_chain_throw(chain, hdr,
                              "invalid",

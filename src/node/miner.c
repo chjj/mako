@@ -236,7 +236,6 @@ static void
 btc_tmpl_witness_hash(uint8_t *hash, const btc_tmpl_t *bt) {
   size_t length = bt->txs.length + 1;
   uint8_t *hashes = (uint8_t *)btc_malloc(length * 32);
-  btc_hash256_t ctx;
   uint8_t root[32];
   size_t i;
 
@@ -252,10 +251,7 @@ btc_tmpl_witness_hash(uint8_t *hash, const btc_tmpl_t *bt) {
 
   btc_free(hashes);
 
-  btc_hash256_init(&ctx);
-  btc_hash256_update(&ctx, root, 32);
-  btc_hash256_update(&ctx, zero_nonce, 32);
-  btc_hash256_final(&ctx, hash);
+  btc_hash256_root(hash, root, zero_nonce);
 }
 
 void

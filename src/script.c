@@ -651,7 +651,9 @@ btc_script_set_p2pk(btc_script_t *script, const uint8_t *pub, size_t len) {
 }
 
 int
-btc_script_get_p2pk(uint8_t *pub, size_t *len, const btc_script_t *script) {
+btc_script_get_p2pk(const uint8_t **pub,
+                    size_t *len,
+                    const btc_script_t *script) {
   btc_reader_t reader;
   btc_opcode_t op;
 
@@ -664,7 +666,7 @@ btc_script_get_p2pk(uint8_t *pub, size_t *len, const btc_script_t *script) {
     return 0;
 
   if (pub != NULL)
-    memcpy(pub, op.data, op.length);
+    *pub = op.data;
 
   if (len != NULL)
     *len = op.length;
@@ -695,7 +697,7 @@ btc_script_set_p2pkh(btc_script_t *script, const uint8_t *hash) {
 }
 
 int
-btc_script_get_p2pkh(uint8_t *hash, const btc_script_t *script) {
+btc_script_get_p2pkh(const uint8_t **hash, const btc_script_t *script) {
   btc_reader_t reader;
   btc_opcode_t op;
 
@@ -714,7 +716,7 @@ btc_script_get_p2pkh(uint8_t *hash, const btc_script_t *script) {
     return 0;
 
   if (hash != NULL)
-    memcpy(hash, op.data, 20);
+    *hash = op.data;
 
   if (btc_reader_op(&reader) != BTC_OP_EQUALVERIFY)
     return 0;
@@ -873,11 +875,11 @@ btc_script_set_p2sh(btc_script_t *script, const uint8_t *hash) {
 }
 
 int
-btc_script_get_p2sh(uint8_t *hash, const btc_script_t *script) {
+btc_script_get_p2sh(const uint8_t **hash, const btc_script_t *script) {
   if (!btc_script_is_p2sh(script))
     return 0;
 
-  memcpy(hash, script->data + 2, 20);
+  *hash = script->data + 2;
 
   return 1;
 }
@@ -970,11 +972,11 @@ btc_script_set_commitment(btc_script_t *script, const uint8_t *hash) {
 }
 
 int
-btc_script_get_commitment(uint8_t *hash, const btc_script_t *script) {
+btc_script_get_commitment(const uint8_t **hash, const btc_script_t *script) {
   if (!btc_script_is_commitment(script))
     return 0;
 
-  memcpy(hash, script->data + 6, 32);
+  *hash = script->data + 6;
 
   return 1;
 }
@@ -1012,8 +1014,7 @@ btc_script_get_program(btc_program_t *program, const btc_script_t *script) {
 
   program->version = btc_smi_decode(script->data[0]);
   program->length = script->data[1];
-
-  memcpy(program->data, script->data + 2, program->length);
+  program->data = script->data + 2;
 
   return 1;
 }
@@ -1026,11 +1027,11 @@ btc_script_is_p2wpkh(const btc_script_t *script) {
 }
 
 int
-btc_script_get_p2wpkh(uint8_t *hash, const btc_script_t *script) {
+btc_script_get_p2wpkh(const uint8_t **hash, const btc_script_t *script) {
   if (!btc_script_is_p2wpkh(script))
     return 0;
 
-  memcpy(hash, script->data + 2, 20);
+  *hash = script->data + 2;
 
   return 1;
 }
@@ -1053,11 +1054,11 @@ btc_script_is_p2wsh(const btc_script_t *script) {
 }
 
 int
-btc_script_get_p2wsh(uint8_t *hash, const btc_script_t *script) {
+btc_script_get_p2wsh(const uint8_t **hash, const btc_script_t *script) {
   if (!btc_script_is_p2wsh(script))
     return 0;
 
-  memcpy(hash, script->data + 2, 32);
+  *hash = script->data + 2;
 
   return 1;
 }

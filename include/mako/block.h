@@ -47,8 +47,8 @@ btc_block_witness_nonce(const btc_block_t *blk);
 BTC_EXTERN int
 btc_block_create_commitment_hash(uint8_t *hash, const btc_block_t *blk);
 
-BTC_EXTERN int
-btc_block_get_commitment_hash(uint8_t *hash, const btc_block_t *blk);
+BTC_EXTERN const uint8_t *
+btc_block_get_commitment_hash(const btc_block_t *blk);
 
 BTC_EXTERN int
 btc_block_check_body(btc_verify_error_t *err, const btc_block_t *blk);

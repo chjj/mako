@@ -420,7 +420,9 @@ BTC_EXTERN void
 btc_script_set_p2pk(btc_script_t *script, const uint8_t *pub, size_t len);
 
 BTC_EXTERN int
-btc_script_get_p2pk(uint8_t *pub, size_t *len, const btc_script_t *script);
+btc_script_get_p2pk(const uint8_t **pub,
+                    size_t *len,
+                    const btc_script_t *script);
 
 BTC_EXTERN int
 btc_script_is_p2pkh(const btc_script_t *script);
@@ -429,7 +431,7 @@ BTC_EXTERN void
 btc_script_set_p2pkh(btc_script_t *script, const uint8_t *hash);
 
 BTC_EXTERN int
-btc_script_get_p2pkh(uint8_t *hash, const btc_script_t *script);
+btc_script_get_p2pkh(const uint8_t **hash, const btc_script_t *script);
 
 BTC_EXTERN int
 btc_script_is_multisig(const btc_script_t *script);
@@ -456,7 +458,7 @@ BTC_EXTERN void
 btc_script_set_p2sh(btc_script_t *script, const uint8_t *hash);
 
 BTC_EXTERN int
-btc_script_get_p2sh(uint8_t *hash, const btc_script_t *script);
+btc_script_get_p2sh(const uint8_t **hash, const btc_script_t *script);
 
 BTC_EXTERN int
 btc_script_is_nulldata(const btc_script_t *script);
@@ -476,7 +478,7 @@ BTC_EXTERN void
 btc_script_set_commitment(btc_script_t *script, const uint8_t *hash);
 
 BTC_EXTERN int
-btc_script_get_commitment(uint8_t *hash, const btc_script_t *script);
+btc_script_get_commitment(const uint8_t **hash, const btc_script_t *script);
 
 BTC_EXTERN int
 btc_script_is_program(const btc_script_t *script);
@@ -491,7 +493,7 @@ BTC_EXTERN int
 btc_script_is_p2wpkh(const btc_script_t *script);
 
 BTC_EXTERN int
-btc_script_get_p2wpkh(uint8_t *hash, const btc_script_t *script);
+btc_script_get_p2wpkh(const uint8_t **hash, const btc_script_t *script);
 
 BTC_EXTERN void
 btc_script_set_p2wpkh(btc_script_t *script, const uint8_t *hash);
@@ -500,7 +502,7 @@ BTC_EXTERN int
 btc_script_is_p2wsh(const btc_script_t *script);
 
 BTC_EXTERN int
-btc_script_get_p2wsh(uint8_t *hash, const btc_script_t *script);
+btc_script_get_p2wsh(const uint8_t **hash, const btc_script_t *script);
 
 BTC_EXTERN void
 btc_script_set_p2wsh(btc_script_t *script, const uint8_t *hash);

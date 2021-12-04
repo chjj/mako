@@ -119,7 +119,6 @@ int
 btc_block_create_commitment_hash(uint8_t *hash, const btc_block_t *blk) {
   const uint8_t *nonce = btc_block_witness_nonce(blk);
   uint8_t root[32];
-  btc_hash256_t ctx;
 
   if (nonce == NULL)
     return 0;
@@ -127,33 +126,31 @@ btc_block_create_commitment_hash(uint8_t *hash, const btc_block_t *blk) {
   if (!btc_block_witness_root(root, blk))
     return 0;
 
-  btc_hash256_init(&ctx);
-  btc_hash256_update(&ctx, root, 32);
-  btc_hash256_update(&ctx, nonce, 32);
-  btc_hash256_final(&ctx, hash);
+  btc_hash256_root(hash, root, nonce);
 
   return 1;
 }
 
-int
-btc_block_get_commitment_hash(uint8_t *hash, const btc_block_t *blk) {
+const uint8_t *
+btc_block_get_commitment_hash(const btc_block_t *blk) {
   const btc_output_t *output;
   const btc_tx_t *tx;
+  const uint8_t *hash;
   size_t i;
 
   if (blk->txs.length == 0)
-    return 0;
+    return NULL;
 
   tx = blk->txs.items[0];
 
   for (i = tx->outputs.length - 1; i != (size_t)-1; i--) {
     output = tx->outputs.items[i];
 
-    if (btc_script_get_commitment(hash, &output->script))
-      return 1;
+    if (btc_script_get_commitment(&hash, &output->script))
+      return hash;
   }
 
-  return 0;
+  return NULL;
 }
 
 #define THROW(r, s) do {      \
