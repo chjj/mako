@@ -1046,9 +1046,7 @@ btc_tx_has_standard_witness(const btc_tx_t *tx, const btc_view_t *view) {
   const btc_input_t *input;
   const btc_stack_t *witness;
   const btc_coin_t *coin;
-  const btc_script_t *redeem;
   btc_script_t prev;
-  unsigned int m;
   size_t i, j;
 
   if (btc_tx_is_coinbase(tx))
@@ -1076,20 +1074,10 @@ btc_tx_has_standard_witness(const btc_tx_t *tx, const btc_view_t *view) {
     if (!btc_script_is_program(&prev))
       return 0;
 
-    if (btc_script_is_p2wpkh(&prev)) {
-      if (witness->length != 2)
-        return 0;
-
-      if (witness->items[0]->length > 73)
-        return 0;
-
-      if (witness->items[1]->length > 65)
-        return 0;
-
-      continue;
-    }
-
     if (btc_script_is_p2wsh(&prev)) {
+      if (btc_stack_top(witness)->length > BTC_MAX_P2WSH_SIZE)
+        return 0;
+
       if (witness->length - 1 > BTC_MAX_P2WSH_STACK)
         return 0;
 
@@ -1098,56 +1086,7 @@ btc_tx_has_standard_witness(const btc_tx_t *tx, const btc_view_t *view) {
           return 0;
       }
 
-      redeem = btc_stack_top(witness);
-
-      if (redeem->length > BTC_MAX_P2WSH_SIZE)
-        return 0;
-
-      if (btc_script_is_p2pk(redeem)) {
-        if (witness->length - 1 != 1)
-          return 0;
-
-        if (witness->items[0]->length > 73)
-          return 0;
-
-        continue;
-      }
-
-      if (btc_script_is_p2pkh(redeem)) {
-        if (witness->length - 1 != 2)
-          return 0;
-
-        if (witness->items[0]->length > 73)
-          return 0;
-
-        if (witness->items[1]->length > 65)
-          return 0;
-
-        continue;
-      }
-
-      if (btc_script_get_multisig(&m, NULL, NULL, redeem)) {
-        if (witness->length - 1 != m + 1)
-          return 0;
-
-        if (witness->items[0]->length != 0)
-          return 0;
-
-        for (j = 1; j < witness->length - 1; j++) {
-          if (witness->items[j]->length > 73)
-            return 0;
-        }
-
-        continue;
-      }
-    }
-
-    if (witness->length > BTC_MAX_P2WSH_STACK)
-      return 0;
-
-    for (j = 0; j < witness->length; j++) {
-      if (witness->items[j]->length > BTC_MAX_P2WSH_PUSH)
-        return 0;
+      continue;
     }
   }
 

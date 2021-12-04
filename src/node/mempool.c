@@ -263,8 +263,10 @@ btc_mempool_destroy(btc_mempool_t *mp) {
 
   btc_hashmap_iterate(&iter, mp->waiting);
 
-  while (btc_hashmap_next(&iter))
+  while (btc_hashmap_next(&iter)) {
+    btc_free(iter.key);
     btc_hashset_destroy(iter.val);
+  }
 
   btc_hashmap_iterate(&iter, mp->orphans);
 
@@ -334,12 +336,12 @@ btc_mempool_close(btc_mempool_t *mp) {
 }
 
 static int
-btc_mempool_throw(btc_mempool_t *mp,
-                  const btc_tx_t *tx,
-                  const char *code,
-                  const char *reason,
-                  int score,
-                  int malleated) {
+btc_mempool_fail(btc_mempool_t *mp,
+                 const btc_tx_t *tx,
+                 const char *code,
+                 const char *reason,
+                 int score,
+                 int malleated) {
   btc_hash_copy(mp->error.hash, tx->hash);
 
   mp->error.code = code;
@@ -347,11 +349,21 @@ btc_mempool_throw(btc_mempool_t *mp,
   mp->error.score = score;
   mp->error.malleated = malleated;
 
+  return 0;
+}
+
+static int
+btc_mempool_throw(btc_mempool_t *mp,
+                  const btc_tx_t *tx,
+                  const char *code,
+                  const char *reason,
+                  int score,
+                  int malleated) {
   btc_mempool_log(mp, "Verification error: %s "
                       "(code=%s score=%d hash=%H)",
                   reason, code, score, tx->hash);
 
-  return 0;
+  return btc_mempool_fail(mp, tx, code, reason, score, malleated);
 }
 
 /*
@@ -380,7 +392,7 @@ btc_mempool_remove_orphan(btc_mempool_t *mp, const uint8_t *hash) {
     btc_hashset_del(set, hash);
 
     if (btc_hashset_size(set) == 0) {
-      btc_hashmap_del(mp->waiting, prevout->hash);
+      btc_free(btc_hashmap_del(mp->waiting, prevout->hash));
       btc_hashset_destroy(set);
     }
   }
@@ -456,11 +468,11 @@ btc_mempool_check_orphan(btc_mempool_t *mp,
     if (btc_mempool_has_reject(mp, prevout->hash)) {
       btc_mempool_log(mp, "Not storing orphan %H (rejected parents).",
                           tx->hash);
-      return btc_mempool_throw(mp, tx,
-                               "duplicate",
-                               "duplicate",
-                               100,
-                               0);
+      return btc_mempool_fail(mp, tx,
+                              "duplicate",
+                              "duplicate",
+                              0,
+                              0);
     }
 
     if (btc_mempool_has(mp, prevout->hash)) {
@@ -517,7 +529,7 @@ btc_mempool_add_orphan(btc_mempool_t *mp,
     const uint8_t *prev = iter.key;
 
     if (!btc_hashmap_has(mp->waiting, prev))
-      btc_hashmap_put(mp->waiting, prev, btc_hashset_create());
+      btc_hashmap_put(mp->waiting, btc_hash_clone(prev), btc_hashset_create());
 
     btc_hashset_put(btc_hashmap_get(mp->waiting, prev), orphan->hash);
 
@@ -558,7 +570,8 @@ btc_mempool_resolve_orphans(btc_mempool_t *mp, const uint8_t *parent) {
     }
   }
 
-  btc_hashmap_del(mp->waiting, parent);
+  btc_free(btc_hashmap_del(mp->waiting, parent));
+
   btc_hashset_destroy(set);
 
   return resolved;
@@ -1206,6 +1219,14 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
      not double-spending an output in the
      mempool. */
   if (btc_mempool_is_double_spend(mp, tx)) {
+    if (btc_tx_is_rbf(tx)) {
+      return btc_mempool_fail(mp, tx,
+                              "duplicate",
+                              "replace-by-fee",
+                              0,
+                              0);
+    }
+
     return btc_mempool_throw(mp, tx,
                              "duplicate",
                              "bad-txns-inputs-spent",
@@ -1441,8 +1462,13 @@ btc_mempool_missing(btc_mempool_t *mp, const btc_tx_t *tx) {
   for (i = 0; i < tx->inputs.length; i++) {
     const btc_input_t *input = tx->inputs.items[i];
 
-    if (btc_hashmap_has(mp->waiting, input->prevout.hash))
-      btc_vector_push(missing, input->prevout.hash);
+    if (!btc_hashmap_has(mp->waiting, input->prevout.hash))
+      continue;
+
+    if (btc_hashmap_has(mp->orphans, input->prevout.hash))
+      continue;
+
+    btc_vector_push(missing, input->prevout.hash);
   }
 
   return missing;

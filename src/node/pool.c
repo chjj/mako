@@ -1545,6 +1545,7 @@ btc_peer_flush_data(btc_peer_t *peer) {
   int64_t unknown = -1;
   uint32_t type;
   btc_inv_t nf;
+  int send_tip;
   size_t size;
   int ret = 1;
 
@@ -1569,10 +1570,13 @@ btc_peer_flush_data(btc_peer_t *peer) {
       break;
     }
 
+    /* Check the hashContinue early. */
+    send_tip = btc_hash_equal(item->hash, peer->hash_continue);
+
+    /* Maybe fall back to full block. */
     if (type == BTC_INV_CMPCT_BLOCK) {
       const btc_entry_t *entry = btc_chain_by_hash(chain, item->hash);
 
-      /* Maybe fall back to full block. */
       if (entry != NULL && entry->height < btc_chain_height(chain) - 10)
         type = peer->compact_witness ? BTC_INV_WITNESS_BLOCK : BTC_INV_BLOCK;
     }
@@ -1665,9 +1669,9 @@ btc_peer_flush_data(btc_peer_t *peer) {
         }
 
         if (type == BTC_INV_TX)
-          btc_peer_sendmsg(peer, BTC_MSG_TX_BASE, &entry->tx);
+          btc_peer_sendmsg(peer, BTC_MSG_TX_BASE, entry->tx);
         else
-          btc_peer_sendmsg(peer, BTC_MSG_TX, &entry->tx);
+          btc_peer_sendmsg(peer, BTC_MSG_TX, entry->tx);
 
         btc_invitem_destroy(item);
 
@@ -1683,7 +1687,7 @@ btc_peer_flush_data(btc_peer_t *peer) {
       }
     }
 
-    if (btc_hash_equal(item->hash, peer->hash_continue)) {
+    if (send_tip) {
       btc_peer_send_inv_1(peer, BTC_INV_BLOCK, btc_chain_tip(chain)->hash);
       btc_hash_init(peer->hash_continue);
     }
@@ -1691,7 +1695,7 @@ btc_peer_flush_data(btc_peer_t *peer) {
     peer->sending.head = next;
     peer->sending.length--;
 
-    if (next == NULL)
+    if (peer->sending.head == NULL)
       peer->sending.tail = NULL;
   }
 
@@ -3144,6 +3148,9 @@ btc_pool_on_txinv(btc_pool_t *pool,
   CHECK(hashes->length > 0);
 
   if (!btc_chain_synced(pool->chain))
+    return;
+
+  if (pool->flags & BTC_POOL_BLOCKSONLY)
     return;
 
   btc_vector_init(&out);

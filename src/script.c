@@ -1496,7 +1496,10 @@ static int
 is_low_der(const btc_buffer_t *sig) {
   uint8_t tmp[64];
 
-  if (!btc_ecdsa_sig_import(tmp, sig->data, sig->length))
+  if (sig->length == 0)
+    return 0;
+
+  if (!btc_ecdsa_sig_import(tmp, sig->data, sig->length - 1))
     return 0;
 
   return btc_ecdsa_is_low_s(tmp);
