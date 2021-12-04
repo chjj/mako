@@ -1304,7 +1304,7 @@ btc_chain_verify_locks(btc_chain_t *chain,
       height = coin->height;
 
     if (!(sequence & BTC_SEQUENCE_TYPE_FLAG)) {
-      height += (sequence & BTC_SEQUENCE_MASK) - 1;
+      height += (int32_t)(sequence & BTC_SEQUENCE_MASK) - 1;
 
       if (height > min_height)
         min_height = height;
@@ -1321,7 +1321,7 @@ btc_chain_verify_locks(btc_chain_t *chain,
 
     time = btc_entry_median_time(entry);
 
-    time += ((sequence & BTC_SEQUENCE_MASK) << BTC_SEQUENCE_GRANULARITY) - 1;
+    time += (int64_t)((sequence & BTC_SEQUENCE_MASK) << BTC_SEQUENCE_GRANULARITY) - 1;
 
     if (time > min_time)
       min_time = time;
