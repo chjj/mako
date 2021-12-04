@@ -63,7 +63,7 @@ convert_error(char *err) {
     return LSM_OK;
 
   if (strcmp(err, "NotFound") == 0)
-    return LSM_CANTOPEN; /* LSM_IOERR_NOENT */
+    return LSM_CANTOPEN;
 
   if (strcmp(err, "Corruption") == 0)
     return LSM_CORRUPT;
@@ -719,7 +719,7 @@ lsm_csr_seek(lsm_cursor *cur, const void *kp, int kn, int whence) {
         leveldb_iter_seek_to_last(it);
       }
 
-      return LSM_OK;
+      return iter_status(it);
     }
 
     case LSM_SEEK_EQ: {
@@ -747,8 +747,11 @@ lsm_csr_seek(lsm_cursor *cur, const void *kp, int kn, int whence) {
     }
 
     case LSM_SEEK_GE: {
-      leveldb_iter_seek(lsm_csr_it(cur), kp, kn);
-      return LSM_OK;
+      leveldb_iterator_t *it = lsm_csr_it(cur);
+
+      leveldb_iter_seek(it, kp, kn);
+
+      return iter_status(it);
     }
   }
 
@@ -757,20 +760,24 @@ lsm_csr_seek(lsm_cursor *cur, const void *kp, int kn, int whence) {
 
 int
 lsm_csr_first(lsm_cursor *cur) {
+  leveldb_iterator_t *it = lsm_csr_it(cur);
+
   lsm_csr_reset(cur);
 
-  leveldb_iter_seek_to_first(lsm_csr_it(cur));
+  leveldb_iter_seek_to_first(it);
 
-  return LSM_OK;
+  return iter_status(it);
 }
 
 int
 lsm_csr_last(lsm_cursor *cur) {
+  leveldb_iterator_t *it = lsm_csr_it(cur);
+
   lsm_csr_reset(cur);
 
-  leveldb_iter_seek_to_last(lsm_csr_it(cur));
+  leveldb_iter_seek_to_last(it);
 
-  return LSM_OK;
+  return iter_status(it);
 }
 
 int

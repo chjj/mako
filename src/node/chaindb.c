@@ -1643,7 +1643,7 @@ btc_chaindb_disconnect(btc_chaindb_t *db,
 #ifdef USE_WORKER
   /* Wait for worker. */
   if (lsm_worker_wait(&db->worker, db->lsm) != 0)
-    return 0;
+    return NULL;
 #endif
 
   /* Begin transaction. */
