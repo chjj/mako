@@ -130,8 +130,6 @@ btc_node_open(btc_node_t *node, const char *prefix, unsigned int flags) {
   char path[BTC_PATH_MAX];
   char file[BTC_PATH_MAX];
 
-  btc_node_log(node, "Opening node.");
-
   if (!btc_path_resolve(path, sizeof(path), prefix, 0))
     return 0;
 
