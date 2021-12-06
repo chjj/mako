@@ -45,7 +45,7 @@
 
 int
 btc_getaddrinfo(btc_sockaddr_t **res, const char *name) {
-  struct addrinfo hints, *r, *p;
+  struct addrinfo hints, *info, *it;
   btc_sockaddr_t *addr = NULL;
   btc_sockaddr_t *prev = NULL;
 
@@ -65,11 +65,11 @@ btc_getaddrinfo(btc_sockaddr_t **res, const char *name) {
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_protocol = 0;
 
-  if (getaddrinfo(name, NULL, &hints, &r) != 0)
+  if (getaddrinfo(name, NULL, &hints, &info) != 0)
     return 0;
 
-  for (p = r; p != NULL; p = p->ai_next) {
-    if (p->ai_family != AF_INET && p->ai_family != AF_INET6)
+  for (it = info; it != NULL; it = it->ai_next) {
+    if (it->ai_family != AF_INET && it->ai_family != AF_INET6)
       continue;
 
     addr = (btc_sockaddr_t *)malloc(sizeof(btc_sockaddr_t));
@@ -77,7 +77,7 @@ btc_getaddrinfo(btc_sockaddr_t **res, const char *name) {
     if (addr == NULL)
       abort(); /* LCOV_EXCL_LINE */
 
-    if (!btc_sockaddr_set(addr, p->ai_addr))
+    if (!btc_sockaddr_set(addr, it->ai_addr))
       abort(); /* LCOV_EXCL_LINE */
 
     if (*res == NULL)
@@ -89,7 +89,7 @@ btc_getaddrinfo(btc_sockaddr_t **res, const char *name) {
     prev = addr;
   }
 
-  freeaddrinfo(r);
+  freeaddrinfo(info);
 
   return 1;
 }
@@ -119,28 +119,28 @@ btc_getifaddrs(btc_sockaddr_t **res) {
 #elif defined(HAVE_GETIFADDRS)
   btc_sockaddr_t *addr = NULL;
   btc_sockaddr_t *prev = NULL;
-  struct ifaddrs *r, *p;
+  struct ifaddrs *addrs, *it;
 
   *res = NULL;
 
-  if (getifaddrs(&r) != 0)
+  if (getifaddrs(&addrs) != 0)
     return 0;
 
-  for (p = r; p != NULL; p = p->ifa_next) {
-    if (p->ifa_addr == NULL)
+  for (it = addrs; it != NULL; it = it->ifa_next) {
+    if (it->ifa_addr == NULL)
       continue;
 
-    if ((p->ifa_flags & IFF_UP) == 0)
+    if ((it->ifa_flags & IFF_UP) == 0)
       continue;
 
-    if (strcmp(p->ifa_name, "lo") == 0)
+    if (strcmp(it->ifa_name, "lo") == 0)
       continue;
 
-    if (strcmp(p->ifa_name, "lo0") == 0)
+    if (strcmp(it->ifa_name, "lo0") == 0)
       continue;
 
-    if (p->ifa_addr->sa_family != AF_INET
-        && p->ifa_addr->sa_family != AF_INET6) {
+    if (it->ifa_addr->sa_family != AF_INET
+        && it->ifa_addr->sa_family != AF_INET6) {
       continue;
     }
 
@@ -149,7 +149,7 @@ btc_getifaddrs(btc_sockaddr_t **res) {
     if (addr == NULL)
       abort(); /* LCOV_EXCL_LINE */
 
-    if (!btc_sockaddr_set(addr, p->ifa_addr))
+    if (!btc_sockaddr_set(addr, it->ifa_addr))
       abort(); /* LCOV_EXCL_LINE */
 
     if (*res == NULL)
@@ -161,7 +161,7 @@ btc_getifaddrs(btc_sockaddr_t **res) {
     prev = addr;
   }
 
-  freeifaddrs(r);
+  freeifaddrs(addrs);
 
   return 1;
 #else /* !HAVE_GETIFADDRS */
