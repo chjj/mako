@@ -522,7 +522,7 @@ btc_netaddr_is_routable(const btc_netaddr_t *addr) {
   return 1;
 }
 
-static enum btc_ipnet
+enum btc_ipnet
 btc_netaddr_network(const btc_netaddr_t *addr) {
   if (!btc_netaddr_is_routable(addr))
     return BTC_IPNET_NONE;

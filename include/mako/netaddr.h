@@ -146,6 +146,9 @@ btc_netaddr_is_valid(const btc_netaddr_t *addr);
 BTC_EXTERN int
 btc_netaddr_is_routable(const btc_netaddr_t *addr);
 
+BTC_EXTERN enum btc_ipnet
+btc_netaddr_network(const btc_netaddr_t *addr);
+
 BTC_EXTERN int
 btc_netaddr_reachability(const btc_netaddr_t *src, const btc_netaddr_t *dst);
 

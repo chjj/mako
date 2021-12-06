@@ -241,7 +241,6 @@ struct btc_addrman_s {
   char file[BTC_PATH_MAX];
   unsigned int flags;
   btc_netaddr_t addr;
-  uint64_t services;
   btc_sockaddr_t proxy;
   int64_t ban_time;
   uint8_t key[32];
@@ -268,9 +267,8 @@ btc_addrman_create(const btc_network_t *network) {
   man->file[0] = '\0';
   man->flags = BTC_POOL_DEFAULT_FLAGS;
   btc_netaddr_set(&man->addr, "127.0.0.1", network->port);
-  man->addr.services = BTC_NET_LOCAL_SERVICES;
+  man->addr.services = BTC_NET_DEFAULT_SERVICES;
   man->addr.time = btc_now();
-  man->services = BTC_NET_LOCAL_SERVICES;
   btc_sockaddr_import(&man->proxy, "0.0.0.0", 0);
   man->ban_time = 24 * 60 * 60;
   btc_getrandom(man->key, 32);
@@ -337,12 +335,6 @@ btc_addrman_set_timedata(btc_addrman_t *man, const btc_timedata_t *td) {
 }
 
 void
-btc_addrman_set_external(btc_addrman_t *man, const btc_netaddr_t *addr) {
-  if (!btc_netaddr_is_null(addr))
-    btc_netaddr_copy(&man->addr, addr);
-}
-
-void
 btc_addrman_set_proxy(btc_addrman_t *man, const btc_netaddr_t *addr) {
   btc_netaddr_get_sockaddr(&man->proxy, addr);
 }
@@ -382,7 +374,7 @@ static int
 btc_addrman_resolve(btc_addrman_t *man) {
   const btc_network_t *network = man->network;
   int64_t now = btc_now();
-  btc_sockaddr_t *res, *p;
+  btc_sockaddr_t *res, *it;
   btc_netaddr_t addr;
   size_t i;
 
@@ -410,8 +402,8 @@ btc_addrman_resolve(btc_addrman_t *man) {
     if (btc_getaddrinfo(&res, seed)) {
       int total = 0;
 
-      for (p = res; p != NULL; p = p->next) {
-        btc_netaddr_set_sockaddr(&addr, p);
+      for (it = res; it != NULL; it = it->next) {
+        btc_netaddr_set_sockaddr(&addr, it);
 
         addr.time = now;
         addr.services = BTC_NET_DEFAULT_SERVICES;
@@ -1028,7 +1020,9 @@ btc_addrman_has_local(btc_addrman_t *man, const btc_netaddr_t *src) {
 }
 
 const btc_netaddr_t *
-btc_addrman_get_local(btc_addrman_t *man, const btc_netaddr_t *src) {
+btc_addrman_get_local(btc_addrman_t *man,
+                      const btc_netaddr_t *src,
+                      uint64_t services) {
   btc_netaddr_t *best_dst = NULL;
   btc_addrmapiter_t iter;
   int best_reach = -1;
@@ -1047,26 +1041,26 @@ btc_addrman_get_local(btc_addrman_t *man, const btc_netaddr_t *src) {
         best_dst = &dst->addr;
       }
     }
+  } else {
+    while (btc_addrmap_next(&iter)) {
+      dst = iter.val;
+      reach = btc_netaddr_reachability(src, &dst->addr);
 
-    return best_dst;
-  }
+      if (reach < best_reach)
+        continue;
 
-  while (btc_addrmap_next(&iter)) {
-    dst = iter.val;
-    reach = btc_netaddr_reachability(src, &dst->addr);
-
-    if (reach < best_reach)
-      continue;
-
-    if (reach > best_reach || dst->score > best_score) {
-      best_reach = reach;
-      best_score = dst->score;
-      best_dst = &dst->addr;
+      if (reach > best_reach || dst->score > best_score) {
+        best_reach = reach;
+        best_score = dst->score;
+        best_dst = &dst->addr;
+      }
     }
   }
 
-  if (best_dst)
+  if (best_dst != NULL) {
     best_dst->time = btc_timedata_now(man->timedata);
+    best_dst->services = services;
+  }
 
   return best_dst;
 }
@@ -1080,15 +1074,22 @@ btc_addrman_add_local(btc_addrman_t *man,
   if (!btc_netaddr_is_routable(addr))
     return 0;
 
-  if (btc_addrmap_has(man->local, addr))
+  local = btc_addrmap_get(man->local, addr);
+
+  if (local != NULL) {
+    if (score > local->score)
+      local->score = score;
+
     return 0;
+  }
 
   local = btc_local_create();
   local->addr = *addr;
   local->type = score;
   local->score = score;
 
-  local->addr.services = man->services;
+  local->addr.services = BTC_NET_DEFAULT_SERVICES;
+  local->addr.time = btc_now();
 
   btc_addrmap_put(man->local, &local->addr, local);
 

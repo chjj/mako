@@ -66,9 +66,6 @@ BTC_EXTERN void
 btc_addrman_set_timedata(btc_addrman_t *man, const btc_timedata_t *td);
 
 BTC_EXTERN void
-btc_addrman_set_external(btc_addrman_t *man, const btc_netaddr_t *addr);
-
-BTC_EXTERN void
 btc_addrman_set_proxy(btc_addrman_t *man, const btc_netaddr_t *addr);
 
 BTC_EXTERN void
@@ -134,7 +131,8 @@ btc_addrman_has_local(btc_addrman_t *man,
 
 BTC_EXTERN const btc_netaddr_t *
 btc_addrman_get_local(btc_addrman_t *man,
-                      const btc_netaddr_t *src);
+                      const btc_netaddr_t *src,
+                      uint64_t services);
 
 BTC_EXTERN int
 btc_addrman_add_local(btc_addrman_t *man,
