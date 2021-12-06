@@ -38,6 +38,29 @@ has only been tested on Linux and Win32 (cross-compiled with mingw).
 `cmake . && make` will produce two binaries: `mako and makod`. The arguments
 mimic `bitcoin-cli` and `bitcoind` respectively.
 
+### Database Backends
+
+There are currently two database backends to choose from: the SQLite LSM tree
+(vendored), or LevelDB (dynamically linked). LevelDB will use less disk space
+and is probably faster, but requires a third party library to be installed on
+the system (LevelDB will never be vendored as it requires a C++ compiler).
+
+#### Building with the SQLite LSM tree
+
+``` bash
+$ cmake . -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-g
+$ make
+```
+
+#### Building with LevelDB
+
+``` bash
+$ cmake . -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-g -DMAKO_USE_LEVELDB=ON
+$ make
+```
+
+Note: LevelDB must be installed system-wide.
+
 ## Why?
 
 There are a few reasons mako needed to exist:
