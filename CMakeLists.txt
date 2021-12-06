@@ -314,6 +314,7 @@ set(tests # crypto
           loop
           thread
           http_client
+          http_server
           workers
           # node
           addrman
@@ -332,13 +333,4 @@ foreach(name ${tests})
                                           mako_io
                                           mako_lib)
   add_test(NAME ${name} COMMAND t-${name})
-endforeach()
-
-foreach(name http_server)
-  add_executable(t-${name} test/t-${name}.c)
-  target_link_libraries(t-${name} PRIVATE mako_tests
-                                          mako_node
-                                          mako_client
-                                          mako_io
-                                          mako_lib)
 endforeach()
