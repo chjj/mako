@@ -625,12 +625,13 @@ lsm_commit(lsm_db *db, int level) {
 
 int
 lsm_rollback(lsm_db *db, int level) {
-  if (db->batch == NULL || level != 0)
+  if (level != 0)
     return LSM_MISUSE;
 
-  leveldb_writebatch_destroy(db->batch);
-
-  db->batch = NULL;
+  if (db->batch != NULL) {
+    leveldb_writebatch_destroy(db->batch);
+    db->batch = NULL;
+  }
 
   return LSM_OK;
 }
