@@ -25,9 +25,8 @@ The node itself is currently incomplete for various reasons, including:
 - Consensus & policy rules are _mostly_ complete: mako supports softforks up to
   and including segwit, but not later additions like taproot.
 - A number of tests still need to be written.
-- I haven't taken the time to have mako fully sync mainnet, only signet. Mako
-  passes all of the transaction and script test vectors from bitcoin core, but
-  there's no telling what consensus issue may arise in its current state.
+- Mako passes all of the transaction and script test vectors from bitcoin core,
+  but there's no telling what consensus issue may arise in its current state.
 
 ## Build & Usage (for experimentation only)
 
