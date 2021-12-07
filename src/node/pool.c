@@ -2707,7 +2707,7 @@ btc_pool_on_complete(btc_pool_t *pool, btc_peer_t *peer) {
 
   /* Advertise our address. */
   if (peer->outbound) {
-    if (pool->flags & BTC_POOL_LISTEN) {
+    if ((pool->flags & BTC_POOL_LISTEN) && btc_chain_synced(pool->chain)) {
       addr = btc_addrman_get_local(pool->addrman, &peer->addr, pool->services);
 
       if (addr != NULL)
@@ -2934,10 +2934,9 @@ btc_pool_on_pong(btc_pool_t *pool,
 
 static void
 btc_pool_on_getaddr(btc_pool_t *pool, btc_peer_t *peer) {
-  const btc_netaddr_t *addr;
-  btc_addriter_t iter;
+  btc_vector_t *snapshot;
   btc_addrs_t addrs;
-  int total = 0;
+  size_t i;
 
   if (peer->outbound) {
     btc_pool_log(pool, "Ignoring getaddr from outbound node (%N).",
@@ -2955,13 +2954,13 @@ btc_pool_on_getaddr(btc_pool_t *pool, btc_peer_t *peer) {
 
   btc_addrs_init(&addrs);
 
-  btc_addrman_iterate(&iter, pool->addrman);
+  snapshot = btc_addrman_getaddr(pool->addrman);
 
-  while (btc_addrman_next(&addr, &iter)) {
+  for (i = 0; i < snapshot->length; i++) {
+    const btc_netaddr_t *addr = snapshot->items[i];
+
     if (btc_filter_has_addr(&peer->addr_filter, addr))
       continue;
-
-    total += 1;
 
     btc_filter_add_addr(&peer->addr_filter, addr);
 
@@ -2971,14 +2970,15 @@ btc_pool_on_getaddr(btc_pool_t *pool, btc_peer_t *peer) {
       break;
   }
 
+  btc_pool_log(pool, "Sending %zu addrs to peer (%N)",
+                     addrs.length, &peer->addr);
+
   if (addrs.length > 0) {
     btc_peer_send_addr(peer, &addrs);
     addrs.length = 0;
   }
 
-  btc_pool_log(pool, "Sent %d addrs to peer (%N)",
-                     total, &peer->addr);
-
+  btc_vector_destroy(snapshot);
   btc_addrs_clear(&addrs);
 }
 
@@ -2993,14 +2993,14 @@ btc_pool_on_addr(btc_pool_t *pool,
   size_t i;
 
   if (addrs->length > 1000) {
-    btc_peer_increase_ban(peer, 100);
+    btc_peer_increase_ban(peer, 20);
     return;
   }
 
   btc_vector_init(&relay);
 
   for (i = 0; i < addrs->length; i++) {
-    const btc_netaddr_t *addr = addrs->items[i];
+    btc_netaddr_t *addr = addrs->items[i];
 
     btc_filter_add_addr(&peer->addr_filter, addr);
 
@@ -3015,6 +3015,9 @@ btc_pool_on_addr(btc_pool_t *pool,
 
     if (btc_addrman_is_banned(pool->addrman, addr))
       continue;
+
+    if (addr->time <= 100000000 || addr->time > now + 10 * 60)
+      addr->time = now - 5 * 24 * 60 * 60;
 
     if (!peer->getting_addr && addrs->length < 10) {
       if (addr->time > since)
@@ -3036,24 +3039,22 @@ btc_pool_on_addr(btc_pool_t *pool,
 
   if (relay.length > 0) {
     btc_vector_t peers;
-    btc_peer_t *p;
+    btc_peer_t *it;
 
     btc_pool_log(pool, "Relaying %zu addrs to random peers.", relay.length);
 
     btc_vector_init(&peers);
 
-    for (p = pool->peers.head; p != NULL; p = p->next) {
-      if (p->state == BTC_PEER_CONNECTED)
-        btc_vector_push(&peers, p);
+    for (it = pool->peers.head; it != NULL; it = it->next) {
+      if (it->state == BTC_PEER_CONNECTED)
+        btc_vector_push(&peers, it);
     }
 
     if (peers.length > 0) {
       for (i = 0; i < relay.length; i++) {
-        const btc_netaddr_t *addr = (const btc_netaddr_t *)relay.items[i];
-        uint32_t h1 = btc_murmur3_sum(addr->raw, 16, 0);
-        uint32_t h2 = btc_murmur3_sum(addr->raw, 16, 1);
-        btc_peer_t *peer1 = peers.items[h1 % peers.length];
-        btc_peer_t *peer2 = peers.items[h2 % peers.length];
+        const btc_netaddr_t *addr = relay.items[i];
+        btc_peer_t *peer1 = peers.items[btc_uniform(peers.length)];
+        btc_peer_t *peer2 = peers.items[btc_uniform(peers.length)];
 
         if (!btc_filter_has_addr(&peer1->addr_filter, addr)) {
           btc_filter_add_addr(&peer1->addr_filter, addr);
@@ -3345,7 +3346,7 @@ btc_pool_on_inv(btc_pool_t *pool,
   size_t i;
 
   if (inv->length > BTC_NET_MAX_INV) {
-    btc_peer_increase_ban(peer, 100);
+    btc_peer_increase_ban(peer, 20);
     return;
   }
 
@@ -3399,7 +3400,7 @@ btc_pool_on_getdata(btc_pool_t *pool,
   if (msg->length > BTC_NET_MAX_INV) {
     btc_pool_log(pool, "Peer sent inv with >50k items (%n).",
                        &peer->addr);
-    btc_peer_increase_ban(peer, 100);
+    btc_peer_increase_ban(peer, 20);
     return;
   }
 
@@ -3630,7 +3631,7 @@ btc_pool_on_headers(btc_pool_t *pool,
     return;
 
   if (msg->length > 2000) {
-    btc_peer_increase_ban(peer, 100);
+    btc_peer_increase_ban(peer, 20);
     return;
   }
 

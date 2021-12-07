@@ -43,6 +43,7 @@ typedef struct btc_addrent_s {
   int32_t attempts;
   int64_t last_success;
   int64_t last_attempt;
+  size_t rand_pos;
   struct btc_addrent_s *prev;
   struct btc_addrent_s *next;
 } btc_addrent_t;
@@ -147,7 +148,10 @@ BTC_EXTERN void
 btc_addrman_iterate(btc_addriter_t *iter, btc_addrman_t *man);
 
 BTC_EXTERN int
-btc_addrman_next(const btc_netaddr_t **addr, btc_addriter_t *iter);
+btc_addrman_next(const btc_addrent_t **entry, btc_addriter_t *iter);
+
+BTC_EXTERN btc_vector_t *
+btc_addrman_getaddr(btc_addrman_t *man);
 
 BTC_EXTERN size_t
 btc_addrman_size(const btc_addrman_t *man);
