@@ -46,14 +46,14 @@ the system (LevelDB will never be vendored as it requires a C++ compiler).
 
 #### Building with the SQLite LSM tree
 
-``` bash
+``` sh
 $ cmake . -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-g
 $ make
 ```
 
 #### Building with LevelDB
 
-``` bash
+``` sh
 $ cmake . -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-g -DMAKO_USE_LEVELDB=ON
 $ make
 ```
