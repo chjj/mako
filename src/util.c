@@ -106,6 +106,15 @@ btc_memxor3(void *z, const void *x, const void *y, size_t n) {
 }
 
 /*
+ * Memory Duplication
+ */
+
+void *
+btc_memdup(const void *xp, size_t xn) {
+  return memcpy(btc_malloc(xn), xp, xn);
+}
+
+/*
  * String
  */
 
@@ -119,6 +128,11 @@ btc_strnlen(const char *xp, size_t max) {
   }
 
   return xn;
+}
+
+char *
+btc_strdup(const char *xp) {
+  return (char *)btc_memdup(xp, strlen(xp) + 1);
 }
 
 /*

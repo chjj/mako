@@ -94,11 +94,21 @@ BTC_EXTERN void
 btc_memxor3(void *z, const void *x, const void *y, size_t n);
 
 /*
+ * Memory Duplication
+ */
+
+BTC_EXTERN void *
+btc_memdup(const void *xp, size_t xn);
+
+/*
  * String
  */
 
 BTC_EXTERN size_t
 btc_strnlen(const char *xp, size_t max);
+
+BTC_EXTERN char *
+btc_strdup(const char *xp);
 
 /*
  * Hash
