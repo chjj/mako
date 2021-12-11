@@ -556,8 +556,10 @@ conf_read_file(btc_conf_t *conf, const char *file) {
     if (btc_match_port(&conf->port, zp, "port="))
       continue;
 
-    if (btc_match_netaddr(&conf->bind, zp, "bind="))
+    if (btc_match_netaddr(&conf->bind, zp, "bind=")) {
+      conf->listen = 1;
       continue;
+    }
 
     if (btc_match_netaddr(&conf->external, zp, "externalip="))
       continue;
@@ -573,7 +575,7 @@ conf_read_file(btc_conf_t *conf, const char *file) {
     if (btc_match_netaddr(&conf->proxy, zp, "proxy="))
       continue;
 
-    if (btc_match_uint(&conf->max_outbound, zp, "maxconnections="))
+    if (btc_match_uint(&conf->max_inbound, zp, "maxconnections="))
       continue;
 
     if (btc_match_uint(&conf->max_outbound, zp, "maxoutbound="))
@@ -684,8 +686,10 @@ conf_parse_args(btc_conf_t *conf, int argc, char **argv, int allow_params) {
     if (btc_match_port(&conf->port, arg, "-port="))
       continue;
 
-    if (btc_match_netaddr(&conf->bind, arg, "-bind="))
+    if (btc_match_netaddr(&conf->bind, arg, "-bind=")) {
+      conf->listen = 1;
       continue;
+    }
 
     if (btc_match_netaddr(&conf->external, arg, "-externalip="))
       continue;
@@ -701,7 +705,7 @@ conf_parse_args(btc_conf_t *conf, int argc, char **argv, int allow_params) {
     if (btc_match_netaddr(&conf->proxy, arg, "-proxy="))
       continue;
 
-    if (btc_match_uint(&conf->max_outbound, arg, "-maxconnections="))
+    if (btc_match_uint(&conf->max_inbound, arg, "-maxconnections="))
       continue;
 
     if (btc_match_uint(&conf->max_outbound, arg, "-maxoutbound="))
@@ -832,8 +836,10 @@ conf_finalize(btc_conf_t *conf, const char *prefix) {
   if (conf->rpc_bind.port == 0)
     conf->rpc_bind.port = conf->rpc_port;
 
-  if (!btc_netaddr_is_null(&conf->proxy))
+  if (!btc_netaddr_is_null(&conf->external)
+      || !btc_netaddr_is_null(&conf->proxy)) {
     conf->discover = 0;
+  }
 
   conf->external.time = btc_now();
   conf->external.services = BTC_NET_LOCAL_SERVICES;
