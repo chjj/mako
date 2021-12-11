@@ -620,7 +620,7 @@ btc_mempool_handle_orphans(btc_mempool_t *mp, const uint8_t *parent) {
  */
 
 static btc_view_t *
-btc_mempool_view(btc_mempool_t *mp, const btc_tx_t *tx, int allow_spent) {
+btc_mempool_view(btc_mempool_t *mp, const btc_tx_t *tx) {
   btc_view_t *view = btc_view_create();
   size_t i;
 
@@ -631,9 +631,6 @@ btc_mempool_view(btc_mempool_t *mp, const btc_tx_t *tx, int allow_spent) {
     btc_coin_t *coin;
 
     if (parent == NULL)
-      continue;
-
-    if (!allow_spent && btc_outmap_has(mp->spents, prevout))
       continue;
 
     if (prevout->index >= parent->tx->outputs.length)
@@ -1235,7 +1232,7 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   }
 
   /* Get coin viewpoint as it pertains to the mempool. */
-  view = btc_mempool_view(mp, tx, 0);
+  view = btc_mempool_view(mp, tx);
 
   /* Maybe store as an orphan. */
   if (btc_mempool_should_orphan(mp, tx, view)) {
@@ -1387,7 +1384,7 @@ btc_mempool_handle_reorg(btc_mempool_t *mp) {
     if (!entry->coinbase && !entry->locks)
       continue;
 
-    view = btc_mempool_view(mp, tx, 1);
+    view = btc_mempool_view(mp, tx);
 
     if (!btc_chain_verify_locks(mp->chain, tip, tx, view, flags)) {
       btc_mempool_evict_entry(mp, entry);
