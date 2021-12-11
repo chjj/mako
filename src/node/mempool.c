@@ -85,7 +85,7 @@ btc_mpentry_init(btc_mpentry_t *entry) {
   entry->delta_fee = 0;
   entry->time = 0;
   entry->coinbase = 0;
-  entry->dependencies = 0;
+  entry->locks = 0;
   entry->desc_fee = 0;
   entry->desc_size = 0;
 }
@@ -110,7 +110,7 @@ btc_mpentry_copy(btc_mpentry_t *z, const btc_mpentry_t *x) {
   z->delta_fee = x->delta_fee;
   z->time = x->time;
   z->coinbase = x->coinbase;
-  z->dependencies = x->dependencies;
+  z->locks = x->locks;
   z->desc_fee = x->desc_fee;
   z->desc_size = x->desc_size;
 }
@@ -124,8 +124,8 @@ btc_mpentry_set(btc_mpentry_t *entry,
   int sigops = btc_tx_sigops_cost(tx, view, flags);
   size_t size = btc_tx_sigops_size(tx, sigops);
   int64_t fee = btc_tx_fee(tx, view);
-  int dependencies = 0;
   int coinbase = 0;
+  int locks = 0;
   size_t i;
 
   for (i = 0; i < tx->inputs.length; i++) {
@@ -137,8 +137,8 @@ btc_mpentry_set(btc_mpentry_t *entry,
     if (coin->coinbase)
       coinbase = 1;
 
-    if (coin->height == -1)
-      dependencies = 1;
+    if (!(input->sequence & BTC_SEQUENCE_DISABLE_FLAG))
+      locks = (tx->version >= 2);
   }
 
   entry->tx = btc_tx_refconst(tx);
@@ -151,7 +151,7 @@ btc_mpentry_set(btc_mpentry_t *entry,
   entry->delta_fee = fee;
   entry->time = btc_now();
   entry->coinbase = coinbase;
-  entry->dependencies = dependencies;
+  entry->locks = locks;
   entry->desc_fee = fee;
   entry->desc_size = size;
 }
@@ -170,7 +170,7 @@ btc_mpentry_write(uint8_t *zp, const btc_mpentry_t *x) {
   zp = btc_int64_write(zp, x->fee);
   zp = btc_int64_write(zp, x->time);
   zp = btc_uint8_write(zp, x->coinbase);
-  zp = btc_uint8_write(zp, x->dependencies);
+  zp = btc_uint8_write(zp, x->locks);
   return zp;
 }
 
@@ -199,7 +199,7 @@ btc_mpentry_read(btc_mpentry_t *z, const uint8_t **xp, size_t *xn) {
   if (!btc_uint8_read(&z->coinbase, xp, xn))
     return 0;
 
-  if (!btc_uint8_read(&z->dependencies, xp, xn))
+  if (!btc_uint8_read(&z->locks, xp, xn))
     return 0;
 
   z->hash = z->tx->hash;
@@ -620,7 +620,7 @@ btc_mempool_handle_orphans(btc_mempool_t *mp, const uint8_t *parent) {
  */
 
 static btc_view_t *
-btc_mempool_view(btc_mempool_t *mp, const btc_tx_t *tx) {
+btc_mempool_view(btc_mempool_t *mp, const btc_tx_t *tx, int allow_spent) {
   btc_view_t *view = btc_view_create();
   size_t i;
 
@@ -633,7 +633,7 @@ btc_mempool_view(btc_mempool_t *mp, const btc_tx_t *tx) {
     if (parent == NULL)
       continue;
 
-    if (btc_outmap_has(mp->spents, prevout))
+    if (!allow_spent && btc_outmap_has(mp->spents, prevout))
       continue;
 
     if (prevout->index >= parent->tx->outputs.length)
@@ -1235,7 +1235,7 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   }
 
   /* Get coin viewpoint as it pertains to the mempool. */
-  view = btc_mempool_view(mp, tx);
+  view = btc_mempool_view(mp, tx, 0);
 
   /* Maybe store as an orphan. */
   if (btc_mempool_should_orphan(mp, tx, view)) {
@@ -1347,7 +1347,7 @@ btc_mempool_remove_block(btc_mempool_t *mp,
   if (btc_hashmap_size(mp->map) == 0)
     return;
 
-  for (i = 0; i < block->txs.length; i++) {
+  for (i = 1; i < block->txs.length; i++) {
     const btc_tx_t *tx = block->txs.items[i];
 
     if (btc_hashmap_has(mp->map, tx->hash))
@@ -1384,7 +1384,10 @@ btc_mempool_handle_reorg(btc_mempool_t *mp) {
       continue;
     }
 
-    view = btc_mempool_view(mp, tx);
+    if (!entry->coinbase && !entry->locks)
+      continue;
+
+    view = btc_mempool_view(mp, tx, 1);
 
     if (!btc_chain_verify_locks(mp->chain, tip, tx, view, flags)) {
       btc_mempool_evict_entry(mp, entry);

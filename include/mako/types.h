@@ -240,7 +240,7 @@ typedef struct btc_mpentry_s {
   int64_t delta_fee;
   int64_t time;
   uint8_t coinbase;
-  uint8_t dependencies;
+  uint8_t locks;
   int64_t desc_fee;
   int64_t desc_size;
 } btc_mpentry_t;
