@@ -4,7 +4,6 @@
  * https://github.com/chjj/mako
  */
 
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -140,26 +139,13 @@ http_res_put(http_res_t *res, const char *str, size_t len) {
   return http_res_write(res, data, len);
 }
 
-static void
-http_res_print(http_res_t *res, const char *fmt, ...) {
-  /* Passing a string >=1kb is undefined behavior. */
-  char out[1024];
-  va_list ap;
-
-  va_start(ap, fmt);
-
-  http_res_put(res, out, vsprintf(out, fmt, ap));
-
-  va_end(ap);
-}
-
 void
 http_res_header(http_res_t *res, const char *field, const char *value) {
   http_head_push_item(&res->headers, field, value);
 }
 
 static int
-http_gmt_date(char *str, size_t max) {
+http_gmt_date(char *buf, size_t size) {
   /* Required by the HTTP standard. */
   time_t ts = time(NULL);
   struct tm *gmt;
@@ -182,35 +168,62 @@ http_gmt_date(char *str, size_t max) {
     return 0;
 
   /* Example: Fri, 05 Nov 2021 06:42:12 GMT */
-  return strftime(str, max, "%a, %d %b %Y %H:%M:%S GMT", gmt) != 0;
+  return strftime(buf, size, "%a, %d %b %Y %H:%M:%S GMT", gmt) != 0;
 }
 
-static void
+static size_t
+http_res_size_head(http_res_t *res, const char *desc, const char *type) {
+  size_t size = 0;
+  size_t i;
+
+  size += 12 + 10 + strlen(desc); /* HTTP/1.1 %u %s */
+  size += 8 + 63;                 /* Date: %s */
+  size += 16 + strlen(type);      /* Content-Type: %s */
+  size += 18 + 20;                /* Content-Length: %lu */
+  size += 24;                     /* Connection: keep-alive */
+
+  for (i = 0; i < res->headers.length; i++) {
+    http_header_t *hdr = res->headers.items[i];
+
+    size += 4 + hdr->field.length + hdr->value.length; /* %s: %s */
+  }
+
+  size += 2; /* \r\n */
+  size += 1; /* \0 */
+
+  return size;
+}
+
+static int
 http_res_write_head(http_res_t *res,
                     unsigned int status,
                     const char *type,
                     unsigned long length) {
   const char *desc = http_status_str(status);
+  char *head = http_malloc(http_res_size_head(res, desc, type));
+  char *zp = head;
   char date[64];
   size_t i;
 
-  http_res_print(res, "HTTP/1.1 %u %s\r\n", status, desc);
+  zp += sprintf(zp, "HTTP/1.1 %u %s\r\n", status, desc);
 
   if (http_gmt_date(date, sizeof(date)))
-    http_res_print(res, "Date: %s\r\n", date);
+    zp += sprintf(zp, "Date: %s\r\n", date);
 
-  http_res_print(res, "Content-Type: %s\r\n", type);
-  http_res_print(res, "Content-Length: %lu\r\n", length);
-  http_res_print(res, "Connection: keep-alive\r\n");
+  zp += sprintf(zp, "Content-Type: %s\r\n", type);
+  zp += sprintf(zp, "Content-Length: %lu\r\n", length);
+  zp += sprintf(zp, "Connection: keep-alive\r\n");
 
   for (i = 0; i < res->headers.length; i++) {
     http_header_t *hdr = res->headers.items[i];
 
-    http_res_print(res, "%s: %s\r\n", hdr->field.data,
-                                      hdr->value.data);
+    zp += sprintf(zp, "%s: %s\r\n", hdr->field.data,
+                                    hdr->value.data);
   }
 
-  http_res_print(res, "\r\n");
+  zp += sprintf(zp, "\r\n");
+
+  return http_res_write(res, head, zp - head);
 }
 
 void

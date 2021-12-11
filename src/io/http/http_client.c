@@ -4,7 +4,6 @@
  * https://github.com/chjj/mako
  */
 
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -458,59 +457,74 @@ http_client_put(http_client_t *client, const char *str, size_t len) {
   return http_client_write(client, data, len);
 }
 
-static int
-http_client_print(http_client_t *client, const char *fmt, ...) {
-  /* Passing a string >=1kb is undefined behavior. */
-  char buf[1024];
-  va_list ap;
-  int rc;
+static size_t
+http_client_size_head(http_client_t *client,
+                      const char *method,
+                      const http_options_t *opt) {
+  size_t size = 0;
 
-  va_start(ap, fmt);
+  size += 12 + strlen(method) + strlen(opt->path); /* %s %s HTTP/1.1 */
 
-  rc = http_client_put(client, buf, vsprintf(buf, fmt, ap));
+  if (client->port != 80)
+    size += 9 + strlen(client->hostname) + 11; /* Host: %s:%d */
+  else
+    size += 8 + strlen(client->hostname); /* Host: %s */
 
-  va_end(ap);
+  if (opt->agent != NULL)
+    size += 14 + strlen(opt->agent); /* User-Agent: %s */
 
-  return rc;
+  if (opt->accept != NULL)
+    size += 10 + strlen(opt->accept); /* Accept: %s */
+
+  if (opt->type != NULL)
+    size += 16 + strlen(opt->type); /* Content-Type: %s */
+
+  if (opt->body != NULL)
+    size += 18 + 20; /* Content-Length: %lu */
+
+  if (opt->headers != NULL) {
+    size_t i;
+
+    for (i = 0; opt->headers[i] != NULL; i += 2) {
+      const char *field = opt->headers[i + 0];
+      const char *value = opt->headers[i + 1];
+
+      size += 4 + strlen(field) + strlen(value); /* %s: %s */
+    }
+  }
+
+  size += 2; /* \r\n */
+  size += 1; /* \0 */
+
+  return size;
 }
 
 static int
 http_client_write_head(http_client_t *client, const http_options_t *opt) {
   const char *method = http_method_str(opt->method);
+  char *head = http_malloc(http_client_size_head(client, method, opt));
+  char *zp = head;
 
-  if (!http_client_print(client, "%s %s HTTP/1.1\r\n", method, opt->path))
-    return 0;
+  zp += sprintf(zp, "%s %s HTTP/1.1\r\n", method, opt->path);
 
-  if (client->port != 80) {
-    if (!http_client_print(client, "Host: %s:%d\r\n", client->hostname,
-                                                      client->port)) {
-      return 0;
-    }
-  } else {
-    if (!http_client_print(client, "Host: %s\r\n", client->hostname))
-      return 0;
-  }
+  if (client->port != 80)
+    zp += sprintf(zp, "Host: %s:%d\r\n", client->hostname, client->port);
+  else
+    zp += sprintf(zp, "Host: %s\r\n", client->hostname);
 
-  if (opt->agent != NULL) {
-    if (!http_client_print(client, "User-Agent: %s\r\n", opt->agent))
-      return 0;
-  }
+  if (opt->agent != NULL)
+    zp += sprintf(zp, "User-Agent: %s\r\n", opt->agent);
 
-  if (opt->accept != NULL) {
-    if (!http_client_print(client, "Accept: %s\r\n", opt->accept))
-      return 0;
-  }
+  if (opt->accept != NULL)
+    zp += sprintf(zp, "Accept: %s\r\n", opt->accept);
 
-  if (opt->type != NULL) {
-    if (!http_client_print(client, "Content-Type: %s\r\n", opt->type))
-      return 0;
-  }
+  if (opt->type != NULL)
+    zp += sprintf(zp, "Content-Type: %s\r\n", opt->type);
 
   if (opt->body != NULL) {
     unsigned long length = strlen(opt->body);
 
-    if (!http_client_print(client, "Content-Length: %lu\r\n", length))
-      return 0;
+    zp += sprintf(zp, "Content-Length: %lu\r\n", length);
   }
 
   if (opt->headers != NULL) {
@@ -520,15 +534,13 @@ http_client_write_head(http_client_t *client, const http_options_t *opt) {
       const char *field = opt->headers[i + 0];
       const char *value = opt->headers[i + 1];
 
-      if (!http_client_print(client, "%s: %s\r\n", field, value))
-        return 0;
+      zp += sprintf(zp, "%s: %s\r\n", field, value);
     }
   }
 
-  if (!http_client_print(client, "\r\n"))
-    return 0;
+  zp += sprintf(zp, "\r\n");
 
-  return 1;
+  return http_client_write(client, head, zp - head);
 }
 
 http_msg_t *
@@ -593,6 +605,7 @@ fail:
 int
 btc_net_external(btc_sockaddr_t *addr, int family, int port) {
   http_msg_t *msg = http_get("icanhazip.com", 80, "/", family);
+  size_t xn;
   char *xp;
   int ret;
 
@@ -600,13 +613,14 @@ btc_net_external(btc_sockaddr_t *addr, int family, int port) {
     return 0;
 
   xp = msg->body.data;
+  xn = msg->body.length;
 
-  while (*xp > ' ')
-    xp++;
+  while (xn > 0 && xp[xn - 1] <= ' ')
+    xn -= 1;
 
-  *xp = '\0';
+  xp[xn] = '\0';
 
-  ret = btc_sockaddr_import(addr, msg->body.data, port);
+  ret = btc_sockaddr_import(addr, xp, port);
 
   http_msg_destroy(msg);
 
