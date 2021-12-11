@@ -713,24 +713,25 @@ btc_peer_sendmsg(btc_peer_t *peer, enum btc_msgtype type, const void *body) {
 
 static int
 btc_peer_send_version(btc_peer_t *peer) {
+  btc_pool_t *pool = peer->pool;
   btc_version_t msg;
 
   btc_version_init(&msg);
 
   msg.version = BTC_NET_PROTOCOL_VERSION;
-  msg.services = peer->pool->services;
-  msg.time = btc_timedata_now(peer->pool->timedata);
+  msg.services = pool->services;
+  msg.time = btc_timedata_now(pool->timedata);
   msg.remote = peer->addr;
 
   btc_netaddr_init(&msg.local);
 
-  msg.local.services = peer->pool->services;
+  msg.local.services = pool->services;
   msg.nonce = peer->nonce;
 
   strcpy(msg.agent, BTC_NET_USER_AGENT);
 
-  msg.height = btc_chain_height(peer->pool->chain);
-  msg.relay = 1;
+  msg.height = btc_chain_height(pool->chain);
+  msg.relay = ((pool->flags & BTC_POOL_BLOCKSONLY) == 0);
 
   return btc_peer_sendmsg(peer, BTC_MSG_VERSION, &msg);
 }
@@ -1145,18 +1146,39 @@ btc_peer_send_blocktxn(btc_peer_t *peer,
 
 static int
 btc_peer_flush_inv(btc_peer_t *peer) {
-  int rc;
+  btc_inv_t inv;
+  int rc = 1;
+  size_t i;
 
   if (peer->inv_queue.length == 0)
     return 1;
 
-  btc_peer_log(peer, "Serving %zu inv items to %N.",
-                     peer->inv_queue.length,
-                     &peer->addr);
+  btc_inv_init(&inv);
+  btc_inv_grow(&inv, peer->inv_queue.length);
 
-  rc = btc_peer_sendmsg(peer, BTC_MSG_INV_FULL, &peer->inv_queue);
+  for (i = 0; i < peer->inv_queue.length; i++) {
+    btc_invitem_t *item = peer->inv_queue.items[i];
 
-  btc_inv_reset(&peer->inv_queue);
+    if (btc_filter_has(&peer->inv_filter, item->hash, 32)) {
+      btc_invitem_destroy(item);
+      continue;
+    }
+
+    btc_filter_add(&peer->inv_filter, item->hash, 32);
+
+    btc_inv_push(&inv, item);
+  }
+
+  peer->inv_queue.length = 0;
+
+  if (inv.length > 0) {
+    btc_peer_log(peer, "Serving %zu inv items to %N.",
+                       inv.length, &peer->addr);
+
+    rc = btc_peer_sendmsg(peer, BTC_MSG_INV_FULL, &inv);
+  }
+
+  btc_inv_clear(&inv);
 
   return rc;
 }
@@ -1169,17 +1191,17 @@ btc_peer_announce_block(btc_peer_t *peer,
   if (btc_filter_has(&peer->inv_filter, hash, 32))
     return 0;
 
-  btc_filter_add(&peer->inv_filter, hash, 32);
-
   /* Send them the block immediately if
      they're using compact block mode 1. */
   if (peer->compact_mode == 1) {
+    btc_filter_add(&peer->inv_filter, hash, 32);
     btc_peer_send_cmpctblock(peer, block);
     return 1;
   }
 
   /* Send header for peers that request it. */
   if (peer->prefer_headers) {
+    btc_filter_add(&peer->inv_filter, hash, 32);
     btc_peer_send_headers_1(peer, &block->header);
     return 1;
   }
@@ -1199,8 +1221,6 @@ btc_peer_announce_tx(btc_peer_t *peer, const btc_mpentry_t *entry) {
   /* Don't send if they already have it. */
   if (btc_filter_has(&peer->inv_filter, entry->hash, 32))
     return 0;
-
-  btc_filter_add(&peer->inv_filter, entry->hash, 32);
 
   /* Check the peer's bloom filter. */
   if (peer->spv_filter != NULL) {
@@ -2674,17 +2694,34 @@ btc_pool_on_tick(btc_pool_t *pool, int64_t now) {
 
 static void
 btc_pool_on_socket(btc_pool_t *pool, btc_socket_t *socket) {
-  btc_peer_t *peer = btc_peer_create(pool);
-  btc_sockaddr_t addr;
+  btc_sockaddr_t sa;
+  btc_netaddr_t na;
+  btc_peer_t *peer;
 
-  btc_socket_address(&addr, socket);
+  btc_socket_address(&sa, socket);
 
-  btc_pool_log(pool, "Accepting inbound peer (%S).", &addr);
+  if (pool->peers.length >= pool->max_inbound) {
+    btc_pool_log(pool, "Ignoring inbound peer (%S).", &sa);
+    btc_socket_close(socket);
+    return;
+  }
+
+  btc_netaddr_set_sockaddr(&na, &sa);
+
+  if (btc_addrman_is_banned(pool->addrman, &na)) {
+    btc_pool_log(pool, "Ignoring banned peer (%S).", &sa);
+    btc_socket_close(socket);
+    return;
+  }
+
+  btc_pool_log(pool, "Accepting inbound peer (%S).", &sa);
+
+  peer = btc_peer_create(pool);
 
   if (!btc_peer_accept(peer, socket)) {
     const char *msg = btc_loop_strerror(pool->loop);
 
-    btc_pool_log(pool, "Connection failed: %s (%S).", msg, &addr);
+    btc_pool_log(pool, "Connection failed: %s (%S).", msg, &sa);
     btc_peer_destroy(peer);
 
     return;
@@ -2705,8 +2742,8 @@ static void
 btc_pool_on_complete(btc_pool_t *pool, btc_peer_t *peer) {
   const btc_netaddr_t *addr;
 
-  /* Advertise our address. */
   if (peer->outbound) {
+    /* Advertise our address. */
     if ((pool->flags & BTC_POOL_LISTEN) && btc_chain_synced(pool->chain)) {
       addr = btc_addrman_get_local(pool->addrman, &peer->addr, pool->services);
 
@@ -3503,6 +3540,8 @@ btc_pool_on_getheaders(btc_pool_t *pool,
 
   while (entry != NULL) {
     btc_headers_push(&blocks, (btc_header_t *)&entry->header);
+
+    btc_filter_add(&peer->inv_filter, entry->hash, 32);
 
     if (entry == stop)
       break;
