@@ -283,7 +283,6 @@ btc_randvec_pop(btc_vector_t *rnd, btc_addrent_t *entry) {
   rnd->items[entry->rand_pos] = top;
 
   top->rand_pos = entry->rand_pos;
-  entry->rand_pos = 0;
 }
 
 static btc_addrent_t *
@@ -1208,21 +1207,21 @@ btc_addrman_size(const btc_addrman_t *man) {
   size += 4;
   size += 32;
 
-  size += btc_size_size(btc_addrmap_size(man->map));
-  size += btc_addrmap_size(man->map) * BTC_ADDRENT_SIZE;
+  size += btc_size_size(man->rnd.length);
+  size += man->rnd.length * BTC_ADDRENT_SIZE;
 
   for (i = 0; i < FRESH_COUNT; i++) {
     const btc_addrmap_t *bucket = man->fresh[i];
 
     size += btc_size_size(btc_addrmap_size(bucket));
-    size += btc_addrmap_size(bucket) * BTC_ADDRKEY_SIZE;
+    size += btc_addrmap_size(bucket) * 4;
   }
 
   for (i = 0; i < USED_COUNT; i++) {
     const btc_bucket_t *bucket = man->used[i];
 
     size += btc_size_size(bucket->length);
-    size += bucket->length * BTC_ADDRKEY_SIZE;
+    size += bucket->length * 4;
   }
 
   return size;
@@ -1230,31 +1229,29 @@ btc_addrman_size(const btc_addrman_t *man) {
 
 static uint8_t *
 btc_addrman_write(uint8_t *zp, const btc_addrman_t *man) {
-  btc_addrmapiter_t iter, it;
-  int i;
-
-  btc_addrmap_iterate(&iter, man->map);
+  size_t i;
 
   zp = btc_uint32_write(zp, SER_VERSION);
   zp = btc_uint32_write(zp, man->network->magic);
   zp = btc_raw_write(zp, man->key, 32);
 
-  zp = btc_size_write(zp, btc_addrmap_size(man->map));
+  zp = btc_size_write(zp, man->rnd.length);
 
-  while (btc_addrmap_next(&iter))
-    zp = btc_addrent_write(zp, iter.val);
+  for (i = 0; i < man->rnd.length; i++)
+    zp = btc_addrent_write(zp, man->rnd.items[i]);
 
   for (i = 0; i < FRESH_COUNT; i++) {
     const btc_addrmap_t *bucket = man->fresh[i];
+    btc_addrmapiter_t iter;
 
-    btc_addrmap_iterate(&it, bucket);
+    btc_addrmap_iterate(&iter, bucket);
 
     zp = btc_size_write(zp, btc_addrmap_size(bucket));
 
-    while (btc_addrmap_next(&it)) {
-      const btc_addrent_t *entry = it.val;
+    while (btc_addrmap_next(&iter)) {
+      const btc_addrent_t *entry = iter.val;
 
-      zp = btc_addrkey_write(zp, &entry->addr);
+      zp = btc_uint32_write(zp, entry->rand_pos);
     }
   }
 
@@ -1265,7 +1262,7 @@ btc_addrman_write(uint8_t *zp, const btc_addrman_t *man) {
     zp = btc_size_write(zp, bucket->length);
 
     for (entry = bucket->head; entry != NULL; entry = entry->next)
-      zp = btc_addrkey_write(zp, &entry->addr);
+      zp = btc_uint32_write(zp, entry->rand_pos);
   }
 
   return zp;
@@ -1274,7 +1271,6 @@ btc_addrman_write(uint8_t *zp, const btc_addrman_t *man) {
 static int
 btc_addrman_read(btc_addrman_t *man, const uint8_t **xp, size_t *xn) {
   uint32_t version, magic;
-  btc_addrmapiter_t iter;
   size_t i, j, length;
 
   btc_addrman_reset(man);
@@ -1321,15 +1317,15 @@ btc_addrman_read(btc_addrman_t *man, const uint8_t **xp, size_t *xn) {
 
     for (j = 0; j < length; j++) {
       btc_addrent_t *entry;
-      btc_netaddr_t key;
+      uint32_t pos;
 
-      if (!btc_addrkey_read(&key, xp, xn))
+      if (!btc_uint32_read(&pos, xp, xn))
         goto fail;
 
-      entry = btc_addrmap_get(man->map, &key);
-
-      if (entry == NULL)
+      if (pos >= man->rnd.length)
         goto fail;
+
+      entry = man->rnd.items[pos];
 
       if (entry->ref_count == 0)
         man->total_fresh++;
@@ -1351,14 +1347,17 @@ btc_addrman_read(btc_addrman_t *man, const uint8_t **xp, size_t *xn) {
 
     for (j = 0; j < length; j++) {
       btc_addrent_t *entry;
-      btc_netaddr_t key;
+      uint32_t pos;
 
-      if (!btc_addrkey_read(&key, xp, xn))
+      if (!btc_uint32_read(&pos, xp, xn))
         goto fail;
 
-      entry = btc_addrmap_get(man->map, &key);
+      if (pos >= man->rnd.length)
+        goto fail;
 
-      if (entry == NULL || entry->ref_count != 0 || entry->used)
+      entry = man->rnd.items[pos];
+
+      if (entry->ref_count != 0 || entry->used)
         goto fail;
 
       man->total_used++;
@@ -1375,10 +1374,8 @@ btc_addrman_read(btc_addrman_t *man, const uint8_t **xp, size_t *xn) {
   if (*xn != 0)
     goto fail;
 
-  btc_addrmap_iterate(&iter, man->map);
-
-  while (btc_addrmap_next(&iter)) {
-    btc_addrent_t *entry = iter.val;
+  for (i = 0; i < man->rnd.length; i++) {
+    btc_addrent_t *entry = man->rnd.items[i];
 
     if (!entry->used && entry->ref_count == 0)
       goto fail;
