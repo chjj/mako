@@ -172,11 +172,12 @@ struct btc_pool_s {
   btc_mempool_t *mempool;
   unsigned int flags;
   uint64_t services;
+  int port;
   btc_sockaddr_t bind;
   btc_netaddr_t connect;
   btc_sockaddr_t proxy;
-  size_t max_outbound;
   size_t max_inbound;
+  size_t max_outbound;
   enum btc_ipnet only_net;
   btc_socket_t *server;
   btc_peers_t peers;
@@ -2125,11 +2126,12 @@ btc_pool_create(const btc_network_t *network,
   pool->mempool = mempool;
   pool->flags = BTC_POOL_DEFAULT_FLAGS;
   pool->services = BTC_NET_LOCAL_SERVICES;
-  btc_sockaddr_import(&pool->bind, "::", network->port);
+  pool->port = network->port;
+  btc_sockaddr_import(&pool->bind, "::", 0);
   btc_netaddr_set(&pool->connect, "0.0.0.0", 0);
   btc_sockaddr_import(&pool->proxy, "0.0.0.0", 0);
+  pool->max_inbound = 128;
   pool->max_outbound = 8;
-  pool->max_inbound = 8;
   pool->only_net = BTC_IPNET_NONE;
   pool->server = NULL;
   btc_peers_init(&pool->peers);
@@ -2176,6 +2178,12 @@ btc_pool_set_timedata(btc_pool_t *pool, btc_timedata_t *td) {
 }
 
 void
+btc_pool_set_port(btc_pool_t *pool, int port) {
+  CHECK(port > 0 && port <= 0xffff);
+  pool->port = port;
+}
+
+void
 btc_pool_set_bind(btc_pool_t *pool, const btc_netaddr_t *addr) {
   btc_netaddr_get_sockaddr(&pool->bind, addr);
 
@@ -2201,13 +2209,13 @@ btc_pool_set_proxy(btc_pool_t *pool, const btc_netaddr_t *addr) {
 }
 
 void
-btc_pool_set_maxoutbound(btc_pool_t *pool, size_t max_outbound) {
-  pool->max_outbound = max_outbound;
+btc_pool_set_maxinbound(btc_pool_t *pool, size_t max_inbound) {
+  pool->max_inbound = max_inbound;
 }
 
 void
-btc_pool_set_maxinbound(btc_pool_t *pool, size_t max_inbound) {
-  pool->max_inbound = max_inbound;
+btc_pool_set_maxoutbound(btc_pool_t *pool, size_t max_outbound) {
+  pool->max_outbound = max_outbound;
 }
 
 void
@@ -2230,14 +2238,18 @@ btc_pool_log(btc_pool_t *pool, const char *fmt, ...) {
 
 static int
 btc_pool_listen(btc_pool_t *pool) {
+  btc_sockaddr_t addr = pool->bind;
   btc_socket_t *server;
 
-  server = btc_loop_listen(pool->loop, &pool->bind);
+  if (addr.port == 0)
+    addr.port = pool->port;
+
+  server = btc_loop_listen(pool->loop, &addr);
 
   if (server == NULL) {
     const char *msg = btc_loop_strerror(pool->loop);
 
-    btc_pool_log(pool, "Could not listen on %S: %s.", &pool->bind, msg);
+    btc_pool_log(pool, "Could not listen on %S: %s.", &addr, msg);
 
     return 0;
   }
@@ -2248,7 +2260,7 @@ btc_pool_listen(btc_pool_t *pool) {
 
   pool->server = server;
 
-  btc_pool_log(pool, "Listening on %S.", &pool->bind);
+  btc_pool_log(pool, "Listening on %S.", &addr);
 
   return 1;
 }
@@ -2265,7 +2277,13 @@ btc_pool_discover_local(btc_pool_t *pool) {
 
     for (it = res; it != NULL; it = it->next) {
       btc_netaddr_set_sockaddr(&addr, it);
+
+      addr.port = pool->port;
+
+      btc_pool_log(pool, "Local address found: %N.", &addr);
+
       btc_addrman_add_local(pool->addrman, &addr, BTC_SCORE_IF);
+
       total += 1;
     }
 
@@ -2284,7 +2302,7 @@ btc_pool_discover_external(btc_pool_t *pool) {
 
   btc_pool_log(pool, "Looking up IPv4 address...");
 
-  if (btc_net_external(&sa, BTC_AF_INET, pool->bind.port)) {
+  if (btc_net_external(&sa, BTC_AF_INET, pool->port)) {
     btc_pool_log(pool, "IPv4 address found: %S.", &sa);
     btc_netaddr_set_sockaddr(&na, &sa);
     btc_addrman_add_local(pool->addrman, &na, BTC_SCORE_DNS);
@@ -2294,7 +2312,7 @@ btc_pool_discover_external(btc_pool_t *pool) {
 
   btc_pool_log(pool, "Looking up IPv6 address...");
 
-  if (btc_net_external(&sa, BTC_AF_INET6, pool->bind.port)) {
+  if (btc_net_external(&sa, BTC_AF_INET6, pool->port)) {
     btc_pool_log(pool, "IPv6 address found: %S.", &sa);
     btc_netaddr_set_sockaddr(&na, &sa);
     btc_addrman_add_local(pool->addrman, &na, BTC_SCORE_DNS);
@@ -2388,10 +2406,10 @@ btc_pool_open(btc_pool_t *pool, const char *prefix, unsigned int flags) {
       return 0;
     }
 
-    btc_pool_discover_local(pool);
-
-    if (pool->flags & BTC_POOL_DISCOVER)
+    if (pool->flags & BTC_POOL_DISCOVER) {
+      btc_pool_discover_local(pool);
       btc_pool_discover_external(pool);
+    }
   }
 
   pool->synced = btc_chain_synced(pool->chain);

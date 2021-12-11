@@ -32,6 +32,9 @@ BTC_EXTERN void
 btc_pool_set_timedata(btc_pool_t *pool, btc_timedata_t *td);
 
 BTC_EXTERN void
+btc_pool_set_port(btc_pool_t *pool, int port);
+
+BTC_EXTERN void
 btc_pool_set_bind(btc_pool_t *pool, const btc_netaddr_t *addr);
 
 BTC_EXTERN void
@@ -44,10 +47,10 @@ BTC_EXTERN void
 btc_pool_set_proxy(btc_pool_t *pool, const btc_netaddr_t *addr);
 
 BTC_EXTERN void
-btc_pool_set_maxoutbound(btc_pool_t *pool, size_t max_outbound);
+btc_pool_set_maxinbound(btc_pool_t *pool, size_t max_inbound);
 
 BTC_EXTERN void
-btc_pool_set_maxinbound(btc_pool_t *pool, size_t max_inbound);
+btc_pool_set_maxoutbound(btc_pool_t *pool, size_t max_outbound);
 
 BTC_EXTERN void
 btc_pool_set_bantime(btc_pool_t *pool, int64_t ban_time);

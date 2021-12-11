@@ -47,6 +47,7 @@ static void
 set_config(btc_node_t *node, const btc_conf_t *conf) {
   btc_chain_set_threads(node->chain, conf->workers);
 
+  btc_pool_set_port(node->pool, conf->port);
   btc_pool_set_bind(node->pool, &conf->bind);
   btc_pool_set_external(node->pool, &conf->external);
   btc_pool_set_connect(node->pool, &conf->connect);

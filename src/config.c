@@ -448,7 +448,7 @@ conf_init(btc_conf_t *conf) {
   conf->workers = 0;
   conf->listen = 1;
   conf->port = 0;
-  btc_netaddr_set(&conf->bind, "0.0.0.0", 0);
+  btc_netaddr_set(&conf->bind, "::", 0);
   btc_netaddr_set(&conf->external, "0.0.0.0", 0);
   conf->no_connect = 0;
   btc_netaddr_set(&conf->connect, "0.0.0.0", 0);
