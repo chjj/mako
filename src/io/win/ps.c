@@ -14,6 +14,7 @@
 
 static void (*global_handler)(void *) = NULL;
 static void *global_arg = NULL;
+static int global_bound = 0;
 
 /*
  * Process
@@ -34,6 +35,11 @@ btc_ps_getenv(char *buf, size_t size, const char *name) {
 int
 btc_ps_daemon(void) {
   return 0;
+}
+
+int
+btc_ps_fdlimit(int minfd) {
+  return minfd < 2048 ? 2048 : minfd;
 }
 
 static BOOL WINAPI
@@ -57,5 +63,9 @@ btc_ps_onterm(void (*handler)(void *), void *arg) {
   global_handler = handler;
   global_arg = arg;
 
-  SetConsoleCtrlHandler(real_handler, TRUE);
+  if (!global_bound) {
+    global_bound = 1;
+
+    SetConsoleCtrlHandler(real_handler, TRUE);
+  }
 }

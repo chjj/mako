@@ -148,6 +148,8 @@ main(int argc, char **argv) {
     }
   }
 
+  btc_ps_fdlimit(args.max_inbound + args.max_outbound + 200);
+
   btc_net_startup();
 
   node = btc_node_create(args.network);

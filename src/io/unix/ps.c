@@ -11,6 +11,8 @@
 
 #include <sys/types.h>
 #include <sys/stat.h> /* umask */
+#include <sys/time.h>
+#include <sys/resource.h> /* getrlimit */
 #include <fcntl.h> /* open */
 #include <unistd.h>
 
@@ -22,6 +24,7 @@
 
 static void (*global_handler)(void *) = NULL;
 static void *global_arg = NULL;
+static int global_bound = 0;
 
 /*
  * Process
@@ -119,6 +122,30 @@ btc_ps_daemon(void) {
 #endif
 }
 
+int
+btc_ps_fdlimit(int minfd) {
+  /* From Bitcoin Core. */
+  struct rlimit lim;
+
+  if (getrlimit(RLIMIT_NOFILE, &lim) < 0)
+    return -1;
+
+  if (lim.rlim_cur < (rlim_t)minfd) {
+    lim.rlim_cur = minfd;
+
+    if (lim.rlim_cur > lim.rlim_max)
+      lim.rlim_cur = lim.rlim_max;
+
+    if (setrlimit(RLIMIT_NOFILE, &lim) < 0)
+      return -1;
+
+    if (getrlimit(RLIMIT_NOFILE, &lim) < 0)
+      return -1;
+  }
+
+  return lim.rlim_cur;
+}
+
 static void
 btc_signal(int signum, void (*handler)(int)) {
   struct sigaction sa;
@@ -147,6 +174,10 @@ btc_ps_onterm(void (*handler)(void *), void *arg) {
   global_handler = handler;
   global_arg = arg;
 
-  btc_signal(SIGTERM, real_handler);
-  btc_signal(SIGINT, real_handler);
+  if (!global_bound) {
+    global_bound = 1;
+
+    btc_signal(SIGTERM, real_handler);
+    btc_signal(SIGINT, real_handler);
+  }
 }
