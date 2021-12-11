@@ -125,7 +125,11 @@ lsm_new(lsm_env *env, lsm_db **lsm) {
   leveldb_options_set_cache(options, cache);
   leveldb_options_set_write_buffer_size(options, 4 << 20);
   leveldb_options_set_block_size(options, 4096);
+#if defined(_WIN32)
+  leveldb_options_set_max_open_files(options, 1000);
+#else
   leveldb_options_set_max_open_files(options, sizeof(void *) < 8 ? 64 : 1000);
+#endif
   leveldb_options_set_block_restart_interval(options, 16);
   leveldb_options_set_max_file_size(options, 2 << 20);
   leveldb_options_set_filter_policy(options, bloom);
