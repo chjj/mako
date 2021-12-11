@@ -453,8 +453,9 @@ conf_init(btc_conf_t *conf) {
   conf->no_connect = 0;
   btc_netaddr_set(&conf->connect, "0.0.0.0", 0);
   btc_netaddr_set(&conf->proxy, "0.0.0.0", 0);
+  conf->max_connections = 0;
+  conf->max_inbound = 128;
   conf->max_outbound = 8;
-  conf->max_inbound = 8;
   conf->ban_time = 24 * 60 * 60;
   conf->discover = 1;
   conf->upnp = 0;
@@ -575,13 +576,13 @@ conf_read_file(btc_conf_t *conf, const char *file) {
     if (btc_match_netaddr(&conf->proxy, zp, "proxy="))
       continue;
 
-    if (btc_match_uint(&conf->max_inbound, zp, "maxconnections="))
-      continue;
-
-    if (btc_match_uint(&conf->max_outbound, zp, "maxoutbound="))
+    if (btc_match_uint(&conf->max_connections, zp, "maxconnections="))
       continue;
 
     if (btc_match_uint(&conf->max_inbound, zp, "maxinbound="))
+      continue;
+
+    if (btc_match_uint(&conf->max_outbound, zp, "maxoutbound="))
       continue;
 
     if (btc_match_uint(&conf->ban_time, zp, "bantime="))
@@ -705,13 +706,13 @@ conf_parse_args(btc_conf_t *conf, int argc, char **argv, int allow_params) {
     if (btc_match_netaddr(&conf->proxy, arg, "-proxy="))
       continue;
 
-    if (btc_match_uint(&conf->max_inbound, arg, "-maxconnections="))
-      continue;
-
-    if (btc_match_uint(&conf->max_outbound, arg, "-maxoutbound="))
+    if (btc_match_uint(&conf->max_connections, arg, "-maxconnections="))
       continue;
 
     if (btc_match_uint(&conf->max_inbound, arg, "-maxinbound="))
+      continue;
+
+    if (btc_match_uint(&conf->max_outbound, arg, "-maxoutbound="))
       continue;
 
     if (btc_match_uint(&conf->ban_time, arg, "-bantime="))
@@ -840,6 +841,20 @@ conf_finalize(btc_conf_t *conf, const char *prefix) {
       || !btc_netaddr_is_null(&conf->proxy)) {
     conf->discover = 0;
   }
+
+  if (conf->max_connections) {
+    conf->max_inbound = conf->max_connections - 8;
+    conf->max_outbound = 8;
+
+    if (conf->max_inbound < 0)
+      conf->max_inbound = 0;
+
+    if (conf->max_outbound > conf->max_connections)
+      conf->max_outbound = conf->max_connections;
+  }
+
+  if (conf->max_inbound == 0)
+    conf->listen = 0;
 
   conf->external.time = btc_now();
   conf->external.services = BTC_NET_LOCAL_SERVICES;

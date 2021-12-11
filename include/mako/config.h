@@ -35,8 +35,9 @@ struct btc_conf_s {
   int no_connect;
   btc_netaddr_t connect;
   btc_netaddr_t proxy;
-  int max_outbound;
+  int max_connections;
   int max_inbound;
+  int max_outbound;
   int ban_time;
   int discover;
   int upnp;
