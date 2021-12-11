@@ -682,9 +682,7 @@ btc_socket_setaddr(btc_socket_t *socket, const btc_sockaddr_t *addr) {
 }
 
 static int
-btc_socket_listen(btc_socket_t *server,
-                  const btc_sockaddr_t *addr,
-                  int backlog) {
+btc_socket_listen(btc_socket_t *server, const btc_sockaddr_t *addr) {
   btc_socklen_t addrlen;
   btc_sockfd_t fd;
 
@@ -706,7 +704,7 @@ btc_socket_listen(btc_socket_t *server,
     return 0;
   }
 
-  if (listen(fd, backlog) == BTC_SOCKET_ERROR) {
+  if (listen(fd, 511) == BTC_SOCKET_ERROR) { /* Could use SOMAXCONN. */
     server->loop->error = btc_errno;
     btc_closesocket(fd);
     return 0;
@@ -1234,17 +1232,23 @@ const char *
 btc_loop_strerror(btc_loop_t *loop) {
 #if defined(_WIN32)
   /* https://stackoverflow.com/questions/3400922 */
+  DWORD flags, length;
+
   memset(loop->errmsg, 0, sizeof(loop->errmsg));
 
-  FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                 NULL,
-                 loop->error,
-                 MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                 loop->errmsg,
-                 sizeof(loop->errmsg),
-                 NULL);
+  flags = FORMAT_MESSAGE_FROM_SYSTEM
+        | FORMAT_MESSAGE_IGNORE_INSERTS
+        | FORMAT_MESSAGE_MAX_WIDTH_MASK;
 
-  if (loop->errmsg[0] == '\0')
+  length = FormatMessageA(flags,
+                          NULL,
+                          loop->error,
+                          MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                          loop->errmsg,
+                          sizeof(loop->errmsg),
+                          NULL);
+
+  if (length == 0 || loop->errmsg[0] == '\0')
     sprintf(loop->errmsg, "WSA Error: %d", loop->error);
 
   loop->errmsg[sizeof(loop->errmsg) - 1] = '\0';
@@ -1344,10 +1348,10 @@ btc_loop_unregister(btc_loop_t *loop, btc_socket_t *socket) {
 }
 
 btc_socket_t *
-btc_loop_listen(btc_loop_t *loop, const btc_sockaddr_t *addr, int backlog) {
+btc_loop_listen(btc_loop_t *loop, const btc_sockaddr_t *addr) {
   btc_socket_t *socket = btc_socket_create(loop);
 
-  if (!btc_socket_listen(socket, addr, backlog))
+  if (!btc_socket_listen(socket, addr))
     goto fail;
 
   if (!btc_loop_register(loop, socket)) {

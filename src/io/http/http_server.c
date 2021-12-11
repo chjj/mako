@@ -549,7 +549,7 @@ on_server_close(btc_socket_t *socket) {
 
 int
 http_server_open(http_server_t *server, const btc_sockaddr_t *addr) {
-  server->socket = btc_loop_listen(server->loop, addr, HTTP_BACKLOG);
+  server->socket = btc_loop_listen(server->loop, addr);
 
   if (server->socket == NULL)
     return 0;

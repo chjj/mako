@@ -2232,7 +2232,7 @@ static int
 btc_pool_listen(btc_pool_t *pool) {
   btc_socket_t *server;
 
-  server = btc_loop_listen(pool->loop, &pool->bind, pool->max_inbound);
+  server = btc_loop_listen(pool->loop, &pool->bind);
 
   if (server == NULL) {
     const char *msg = btc_loop_strerror(pool->loop);

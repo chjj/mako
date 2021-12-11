@@ -18,7 +18,6 @@
 #define HTTP_MAX_BUFFER (20 << 20)
 #define HTTP_MAX_FIELD_SIZE (1 << 10)
 #define HTTP_MAX_HEADERS 100
-#define HTTP_BACKLOG 100
 
 /*
  * Helpers

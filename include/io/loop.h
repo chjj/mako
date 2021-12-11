@@ -116,9 +116,7 @@ BTC_EXTERN const char *
 btc_loop_strerror(btc_loop_t *loop);
 
 BTC_EXTERN btc_socket_t *
-btc_loop_listen(btc_loop_t *loop,
-                const struct btc_sockaddr_s *addr,
-                int backlog);
+btc_loop_listen(btc_loop_t *loop, const struct btc_sockaddr_s *addr);
 
 BTC_EXTERN btc_socket_t *
 btc_loop_connect(btc_loop_t *loop, const struct btc_sockaddr_s *addr);
