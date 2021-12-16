@@ -2472,8 +2472,10 @@ btc_pool_get_addr(btc_pool_t *pool) {
     if ((addr->services & pool->required_services) != pool->required_services)
       continue;
 
-    if (btc_netaddr_is_onion(addr))
-      continue;
+    if (!(pool->flags & BTC_POOL_ONION)) {
+      if (btc_netaddr_is_onion(addr))
+        continue;
+    }
 
     if (i < 30 && now - entry->last_attempt < 600)
       continue;
@@ -3463,6 +3465,12 @@ btc_pool_on_getdata(btc_pool_t *pool,
     btc_peer_send_data(peer, btc_zinv_get(msg, i));
 
   btc_peer_flush_data(peer);
+
+  if (peer->sending.length > BTC_NET_MAX_INV) {
+    btc_peer_log(peer, "Peer exceeded getdata queue (%N).", &peer->addr);
+    btc_peer_close(peer);
+    return;
+  }
 }
 
 static void
@@ -3483,6 +3491,27 @@ btc_pool_on_notfound(btc_pool_t *pool,
       return;
     }
   }
+}
+
+static size_t
+btc_pool_inv_size(btc_pool_t *pool,
+                  const btc_entry_t *start,
+                  const btc_entry_t *stop,
+                  size_t max) {
+  size_t length;
+
+  if (start == NULL)
+    return 0;
+
+  if (stop == NULL || stop->height < start->height)
+    stop = btc_chain_tip(pool->chain);
+
+  length = stop->height - start->height + 1;
+
+  if (length > max)
+    length = max;
+
+  return length;
 }
 
 static void
@@ -3506,7 +3535,7 @@ btc_pool_on_getblocks(btc_pool_t *pool,
   stop = btc_chain_by_hash(pool->chain, msg->stop);
 
   btc_zinv_init(&blocks);
-  btc_zinv_grow(&blocks, 64);
+  btc_zinv_grow(&blocks, btc_pool_inv_size(pool, entry, stop, 500));
 
   while (entry != NULL) {
     if (entry == stop)
@@ -3554,7 +3583,7 @@ btc_pool_on_getheaders(btc_pool_t *pool,
   }
 
   btc_headers_init(&blocks);
-  btc_headers_grow(&blocks, 64);
+  btc_headers_grow(&blocks, btc_pool_inv_size(pool, entry, stop, 2000));
 
   while (entry != NULL) {
     btc_headers_push(&blocks, (btc_header_t *)&entry->header);
@@ -3570,9 +3599,10 @@ btc_pool_on_getheaders(btc_pool_t *pool,
     entry = entry->next;
   }
 
-  btc_peer_send_headers(peer, &blocks);
-
-  blocks.length = 0;
+  if (blocks.length > 0) {
+    btc_peer_send_headers(peer, &blocks);
+    blocks.length = 0;
+  }
 
   btc_headers_clear(&blocks);
 }
