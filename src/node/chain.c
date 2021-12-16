@@ -1290,6 +1290,7 @@ btc_chain_verify_locks(btc_chain_t *chain,
     uint32_t sequence = input->sequence;
     const btc_entry_t *entry;
     const btc_coin_t *coin;
+    uint32_t masked;
     int32_t height;
     int64_t time;
 
@@ -1303,8 +1304,10 @@ btc_chain_verify_locks(btc_chain_t *chain,
     else
       height = coin->height;
 
+    masked = sequence & BTC_SEQUENCE_MASK;
+
     if (!(sequence & BTC_SEQUENCE_TYPE_FLAG)) {
-      height += (int32_t)(sequence & BTC_SEQUENCE_MASK) - 1;
+      height += (int32_t)masked - 1;
 
       if (height > min_height)
         min_height = height;
@@ -1319,9 +1322,9 @@ btc_chain_verify_locks(btc_chain_t *chain,
 
     CHECK(entry != NULL);
 
-    time = btc_entry_median_time(entry);
+    masked <<= BTC_SEQUENCE_GRANULARITY;
 
-    time += (int64_t)((sequence & BTC_SEQUENCE_MASK) << BTC_SEQUENCE_GRANULARITY) - 1;
+    time = btc_entry_median_time(entry) + ((int64_t)masked - 1);
 
     if (time > min_time)
       min_time = time;
@@ -1607,16 +1610,12 @@ btc_chain_unreorganize(btc_chain_t *chain,
   btc_vector_init(&connect);
 
   /* Blocks to disconnect. */
-  for (entry = tip; entry != fork; entry = entry->prev) {
+  for (entry = tip; entry != fork; entry = entry->prev)
     btc_vector_push(&disconnect, entry);
-    entry = entry->prev;
-  }
 
   /* Blocks to connect. */
-  for (entry = last; entry != fork; entry = entry->prev) {
+  for (entry = last; entry != fork; entry = entry->prev)
     btc_vector_push(&connect, entry);
-    entry = entry->prev;
-  }
 
   /* Disconnect blocks and transactions. */
   for (i = 0; i < disconnect.length; i++) {
@@ -1681,16 +1680,12 @@ btc_chain_reorganize(btc_chain_t *chain, btc_entry_t *competitor) {
   fork = find_fork(tip, competitor);
 
   /* Blocks to disconnect. */
-  for (entry = tip; entry != fork; entry = entry->prev) {
+  for (entry = tip; entry != fork; entry = entry->prev)
     btc_vector_push(&disconnect, entry);
-    entry = entry->prev;
-  }
 
   /* Blocks to connect. */
-  for (entry = competitor; entry != fork; entry = entry->prev) {
+  for (entry = competitor; entry != fork; entry = entry->prev)
     btc_vector_push(&connect, entry);
-    entry = entry->prev;
-  }
 
   /* Disconnect blocks and transactions. */
   for (i = 0; i < disconnect.length; i++) {

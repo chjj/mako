@@ -1451,11 +1451,13 @@ btc_chaindb_disconnect_block(btc_chaindb_t *db,
   for (i = block->txs.length - 1; i != (size_t)-1; i--) {
     tx = block->txs.items[i];
 
-    for (j = tx->inputs.length - 1; j != (size_t)-1; j--) {
-      input = tx->inputs.items[j];
-      coin = btc_undo_pop(undo);
+    if (i > 0) {
+      for (j = tx->inputs.length - 1; j != (size_t)-1; j--) {
+        input = tx->inputs.items[j];
+        coin = btc_undo_pop(undo);
 
-      btc_view_put(view, &input->prevout, coin);
+        btc_view_put(view, &input->prevout, coin);
+      }
     }
 
     /* Remove any created coins. */
