@@ -435,21 +435,17 @@ btc_mempool_limit_orphans(btc_mempool_t *mp) {
 }
 
 static int
-btc_mempool_should_orphan(btc_mempool_t *mp,
-                          const btc_tx_t *tx,
-                          const btc_view_t *view) {
+btc_tx_has_coins(const btc_tx_t *tx, const btc_view_t *view) {
   size_t i;
-
-  (void)mp;
 
   for (i = 0; i < tx->inputs.length; i++) {
     const btc_input_t *input = tx->inputs.items[i];
 
     if (!btc_view_has(view, &input->prevout))
-      return 1;
+      return 0;
   }
 
-  return 0;
+  return 1;
 }
 
 static int
@@ -1235,7 +1231,7 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   view = btc_mempool_view(mp, tx);
 
   /* Maybe store as an orphan. */
-  if (btc_mempool_should_orphan(mp, tx, view)) {
+  if (!btc_tx_has_coins(tx, view)) {
     /* Preliminary orphan checks. */
     if (!btc_mempool_check_orphan(mp, tx, view)) {
       btc_view_destroy(view);
