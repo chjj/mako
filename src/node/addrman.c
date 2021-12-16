@@ -1066,54 +1066,54 @@ btc_addrman_mark_ack(btc_addrman_t *man,
 }
 
 int
-btc_addrman_has_local(btc_addrman_t *man, const btc_netaddr_t *src) {
-  return btc_addrmap_has(man->local, src);
+btc_addrman_has_local(btc_addrman_t *man, const btc_netaddr_t *addr) {
+  return btc_addrmap_has(man->local, addr);
 }
 
 const btc_netaddr_t *
 btc_addrman_get_local(btc_addrman_t *man,
-                      const btc_netaddr_t *src,
+                      const btc_netaddr_t *dst,
                       uint64_t services) {
-  btc_netaddr_t *best_dst = NULL;
+  btc_netaddr_t *best_addr = NULL;
   btc_addrmapiter_t iter;
   int best_reach = -1;
   int best_score = -1;
-  btc_local_t *dst;
+  btc_local_t *src;
   int reach;
 
   btc_addrmap_iterate(&iter, man->local);
 
-  if (src == NULL) {
+  if (dst == NULL) {
     while (btc_addrmap_next(&iter)) {
-      dst = iter.val;
+      src = iter.val;
 
-      if (dst->score > best_score) {
-        best_score = dst->score;
-        best_dst = &dst->addr;
+      if (src->score > best_score) {
+        best_score = src->score;
+        best_addr = &src->addr;
       }
     }
   } else {
     while (btc_addrmap_next(&iter)) {
-      dst = iter.val;
-      reach = btc_netaddr_reachability(src, &dst->addr);
+      src = iter.val;
+      reach = btc_netaddr_reachability(&src->addr, dst);
 
       if (reach < best_reach)
         continue;
 
-      if (reach > best_reach || dst->score > best_score) {
+      if (reach > best_reach || src->score > best_score) {
         best_reach = reach;
-        best_score = dst->score;
-        best_dst = &dst->addr;
+        best_score = src->score;
+        best_addr = &src->addr;
       }
     }
   }
 
-  if (best_dst != NULL) {
-    best_dst->time = btc_timedata_now(man->timedata);
-    best_dst->services = services;
+  if (best_addr != NULL) {
+    best_addr->time = btc_timedata_now(man->timedata);
+    best_addr->services = services;
   }
 
-  return best_dst;
+  return best_addr;
 }
 
 int
