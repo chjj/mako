@@ -829,7 +829,7 @@ conf_finalize(btc_conf_t *conf, const char *prefix) {
     conf->connect.port = network->port;
 
   if (conf->proxy.port == 0)
-    conf->proxy.port = 1080;
+    conf->proxy.port = conf->onion ? 9050 : 1080;
 
   if (conf->rpc_port == 0)
     conf->rpc_port = network->rpc_port;

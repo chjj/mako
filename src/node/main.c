@@ -52,8 +52,8 @@ set_config(btc_node_t *node, const btc_conf_t *conf) {
   btc_pool_set_external(node->pool, &conf->external);
   btc_pool_set_connect(node->pool, &conf->connect);
   btc_pool_set_proxy(node->pool, &conf->proxy);
-  btc_pool_set_maxoutbound(node->pool, conf->max_outbound);
   btc_pool_set_maxinbound(node->pool, conf->max_inbound);
+  btc_pool_set_maxoutbound(node->pool, conf->max_outbound);
   btc_pool_set_bantime(node->pool, conf->ban_time);
   btc_pool_set_onlynet(node->pool, conf->only_net);
 
