@@ -48,7 +48,7 @@ typedef struct btc_addrent_s {
   struct btc_addrent_s *next;
 } btc_addrent_t;
 
-typedef btc_addrmapiter_t btc_addriter_t;
+typedef btc_netmapiter_t btc_addriter_t;
 
 /*
  * Address Manager

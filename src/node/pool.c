@@ -146,7 +146,7 @@ typedef struct btc_nonces_s {
 } btc_nonces_t;
 
 typedef struct btc_peers_s {
-  btc_addrmap_t *map;
+  btc_netmap_t *map;
   btc_intmap_t *ids;
   btc_peer_t *head;
   btc_peer_t *tail;
@@ -2008,7 +2008,7 @@ btc_peer_on_tick(btc_peer_t *peer, int64_t now) {
 
 static void
 btc_peers_init(btc_peers_t *list) {
-  list->map = btc_addrmap_create(); /* addr->peer */
+  list->map = btc_netmap_create(); /* addr->peer */
   list->ids = btc_intmap_create(); /* id->peer */
   list->head = NULL;
   list->tail = NULL;
@@ -2020,13 +2020,13 @@ btc_peers_init(btc_peers_t *list) {
 
 static void
 btc_peers_clear(btc_peers_t *list) {
-  btc_addrmap_destroy(list->map);
+  btc_netmap_destroy(list->map);
   btc_intmap_destroy(list->ids);
 }
 
 static void
 btc_peers_add(btc_peers_t *list, btc_peer_t *peer) {
-  CHECK(btc_addrmap_put(list->map, &peer->addr, peer));
+  CHECK(btc_netmap_put(list->map, &peer->addr, peer));
   CHECK(btc_intmap_put(list->ids, peer->id, peer));
 
   btc_list_push(list, peer, btc_peer_t);
@@ -2041,7 +2041,7 @@ btc_peers_add(btc_peers_t *list, btc_peer_t *peer) {
 
 static void
 btc_peers_remove(btc_peers_t *list, btc_peer_t *peer) {
-  CHECK(btc_addrmap_del(list->map, &peer->addr) == &peer->addr);
+  CHECK(btc_netmap_del(list->map, &peer->addr) == &peer->addr);
   CHECK(btc_intmap_del(list->ids, peer->id) == peer->id);
 
   btc_list_remove(list, peer, btc_peer_t);
@@ -2060,12 +2060,12 @@ btc_peers_remove(btc_peers_t *list, btc_peer_t *peer) {
 
 static int
 btc_peers_has(btc_peers_t *list, const btc_netaddr_t *addr) {
-  return btc_addrmap_has(list->map, addr);
+  return btc_netmap_has(list->map, addr);
 }
 
 static btc_peer_t *
 btc_peers_get(btc_peers_t *list, const btc_netaddr_t *addr) {
-  return btc_addrmap_get(list->map, addr);
+  return btc_netmap_get(list->map, addr);
 }
 
 static btc_peer_t *

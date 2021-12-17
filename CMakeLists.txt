@@ -46,6 +46,7 @@ list(APPEND mako_sources src/crypto/chacha20.c
                          src/json/json_extra.c
                          src/json/json_parser.c
                          src/map/addrmap.c
+                         src/map/addrset.c
                          src/map/hashmap.c
                          src/map/hashset.c
                          src/map/hashtab.c
@@ -53,6 +54,7 @@ list(APPEND mako_sources src/crypto/chacha20.c
                          src/map/longmap.c
                          src/map/longset.c
                          src/map/longtab.c
+                         src/map/netmap.c
                          src/map/outmap.c
                          src/map/outset.c
                          src/address.c

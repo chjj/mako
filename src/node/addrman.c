@@ -313,14 +313,14 @@ struct btc_addrman_s {
   btc_sockaddr_t proxy;
   int64_t ban_time;
   uint8_t key[32];
-  btc_addrmap_t *map;
+  btc_netmap_t *map;
   btc_vector_t rnd;
-  btc_addrmap_t **fresh;
+  btc_netmap_t **fresh;
   size_t total_fresh;
   btc_bucket_t **used;
   size_t total_used;
-  btc_addrmap_t *local;
-  btc_addrmap_t *banned;
+  btc_netmap_t *local;
+  btc_netmap_t *banned;
   int needs_flush;
 };
 
@@ -342,18 +342,18 @@ btc_addrman_create(const btc_network_t *network) {
   btc_sockaddr_import(&man->proxy, "0.0.0.0", 0);
   man->ban_time = 24 * 60 * 60;
   btc_getrandom(man->key, 32);
-  man->map = btc_addrmap_create();
+  man->map = btc_netmap_create();
   btc_vector_init(&man->rnd);
-  man->fresh = btc_malloc(FRESH_COUNT * sizeof(btc_addrmap_t *));
+  man->fresh = btc_malloc(FRESH_COUNT * sizeof(btc_netmap_t *));
   man->total_fresh = 0;
   man->used = btc_malloc(USED_COUNT * sizeof(btc_bucket_t *));
   man->total_used = 0;
-  man->local = btc_addrmap_create();
-  man->banned = btc_addrmap_create();
+  man->local = btc_netmap_create();
+  man->banned = btc_netmap_create();
   man->needs_flush = 0;
 
   for (i = 0; i < FRESH_COUNT; i++)
-    man->fresh[i] = btc_addrmap_create();
+    man->fresh[i] = btc_netmap_create();
 
   for (i = 0; i < USED_COUNT; i++)
     man->used[i] = btc_bucket_create();
@@ -363,36 +363,36 @@ btc_addrman_create(const btc_network_t *network) {
 
 void
 btc_addrman_destroy(btc_addrman_t *man) {
-  btc_addrmapiter_t iter;
+  btc_netmapiter_t iter;
   size_t i;
 
-  btc_addrmap_iterate(&iter, man->map);
+  btc_netmap_iterate(&iter, man->map);
 
-  while (btc_addrmap_next(&iter))
+  while (btc_netmap_next(&iter))
     btc_addrent_destroy(iter.val);
 
   for (i = 0; i < FRESH_COUNT; i++)
-    btc_addrmap_destroy(man->fresh[i]);
+    btc_netmap_destroy(man->fresh[i]);
 
   for (i = 0; i < USED_COUNT; i++)
     btc_bucket_destroy(man->used[i]);
 
-  btc_addrmap_iterate(&iter, man->local);
+  btc_netmap_iterate(&iter, man->local);
 
-  while (btc_addrmap_next(&iter))
+  while (btc_netmap_next(&iter))
     btc_local_destroy(iter.val);
 
-  btc_addrmap_iterate(&iter, man->banned);
+  btc_netmap_iterate(&iter, man->banned);
 
-  while (btc_addrmap_next(&iter))
+  while (btc_netmap_next(&iter))
     btc_netaddr_destroy(iter.val);
 
-  btc_addrmap_destroy(man->map);
+  btc_netmap_destroy(man->map);
   btc_vector_clear(&man->rnd);
   btc_free(man->fresh);
   btc_free(man->used);
-  btc_addrmap_destroy(man->local);
-  btc_addrmap_destroy(man->banned);
+  btc_netmap_destroy(man->local);
+  btc_netmap_destroy(man->banned);
   btc_free(man);
 }
 
@@ -466,7 +466,7 @@ btc_addrman_resolve(btc_addrman_t *man) {
     }
 
     /* Temporary. */
-    if (btc_addrmap_size(man->map) >= 10)
+    if (btc_netmap_size(man->map) >= 10)
       continue;
 
     btc_addrman_log(man, "Resolving %s...", seed);
@@ -560,19 +560,19 @@ btc_addrman_is_full(btc_addrman_t *man) {
 
 void
 btc_addrman_reset(btc_addrman_t *man) {
-  btc_addrmapiter_t iter;
+  btc_netmapiter_t iter;
   size_t i;
 
-  btc_addrmap_iterate(&iter, man->map);
+  btc_netmap_iterate(&iter, man->map);
 
-  while (btc_addrmap_next(&iter))
+  while (btc_netmap_next(&iter))
     btc_addrent_destroy(iter.val);
 
-  btc_addrmap_reset(man->map);
+  btc_netmap_reset(man->map);
   btc_vector_reset(&man->rnd);
 
   for (i = 0; i < FRESH_COUNT; i++)
-    btc_addrmap_reset(man->fresh[i]);
+    btc_netmap_reset(man->fresh[i]);
 
   for (i = 0; i < USED_COUNT; i++)
     btc_list_reset((btc_bucket_t *)man->used[i]);
@@ -590,7 +590,7 @@ btc_addrman_ban(btc_addrman_t *man, const btc_netaddr_t *addr) {
   entry->port = 0;
   entry->time = btc_now();
 
-  if (!btc_addrmap_put(man->banned, entry, entry))
+  if (!btc_netmap_put(man->banned, entry, entry))
     btc_netaddr_destroy(entry);
 }
 
@@ -600,7 +600,7 @@ btc_addrman_unban(btc_addrman_t *man, const btc_netaddr_t *addr) {
 
   key.port = 0;
 
-  btc_addrmap_del(man->banned, &key);
+  btc_netmap_del(man->banned, &key);
 }
 
 int
@@ -610,13 +610,13 @@ btc_addrman_is_banned(btc_addrman_t *man, const btc_netaddr_t *addr) {
 
   key.port = 0;
 
-  entry = btc_addrmap_get(man->banned, &key);
+  entry = btc_netmap_get(man->banned, &key);
 
   if (entry == NULL)
     return 0;
 
   if (btc_now() > entry->time + man->ban_time) {
-    btc_addrmap_del(man->banned, &key);
+    btc_netmap_del(man->banned, &key);
     btc_netaddr_destroy(entry);
     return 0;
   }
@@ -626,14 +626,14 @@ btc_addrman_is_banned(btc_addrman_t *man, const btc_netaddr_t *addr) {
 
 void
 btc_addrman_clear_banned(btc_addrman_t *man) {
-  btc_addrmapiter_t iter;
+  btc_netmapiter_t iter;
 
-  btc_addrmap_iterate(&iter, man->banned);
+  btc_netmap_iterate(&iter, man->banned);
 
-  while (btc_addrmap_next(&iter))
+  while (btc_netmap_next(&iter))
     btc_netaddr_destroy(iter.val);
 
-  btc_addrmap_reset(man->banned);
+  btc_netmap_reset(man->banned);
 }
 
 const btc_addrent_t *
@@ -673,17 +673,17 @@ btc_addrman_get(btc_addrman_t *man) {
         entry = entry->next;
     } else {
       size_t i = btc_uniform(FRESH_COUNT);
-      btc_addrmap_t *bucket = man->fresh[i];
-      btc_addrmapiter_t iter;
+      btc_netmap_t *bucket = man->fresh[i];
+      btc_netmapiter_t iter;
 
-      if (btc_addrmap_size(bucket) == 0)
+      if (btc_netmap_size(bucket) == 0)
         continue;
 
-      index = btc_uniform(btc_addrmap_size(bucket));
+      index = btc_uniform(btc_netmap_size(bucket));
 
-      btc_addrmap_iterate(&iter, bucket);
+      btc_netmap_iterate(&iter, bucket);
 
-      while (btc_addrmap_next(&iter)) {
+      while (btc_netmap_next(&iter)) {
         entry = iter.val;
 
         if (index == 0)
@@ -704,7 +704,7 @@ btc_addrman_get(btc_addrman_t *man) {
   return entry;
 }
 
-static btc_addrmap_t *
+static btc_netmap_t *
 fresh_bucket(btc_addrman_t *man, const btc_addrent_t *entry) {
   uint32_t hash32, hash, index;
   uint8_t hash1[32];
@@ -761,22 +761,22 @@ used_bucket(btc_addrman_t *man, const btc_addrent_t *entry) {
 }
 
 static void
-evict_fresh(btc_addrman_t *man, btc_addrmap_t *bucket) {
+evict_fresh(btc_addrman_t *man, btc_netmap_t *bucket) {
   int64_t now = btc_timedata_now(man->timedata);
   btc_addrent_t *old = NULL;
-  btc_addrmapiter_t iter;
+  btc_netmapiter_t iter;
   btc_addrent_t *entry;
 
-  btc_addrmap_iterate(&iter, bucket);
+  btc_netmap_iterate(&iter, bucket);
 
-  while (btc_addrmap_next(&iter)) {
+  while (btc_netmap_next(&iter)) {
     entry = iter.val;
 
     if (btc_addrent_is_stale(entry, now)) {
-      btc_addrmap_del(bucket, &entry->addr);
+      btc_netmap_del(bucket, &entry->addr);
 
       if (--entry->ref_count == 0) {
-        btc_addrmap_del(man->map, &entry->addr);
+        btc_netmap_del(man->map, &entry->addr);
         btc_randvec_pop(&man->rnd, entry);
         btc_addrent_destroy(entry);
         man->total_fresh -= 1;
@@ -797,10 +797,10 @@ evict_fresh(btc_addrman_t *man, btc_addrmap_t *bucket) {
   if (old == NULL)
     return;
 
-  btc_addrmap_del(bucket, &old->addr);
+  btc_netmap_del(bucket, &old->addr);
 
   if (--old->ref_count == 0) {
-    btc_addrmap_del(man->map, &old->addr);
+    btc_netmap_del(man->map, &old->addr);
     btc_randvec_pop(&man->rnd, old);
     btc_addrent_destroy(old);
     man->total_fresh -= 1;
@@ -826,12 +826,12 @@ btc_addrman_add(btc_addrman_t *man,
                 const btc_netaddr_t *src) {
   int64_t now = btc_timedata_now(man->timedata);
   btc_addrent_t *entry;
-  btc_addrmap_t *bucket;
+  btc_netmap_t *bucket;
   int32_t i;
 
   CHECK(addr->port != 0);
 
-  entry = btc_addrmap_get(man->map, addr);
+  entry = btc_netmap_get(man->map, addr);
 
   if (entry != NULL) {
     int64_t penalty = 2 * 60 * 60;
@@ -897,16 +897,16 @@ btc_addrman_add(btc_addrman_t *man,
 
   bucket = fresh_bucket(man, entry);
 
-  if (btc_addrmap_has(bucket, &entry->addr))
+  if (btc_netmap_has(bucket, &entry->addr))
     return 0;
 
-  if (btc_addrmap_size(bucket) >= FRESH_SIZE)
+  if (btc_netmap_size(bucket) >= FRESH_SIZE)
     evict_fresh(man, bucket);
 
-  btc_addrmap_put(bucket, &entry->addr, entry);
+  btc_netmap_put(bucket, &entry->addr, entry);
   entry->ref_count += 1;
 
-  if (btc_addrmap_put(man->map, &entry->addr, entry))
+  if (btc_netmap_put(man->map, &entry->addr, entry))
     btc_randvec_push(&man->rnd, entry);
 
   man->needs_flush = 1;
@@ -916,7 +916,7 @@ btc_addrman_add(btc_addrman_t *man,
 
 int
 btc_addrman_remove(btc_addrman_t *man, const btc_netaddr_t *addr) {
-  btc_addrent_t *entry = btc_addrmap_get(man->map, addr);
+  btc_addrent_t *entry = btc_netmap_get(man->map, addr);
   size_t i;
 
   if (entry == NULL)
@@ -944,12 +944,12 @@ btc_addrman_remove(btc_addrman_t *man, const btc_netaddr_t *addr) {
 
     CHECK(head == NULL);
   } else {
-    btc_addrmap_t *bucket;
+    btc_netmap_t *bucket;
 
     for (i = 0; i < FRESH_COUNT; i++) {
       bucket = man->fresh[i];
 
-      if (btc_addrmap_del(bucket, &entry->addr))
+      if (btc_netmap_del(bucket, &entry->addr))
         entry->ref_count -= 1;
     }
 
@@ -958,7 +958,7 @@ btc_addrman_remove(btc_addrman_t *man, const btc_netaddr_t *addr) {
     CHECK(entry->ref_count == 0);
   }
 
-  CHECK(btc_addrmap_del(man->map, &entry->addr));
+  CHECK(btc_netmap_del(man->map, &entry->addr));
 
   btc_randvec_pop(&man->rnd, entry);
 
@@ -969,7 +969,7 @@ btc_addrman_remove(btc_addrman_t *man, const btc_netaddr_t *addr) {
 
 void
 btc_addrman_mark_attempt(btc_addrman_t *man, const btc_netaddr_t *addr) {
-  btc_addrent_t *entry = btc_addrmap_get(man->map, addr);
+  btc_addrent_t *entry = btc_netmap_get(man->map, addr);
 
   if (entry == NULL)
     return;
@@ -980,7 +980,7 @@ btc_addrman_mark_attempt(btc_addrman_t *man, const btc_netaddr_t *addr) {
 
 void
 btc_addrman_mark_success(btc_addrman_t *man, const btc_netaddr_t *addr) {
-  btc_addrent_t *entry = btc_addrmap_get(man->map, addr);
+  btc_addrent_t *entry = btc_netmap_get(man->map, addr);
   int64_t now;
 
   if (entry == NULL)
@@ -996,10 +996,10 @@ void
 btc_addrman_mark_ack(btc_addrman_t *man,
                      const btc_netaddr_t *addr,
                      uint64_t services) {
-  btc_addrent_t *entry = btc_addrmap_get(man->map, addr);
+  btc_addrent_t *entry = btc_netmap_get(man->map, addr);
   btc_addrent_t *evicted;
-  btc_addrmap_t *old = NULL;
-  btc_addrmap_t *fresh;
+  btc_netmap_t *old = NULL;
+  btc_netmap_t *fresh;
   btc_bucket_t *bucket;
   int64_t now;
   size_t i;
@@ -1024,7 +1024,7 @@ btc_addrman_mark_ack(btc_addrman_t *man,
   for (i = 0; i < FRESH_COUNT; i++) {
     fresh = man->fresh[i];
 
-    if (btc_addrmap_del(fresh, &entry->addr)) {
+    if (btc_netmap_del(fresh, &entry->addr)) {
       entry->ref_count -= 1;
       old = fresh;
     }
@@ -1050,7 +1050,7 @@ btc_addrman_mark_ack(btc_addrman_t *man,
   fresh = fresh_bucket(man, evicted);
 
   /* Move to entry's old bucket if no room. */
-  if (btc_addrmap_size(fresh) >= FRESH_SIZE)
+  if (btc_netmap_size(fresh) >= FRESH_SIZE)
     fresh = old;
 
   /* Swap to evicted's used bucket. */
@@ -1059,7 +1059,7 @@ btc_addrman_mark_ack(btc_addrman_t *man,
 
   /* Move evicted to fresh bucket. */
   evicted->used = 0;
-  btc_addrmap_put(fresh, &evicted->addr, evicted);
+  btc_netmap_put(fresh, &evicted->addr, evicted);
   CHECK(evicted->ref_count == 0);
   evicted->ref_count += 1;
   man->total_fresh += 1;
@@ -1067,7 +1067,7 @@ btc_addrman_mark_ack(btc_addrman_t *man,
 
 int
 btc_addrman_has_local(btc_addrman_t *man, const btc_netaddr_t *addr) {
-  return btc_addrmap_has(man->local, addr);
+  return btc_netmap_has(man->local, addr);
 }
 
 const btc_netaddr_t *
@@ -1075,16 +1075,16 @@ btc_addrman_get_local(btc_addrman_t *man,
                       const btc_netaddr_t *dst,
                       uint64_t services) {
   btc_netaddr_t *best_addr = NULL;
-  btc_addrmapiter_t iter;
+  btc_netmapiter_t iter;
   int best_reach = -1;
   int best_score = -1;
   btc_local_t *src;
   int reach;
 
-  btc_addrmap_iterate(&iter, man->local);
+  btc_netmap_iterate(&iter, man->local);
 
   if (dst == NULL) {
-    while (btc_addrmap_next(&iter)) {
+    while (btc_netmap_next(&iter)) {
       src = iter.val;
 
       if (src->score > best_score) {
@@ -1093,7 +1093,7 @@ btc_addrman_get_local(btc_addrman_t *man,
       }
     }
   } else {
-    while (btc_addrmap_next(&iter)) {
+    while (btc_netmap_next(&iter)) {
       src = iter.val;
       reach = btc_netaddr_reachability(&src->addr, dst);
 
@@ -1125,7 +1125,7 @@ btc_addrman_add_local(btc_addrman_t *man,
   if (!btc_netaddr_is_routable(addr))
     return 0;
 
-  local = btc_addrmap_get(man->local, addr);
+  local = btc_netmap_get(man->local, addr);
 
   if (local != NULL) {
     if (score > local->score)
@@ -1142,14 +1142,14 @@ btc_addrman_add_local(btc_addrman_t *man,
   local->addr.services = BTC_NET_DEFAULT_SERVICES;
   local->addr.time = btc_now();
 
-  btc_addrmap_put(man->local, &local->addr, local);
+  btc_netmap_put(man->local, &local->addr, local);
 
   return 1;
 }
 
 int
 btc_addrman_mark_local(btc_addrman_t *man, const btc_netaddr_t *addr) {
-  btc_local_t *local = btc_addrmap_get(man->local, addr);
+  btc_local_t *local = btc_netmap_get(man->local, addr);
 
   if (local == NULL)
     return 0;
@@ -1161,12 +1161,12 @@ btc_addrman_mark_local(btc_addrman_t *man, const btc_netaddr_t *addr) {
 
 void
 btc_addrman_iterate(btc_addriter_t *iter, btc_addrman_t *man) {
-  btc_addrmap_iterate(iter, man->map);
+  btc_netmap_iterate(iter, man->map);
 }
 
 int
 btc_addrman_next(const btc_addrent_t **entry, btc_addriter_t *iter) {
-  if (btc_addrmap_next(iter)) {
+  if (btc_netmap_next(iter)) {
     *entry = iter->val;
     return 1;
   }
@@ -1211,10 +1211,10 @@ btc_addrman_size(const btc_addrman_t *man) {
   size += man->rnd.length * BTC_ADDRENT_SIZE;
 
   for (i = 0; i < FRESH_COUNT; i++) {
-    const btc_addrmap_t *bucket = man->fresh[i];
+    const btc_netmap_t *bucket = man->fresh[i];
 
-    size += btc_size_size(btc_addrmap_size(bucket));
-    size += btc_addrmap_size(bucket) * 4;
+    size += btc_size_size(btc_netmap_size(bucket));
+    size += btc_netmap_size(bucket) * 4;
   }
 
   for (i = 0; i < USED_COUNT; i++) {
@@ -1241,14 +1241,14 @@ btc_addrman_write(uint8_t *zp, const btc_addrman_t *man) {
     zp = btc_addrent_write(zp, man->rnd.items[i]);
 
   for (i = 0; i < FRESH_COUNT; i++) {
-    const btc_addrmap_t *bucket = man->fresh[i];
-    btc_addrmapiter_t iter;
+    const btc_netmap_t *bucket = man->fresh[i];
+    btc_netmapiter_t iter;
 
-    btc_addrmap_iterate(&iter, bucket);
+    btc_netmap_iterate(&iter, bucket);
 
-    zp = btc_size_write(zp, btc_addrmap_size(bucket));
+    zp = btc_size_write(zp, btc_netmap_size(bucket));
 
-    while (btc_addrmap_next(&iter)) {
+    while (btc_netmap_next(&iter)) {
       const btc_addrent_t *entry = iter.val;
 
       zp = btc_uint32_write(zp, entry->rand_pos);
@@ -1301,7 +1301,7 @@ btc_addrman_read(btc_addrman_t *man, const uint8_t **xp, size_t *xn) {
       goto fail;
     }
 
-    if (!btc_addrmap_put(man->map, &entry->addr, entry)) {
+    if (!btc_netmap_put(man->map, &entry->addr, entry)) {
       btc_addrent_destroy(entry);
       goto fail;
     }
@@ -1310,7 +1310,7 @@ btc_addrman_read(btc_addrman_t *man, const uint8_t **xp, size_t *xn) {
   }
 
   for (i = 0; i < FRESH_COUNT; i++) {
-    btc_addrmap_t *bucket = man->fresh[i];
+    btc_netmap_t *bucket = man->fresh[i];
 
     if (!btc_size_read(&length, xp, xn))
       goto fail;
@@ -1332,10 +1332,10 @@ btc_addrman_read(btc_addrman_t *man, const uint8_t **xp, size_t *xn) {
 
       entry->ref_count++;
 
-      btc_addrmap_put(bucket, &entry->addr, entry);
+      btc_netmap_put(bucket, &entry->addr, entry);
     }
 
-    if (btc_addrmap_size(bucket) > FRESH_SIZE)
+    if (btc_netmap_size(bucket) > FRESH_SIZE)
       goto fail; /* Bucket size mismatch. */
   }
 

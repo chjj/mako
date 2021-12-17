@@ -1,5 +1,5 @@
 /*!
- * addrmap.c - address map for mako
+ * addrset.c - address set for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
  * https://github.com/chjj/mako
  */
@@ -9,7 +9,7 @@
 #include "map.h"
 
 /*
- * Address Map
+ * Address Set
  */
 
-DEFINE_ADDRESS_MAP(btc_addrmap, void *, NULL, MAP_EXTERN)
+DEFINE_ADDRESS_SET(btc_addrset, MAP_EXTERN)
