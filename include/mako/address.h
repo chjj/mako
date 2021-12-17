@@ -44,6 +44,9 @@ btc_address_clear(btc_address_t *z);
 BTC_EXTERN void
 btc_address_copy(btc_address_t *z, const btc_address_t *x);
 
+BTC_EXTERN uint32_t
+btc_address_hash(const btc_address_t *x);
+
 BTC_EXTERN int
 btc_address_equal(const btc_address_t *x, const btc_address_t *y);
 

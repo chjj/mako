@@ -350,10 +350,7 @@ btc_invitem_type(const btc_invitem_t *x) {
 
 uint32_t
 btc_invitem_hash(const btc_invitem_t *x) {
-  uint8_t tmp[36];
-  btc_uint32_write(tmp, btc_invitem_type(x));
-  btc_raw_write(tmp + 4, x->hash, 32);
-  return btc_murmur3_sum(tmp, 36, 0xfba4c795);
+  return btc_murmur3_sum(x->hash, 32, btc_invitem_type(x) ^ 0xfba4c795);
 }
 
 int

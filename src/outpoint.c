@@ -44,9 +44,7 @@ btc_outpoint_set(btc_outpoint_t *z, const uint8_t *hash, uint32_t index) {
 
 uint32_t
 btc_outpoint_hash(const btc_outpoint_t *x) {
-  uint8_t tmp[36];
-  btc_outpoint_write(tmp, x);
-  return btc_murmur3_sum(tmp, 36, 0xfba4c795);
+  return btc_murmur3_sum(x->hash, 32, x->index ^ 0xfba4c795);
 }
 
 int

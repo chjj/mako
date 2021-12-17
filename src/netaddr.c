@@ -159,12 +159,7 @@ btc_netaddr_get(char *zp, const btc_netaddr_t *x) {
 
 uint32_t
 btc_netaddr_hash(const btc_netaddr_t *x) {
-  uint8_t tmp[18];
-
-  btc_raw_write(tmp, x->raw, 16);
-  btc_uint16_write(tmp + 16, x->port);
-
-  return btc_murmur3_sum(tmp, 18, 0xfba4c795);
+  return btc_murmur3_sum(x->raw, 16, (uint32_t)x->port ^ 0xfba4c795);
 }
 
 int

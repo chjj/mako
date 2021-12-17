@@ -44,6 +44,15 @@ btc_address_copy(btc_address_t *z, const btc_address_t *x) {
   memcpy(z->hash, x->hash, 40);
 }
 
+uint32_t
+btc_address_hash(const btc_address_t *x) {
+  uint32_t seed = ((uint32_t)x->type << 16)
+                | ((uint32_t)x->version << 8)
+                | ((uint32_t)x->length << 0);
+
+  return btc_murmur3_sum(x->hash, 40, seed ^ 0xfba4c795);
+}
+
 int
 btc_address_equal(const btc_address_t *x, const btc_address_t *y) {
   if (x->type != y->type)

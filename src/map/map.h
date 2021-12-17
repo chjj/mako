@@ -325,6 +325,15 @@ name##_next(name##iter_t *iter) {                              \
              sentinel,                                   \
              scope)
 
+#define DEFINE_ADDRESS_MAP(name, val_t, sentinel, scope) \
+  DEFINE_MAP(name,                                       \
+             btc_address_t *,                            \
+             val_t,                                      \
+             btc_address_hash,                           \
+             btc_address_equal,                          \
+             sentinel,                                   \
+             scope)
+
 /*
  * Sets
  */
@@ -369,6 +378,13 @@ name##_next(name##iter_t *iter) {                              \
              btc_netaddr_t *,           \
              btc_netaddr_hash,          \
              btc_netaddr_equal,         \
+             scope)
+
+#define DEFINE_ADDRESS_SET(name, scope) \
+  DEFINE_SET(name,                      \
+             btc_address_t *,           \
+             btc_address_hash,          \
+             btc_address_equal,         \
              scope)
 
 #endif /* BTC_MAP_INTERNAL_H */
