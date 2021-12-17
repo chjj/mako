@@ -539,7 +539,8 @@ static int measure_integer (json_int_t value)
 {
    int length = 0;
 
-   do {
+   do
+   {
       length += 1;
       value /= 10;
    } while (value != 0);
@@ -698,7 +699,8 @@ size_t json_measure_ex (json_value * value, json_serialize_opts opts)
             hi = integer / 100000000;
             lo = integer % 100000000;
 
-            if (lo != 0) {
+            if (lo != 0)
+            {
                pad = 8 - measure_integer(lo);
 
                while ((lo % 10) == 0)
@@ -944,7 +946,8 @@ void json_serialize_ex (json_char * buf, json_value * value, json_serialize_opts
             lo = integer % 100000000;
             pad = 0;
 
-            if (lo != 0) {
+            if (lo != 0)
+            {
                pad = 8 - measure_integer(lo);
 
                while ((lo % 10) == 0)
@@ -959,8 +962,10 @@ void json_serialize_ex (json_char * buf, json_value * value, json_serialize_opts
 
             ptr = buf;
 
-            if (lo != 0) {
-               do {
+            if (lo != 0)
+            {
+               do
+               {
                   *-- ptr = "0123456789"[lo % 10];
                   lo /= 10;
                } while (lo != 0);
@@ -971,7 +976,8 @@ void json_serialize_ex (json_char * buf, json_value * value, json_serialize_opts
                *-- ptr = '.';
             }
 
-            do {
+            do
+            {
                *-- ptr = "0123456789"[hi % 10];
                hi /= 10;
             } while (hi != 0);

@@ -840,7 +840,8 @@ json_value * json_parse_ex (json_settings * settings,
                         json_int_t hi = (json_int_t) top->u.dbl;
                         json_int_t lo = (json_int_t) num_fraction;
 
-                        if (lo != 0) {
+                        if (lo != 0)
+                        {
                            while (num_digits++ < 8)
                               lo *= 10;
                         }
