@@ -315,8 +315,7 @@ set(tests # crypto
           fs
           loop
           thread
-          http_client
-          http_server
+          http
           workers
           # node
           addrman
