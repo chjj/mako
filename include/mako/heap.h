@@ -39,6 +39,9 @@ btc_heap_shift(btc_vector_t *z, btc_heapcmp_f *cmp);
 BTC_EXTERN void *
 btc_heap_remove(btc_vector_t *z, size_t i, btc_heapcmp_f *cmp);
 
+BTC_EXTERN void
+btc_heap_fix(btc_vector_t *z, size_t i, btc_heapcmp_f *cmp);
+
 #ifdef __cplusplus
 }
 #endif

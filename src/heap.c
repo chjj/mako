@@ -2,6 +2,9 @@
  * heap.c - heap functions for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
  * https://github.com/chjj/mako
+ *
+ * Resources:
+ *   https://github.com/golang/go/blob/2580d0e/src/container/heap/heap.go
  */
 
 #include <limits.h>
@@ -28,9 +31,10 @@ heap_less(const btc_vector_t *x, int i, int j, btc_heapcmp_f *cmp) {
   return cmp(x->items[i], x->items[j]) < 0;
 }
 
-static void
+static int
 heap_down(btc_vector_t *z, int i, int n, btc_heapcmp_f *cmp) {
   int l, j, r;
+  int i0 = i;
 
   for (;;) {
     l = 2 * i + 1;
@@ -41,7 +45,7 @@ heap_down(btc_vector_t *z, int i, int n, btc_heapcmp_f *cmp) {
     j = l;
     r = l + 1;
 
-    if (r < n && !heap_less(z, l, r, cmp))
+    if (r < n && heap_less(z, r, l, cmp))
       j = r;
 
     if (!heap_less(z, j, i, cmp))
@@ -50,6 +54,8 @@ heap_down(btc_vector_t *z, int i, int n, btc_heapcmp_f *cmp) {
     heap_swap(z, i, j);
     i = j;
   }
+
+  return i > i0;
 }
 
 static void
@@ -120,9 +126,19 @@ btc_heap_remove(btc_vector_t *z, size_t i, btc_heapcmp_f *cmp) {
 
   if (n != (int)i) {
     heap_swap(z, i, n);
-    heap_down(z, i, n, cmp);
-    heap_up(z, i, cmp);
+
+    if (!heap_down(z, i, n, cmp))
+      heap_up(z, i, cmp);
   }
 
   return btc_vector_pop(z);
+}
+
+void
+btc_heap_fix(btc_vector_t *z, size_t i, btc_heapcmp_f *cmp) {
+  CHECK(i < z->length);
+  CHECK(z->length <= INT_MAX);
+
+  if (!heap_down(z, i, z->length, cmp))
+    heap_up(z, i, cmp);
 }
