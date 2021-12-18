@@ -17,6 +17,7 @@
 #include <mako/policy.h>
 #include <mako/script.h>
 #include <mako/tx.h>
+#include <mako/util.h>
 #include <mako/vector.h>
 #include "impl.h"
 #include "internal.h"
@@ -835,18 +836,12 @@ btc_script_get_multisig(unsigned int *m,
 }
 
 static int
-multikey_compare(const void *a, const void *b) {
-  const btc_multikey_t *x = (const btc_multikey_t *)a;
-  const btc_multikey_t *y = (const btc_multikey_t *)b;
-  int xn = x->length;
-  int yn = y->length;
-  int mn = xn < yn ? xn : yn;
-  int cmp = memcmp(x->data, y->data, mn);
+multikey_compare(const void *xp, const void *yp) {
+  const btc_multikey_t *x = xp;
+  const btc_multikey_t *y = yp;
 
-  if (cmp != 0)
-    return cmp;
-
-  return xn - yn;
+  return btc_memcmp4(x->data, x->length,
+                     y->data, y->length);
 }
 
 void
