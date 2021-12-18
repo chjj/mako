@@ -177,10 +177,10 @@ extern "C" {
  */
 
 BTC_EXTERN int64_t
-btc_get_min_fee(size_t size, int64_t rate);
+btc_get_fee(size_t size, int64_t rate);
 
 BTC_EXTERN int64_t
-btc_get_round_fee(size_t size, int64_t rate);
+btc_round_fee(size_t size, int64_t rate);
 
 BTC_EXTERN int64_t
 btc_get_rate(size_t size, int64_t fee);

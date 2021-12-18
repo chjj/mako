@@ -1042,7 +1042,7 @@ btc_mempool_verify(btc_mempool_t *mp,
   }
 
   /* Make sure this guy gave a decent fee. */
-  minfee = btc_get_min_fee(entry->size, mp->network->min_relay);
+  minfee = btc_get_fee(entry->size, mp->network->min_relay);
 
   if (entry->fee < minfee) {
     return btc_mempool_throw(mp, tx,

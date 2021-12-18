@@ -15,10 +15,11 @@
  */
 
 int64_t
-btc_get_min_fee(size_t size, int64_t rate) {
+btc_get_fee(size_t size, int64_t rate) {
   int64_t fee;
 
   CHECK(rate >= 0);
+  CHECK(size <= UINT32_MAX);
 
   if (size == 0)
     return 0;
@@ -32,10 +33,11 @@ btc_get_min_fee(size_t size, int64_t rate) {
 }
 
 int64_t
-btc_get_round_fee(size_t size, int64_t rate) {
+btc_round_fee(size_t size, int64_t rate) {
   int64_t fee;
 
   CHECK(rate >= 0);
+  CHECK(size <= UINT32_MAX);
 
   if (size == 0)
     return 0;
@@ -51,6 +53,7 @@ btc_get_round_fee(size_t size, int64_t rate) {
 int64_t
 btc_get_rate(size_t size, int64_t fee) {
   CHECK(fee >= 0);
+  CHECK(size <= UINT32_MAX);
 
   if (size == 0)
     return 0;

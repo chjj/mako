@@ -108,7 +108,7 @@ btc_output_dust_threshold(const btc_output_t *x, int64_t rate) {
     size += 32 + 4 + 1 + 107 + 4;
   }
 
-  return 3 * btc_get_min_fee(size, rate);
+  return 3 * btc_get_fee(size, rate);
 }
 
 int64_t
