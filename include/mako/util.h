@@ -76,6 +76,9 @@ btc_memzero(void *ptr, size_t len);
 BTC_EXTERN int
 btc_memcmp(const void *x, const void *y, size_t n);
 
+BTC_EXTERN int
+btc_memcmp4(const void *x, size_t xn, const void *y, size_t yn);
+
 /*
  * Memory Equal
  */

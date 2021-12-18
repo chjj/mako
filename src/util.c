@@ -66,6 +66,26 @@ btc_memcmp(const void *x, const void *y, size_t n) {
   return 0;
 }
 
+int
+btc_memcmp4(const void *x, size_t xn, const void *y, size_t yn) {
+  size_t n = xn < yn ? xn : yn;
+
+  if (n > 0) {
+    int cmp = memcmp(x, y, n);
+
+    if (cmp != 0)
+      return cmp;
+  }
+
+  if (xn < yn)
+    return -1;
+
+  if (xn > yn)
+    return 1;
+
+  return 0;
+}
+
 /*
  * Memory Equal
  */
