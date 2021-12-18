@@ -1231,7 +1231,7 @@ btc_peer_announce_tx(btc_peer_t *peer, const btc_mpentry_t *entry) {
 
   /* Check the fee filter. */
   if (peer->fee_rate != -1) {
-    int64_t rate = btc_get_rate(entry->size, entry->fee);
+    int64_t rate = btc_get_rate(entry->fee, entry->size);
 
     if (rate < peer->fee_rate)
       return 0;

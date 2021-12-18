@@ -148,7 +148,7 @@ btc_blockentry_set_view(btc_blockentry_t *z,
   z->hash = z->tx->hash;
   z->whash = z->tx->whash;
   z->fee = btc_tx_fee(x, view);
-  z->rate = btc_get_rate(size, z->fee);
+  z->rate = btc_get_rate(z->fee, size);
   z->weight = btc_tx_weight(x);
   z->sigops = sigops;
   z->desc_rate = z->rate;
@@ -161,10 +161,10 @@ btc_blockentry_set_mpentry(btc_blockentry_t *z, const btc_mpentry_t *x) {
   z->hash = z->tx->hash;
   z->whash = z->tx->whash;
   z->fee = x->fee;
-  z->rate = btc_get_rate(x->size, x->delta_fee);
+  z->rate = btc_get_rate(x->delta_fee, x->size);
   z->weight = btc_tx_weight(x->tx);
   z->sigops = x->sigops;
-  z->desc_rate = btc_get_rate(x->desc_size, x->desc_fee);
+  z->desc_rate = btc_get_rate(x->desc_fee, x->desc_size);
   z->dep_count = 0;
 }
 

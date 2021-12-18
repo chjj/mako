@@ -357,7 +357,7 @@ btc_selector_full(const btc_selector_t *sel, int64_t fee) {
 
 static int64_t
 btc_selector_fee(const btc_selector_t *sel, int64_t rate) {
-  int64_t fee = btc_get_fee(sel->size, rate);
+  int64_t fee = btc_get_fee(rate, sel->size);
   return btc_fee_range(fee);
 }
 
