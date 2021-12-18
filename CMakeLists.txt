@@ -97,6 +97,7 @@ list(APPEND mako_sources src/crypto/chacha20.c
                          src/printf_core.c
                          src/regtest.c
                          src/script.c
+                         src/select.c
                          src/sign.c
                          src/signet.c
                          src/simnet.c

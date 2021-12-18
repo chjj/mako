@@ -1022,9 +1022,10 @@ btc_miner_update_time(btc_miner_t *miner, btc_tmpl_t *bt) {
 }
 
 static int64_t
-cmp_rate(void *ap, void *bp) {
-  btc_blockentry_t *a = ap;
-  btc_blockentry_t *b = bp;
+cmp_rate(const void *ap, const void *bp) {
+  const btc_blockentry_t *a = ap;
+  const btc_blockentry_t *b = bp;
+
   int64_t x = a->rate;
   int64_t y = b->rate;
 

@@ -21,7 +21,7 @@ extern "C" {
  * Types
  */
 
-typedef int64_t btc_heapcmp_f(void *x, void *y);
+typedef int64_t btc_heapcmp_f(const void *x, const void *y);
 
 /*
  * Heap

@@ -871,9 +871,9 @@ use_desc(const btc_mpentry_t *a) {
 }
 
 static int64_t
-cmp_rate(void *left, void *right) {
-  const btc_mpentry_t *a = (const btc_mpentry_t *)left;
-  const btc_mpentry_t *b = (const btc_mpentry_t *)right;
+cmp_rate(const void *ap, const void *bp) {
+  const btc_mpentry_t *a = ap;
+  const btc_mpentry_t *b = bp;
 
   int64_t xf = a->delta_fee;
   int64_t xs = a->size;
