@@ -164,13 +164,10 @@ btc_netaddr_hash(const btc_netaddr_t *x) {
 
 int
 btc_netaddr_equal(const btc_netaddr_t *x, const btc_netaddr_t *y) {
-  if (memcmp(x->raw, y->raw, 16) != 0)
-    return 0;
-
   if (x->port != y->port)
     return 0;
 
-  return 1;
+  return memcmp(x->raw, y->raw, 16) == 0;
 }
 
 size_t
