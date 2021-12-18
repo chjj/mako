@@ -22,46 +22,6 @@
 #include "internal.h"
 
 /*
- * Helpers
- */
-
-static btc_vector_t *
-btc_tx_input_addrs(const btc_tx_t *tx, const btc_view_t *view) {
-  btc_addrset_t *set = btc_addrset_create();
-  btc_vector_t *out = btc_vector_create();
-  const btc_input_t *input;
-  const btc_coin_t *coin;
-  btc_address_t *addr;
-  btc_address_t key;
-  size_t i;
-
-  btc_vector_grow(out, tx->inputs.length);
-
-  for (i = 0; i < tx->inputs.length; i++) {
-    input = tx->inputs.items[i];
-    coin = btc_view_get(view, &input->prevout);
-
-    if (coin == NULL)
-      continue;
-
-    if (!btc_address_set_script(&key, &coin->output.script))
-      continue;
-
-    if (btc_addrset_has(set, &key))
-      continue;
-
-    addr = btc_address_clone(&key);
-
-    btc_addrset_put(set, addr);
-    btc_vector_push(out, addr);
-  }
-
-  btc_addrset_destroy(set);
-
-  return out;
-}
-
-/*
  * Key Pair
  */
 

@@ -275,6 +275,39 @@ btc_tx_has_standard_witness(const btc_tx_t *tx, const btc_view_t *view);
 BTC_EXTERN int
 btc_tx_matches(const btc_tx_t *tx, btc_bloom_t *filter);
 
+BTC_EXTERN btc_vector_t *
+btc_tx_input_addrs(const btc_tx_t *tx, const btc_view_t *view);
+
+BTC_EXTERN btc_vector_t *
+btc_tx_output_addrs(const btc_tx_t *tx);
+
+BTC_EXTERN void
+btc_tx_outpoint(btc_outpoint_t *out, const btc_tx_t *tx, uint32_t index);
+
+BTC_EXTERN btc_coin_t *
+btc_tx_coin(const btc_tx_t *tx, size_t index, int32_t height);
+
+BTC_EXTERN void
+btc_tx_add_input(btc_tx_t *tx, const uint8_t *hash, uint32_t index);
+
+BTC_EXTERN void
+btc_tx_add_outpoint(btc_tx_t *tx, const btc_outpoint_t *prevout);
+
+BTC_EXTERN void
+btc_tx_add_output(btc_tx_t *tx, const btc_address_t *addr, int64_t value);
+
+BTC_EXTERN void
+btc_tx_add_nulldata(btc_tx_t *tx, const uint8_t *data, size_t length);
+
+BTC_EXTERN void
+btc_tx_set_locktime(btc_tx_t *tx, uint32_t locktime);
+
+BTC_EXTERN void
+btc_tx_set_sequence(btc_tx_t *tx, size_t index, uint32_t locktime, int sec);
+
+BTC_EXTERN void
+btc_tx_sort(btc_tx_t *tx);
+
 BTC_EXTERN size_t
 btc_tx_base_size(const btc_tx_t *tx);
 
@@ -301,9 +334,6 @@ btc_tx_write(uint8_t *zp, const btc_tx_t *tx);
 
 BTC_EXTERN int
 btc_tx_read(btc_tx_t *z, const uint8_t **xp, size_t *xn);
-
-BTC_EXTERN btc_coin_t *
-btc_tx_coin(const btc_tx_t *tx, size_t index, int32_t height);
 
 BTC_EXTERN void
 btc_tx_inspect(const btc_tx_t *tx,

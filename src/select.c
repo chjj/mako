@@ -38,15 +38,6 @@ typedef struct btc_utxo_s {
  * Helpers
  */
 
-static void
-btc_tx_add_outpoint(btc_tx_t *tx, const btc_outpoint_t *prevout) {
-  btc_input_t *input = btc_input_create();
-
-  btc_outpoint_copy(&input->prevout, prevout);
-
-  btc_inpvec_push(&tx->inputs, input);
-}
-
 static size_t
 btc_estimate_input_size(const btc_script_t *prev) {
   size_t base = 40;

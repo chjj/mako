@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <mako/address.h>
 #include <mako/bloom.h>
 #include <mako/coins.h>
 #include <mako/consensus.h>
@@ -17,6 +18,7 @@
 #include <mako/script.h>
 #include <mako/tx.h>
 #include <mako/util.h>
+#include <mako/vector.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -982,6 +984,189 @@ btc_tx_matches(const btc_tx_t *tx, btc_bloom_t *filter) {
   return 0;
 }
 
+btc_vector_t *
+btc_tx_input_addrs(const btc_tx_t *tx, const btc_view_t *view) {
+  btc_addrset_t *set = btc_addrset_create();
+  btc_vector_t *out = btc_vector_create();
+  const btc_input_t *input;
+  const btc_coin_t *coin;
+  btc_address_t *addr;
+  btc_address_t key;
+  size_t i;
+
+  btc_vector_grow(out, tx->inputs.length);
+
+  for (i = 0; i < tx->inputs.length; i++) {
+    input = tx->inputs.items[i];
+    coin = btc_view_get(view, &input->prevout);
+
+    if (coin == NULL)
+      continue;
+
+    if (!btc_address_set_script(&key, &coin->output.script))
+      continue;
+
+    if (btc_addrset_has(set, &key))
+      continue;
+
+    addr = btc_address_clone(&key);
+
+    btc_addrset_put(set, addr);
+    btc_vector_push(out, addr);
+  }
+
+  btc_addrset_destroy(set);
+
+  return out;
+}
+
+btc_vector_t *
+btc_tx_output_addrs(const btc_tx_t *tx) {
+  btc_addrset_t *set = btc_addrset_create();
+  btc_vector_t *out = btc_vector_create();
+  const btc_output_t *output;
+  btc_address_t *addr;
+  btc_address_t key;
+  size_t i;
+
+  btc_vector_grow(out, tx->outputs.length);
+
+  for (i = 0; i < tx->outputs.length; i++) {
+    output = tx->outputs.items[i];
+
+    if (!btc_address_set_script(&key, &output->script))
+      continue;
+
+    if (btc_addrset_has(set, &key))
+      continue;
+
+    addr = btc_address_clone(&key);
+
+    btc_addrset_put(set, addr);
+    btc_vector_push(out, addr);
+  }
+
+  btc_addrset_destroy(set);
+
+  return out;
+}
+
+void
+btc_tx_outpoint(btc_outpoint_t *out, const btc_tx_t *tx, uint32_t index) {
+  btc_outpoint_set(out, tx->hash, index);
+}
+
+btc_coin_t *
+btc_tx_coin(const btc_tx_t *tx, size_t index, int32_t height) {
+  btc_coin_t *coin = btc_coin_create();
+
+  coin->version = tx->version;
+  coin->height = height;
+  coin->coinbase = btc_tx_is_coinbase(tx);
+
+  btc_output_copy(&coin->output, tx->outputs.items[index]);
+
+  return coin;
+}
+
+void
+btc_tx_add_input(btc_tx_t *tx, const uint8_t *hash, uint32_t index) {
+  btc_input_t *input = btc_input_create();
+
+  btc_outpoint_set(&input->prevout, hash, index);
+
+  btc_inpvec_push(&tx->inputs, input);
+}
+
+void
+btc_tx_add_outpoint(btc_tx_t *tx, const btc_outpoint_t *prevout) {
+  btc_input_t *input = btc_input_create();
+
+  btc_outpoint_copy(&input->prevout, prevout);
+
+  btc_inpvec_push(&tx->inputs, input);
+}
+
+void
+btc_tx_add_output(btc_tx_t *tx, const btc_address_t *addr, int64_t value) {
+  btc_output_t *output = btc_output_create();
+
+  btc_address_get_script(&output->script, addr);
+
+  output->value = value;
+
+  btc_outvec_push(&tx->outputs, output);
+}
+
+void
+btc_tx_add_nulldata(btc_tx_t *tx, const uint8_t *data, size_t length) {
+  btc_output_t *output = btc_output_create();
+
+  btc_script_set_nulldata(&output->script, data, length);
+
+  btc_outvec_push(&tx->outputs, output);
+}
+
+void
+btc_tx_set_locktime(btc_tx_t *tx, uint32_t locktime) {
+  size_t i;
+
+  for (i = 0; i < tx->inputs.length; i++) {
+    btc_input_t *input = tx->inputs.items[i];
+
+    if (input->sequence == 0xffffffff)
+      input->sequence = 0xfffffffe;
+  }
+
+  tx->locktime = locktime;
+}
+
+void
+btc_tx_set_sequence(btc_tx_t *tx, size_t index, uint32_t locktime, int sec) {
+  btc_input_t *input = tx->inputs.items[index];
+
+  tx->version = 2;
+
+  if (sec) {
+    locktime >>= BTC_SEQUENCE_GRANULARITY;
+    locktime &= BTC_SEQUENCE_MASK;
+    locktime |= BTC_SEQUENCE_TYPE_FLAG;
+  } else {
+    locktime &= BTC_SEQUENCE_MASK;
+  }
+
+  input->sequence = locktime;
+}
+
+static int
+input_compare(const void *xp, const void *yp) {
+  const btc_input_t *x = *((const btc_input_t **)xp);
+  const btc_input_t *y = *((const btc_input_t **)yp);
+
+  return btc_outpoint_compare(&x->prevout, &y->prevout);
+}
+
+static int
+output_compare(const void *xp, const void *yp) {
+  const btc_output_t *x = *((const btc_output_t **)xp);
+  const btc_output_t *y = *((const btc_output_t **)yp);
+
+  return btc_output_compare(x, y);
+}
+
+void
+btc_tx_sort(btc_tx_t *tx) {
+  qsort(tx->inputs.items,
+        tx->inputs.length,
+        sizeof(btc_input_t *),
+        input_compare);
+
+  qsort(tx->outputs.items,
+        tx->outputs.length,
+        sizeof(btc_output_t *),
+        output_compare);
+}
+
 size_t
 btc_tx_base_size(const btc_tx_t *tx) {
   size_t size = 0;
@@ -1124,19 +1309,6 @@ btc_tx_read(btc_tx_t *z, const uint8_t **xp, size_t *xn) {
   }
 
   return 1;
-}
-
-btc_coin_t *
-btc_tx_coin(const btc_tx_t *tx, size_t index, int32_t height) {
-  btc_coin_t *coin = btc_coin_create();
-
-  coin->version = tx->version;
-  coin->height = height;
-  coin->coinbase = btc_tx_is_coinbase(tx);
-
-  btc_output_copy(&coin->output, tx->outputs.items[index]);
-
-  return coin;
 }
 
 /*
