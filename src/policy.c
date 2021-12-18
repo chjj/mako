@@ -40,7 +40,7 @@ btc_get_round_fee(size_t size, int64_t rate) {
   if (size == 0)
     return 0;
 
-  fee = rate * (((int64_t)size + 1000 - 1) / 1000);
+  fee = rate * (((int64_t)size + 999) / 1000);
 
   if (fee == 0 && rate > 0)
     fee = rate;
