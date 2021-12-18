@@ -68,6 +68,17 @@ btc_address_equal(const btc_address_t *x, const btc_address_t *y) {
 }
 
 int
+btc_address_compare(const btc_address_t *x, const btc_address_t *y) {
+  if (x->type != y->type)
+    return (int)x->type - (int)y->type;
+
+  if (x->version != y->version)
+    return (int)x->version - (int)y->version;
+
+  return btc_memcmp4(x->hash, x->length, y->hash, y->length);
+}
+
+int
 btc_address_is_p2pkh(const btc_address_t *addr) {
   return addr->type == BTC_ADDRESS_P2PKH;
 }
