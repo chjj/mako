@@ -9,6 +9,7 @@
 #include <string.h>
 #include <mako/buffer.h>
 #include <mako/crypto/hash.h>
+#include <mako/util.h>
 #include "impl.h"
 #include "internal.h"
 
@@ -85,11 +86,11 @@ btc_buffer_rocopy(btc_buffer_t *z, const btc_buffer_t *x) {
   btc_buffer_roset(z, x->data, x->length);
 }
 
-btc_buffer_t *
-btc_buffer_roclone(const btc_buffer_t *x) {
-  btc_buffer_t *z = btc_buffer_create();
-  btc_buffer_rocopy(z, x);
-  return z;
+void
+btc_buffer_rwset(btc_buffer_t *z, uint8_t *zp, size_t zn) {
+  z->data = zp;
+  z->alloc = zn;
+  z->length = 0;
 }
 
 int
@@ -97,12 +98,15 @@ btc_buffer_equal(const btc_buffer_t *x, const btc_buffer_t *y) {
   if (x->length != y->length)
     return 0;
 
-  if (x->length > 0) {
-    if (memcmp(x->data, y->data, x->length) != 0)
-      return 0;
-  }
+  if (x->length == 0)
+    return 1;
 
-  return 1;
+  return memcmp(x->data, y->data, y->length) == 0;
+}
+
+int
+btc_buffer_compare(const btc_buffer_t *x, const btc_buffer_t *y) {
+  return btc_memcmp4(x->data, x->length, y->data, y->length);
 }
 
 size_t

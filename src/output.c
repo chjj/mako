@@ -38,6 +38,25 @@ btc_output_copy(btc_output_t *z, const btc_output_t *x) {
   btc_script_copy(&z->script, &x->script);
 }
 
+int
+btc_output_equal(const btc_output_t *x, const btc_output_t *y) {
+  if (x->value != y->value)
+    return 0;
+
+  return btc_script_equal(&x->script, &y->script);
+}
+
+int
+btc_output_compare(const btc_output_t *x, const btc_output_t *y) {
+  if (x->value < y->value)
+    return -1;
+
+  if (x->value > y->value)
+    return 1;
+
+  return btc_script_compare(&x->script, &y->script);
+}
+
 size_t
 btc_output_size(const btc_output_t *x) {
   size_t size = 0;

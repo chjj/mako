@@ -399,8 +399,9 @@ btc_opcode_read(btc_opcode_t *z, const uint8_t **xp, size_t *xn);
 #define btc_script_copy btc_buffer_copy
 #define btc_script_roset btc_buffer_roset
 #define btc_script_rocopy btc_buffer_rocopy
-#define btc_script_roclone btc_buffer_roclone
+#define btc_script_rwset btc_buffer_rwset
 #define btc_script_equal btc_buffer_equal
+#define btc_script_compare btc_buffer_compare
 #define btc_script_size btc_buffer_size
 #define btc_script_write btc_buffer_write
 #define btc_script_read btc_buffer_read

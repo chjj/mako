@@ -42,6 +42,9 @@ BTC_EXTERN int
 btc_outpoint_equal(const btc_outpoint_t *x, const btc_outpoint_t *y);
 
 BTC_EXTERN int
+btc_outpoint_compare(const btc_outpoint_t *x, const btc_outpoint_t *y);
+
+BTC_EXTERN int
 btc_outpoint_is_null(const btc_outpoint_t *x);
 
 BTC_EXTERN size_t
@@ -105,6 +108,12 @@ btc_output_clear(btc_output_t *z);
 
 BTC_EXTERN void
 btc_output_copy(btc_output_t *z, const btc_output_t *x);
+
+BTC_EXTERN int
+btc_output_equal(const btc_output_t *x, const btc_output_t *y);
+
+BTC_EXTERN int
+btc_output_compare(const btc_output_t *x, const btc_output_t *y);
 
 BTC_EXTERN size_t
 btc_output_size(const btc_output_t *x);

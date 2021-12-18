@@ -59,6 +59,22 @@ btc_outpoint_equal(const btc_outpoint_t *x, const btc_outpoint_t *y) {
 }
 
 int
+btc_outpoint_compare(const btc_outpoint_t *x, const btc_outpoint_t *y) {
+  int cmp = btc_hash_compare(x->hash, y->hash);
+
+  if (cmp != 0)
+    return cmp;
+
+  if (x->index < y->index)
+    return -1;
+
+  if (x->index > y->index)
+    return 1;
+
+  return 0;
+}
+
+int
 btc_outpoint_is_null(const btc_outpoint_t *x) {
   static const btc_outpoint_t zero = {{0}, 0xffffffff};
   return btc_outpoint_equal(x, &zero);
