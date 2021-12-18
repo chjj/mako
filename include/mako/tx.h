@@ -18,6 +18,12 @@ extern "C" {
 #include "types.h"
 
 /*
+ * Types
+ */
+
+typedef int btc_derive_f(uint8_t *, const btc_address_t *, void *);
+
+/*
  * Outpoint
  */
 
@@ -208,24 +214,6 @@ btc_tx_verify_input(const btc_tx_t *tx,
                     btc_tx_cache_t *cache);
 
 BTC_EXTERN int
-btc_tx_sign(btc_tx_t *tx,
-            const btc_view_t *view,
-            int (*derive)(uint8_t *priv,
-                          const btc_script_t *script,
-                          void *arg1,
-                          void *arg2),
-            void *arg1,
-            void *arg2);
-
-BTC_EXTERN int
-btc_tx_sign_input(btc_tx_t *tx,
-                  size_t index,
-                  const btc_output_t *coin,
-                  const uint8_t *priv,
-                  int type,
-                  btc_tx_cache_t *cache);
-
-BTC_EXTERN int
 btc_tx_is_rbf(const btc_tx_t *tx);
 
 BTC_EXTERN int
@@ -336,6 +324,22 @@ btc_txvec_base_write(uint8_t *zp, const btc_txvec_t *x);
 
 BTC_EXTERN size_t
 btc_txvec_witness_size(const btc_txvec_t *txs);
+
+/*
+ * Signing
+ */
+
+BTC_EXTERN int
+btc_tx_sign_step(btc_tx_t *tx,
+                 const btc_view_t *view,
+                 const uint8_t *priv,
+                 btc_tx_cache_t *cache);
+
+BTC_EXTERN int
+btc_tx_sign(btc_tx_t *tx,
+            const btc_view_t *view,
+            btc_derive_f *derive,
+            void *arg);
 
 #ifdef __cplusplus
 }
