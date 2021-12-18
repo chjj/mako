@@ -50,13 +50,13 @@ btc_estimate_input_size(const btc_script_t *prev) {
     /* varint script size */
     base += 1;
     /* OP_PUSHDATA0 [signature] */
-    base += 1 + 74;
+    base += 1 + 73;
   } else if (btc_script_is_p2pkh(prev)) {
     /* P2PKH */
     /* varint script size */
     base += 1;
     /* OP_PUSHDATA0 [signature] */
-    base += 1 + 74;
+    base += 1 + 73;
     /* OP_PUSHDATA0 [key] */
     base += 1 + 33;
   } else if (btc_script_get_multisig(&m, NULL, NULL, prev)) {
@@ -66,13 +66,13 @@ btc_estimate_input_size(const btc_script_t *prev) {
     /* OP_0 */
     base += 1;
     /* OP_PUSHDATA0 [signature] ... */
-    base += (1 + 74) * m;
+    base += (1 + 73) * m;
   } else if (btc_script_is_p2sh(prev)) {
     /* Nested P2WPKH */
     /* varint-items-len */
     wit += 1;
     /* varint-len [signature] */
-    wit += 1 + 74;
+    wit += 1 + 73;
     /* varint-len [key] */
     wit += 1 + 33;
     /* varint script size */
@@ -84,7 +84,7 @@ btc_estimate_input_size(const btc_script_t *prev) {
     /* varint-items-len */
     wit += 1;
     /* varint-len [signature] */
-    wit += 1 + 74;
+    wit += 1 + 73;
     /* varint-len [key] */
     wit += 1 + 33;
   } else if (btc_script_is_p2wsh(prev)) {
@@ -92,7 +92,7 @@ btc_estimate_input_size(const btc_script_t *prev) {
     /* varint-items-len */
     wit += 1;
     /* 2-of-3 multisig input */
-    wit += 151;
+    wit += 149;
   } else if (btc_script_is_program(prev)) {
     /* Unknown witness program. */
     wit += 110;
@@ -367,7 +367,7 @@ btc_selector_spendable(const btc_selector_t *sel, const btc_utxo_t *utxo) {
 
   if (opt->height >= 0 && utxo->coinbase) {
     if (utxo->height == -1)
-      return 0;
+      return 0; /* LCOV_EXCL_LINE */
 
     if (opt->height + 1 < utxo->height + BTC_COINBASE_MATURITY)
       return 0;
@@ -386,9 +386,23 @@ btc_selector_spendable(const btc_selector_t *sel, const btc_utxo_t *utxo) {
   return 1;
 }
 
+static int
+btc_selector_should_fund(btc_selector_t *sel, int64_t fee) {
+  if (sel->utxos.length == 0)
+    return 0;
+
+  if (sel->strategy == BTC_SELECT_ALL)
+    return 1;
+
+  if (!btc_selector_full(sel, fee))
+    return 1;
+
+  return 0;
+}
+
 static void
 btc_selector_fund(btc_selector_t *sel, int64_t fee) {
-  while (sel->utxos.length > 0 && !btc_selector_full(sel, fee)) {
+  while (btc_selector_should_fund(sel, fee)) {
     btc_utxo_t *utxo = btc_selector_shift(sel);
 
     if (btc_selector_spendable(sel, utxo)) {
@@ -403,11 +417,12 @@ btc_selector_fund(btc_selector_t *sel, int64_t fee) {
 }
 
 static int64_t
-btc_selector_select_rate(btc_selector_t *sel, int64_t rate) {
+btc_selector_by_rate(btc_selector_t *sel, int64_t rate) {
+  const btc_selopt_t *opt = sel->opt;
   int64_t fee;
 
   if (sel->strategy == BTC_SELECT_ALL) {
-    btc_selector_fund(sel, BTC_MAX_MONEY);
+    btc_selector_fund(sel, 0);
   } else {
     while (sel->utxos.length > 0) {
       fee = btc_selector_fee(sel, rate);
@@ -424,15 +439,15 @@ btc_selector_select_rate(btc_selector_t *sel, int64_t rate) {
   if (!btc_selector_full(sel, fee))
     return -1;
 
+  if (opt->maxfee > 0 && fee > opt->maxfee)
+    return -1;
+
   return sel->inpval - btc_selector_total(sel, fee);
 }
 
 static int64_t
-btc_selector_select_fee(btc_selector_t *sel, int64_t fee) {
-  if (sel->strategy == BTC_SELECT_ALL)
-    btc_selector_fund(sel, BTC_MAX_MONEY);
-  else
-    btc_selector_fund(sel, fee);
+btc_selector_by_fee(btc_selector_t *sel, int64_t fee) {
+  btc_selector_fund(sel, fee);
 
   if (!btc_selector_full(sel, fee))
     return -1;
@@ -455,17 +470,16 @@ btc_selector_fill(btc_selector_t *sel, const btc_address_t *addr) {
   /* Select necessary coins. */
   if (opt->fee >= 0) {
     fee = btc_fee_range(opt->fee);
-    change = btc_selector_select_fee(sel, fee);
+    change = btc_selector_by_fee(sel, fee);
   } else if (opt->rate > 0) {
-    change = btc_selector_select_rate(sel, opt->rate);
+    change = btc_selector_by_rate(sel, opt->rate);
     fee = btc_selector_fee(sel, opt->rate);
   }
 
-  if (change < 0)
+  if (change < 0) {
+    /* Failed to find enough funds. */
     return 0;
-
-  if (opt->maxfee > 0 && fee > opt->maxfee)
-    return 0;
+  }
 
   /* Attempt to subtract fee. */
   if (opt->subfee) {
