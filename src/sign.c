@@ -139,6 +139,7 @@ btc_tx_signature(uint8_t *sig,
     return 0;
 
   CHECK(btc_ecdsa_sig_export(sig, sig_len, tmp));
+  CHECK(*sig_len <= 72);
 
   sig[(*sig_len)++] = type;
 
@@ -156,7 +157,7 @@ btc_tx_sign_p2pk(btc_tx_t *tx,
   size_t pub_len, sig_len;
   btc_writer_t writer;
   const uint8_t *pub;
-  uint8_t sig[74];
+  uint8_t sig[73];
 
   if (!btc_script_get_p2pk(&pub, &pub_len, &coin->script))
     return 0;
@@ -194,7 +195,7 @@ btc_tx_sign_p2pkh(btc_tx_t *tx,
   const uint8_t *hash, *pub;
   size_t pub_len, sig_len;
   btc_writer_t writer;
-  uint8_t sig[74];
+  uint8_t sig[73];
 
   if (!btc_script_get_p2pkh(&hash, &coin->script))
     return 0;
@@ -233,7 +234,7 @@ btc_tx_sign_p2wpkh(btc_tx_t *tx,
   const uint8_t *hash, *pub;
   size_t pub_len, sig_len;
   btc_script_t redeem;
-  uint8_t sig[74];
+  uint8_t sig[73];
   uint8_t tmp[25];
 
   if (!btc_script_get_p2wpkh(&hash, &coin->script))
