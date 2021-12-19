@@ -481,14 +481,14 @@ http_client_size_head(http_client_t *client,
   if (opt->type != NULL)
     size += 16 + strlen(opt->type); /* Content-Type: %s */
 
+  if (opt->body != NULL)
+    size += 18 + 20; /* Content-Length: %lu */
+
   if (opt->user != NULL && opt->pass != NULL) {
     size_t len = strlen(opt->user) + 1 + strlen(opt->pass);
 
     size += 23 + base64_encode_size(len); /* Authorization: Basic %s */
   }
-
-  if (opt->body != NULL)
-    size += 18 + 20; /* Content-Length: %lu */
 
   if (opt->headers != NULL) {
     size_t i;
@@ -529,6 +529,12 @@ http_client_write_head(http_client_t *client, const http_options_t *opt) {
   if (opt->type != NULL)
     zp += sprintf(zp, "Content-Type: %s\r\n", opt->type);
 
+  if (opt->body != NULL) {
+    unsigned long length = strlen(opt->body);
+
+    zp += sprintf(zp, "Content-Length: %lu\r\n", length);
+  }
+
   if (opt->user != NULL && opt->pass != NULL) {
     char tp[512], bp[685];
     int tn;
@@ -541,12 +547,6 @@ http_client_write_head(http_client_t *client, const http_options_t *opt) {
     base64_encode(bp, NULL, (unsigned char *)tp, tn);
 
     zp += sprintf(zp, "Authorization: Basic %s\r\n", bp);
-  }
-
-  if (opt->body != NULL) {
-    unsigned long length = strlen(opt->body);
-
-    zp += sprintf(zp, "Content-Length: %lu\r\n", length);
   }
 
   if (opt->headers != NULL) {
