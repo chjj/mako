@@ -98,11 +98,6 @@ find_prefix(const uint32_t *table, uint32_t prefix) {
   return -1;
 }
 
-static uint32_t
-sec_equal(uint32_t x, uint32_t y) {
-  return ((x ^ y) - 1) >> 31;
-}
-
 /*
  * HD Node
  */
@@ -219,15 +214,22 @@ btc_hdpriv_generate(btc_hdnode_t *node, enum btc_bip32_type type) {
 
 int
 btc_hdpriv_equal(const btc_hdnode_t *x, const btc_hdnode_t *y) {
-  int ret = 1;
+  uint32_t z = 0;
+  int i;
 
-  ret &= sec_equal(x->depth, y->depth);
-  ret &= sec_equal(x->parent, y->parent);
-  ret &= sec_equal(x->index, y->index);
-  ret &= btc_memequal(x->chain, y->chain, 32);
-  ret &= btc_memequal(x->seckey, y->seckey, 32);
+  z |= x->depth ^ y->depth;
+  z |= x->parent ^ y->parent;
+  z |= x->index ^ y->index;
 
-  return ret;
+  for (i = 0; i < 32; i++)
+    z |= x->chain[i] ^ y->chain[i];
+
+  for (i = 0; i < 32; i++)
+    z |= x->seckey[i] ^ y->seckey[i];
+
+  z = (z >> 1) | (z & 1);
+
+  return (z - 1) >> 31;
 }
 
 int
@@ -525,15 +527,22 @@ btc_hdpub_set(btc_hdnode_t *node,
 
 int
 btc_hdpub_equal(const btc_hdnode_t *x, const btc_hdnode_t *y) {
-  int ret = 1;
+  uint32_t z = 0;
+  int i;
 
-  ret &= sec_equal(x->depth, y->depth);
-  ret &= sec_equal(x->parent, y->parent);
-  ret &= sec_equal(x->index, y->index);
-  ret &= btc_memequal(x->chain, y->chain, 32);
-  ret &= btc_memequal(x->pubkey, y->pubkey, 33);
+  z |= x->depth ^ y->depth;
+  z |= x->parent ^ y->parent;
+  z |= x->index ^ y->index;
 
-  return ret;
+  for (i = 0; i < 32; i++)
+    z |= x->chain[i] ^ y->chain[i];
+
+  for (i = 0; i < 33; i++)
+    z |= x->pubkey[i] ^ y->pubkey[i];
+
+  z = (z >> 1) | (z & 1);
+
+  return (z - 1) >> 31;
 }
 
 int
