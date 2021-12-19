@@ -19,7 +19,6 @@ btc_get_fee(int64_t rate, size_t size) {
   int64_t fee;
 
   CHECK(rate >= 0);
-  CHECK(size <= UINT32_MAX);
 
   if (size == 0)
     return 0;
@@ -37,7 +36,6 @@ btc_round_fee(int64_t rate, size_t size) {
   int64_t fee;
 
   CHECK(rate >= 0);
-  CHECK(size <= UINT32_MAX);
 
   if (size == 0)
     return 0;
@@ -53,7 +51,6 @@ btc_round_fee(int64_t rate, size_t size) {
 int64_t
 btc_get_rate(int64_t fee, size_t size) {
   CHECK(fee >= 0);
-  CHECK(size <= UINT32_MAX);
 
   if (size == 0)
     return 0;
