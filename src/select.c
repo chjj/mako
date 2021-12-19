@@ -227,6 +227,7 @@ btc_selopt_init(btc_selopt_t *opt) {
   opt->depth = -1;
   opt->subfee = 0;
   opt->subpos = -1;
+  opt->round = 0;
 }
 
 /*
@@ -357,7 +358,13 @@ btc_selector_full(const btc_selector_t *sel, int64_t fee) {
 
 static int64_t
 btc_selector_fee(const btc_selector_t *sel, int64_t rate) {
-  int64_t fee = btc_get_fee(rate, sel->size);
+  int64_t fee;
+
+  if (sel->opt->round)
+    fee = btc_round_fee(rate, sel->size);
+  else
+    fee = btc_get_fee(rate, sel->size);
+
   return btc_fee_range(fee);
 }
 
