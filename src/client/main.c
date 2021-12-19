@@ -202,6 +202,8 @@ main(int argc, char **argv) {
 
   client = btc_client_create();
 
+  btc_client_auth(client, args.rpc_user, args.rpc_pass);
+
   if (!btc_client_open(client, args.rpc_connect, args.rpc_port, 0)) {
     fprintf(stderr, "Could not connect to %s (port=%d).\n",
                     args.rpc_connect, args.rpc_port);

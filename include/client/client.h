@@ -40,6 +40,9 @@ btc_client_open(btc_client_t *client,
 BTC_EXTERN void
 btc_client_close(btc_client_t *client);
 
+BTC_EXTERN void
+btc_client_auth(btc_client_t *client, const char *user, const char *pass);
+
 BTC_EXTERN struct _json_value *
 btc_client_call(btc_client_t *client,
                 const char *method,

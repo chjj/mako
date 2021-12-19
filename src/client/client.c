@@ -21,11 +21,15 @@
 
 struct btc_client_s {
   http_client_t *http;
+  char user[256];
+  char pass[256];
 };
 
 static void
 btc_client_init(btc_client_t *client) {
   client->http = http_client_create();
+  client->user[0] = '\0';
+  client->pass[0] = '\0';
 }
 
 static void
@@ -59,6 +63,23 @@ btc_client_close(btc_client_t *client) {
   http_client_close(client->http);
 }
 
+void
+btc_client_auth(btc_client_t *client, const char *user, const char *pass) {
+  if (pass != NULL && *pass != '\0') {
+    size_t userlen = strlen(user);
+    size_t passlen = strlen(pass);
+
+    CHECK(userlen + 1 <= sizeof(client->user));
+    CHECK(passlen + 1 <= sizeof(client->pass));
+
+    memcpy(client->user, user, userlen + 1);
+    memcpy(client->pass, pass, passlen + 1);
+  } else {
+    client->user[0] = '\0';
+    client->pass[0] = '\0';
+  }
+}
+
 json_value *
 btc_client_call(btc_client_t *client, const char *method, json_value *params) {
   json_value *error, *code, *message, *result;
@@ -88,6 +109,11 @@ btc_client_call(btc_client_t *client, const char *method, json_value *params) {
   options.type = "application/json";
   options.body = body;
 
+  if (*client->pass) {
+    options.user = client->user;
+    options.pass = client->pass;
+  }
+
   msg = http_client_request(client->http, &options);
 
   btc_free(body);
@@ -98,8 +124,13 @@ btc_client_call(btc_client_t *client, const char *method, json_value *params) {
   }
 
   if (msg->status != 200) {
-    fprintf(stderr, "HTTP Error (status=%u).\n", msg->status);
+    if (msg->status == 401)
+      fprintf(stderr, "Invalid RPC credentials.\n");
+    else
+      fprintf(stderr, "HTTP Error (status=%u).\n", msg->status);
+
     http_msg_destroy(msg);
+
     return NULL;
   }
 

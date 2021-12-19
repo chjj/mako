@@ -117,6 +117,18 @@ http_res_send_json(http_res_t *res, json_value *value) {
 }
 
 /*
+ * Hash Helpers
+ */
+
+static void
+btc_hash_auth(uint8_t *hash, const char *user, const char *pass) {
+  btc_hmac256_t ctx;
+  btc_hmac256_init(&ctx, (const uint8_t *)user, strlen(user));
+  btc_hmac256_update(&ctx, (const uint8_t *)pass, strlen(pass));
+  btc_hmac256_final(&ctx, hash);
+}
+
+/*
  * RPC Request
  */
 
@@ -281,15 +293,10 @@ btc_rpc_set_bind(btc_rpc_t *rpc, const btc_netaddr_t *addr) {
 
 void
 btc_rpc_set_credentials(btc_rpc_t *rpc, const char *user, const char *pass) {
-  btc_hmac256_t hmac;
-
-  if (pass == NULL || *pass == '\0') {
+  if (pass != NULL && *pass != '\0')
+    btc_hash_auth(rpc->auth_hash, user, pass);
+  else
     btc_hash_init(rpc->auth_hash);
-  } else {
-    btc_hmac256_init(&hmac, (const uint8_t *)user, strlen(user));
-    btc_hmac256_update(&hmac, (const uint8_t *)pass, strlen(pass));
-    btc_hmac256_final(&hmac, rpc->auth_hash);
-  }
 }
 
 static void
@@ -809,6 +816,17 @@ on_request(http_server_t *server, http_req_t *req, http_res_t *res) {
   if (req->path.length != 1 || req->path.data[0] != '/') {
     http_res_error(res, 404);
     return 1;
+  }
+
+  if (!btc_hash_is_null(rpc->auth_hash)) {
+    uint8_t hash[32];
+
+    btc_hash_auth(hash, req->user.data, req->pass.data);
+
+    if (!btc_memequal(hash, rpc->auth_hash, 32)) {
+      http_res_unauthorized(res, "Bitcoin RPC");
+      return 1;
+    }
   }
 
   rpc_req_init(&rreq);
