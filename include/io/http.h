@@ -90,6 +90,8 @@ typedef struct http_req {
   unsigned int method;
   http_string_t path;
   http_head_t headers;
+  http_string_t user;
+  http_string_t pass;
   http_string_t body;
 } http_req_t;
 
@@ -118,6 +120,8 @@ typedef struct http_options {
   const char *agent;
   const char *accept;
   const char *type;
+  const char *user;
+  const char *pass;
   const char *body;
 } http_options_t;
 
@@ -158,6 +162,9 @@ http_res_send_data(http_res_t *res,
 
 BTC_EXTERN void
 http_res_error(http_res_t *res, unsigned int status);
+
+BTC_EXTERN void
+http_res_unauthorized(http_res_t *res, const char *realm);
 
 /*
  * Server

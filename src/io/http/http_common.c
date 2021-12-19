@@ -80,7 +80,8 @@ void
 http_string_assign(http_string_t *z, const char *xp, size_t xn) {
   http_string_grow(z, xn);
 
-  memcpy(z->data, xp, xn);
+  if (xn > 0)
+    memcpy(z->data, xp, xn);
 
   z->length = xn;
   z->data[z->length] = '\0';
@@ -212,4 +213,284 @@ http_head_push_item(http_head_t *z, const char *field, const char *value) {
   http_string_set(&hdr->value, value);
 
   http_head_push(z, hdr);
+}
+
+/*
+ * Base64
+ */
+
+static const char *base64_charset =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static const signed char base64_table[256] = {
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, 62, -1, -1, -1, 63,
+  52, 53, 54, 55, 56, 57, 58, 59,
+  60, 61, -1, -1, -1, -1, -1, -1,
+  -1,  0,  1,  2,  3,  4,  5,  6,
+   7,  8,  9, 10, 11, 12, 13, 14,
+  15, 16, 17, 18, 19, 20, 21, 22,
+  23, 24, 25, -1, -1, -1, -1, -1,
+  -1, 26, 27, 28, 29, 30, 31, 32,
+  33, 34, 35, 36, 37, 38, 39, 40,
+  41, 42, 43, 44, 45, 46, 47, 48,
+  49, 50, 51, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1,
+  -1, -1, -1, -1, -1, -1, -1, -1
+};
+
+static int
+base64_check_padding(const char *str, size_t len, size_t size) {
+  switch (size % 3) {
+    case 0: {
+      if (len == 0)
+        return 1;
+
+      if (len == 1)
+        return str[0] != '=';
+
+      return str[len - 2] != '='
+          && str[len - 1] != '=';
+    }
+
+    case 1: {
+      return len >= 4
+          && str[len - 2] == '='
+          && str[len - 1] == '=';
+    }
+
+    case 2: {
+      return len >= 4
+          && str[len - 2] != '='
+          && str[len - 1] == '=';
+    }
+
+    default: {
+      return 0; /* Unreachable. */
+    }
+  }
+}
+
+size_t
+base64_encode_size(size_t len) {
+  size_t size = (len / 3) * 4;
+
+  switch (len % 3) {
+    case 1:
+      size += 2;
+      size += 2;
+      break;
+    case 2:
+      size += 3;
+      size += 1;
+      break;
+  }
+
+  return size;
+}
+
+void
+base64_encode(char *dst,
+              size_t *dstlen,
+              const unsigned char *src,
+              size_t srclen) {
+  size_t left = srclen;
+  size_t i = 0;
+  size_t j = 0;
+
+  while (left >= 3) {
+    int c1 = src[i++];
+    int c2 = src[i++];
+    int c3 = src[i++];
+
+    dst[j++] = base64_charset[c1 >> 2];
+    dst[j++] = base64_charset[((c1 & 3) << 4) | (c2 >> 4)];
+    dst[j++] = base64_charset[((c2 & 15) << 2) | (c3 >> 6)];
+    dst[j++] = base64_charset[c3 & 63];
+
+    left -= 3;
+  }
+
+  switch (left) {
+    case 1: {
+      int c1 = src[i++];
+
+      dst[j++] = base64_charset[c1 >> 2];
+      dst[j++] = base64_charset[(c1 & 3) << 4];
+      dst[j++] = '=';
+      dst[j++] = '=';
+
+      break;
+    }
+
+    case 2: {
+      int c1 = src[i++];
+      int c2 = src[i++];
+
+      dst[j++] = base64_charset[c1 >> 2];
+      dst[j++] = base64_charset[((c1 & 3) << 4) | (c2 >> 4)];
+      dst[j++] = base64_charset[(c2 & 15) << 2];
+      dst[j++] = '=';
+
+      break;
+    }
+  }
+
+  dst[j] = '\0';
+
+  if (dstlen != NULL)
+    *dstlen = j;
+}
+
+size_t
+base64_decode_size(const char *str, size_t len) {
+  size_t size, rem;
+
+  if (len > 0 && str[len - 1] == '=')
+    len -= 1;
+
+  if (len > 0 && str[len - 1] == '=')
+    len -= 1;
+
+  size = (len / 4) * 3;
+  rem = len & 3;
+
+  if (rem)
+    size += rem - 1;
+
+  return size;
+}
+
+int
+base64_decode(unsigned char *dst,
+              size_t *dstlen,
+              const char *src,
+              size_t srclen) {
+  size_t size = base64_decode_size(src, srclen);
+  size_t left = srclen;
+  size_t i = 0;
+  size_t j = 0;
+
+  if (!base64_check_padding(src, srclen, size))
+    return 0;
+
+  if (left > 0 && src[left - 1] == '=')
+    left -= 1;
+
+  if (left > 0 && src[left - 1] == '=')
+    left -= 1;
+
+  if ((left & 3) == 1) /* Fail early. */
+    return 0;
+
+  while (left >= 4) {
+    int t1 = base64_table[src[i++] & 0xff];
+    int t2 = base64_table[src[i++] & 0xff];
+    int t3 = base64_table[src[i++] & 0xff];
+    int t4 = base64_table[src[i++] & 0xff];
+
+    if ((t1 | t2 | t3 | t4) < 0)
+      return 0;
+
+    dst[j++] = (t1 << 2) | (t2 >> 4);
+    dst[j++] = (t2 << 4) | (t3 >> 2);
+    dst[j++] = (t3 << 6) | (t4 >> 0);
+
+    left -= 4;
+  }
+
+  switch (left) {
+    case 1: {
+      return 0;
+    }
+
+    case 2: {
+      int t1 = base64_table[src[i++] & 0xff];
+      int t2 = base64_table[src[i++] & 0xff];
+
+      if ((t1 | t2) < 0)
+        return 0;
+
+      dst[j++] = (t1 << 2) | (t2 >> 4);
+
+      if (t2 & 15)
+        return 0;
+
+      break;
+    }
+
+    case 3: {
+      int t1 = base64_table[src[i++] & 0xff];
+      int t2 = base64_table[src[i++] & 0xff];
+      int t3 = base64_table[src[i++] & 0xff];
+
+      if ((t1 | t2 | t3) < 0)
+        return 0;
+
+      dst[j++] = (t1 << 2) | (t2 >> 4);
+      dst[j++] = (t2 << 4) | (t3 >> 2);
+
+      if (t3 & 3)
+        return 0;
+
+      break;
+    }
+  }
+
+  if (dstlen != NULL)
+    *dstlen = j;
+
+  return 1;
+}
+
+int
+base64_test(const char *str, size_t len) {
+  size_t size = base64_decode_size(str, len);
+  size_t i;
+
+  if (!base64_check_padding(str, len, size))
+    return 0;
+
+  if (len > 0 && str[len - 1] == '=')
+    len -= 1;
+
+  if (len > 0 && str[len - 1] == '=')
+    len -= 1;
+
+  if ((len & 3) == 1) /* Fail early. */
+    return 0;
+
+  for (i = 0; i < len; i++) {
+    if (base64_table[str[i] & 0xff] == -1)
+      return 0;
+  }
+
+  switch (len & 3) {
+    case 1:
+      return 0;
+    case 2:
+      return (base64_table[str[len - 1] & 0xff] & 15) == 0;
+    case 3:
+      return (base64_table[str[len - 1] & 0xff] & 3) == 0;
+  }
+
+  return 1;
 }

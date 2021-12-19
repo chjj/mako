@@ -101,4 +101,35 @@ http_head_push(http_head_t *z, http_header_t *x);
 void
 http_head_push_item(http_head_t *z, const char *field, const char *value);
 
+/*
+ * Base64
+ */
+
+#define base64_encode_size http_base64_encode_size
+#define base64_encode http_base64_encode
+#define base64_decode_size http_base64_decode_size
+#define base64_decode http_base64_decode
+#define base64_test http_base64_test
+
+size_t
+base64_encode_size(size_t len);
+
+void
+base64_encode(char *dst,
+              size_t *dstlen,
+              const unsigned char *src,
+              size_t srclen);
+
+size_t
+base64_decode_size(const char *str, size_t len);
+
+int
+base64_decode(unsigned char *dst,
+              size_t *dstlen,
+              const char *src,
+              size_t srclen);
+
+int
+base64_test(const char *str, size_t len);
+
 #endif /* HTTP_COMMON_H */

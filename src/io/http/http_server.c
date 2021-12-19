@@ -40,6 +40,8 @@ http_req_init(http_req_t *req) {
   req->method = 0;
   http_string_init(&req->path);
   http_head_init(&req->headers);
+  http_string_init(&req->user);
+  http_string_init(&req->pass);
   http_string_init(&req->body);
 }
 
@@ -47,6 +49,8 @@ static void
 http_req_clear(http_req_t *req) {
   http_string_clear(&req->path);
   http_head_clear(&req->headers);
+  http_string_clear(&req->user);
+  http_string_clear(&req->pass);
   http_string_clear(&req->body);
 }
 
@@ -256,6 +260,80 @@ http_res_error(http_res_t *res, unsigned int status) {
   http_res_send(res, status, "text/plain", body);
 }
 
+void
+http_res_unauthorized(http_res_t *res, const char *realm) {
+  char value[14 + 128 + 1];
+
+  if (strlen(realm) > 128)
+    abort(); /* LCOV_EXCL_LINE */
+
+  sprintf(value, "Basic realm=\"%s\"", realm);
+
+  http_res_header(res, "WWW-Authenticate", value);
+  http_res_error(res, 401);
+}
+
+/*
+ * Basic Auth
+ */
+
+static int
+http_parse_auth(http_req_t *req) {
+  const http_string_t *hdr = http_req_header(req, "Authorization");
+  size_t xn, zn, un, pn;
+  char *sp, *up, *pp;
+  const char *xp;
+  char zp[512];
+
+  if (hdr == NULL)
+    return 1;
+
+  if (hdr->length < 6 || hdr->length > 6 + 684)
+    return 0;
+
+  if (memcmp(hdr->data, "Basic ", 6) != 0)
+    return 0;
+
+  xp = hdr->data + 6;
+  xn = hdr->length - 6;
+
+  if (base64_decode_size(xp, xn) + 1 > sizeof(zp))
+    return 0;
+
+  if (!base64_decode((unsigned char *)zp, &zn, xp, xn))
+    return 0;
+
+  zp[zn] = '\0';
+
+  if (strlen(zp) != zn)
+    return 0;
+
+  sp = strchr(zp, ':');
+
+  if (sp != NULL) {
+    up = zp;
+    un = sp - zp;
+    pp = sp + 1;
+    pn = zn - (un + 1);
+  } else {
+    up = zp;
+    un = zn;
+    pp = NULL;
+    pn = 0;
+  }
+
+  if (un > 255)
+    return 0;
+
+  if (pn > 255)
+    return 0;
+
+  http_string_assign(&req->user, up, un);
+  http_string_assign(&req->pass, pp, pn);
+
+  return 1;
+}
+
 /*
  * Connection
  */
@@ -422,6 +500,8 @@ on_headers_complete(struct http_parser *parser) {
 
     http_string_lower(&hdr->field);
   }
+
+  http_parse_auth(req);
 
   return 0;
 }

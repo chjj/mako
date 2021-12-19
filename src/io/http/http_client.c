@@ -47,6 +47,8 @@ http_options_init(http_options_t *options) {
   options->agent = "libio 0.0";
   options->accept = "*/*";
   options->type = NULL;
+  options->user = NULL;
+  options->pass = NULL;
   options->body = NULL;
 }
 
@@ -479,6 +481,12 @@ http_client_size_head(http_client_t *client,
   if (opt->type != NULL)
     size += 16 + strlen(opt->type); /* Content-Type: %s */
 
+  if (opt->user != NULL && opt->pass != NULL) {
+    size_t len = strlen(opt->user) + 1 + strlen(opt->pass);
+
+    size += 23 + base64_encode_size(len); /* Authorization: Basic %s */
+  }
+
   if (opt->body != NULL)
     size += 18 + 20; /* Content-Length: %lu */
 
@@ -520,6 +528,20 @@ http_client_write_head(http_client_t *client, const http_options_t *opt) {
 
   if (opt->type != NULL)
     zp += sprintf(zp, "Content-Type: %s\r\n", opt->type);
+
+  if (opt->user != NULL && opt->pass != NULL) {
+    char tp[512], bp[685];
+    int tn;
+
+    if (strlen(opt->user) > 255 || strlen(opt->pass) > 255)
+      return 0;
+
+    tn = sprintf(tp, "%s:%s", opt->user, opt->pass);
+
+    base64_encode(bp, NULL, (unsigned char *)tp, tn);
+
+    zp += sprintf(zp, "Authorization: Basic %s\r\n", bp);
+  }
 
   if (opt->body != NULL) {
     unsigned long length = strlen(opt->body);
