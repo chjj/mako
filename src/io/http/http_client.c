@@ -467,10 +467,10 @@ http_client_size_head(http_client_t *client,
 
   size += 12 + strlen(method) + strlen(opt->path); /* %s %s HTTP/1.1 */
 
-  if (client->port != 80)
-    size += 9 + strlen(client->hostname) + 11; /* Host: %s:%d */
-  else
+  if (client->port == 80)
     size += 8 + strlen(client->hostname); /* Host: %s */
+  else
+    size += 11 + strlen(client->hostname) + 11; /* Host: [%s]:%d */
 
   if (opt->agent != NULL)
     size += 14 + strlen(opt->agent); /* User-Agent: %s */
@@ -515,10 +515,12 @@ http_client_write_head(http_client_t *client, const http_options_t *opt) {
 
   zp += sprintf(zp, "%s %s HTTP/1.1\r\n", method, opt->path);
 
-  if (client->port != 80)
-    zp += sprintf(zp, "Host: %s:%d\r\n", client->hostname, client->port);
-  else
+  if (client->port == 80)
     zp += sprintf(zp, "Host: %s\r\n", client->hostname);
+  else if (strchr(client->hostname, ':') != NULL)
+    zp += sprintf(zp, "Host: [%s]:%d\r\n", client->hostname, client->port);
+  else
+    zp += sprintf(zp, "Host: %s:%d\r\n", client->hostname, client->port);
 
   if (opt->agent != NULL)
     zp += sprintf(zp, "User-Agent: %s\r\n", opt->agent);
