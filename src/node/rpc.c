@@ -824,7 +824,7 @@ on_request(http_server_t *server, http_req_t *req, http_res_t *res) {
     btc_hash_auth(hash, req->user.data, req->pass.data);
 
     if (!btc_memequal(hash, rpc->auth_hash, 32)) {
-      http_res_unauthorized(res, "Bitcoin RPC");
+      http_res_unauthorized(res, "jsonrpc");
       return 1;
     }
   }
