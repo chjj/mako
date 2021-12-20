@@ -532,14 +532,8 @@ on_message_complete(struct http_parser *parser) {
   conn->last_was_value = 0;
   conn->total_buffered = 0;
 
-  if (server->on_request != NULL) {
-    if (!server->on_request(server, req, res)) {
-      http_req_destroy(req);
-      http_res_destroy(res);
-      btc_socket_close(conn->socket);
-      return 1;
-    }
-  }
+  if (!server->on_request(server, req, res))
+    btc_socket_close(conn->socket);
 
   http_req_destroy(req);
   http_res_destroy(res);
@@ -587,11 +581,19 @@ http_conn_accept(http_conn_t *conn, btc_socket_t *socket) {
  * Server
  */
 
+static int
+default_request_cb(http_server_t *server, http_req_t *req, http_res_t *res) {
+  (void)server;
+  (void)req;
+  http_res_error(res, 500);
+  return 1;
+}
+
 static void
 http_server_init(http_server_t *server, btc_loop_t *loop) {
   server->loop = loop;
   server->socket = NULL;
-  server->on_request = NULL;
+  server->on_request = default_request_cb;
   server->data = NULL;
 }
 

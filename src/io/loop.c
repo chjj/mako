@@ -555,6 +555,55 @@ safe_epoll_create(void) {
 #endif
 
 /*
+ * Default Callbacks
+ */
+
+static void
+default_socket_cb(btc_socket_t *socket, btc_socket_t *child) {
+  (void)socket;
+  (void)child;
+}
+
+static void
+default_connect_cb(btc_socket_t *socket) {
+  (void)socket;
+}
+
+static void
+default_close_cb(btc_socket_t *socket) {
+  (void)socket;
+}
+
+static void
+default_error_cb(btc_socket_t *socket) {
+  btc_socket_close(socket);
+}
+
+static int
+default_data_cb(btc_socket_t *socket, const void *buf, size_t len) {
+  (void)socket;
+  (void)buf;
+  (void)len;
+  return 1;
+}
+
+static void
+default_drain_cb(btc_socket_t *socket) {
+  (void)socket;
+}
+
+static void
+default_message_cb(btc_socket_t *socket,
+                   const void *buf,
+                   size_t len,
+                   const struct btc_sockaddr_s *addr) {
+  (void)socket;
+  (void)buf;
+  (void)len;
+  (void)addr;
+}
+
+/*
  * Socket
  */
 
@@ -568,6 +617,14 @@ btc_socket_create(btc_loop_t *loop) {
   socket->addr = (struct sockaddr *)&socket->storage;
   socket->fd = BTC_INVALID_SOCKET;
   socket->state = BTC_SOCKET_DISCONNECTED;
+
+  socket->on_socket = default_socket_cb;
+  socket->on_connect = default_connect_cb;
+  socket->on_close = default_close_cb;
+  socket->on_error = default_error_cb;
+  socket->on_data = default_data_cb;
+  socket->on_drain = default_drain_cb;
+  socket->on_message = default_message_cb;
 
   return socket;
 }
@@ -930,8 +987,7 @@ btc_socket_flush_write(btc_socket_t *socket) {
 
   if (socket->draining) {
     socket->draining = 0;
-    if (socket->on_drain != NULL)
-      socket->on_drain(socket);
+    socket->on_drain(socket);
   }
 
   return 1;

@@ -623,7 +623,6 @@ btc_peer_accept(btc_peer_t *peer, btc_socket_t *socket) {
   peer->nonce = btc_nonces_alloc(&peer->pool->nonces);
 
   btc_socket_set_data(socket, peer);
-  /* btc_socket_on_connect(socket, on_connect); */
   btc_socket_on_close(socket, on_close);
   btc_socket_on_error(socket, on_error);
   btc_socket_on_data(socket, on_data);
@@ -2035,8 +2034,6 @@ btc_peers_add(btc_peers_t *list, btc_peer_t *peer) {
     list->outbound += 1;
   else
     list->inbound += 1;
-
-  btc_socket_complete(peer->socket);
 }
 
 static void
@@ -2551,6 +2548,8 @@ btc_pool_add_outbound(btc_pool_t *pool) {
 
   btc_peers_add(&pool->peers, peer);
 
+  btc_socket_complete(peer->socket);
+
   return 1;
 }
 
@@ -2659,6 +2658,8 @@ btc_pool_add_loader(btc_pool_t *pool) {
   btc_peers_add(&pool->peers, peer);
 
   btc_pool_set_loader(pool, peer);
+
+  btc_socket_complete(peer->socket);
 
   return 1;
 }
