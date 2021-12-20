@@ -135,41 +135,50 @@ btc_hash_auth(uint8_t *hash, const char *user, const char *pass) {
 typedef struct rpc_req_s {
   const char *method;
   const json_value *params;
-  int64_t id;
+  const json_value *id;
 } rpc_req_t;
 
 static void
 rpc_req_init(rpc_req_t *req) {
-  req->method = NULL;
+  req->method = "";
   req->params = NULL;
-  req->id = 0;
+  req->id = NULL;
 }
 
 static int
 rpc_req_set(rpc_req_t *req, const json_value *obj) {
-  const json_value *method, *params, *id;
+  const json_value *id, *method, *params;
 
   if (obj == NULL || obj->type != json_object)
     return 0;
+
+  id = json_object_get(obj, "id");
+
+  if (id != NULL
+      && id->type != json_null
+      && id->type != json_integer
+      && id->type != json_string) {
+    return 0;
+  }
+
+  req->id = id;
 
   method = json_object_get(obj, "method");
 
   if (method == NULL || method->type != json_string)
     return 0;
 
+  req->method = method->u.string.ptr;
+
   params = json_object_get(obj, "params");
 
-  if (params == NULL || params->type != json_array)
+  if (params != NULL
+      && params->type != json_null
+      && params->type != json_array) {
     return 0;
+  }
 
-  id = json_object_get(obj, "id");
-
-  if (id == NULL || id->type != json_integer)
-    return 0;
-
-  req->method = method->u.string.ptr;
   req->params = params;
-  req->id = id->u.integer;
 
   return 1;
 }
@@ -180,15 +189,15 @@ rpc_req_set(rpc_req_t *req, const json_value *obj) {
 
 typedef struct rpc_res_s {
   json_value *result;
+  json_int_t code;
   const char *msg;
-  int code;
 } rpc_res_t;
 
 static void
 rpc_res_init(rpc_res_t *res) {
   res->result = NULL;
-  res->msg = NULL;
   res->code = 0;
+  res->msg = NULL;
 }
 
 static void
@@ -197,12 +206,12 @@ rpc_res_error(rpc_res_t *res, int code, const char *msg) {
     json_builder_free(res->result);
 
   res->result = NULL;
-  res->msg = msg;
   res->code = code;
+  res->msg = msg;
 }
 
 static json_value *
-rpc_res_encode(rpc_res_t *res, int64_t id) {
+rpc_res_encode(rpc_res_t *res, const json_value *id) {
   json_value *obj = json_object_new(3);
   json_value *err;
 
@@ -215,15 +224,21 @@ rpc_res_encode(rpc_res_t *res, int64_t id) {
     if (res->msg == NULL)
       res->msg = "Error";
 
-    json_object_push(err, "message", json_string_new(res->msg));
     json_object_push(err, "code", json_integer_new(res->code));
+    json_object_push(err, "message", json_string_new(res->msg));
   } else {
     err = json_null_new();
   }
 
   json_object_push(obj, "result", res->result);
   json_object_push(obj, "error", err);
-  json_object_push(obj, "id", json_integer_new(id));
+
+  if (id != NULL && id->type == json_integer)
+    json_object_push(obj, "id", json_integer_new(id->u.integer));
+  else if (id != NULL && id->type == json_string)
+    json_object_push(obj, "id", json_string_new(id->u.string.ptr));
+  else
+    json_object_push(obj, "id", json_null_new());
 
   res->result = NULL;
 
@@ -769,8 +784,16 @@ btc_rpc_handle(btc_rpc_t *rpc, const rpc_req_t *req, rpc_res_t *res) {
 
   btc_rpc_log(rpc, "Incoming RPC request: %s.", req->method);
 
-  params.length = req->params->u.array.length;
-  params.values = req->params->u.array.values;
+  if (req->params == NULL || req->params->type == json_null) {
+    params.length = 0;
+    params.values = NULL;
+  } else if (req->params->type == json_array) {
+    params.length = req->params->u.array.length;
+    params.values = req->params->u.array.values;
+  } else {
+    btc_abort(); /* LCOV_EXCL_LINE */
+  }
+
   params.help = 0;
 
   btc_rpc_methods[index].handler(rpc, &params, res);
@@ -803,10 +826,11 @@ btc_rpc_help(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
 static int
 on_request(http_server_t *server, http_req_t *req, http_res_t *res) {
   btc_rpc_t *rpc = server->data;
+  json_value *input, *output;
   json_settings settings;
-  json_value *obj;
   rpc_req_t rreq;
   rpc_res_t rres;
+  unsigned int i;
 
   if (req->method != HTTP_METHOD_POST) {
     http_res_error(res, 400);
@@ -829,28 +853,42 @@ on_request(http_server_t *server, http_req_t *req, http_res_t *res) {
     }
   }
 
-  rpc_req_init(&rreq);
-  rpc_res_init(&rres);
-
   memset(&settings, 0, sizeof(settings));
 
   settings.settings = json_enable_amounts;
 
-  obj = json_parse_ex(&settings, req->body.data, req->body.length, NULL);
+  input = json_parse_ex(&settings, req->body.data, req->body.length, NULL);
 
-  if (!rpc_req_set(&rreq, obj))
-    rpc_res_error(&rres, RPC_INVALID_REQUEST, "Invalid request");
-  else
-    btc_rpc_handle(rpc, &rreq, &rres);
+  if (input != NULL && input->type == json_array) {
+    output = json_array_new(input->u.array.length);
 
-  if (obj != NULL)
-    json_value_free(obj);
+    for (i = 0; i < input->u.array.length; i++) {
+      rpc_req_init(&rreq);
+      rpc_res_init(&rres);
 
-  obj = rpc_res_encode(&rres, rreq.id);
+      if (!rpc_req_set(&rreq, input->u.array.values[i]))
+        rpc_res_error(&rres, RPC_INVALID_PARAMS, "Invalid params");
+      else
+        btc_rpc_handle(rpc, &rreq, &rres);
 
-  http_res_send_json(res, obj);
+      json_array_push(output, rpc_res_encode(&rres, rreq.id));
+    }
+  } else {
+    rpc_req_init(&rreq);
+    rpc_res_init(&rres);
 
-  json_builder_free(obj);
+    if (!rpc_req_set(&rreq, input))
+      rpc_res_error(&rres, RPC_INVALID_REQUEST, "Invalid request");
+    else
+      btc_rpc_handle(rpc, &rreq, &rres);
+
+    output = rpc_res_encode(&rres, rreq.id);
+  }
+
+  http_res_send_json(res, output);
+
+  json_value_free(input); /* Accepts NULL. */
+  json_builder_free(output);
 
   return 1;
 }
@@ -868,17 +906,23 @@ btc_rpc_call(btc_rpc_t *rpc, const char *method, const json_value *params) {
 
   if (index < 0) {
     rpc_res_error(&res, RPC_METHOD_NOT_FOUND, "Method not found");
-  } else if (params->type != json_array) {
+  } else if (params != NULL && params->type != json_array) {
     rpc_res_error(&res, RPC_INVALID_REQUEST, "Invalid request");
   } else {
     json_params parms;
 
-    parms.length = params->u.array.length;
-    parms.values = params->u.array.values;
+    if (params == NULL) {
+      parms.length = 0;
+      parms.values = NULL;
+    } else {
+      parms.length = params->u.array.length;
+      parms.values = params->u.array.values;
+    }
+
     parms.help = 0;
 
     btc_rpc_methods[index].handler(rpc, &parms, &res);
   }
 
-  return rpc_res_encode(&res, 0);
+  return rpc_res_encode(&res, NULL);
 }

@@ -21,6 +21,7 @@
 
 struct btc_client_s {
   http_client_t *http;
+  uint32_t id;
   char user[256];
   char pass[256];
 };
@@ -28,6 +29,7 @@ struct btc_client_s {
 static void
 btc_client_init(btc_client_t *client) {
   client->http = http_client_create();
+  client->id = 0;
   client->user[0] = '\0';
   client->pass[0] = '\0';
 }
@@ -82,8 +84,9 @@ btc_client_auth(btc_client_t *client, const char *user, const char *pass) {
 
 json_value *
 btc_client_call(btc_client_t *client, const char *method, json_value *params) {
-  json_value *error, *code, *message, *result;
+  json_value *id, *error, *code, *message, *result;
   json_value *obj = json_object_new(3);
+  uint32_t num = client->id++;
   http_options_t options;
   http_msg_t *msg;
   char *body;
@@ -93,7 +96,7 @@ btc_client_call(btc_client_t *client, const char *method, json_value *params) {
 
   json_object_push(obj, "method", json_string_new(method));
   json_object_push(obj, "params", params);
-  json_object_push(obj, "id", json_integer_new(0));
+  json_object_push(obj, "id", json_integer_new(num));
 
   body = json_encode(obj);
 
@@ -147,14 +150,14 @@ btc_client_call(btc_client_t *client, const char *method, json_value *params) {
     if (error->type != json_object)
       goto fail;
 
-    message = json_object_get(error, "message");
-
-    if (message == NULL || message->type != json_string)
-      goto fail;
-
     code = json_object_get(error, "code");
 
     if (code == NULL || code->type != json_integer)
+      goto fail;
+
+    message = json_object_get(error, "message");
+
+    if (message == NULL || message->type != json_string)
       goto fail;
 
     if (strcmp(method, "help") == 0 && code->u.integer == -1) {
@@ -169,6 +172,14 @@ btc_client_call(btc_client_t *client, const char *method, json_value *params) {
 
     return NULL;
   }
+
+  id = json_object_get(obj, "id");
+
+  if (id == NULL || id->type != json_integer)
+    goto fail;
+
+  if (id->u.integer != (json_int_t)num)
+    goto fail;
 
   result = json_object_pluck(obj, "result");
 
