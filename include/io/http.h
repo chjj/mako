@@ -123,6 +123,7 @@ typedef struct http_options {
   const char *user;
   const char *pass;
   const char *body;
+  size_t length;
 } http_options_t;
 
 typedef struct http_msg {
@@ -188,6 +189,13 @@ http_server_close(http_server_t *server);
 
 BTC_EXTERN void
 http_options_init(http_options_t *options);
+
+BTC_EXTERN void
+http_options_clear(http_options_t *options);
+
+BTC_EXTERN void
+http_options_header(http_options_t *options, const char *field,
+                                             const char *value);
 
 /*
  * Message

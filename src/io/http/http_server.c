@@ -279,7 +279,7 @@ http_res_unauthorized(http_res_t *res, const char *realm) {
 
 static int
 http_parse_auth(http_req_t *req) {
-  const http_string_t *hdr = http_req_header(req, "Authorization");
+  const http_string_t *hdr = http_req_header(req, "authorization");
   size_t xn, zn, un, pn;
   char *sp, *up, *pp;
   const char *xp;

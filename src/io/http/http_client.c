@@ -50,6 +50,27 @@ http_options_init(http_options_t *options) {
   options->user = NULL;
   options->pass = NULL;
   options->body = NULL;
+  options->length = 0;
+}
+
+void
+http_options_clear(http_options_t *options) {
+  if (options->headers != NULL)
+    free(options->headers);
+
+  options->headers = NULL;
+  options->length = 0;
+}
+
+void
+http_options_header(http_options_t *options, const char *field,
+                                             const char *value) {
+  http_options_t *z = options;
+
+  z->headers = http_realloc(z->headers, (z->length + 2) * sizeof(const char *));
+
+  z->headers[z->length++] = field;
+  z->headers[z->length++] = value;
 }
 
 /*
@@ -493,7 +514,7 @@ http_client_size_head(http_client_t *client,
   if (opt->headers != NULL) {
     size_t i;
 
-    for (i = 0; opt->headers[i] != NULL; i += 2) {
+    for (i = 0; i < opt->length; i += 2) {
       const char *field = opt->headers[i + 0];
       const char *value = opt->headers[i + 1];
 
@@ -554,7 +575,7 @@ http_client_write_head(http_client_t *client, const http_options_t *opt) {
   if (opt->headers != NULL) {
     size_t i;
 
-    for (i = 0; opt->headers[i] != NULL; i += 2) {
+    for (i = 0; i < opt->length; i += 2) {
       const char *field = opt->headers[i + 0];
       const char *value = opt->headers[i + 1];
 
