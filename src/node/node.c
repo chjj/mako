@@ -55,13 +55,20 @@ on_disconnect(const btc_entry_t *entry,
               const btc_view_t *view,
               void *arg);
 
-
 static void
 on_reorganize(const btc_entry_t *old, const btc_entry_t *new_, void *arg);
 
+static void
+on_block(const btc_block_t *block, const btc_entry_t *entry, void *arg);
+
+static void
+on_bad_block_orphan(const btc_verify_error_t *err, unsigned int id, void *arg);
 
 static void
 on_tx(const btc_mpentry_t *entry, const btc_view_t *view, void *arg);
+
+static void
+on_bad_tx_orphan(const btc_verify_error_t *err, unsigned int id, void *arg);
 
 /*
  * Node
@@ -97,9 +104,12 @@ btc_node_create(const btc_network_t *network) {
   btc_chain_on_connect(node->chain, on_connect);
   btc_chain_on_disconnect(node->chain, on_disconnect);
   btc_chain_on_reorganize(node->chain, on_reorganize);
+  btc_chain_on_block(node->chain, on_block);
+  btc_chain_on_badorphan(node->chain, on_bad_block_orphan);
 
   btc_mempool_set_context(node->mempool, node);
   btc_mempool_on_tx(node->mempool, on_tx);
+  btc_mempool_on_badorphan(node->mempool, on_bad_tx_orphan);
 
   return node;
 }
@@ -234,10 +244,32 @@ on_reorganize(const btc_entry_t *old, const btc_entry_t *new_, void *arg) {
 }
 
 static void
+on_block(const btc_block_t *block, const btc_entry_t *entry, void *arg) {
+  btc_node_t *node = (btc_node_t *)arg;
+
+  if (btc_chain_synced(node->chain))
+    btc_pool_announce_block(node->pool, block, entry->hash);
+}
+
+static void
+on_bad_block_orphan(const btc_verify_error_t *err, unsigned int id, void *arg) {
+  btc_node_t *node = (btc_node_t *)arg;
+
+  btc_pool_handle_badorphan(node->pool, "block", err, id);
+}
+
+static void
 on_tx(const btc_mpentry_t *entry, const btc_view_t *view, void *arg) {
   btc_node_t *node = (btc_node_t *)arg;
 
-  (void)node;
-  (void)entry;
   (void)view;
+
+  btc_pool_announce_tx(node->pool, entry);
+}
+
+static void
+on_bad_tx_orphan(const btc_verify_error_t *err, unsigned int id, void *arg) {
+  btc_node_t *node = (btc_node_t *)arg;
+
+  btc_pool_handle_badorphan(node->pool, "tx", err, id);
 }

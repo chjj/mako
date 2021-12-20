@@ -64,6 +64,20 @@ btc_pool_open(btc_pool_t *pool, const char *prefix, unsigned int flags);
 BTC_EXTERN void
 btc_pool_close(btc_pool_t *pool);
 
+BTC_EXTERN void
+btc_pool_announce_block(btc_pool_t *pool,
+                        const btc_block_t *block,
+                        const uint8_t *hash);
+
+BTC_EXTERN void
+btc_pool_announce_tx(btc_pool_t *pool, const btc_mpentry_t *entry);
+
+BTC_EXTERN void
+btc_pool_handle_badorphan(btc_pool_t *pool,
+                          const char *msg,
+                          const btc_verify_error_t *err,
+                          unsigned int id);
+
 #ifdef __cplusplus
 }
 #endif

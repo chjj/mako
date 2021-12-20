@@ -3790,7 +3790,7 @@ btc_pool_on_sendheaders(btc_pool_t *pool, btc_peer_t *peer) {
   (void)peer;
 }
 
-static void
+void
 btc_pool_announce_block(btc_pool_t *pool,
                         const btc_block_t *block,
                         const uint8_t *hash) {
@@ -3804,13 +3804,9 @@ btc_pool_announce_block(btc_pool_t *pool,
   }
 }
 
-static void
-btc_pool_announce_tx(btc_pool_t *pool, const uint8_t *hash) {
-  const btc_mpentry_t *entry = btc_mempool_get(pool->mempool, hash);
+void
+btc_pool_announce_tx(btc_pool_t *pool, const btc_mpentry_t *entry) {
   btc_peer_t *peer;
-
-  if (entry == NULL)
-    return;
 
   for (peer = pool->peers.head; peer != NULL; peer = peer->next) {
     if (peer->state != BTC_PEER_CONNECTED)
@@ -3818,6 +3814,26 @@ btc_pool_announce_tx(btc_pool_t *pool, const uint8_t *hash) {
 
     btc_peer_announce_tx(peer, entry);
   }
+}
+
+void
+btc_pool_handle_badorphan(btc_pool_t *pool,
+                          const char *msg,
+                          const btc_verify_error_t *err,
+                          unsigned int id) {
+  btc_peer_t *peer = btc_peers_find(&pool->peers, id);
+
+  if (peer == NULL) {
+    btc_pool_log(pool, "Could not find offending peer for orphan: %H (%u).",
+                       err->hash, id);
+    return;
+  }
+
+  btc_pool_log(pool, "Punishing peer for sending a bad orphan (%N).",
+                     &peer->addr);
+
+  /* Punish the original peer who sent this. */
+  btc_peer_reject(peer, msg, err);
 }
 
 static void
@@ -3885,9 +3901,6 @@ btc_pool_add_block(btc_pool_t *pool,
   }
 
   btc_pool_resolve_chain(pool, peer, hash);
-
-  if (btc_chain_synced(pool->chain))
-    btc_pool_announce_block(pool, block, hash);
 }
 
 static void
@@ -3925,8 +3938,6 @@ btc_pool_on_tx(btc_pool_t *pool, btc_peer_t *peer, const btc_tx_t *tx) {
 
     return;
   }
-
-  btc_pool_announce_tx(pool, tx->hash);
 }
 
 static void
