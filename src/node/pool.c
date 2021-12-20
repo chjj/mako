@@ -2548,8 +2548,6 @@ btc_pool_add_outbound(btc_pool_t *pool) {
 
   btc_peers_add(&pool->peers, peer);
 
-  btc_socket_complete(peer->socket);
-
   return 1;
 }
 
@@ -2658,8 +2656,6 @@ btc_pool_add_loader(btc_pool_t *pool) {
   btc_peers_add(&pool->peers, peer);
 
   btc_pool_set_loader(pool, peer);
-
-  btc_socket_complete(peer->socket);
 
   return 1;
 }
@@ -3131,8 +3127,6 @@ btc_pool_on_addr(btc_pool_t *pool,
   }
 
   btc_vector_clear(&relay);
-
-  btc_pool_fill_outbound(pool);
 }
 
 static void

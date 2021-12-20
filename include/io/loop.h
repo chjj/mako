@@ -67,9 +67,6 @@ BTC_EXTERN void
 btc_socket_on_message(btc_socket_t *socket, btc_socket_message_cb *handler);
 
 BTC_EXTERN void
-btc_socket_complete(btc_socket_t *socket);
-
-BTC_EXTERN void
 btc_socket_set_data(btc_socket_t *socket, void *data);
 
 BTC_EXTERN void *

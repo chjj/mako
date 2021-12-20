@@ -240,8 +240,6 @@ http_client_connect(http_client_t *client, const btc_sockaddr_t *addr) {
 
   client->socket = socket;
 
-  btc_socket_complete(socket);
-
   return 1;
 }
 
