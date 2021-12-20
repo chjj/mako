@@ -3028,11 +3028,12 @@ btc_pool_on_getaddr(btc_pool_t *pool, btc_peer_t *peer) {
       break;
   }
 
-  btc_pool_log(pool, "Sending %zu addrs to peer (%N)",
-                     addrs.length, &peer->addr);
-
   if (addrs.length > 0) {
+    btc_pool_log(pool, "Sending %zu addrs to peer (%N)",
+                       addrs.length, &peer->addr);
+
     btc_peer_send_addr(peer, &addrs);
+
     addrs.length = 0;
   }
 
