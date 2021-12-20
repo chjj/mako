@@ -61,9 +61,8 @@ typedef signed __int64 btc_msec_t;
 #  define BTC_EMSGSIZE WSAEMSGSIZE
 #  define BTC_EAFNOSUPPORT WSAEAFNOSUPPORT
 #  define BTC_ENOBUFS WSAENOBUFS
-#  define BTC_EISCONN WSAEISCONN
+#  define BTC_EINPROGRESS WSAEWOULDBLOCK
 #  define btc_closesocket closesocket
-#  define btc_retry_connect(x) ((x) == WSAEWOULDBLOCK || (x) == WSAEALREADY)
 #else
 typedef socklen_t btc_socklen_t;
 typedef int btc_sockfd_t;
@@ -86,12 +85,8 @@ typedef long long btc_msec_t;
 #  define BTC_EMSGSIZE EMSGSIZE
 #  define BTC_EAFNOSUPPORT EAFNOSUPPORT
 #  define BTC_ENOBUFS ENOBUFS
-#  define BTC_EISCONN EISCONN
+#  define BTC_EINPROGRESS EINPROGRESS
 #  define btc_closesocket close
-#  define btc_retry_connect(x) ((x) == EAGAIN      \
-                             || (x) == EWOULDBLOCK \
-                             || (x) == EINPROGRESS \
-                             || (x) == EALREADY)
 #endif
 
 /*
@@ -529,6 +524,41 @@ safe_connect(btc_sockfd_t sockfd,
 #endif
 }
 
+static int
+finalize_connect(btc_sockfd_t fd) {
+  /* https://stackoverflow.com/questions/17769964 */
+  /* https://cr.yp.to/docs/connect.html */
+  struct sockaddr_storage storage;
+  struct sockaddr *addr = (struct sockaddr *)&storage;
+  btc_socklen_t addrlen = sizeof(storage);
+
+  memset(&storage, 0, sizeof(storage));
+
+  if (getpeername(fd, addr, &addrlen) == BTC_SOCKET_ERROR) {
+#if defined(_WIN32)
+    /* Unsure if we can abuse error slippage on windows. */
+    if (WSAGetLastError() == WSAENOTCONN) {
+      int len = sizeof(int);
+      int rc = 0;
+
+      if (getsockopt(fd, SOL_SOCKET, SO_ERROR, (char *)&rc, &len) == 0)
+        WSASetLastError(rc);
+    }
+
+    return SOCKET_ERROR;
+#else
+    if (errno == ENOTCONN) {
+      unsigned char ch;
+      read(fd, &ch, 1);
+    }
+
+    return -1;
+#endif
+  }
+
+  return 0;
+}
+
 /*
  * Epoll Helper
  */
@@ -831,17 +861,17 @@ btc_socket_connect(btc_socket_t *socket, const btc_sockaddr_t *addr) {
   if (safe_connect(fd, socket->addr, addrlen) == BTC_SOCKET_ERROR) {
     int error = btc_errno;
 
-    if (btc_retry_connect(error)) {
+    if (error == BTC_EINPROGRESS) {
       socket->fd = fd;
       socket->state = BTC_SOCKET_CONNECTING;
       return 1;
     }
 
-    if (error != BTC_EISCONN) {
-      socket->loop->error = error;
-      btc_closesocket(fd);
-      return 0;
-    }
+    socket->loop->error = error;
+
+    btc_closesocket(fd);
+
+    return 0;
   }
 
   socket->fd = fd;
@@ -1595,20 +1625,11 @@ handle_write(btc_loop_t *loop, btc_socket_t *socket) {
 
   switch (socket->state) {
     case BTC_SOCKET_CONNECTING: {
-      btc_socklen_t addrlen = sa_addrlen(socket->addr);
-
-      if (safe_connect(socket->fd, socket->addr, addrlen) == BTC_SOCKET_ERROR) {
-        int error = btc_errno;
-
-        if (btc_retry_connect(error))
-          break;
-
-        if (error != BTC_EISCONN) {
-          socket->loop->error = error;
-          socket->on_error(socket);
-          btc_socket_close(socket);
-          break;
-        }
+      if (finalize_connect(socket->fd) == BTC_SOCKET_ERROR) {
+        socket->loop->error = btc_errno;
+        socket->on_error(socket);
+        btc_socket_close(socket);
+        break;
       }
 
       socket->state = BTC_SOCKET_CONNECTED;
