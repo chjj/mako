@@ -1369,8 +1369,6 @@ btc_loop_register(btc_loop_t *loop, btc_socket_t *socket) {
 #if defined(BTC_USE_EPOLL)
   struct epoll_event ev;
 
-  CHECK(socket->fd != -1);
-
   memset(&ev, 0, sizeof(ev));
 
   ev.events = EPOLLIN | EPOLLOUT;
@@ -1438,9 +1436,14 @@ btc_loop_unregister(btc_loop_t *loop, btc_socket_t *socket) {
 
   btc_list_remove(&loop->sockets, &socket->link);
 #elif defined(BTC_USE_POLL)
-  loop->pfds[socket->index] = loop->pfds[loop->length - 1];
-  loop->sockets[socket->index] = loop->sockets[loop->length - 1];
-  loop->sockets[socket->index]->index = socket->index;
+  CHECK(loop->length > 0);
+
+  if (socket->index != loop->length - 1) {
+    loop->pfds[socket->index] = loop->pfds[loop->length - 1];
+    loop->sockets[socket->index] = loop->sockets[loop->length - 1];
+    loop->sockets[socket->index]->index = socket->index;
+  }
+
   loop->length--;
 #else
   FD_CLR(socket->fd, &loop->fds);
