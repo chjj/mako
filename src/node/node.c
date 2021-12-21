@@ -140,13 +140,13 @@ btc_node_open(btc_node_t *node, const char *prefix, unsigned int flags) {
   char path[BTC_PATH_MAX];
   char file[BTC_PATH_MAX];
 
-  if (!btc_path_resolve(path, sizeof(path), prefix, 0))
+  if (!btc_path_resolve(path, sizeof(path), prefix, NULL))
     return 0;
 
   if (!btc_fs_mkdirp(path, 0755))
     return 0;
 
-  if (!btc_path_join(file, sizeof(file), path, "debug.log", 0))
+  if (!btc_path_join(file, sizeof(file), path, "debug.log", NULL))
     return 0;
 
   if (!btc_logger_open(node->logger, file))

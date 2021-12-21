@@ -222,7 +222,7 @@ btc_match__path(char *zp, size_t zn, const char *xp, const char *yp) {
     if (home == NULL)
       home = "/";
 
-    if (!btc_join(zp, zn, home, val + 2, 0))
+    if (!btc_join(zp, zn, home, val + 2, NULL))
       return btc_die("Invalid option: `%s`", xp);
 
     return 1;
@@ -506,9 +506,9 @@ conf_find_file(char *buf, size_t size,
   }
 
   if (network->type == BTC_NETWORK_MAINNET)
-    ret = btc_join(buf, size, prefix, BTC_CONFIG_FILE, 0);
+    ret = btc_join(buf, size, prefix, BTC_CONFIG_FILE, NULL);
   else
-    ret = btc_join(buf, size, prefix, network->name, BTC_CONFIG_FILE, 0);
+    ret = btc_join(buf, size, prefix, network->name, BTC_CONFIG_FILE, NULL);
 
   if (ret == 0)
     return btc_die("Invalid datadir: %s", prefix);
@@ -810,7 +810,7 @@ conf_finalize(btc_conf_t *conf, const char *prefix) {
     btc_str_set(conf->prefix, prefix);
 
   if (network->type != BTC_NETWORK_MAINNET) {
-    if (!btc_join(path, size, path, network->name, 0)) {
+    if (!btc_join(path, size, path, network->name, NULL)) {
       btc_die("Invalid datadir: %s", path);
       return;
     }

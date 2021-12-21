@@ -687,13 +687,13 @@ static int
 btc_chaindb_load_prefix(btc_chaindb_t *db, const char *prefix) {
   char path[BTC_PATH_MAX];
 
-  if (!btc_path_resolve(db->prefix, sizeof(db->prefix), prefix, 0))
+  if (!btc_path_resolve(db->prefix, sizeof(db->prefix), prefix, NULL))
     return 0;
 
   if (!btc_fs_mkdirp(db->prefix, 0755))
     return 0;
 
-  if (!btc_path_join(path, sizeof(path), db->prefix, "blocks", 0))
+  if (!btc_path_join(path, sizeof(path), db->prefix, "blocks", NULL))
     return 0;
 
   if (!btc_fs_exists(path) && !btc_fs_mkdir(path, 0755))
@@ -707,7 +707,7 @@ btc_chaindb_load_database(btc_chaindb_t *db) {
   char path[BTC_PATH_MAX];
   int rc;
 
-  if (!btc_path_join(path, sizeof(path), db->prefix, "chain.dat", 0)) {
+  if (!btc_path_join(path, sizeof(path), db->prefix, "chain.dat", NULL)) {
     fprintf(stderr, "lsm_open: path too long\n");
     return 0;
   }

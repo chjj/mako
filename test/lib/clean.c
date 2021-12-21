@@ -23,7 +23,7 @@ btc_rmdir_r(const char *path) {
   for (i = 0; i < count; i++) {
     const char *name = list[i]->d_name;
 
-    ASSERT(btc_path_join(file, sizeof(file), path, name, 0));
+    ASSERT(btc_path_join(file, sizeof(file), path, name, NULL));
 
     ret &= btc_fs_unlink(file);
 
@@ -41,39 +41,39 @@ int
 btc_clean(const char *prefix) {
   char path[BTC_PATH_MAX];
 
-  ASSERT(btc_path_join(path, sizeof(path), prefix, "blocks", 0));
+  ASSERT(btc_path_join(path, sizeof(path), prefix, "blocks", NULL));
 
   btc_rmdir_r(path);
 
-  ASSERT(btc_path_join(path, sizeof(path), prefix, "chain", 0));
+  ASSERT(btc_path_join(path, sizeof(path), prefix, "chain", NULL));
 
   btc_rmdir_r(path);
 
-  ASSERT(btc_path_join(path, sizeof(path), prefix, "chain.dat", 0));
+  ASSERT(btc_path_join(path, sizeof(path), prefix, "chain.dat", NULL));
 
   btc_fs_unlink(path);
 
-  ASSERT(btc_path_join(path, sizeof(path), prefix, "chain.dat-log", 0));
+  ASSERT(btc_path_join(path, sizeof(path), prefix, "chain.dat-log", NULL));
 
   btc_fs_unlink(path);
 
-  ASSERT(btc_path_join(path, sizeof(path), prefix, "debug.log", 0));
+  ASSERT(btc_path_join(path, sizeof(path), prefix, "debug.log", NULL));
 
   btc_fs_unlink(path);
 
-  ASSERT(btc_path_join(path, sizeof(path), prefix, "mempool.dat", 0));
+  ASSERT(btc_path_join(path, sizeof(path), prefix, "mempool.dat", NULL));
 
   btc_fs_unlink(path);
 
-  ASSERT(btc_path_join(path, sizeof(path), prefix, "wallet", 0));
+  ASSERT(btc_path_join(path, sizeof(path), prefix, "wallet", NULL));
 
   btc_rmdir_r(path);
 
-  ASSERT(btc_path_join(path, sizeof(path), prefix, "wallet.dat", 0));
+  ASSERT(btc_path_join(path, sizeof(path), prefix, "wallet.dat", NULL));
 
   btc_fs_unlink(path);
 
-  ASSERT(btc_path_join(path, sizeof(path), prefix, "wallet.dat-log", 0));
+  ASSERT(btc_path_join(path, sizeof(path), prefix, "wallet.dat-log", NULL));
 
   btc_fs_unlink(path);
 

@@ -990,7 +990,7 @@ btc_path_is_absolute(const char *path) {
 
 int
 btc_path_absolute(char *path, size_t size) {
-  return btc_path_resolve(path, size, path, 0);
+  return btc_path_resolve(path, size, path, NULL);
 }
 
 int
