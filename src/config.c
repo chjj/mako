@@ -43,6 +43,15 @@
 } while (0)
 
 /*
+ * Declarations (for avoiding windows.h)
+ */
+
+#ifdef _WIN32
+__declspec(dllimport) unsigned long __stdcall
+GetEnvironmentVariableA(const char *name, char *buf, unsigned long size);
+#endif
+
+/*
  * Helpers
  */
 
@@ -215,7 +224,22 @@ btc_match__path(char *zp, size_t zn, const char *xp, const char *yp) {
   if (!btc_match(&val, xp, yp))
     return 0;
 
-#ifndef _WIN32
+#if defined(_WIN32)
+  if (val[0] == '~' && (val[1] == '/' || val[1] == '\\') && val[2] != '\0') {
+    unsigned long ret;
+    char home[260];
+
+    ret = GetEnvironmentVariableA("USERPROFILE", home, sizeof(home));
+
+    if (ret < 1 || ret >= sizeof(home))
+      btc_str_assign(home, "C:\\");
+
+    if (!btc_join(zp, zn, home, val + 2, NULL))
+      return btc_die("Invalid option: `%s`", xp);
+
+    return 1;
+  }
+#else
   if (val[0] == '~' && val[1] == '/' && val[2] != '\0') {
     char *home = getenv("HOME");
 
