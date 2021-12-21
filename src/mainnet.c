@@ -606,7 +606,7 @@ static const btc_network_t mainnet = {
   /* .block = */ {
     /* .prune_after_height = */ 1000,
     /* .keep_blocks = */ 288,
-    /* .max_tip_age = */ 24 * 60 * 60,
+    /* .max_tip_age = */ 2 * 60 * 60,
     /* .slow_height = */ 325000
   },
   /* .softforks = */ {
