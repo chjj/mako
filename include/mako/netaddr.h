@@ -21,7 +21,7 @@ extern "C" {
  * Constants
  */
 
-#define BTC_ADDRSTRLEN (65 + 8)
+#define BTC_ADDRSTRLEN (65 + 14)
 
 /*
  * Types
@@ -81,10 +81,10 @@ BTC_EXTERN int
 btc_netaddr_is_onion(const btc_netaddr_t *addr);
 
 BTC_EXTERN int
-btc_netaddr_is_ip4(const btc_netaddr_t *addr);
+btc_netaddr_is_ipv4(const btc_netaddr_t *addr);
 
 BTC_EXTERN int
-btc_netaddr_is_ip6(const btc_netaddr_t *addr);
+btc_netaddr_is_ipv6(const btc_netaddr_t *addr);
 
 BTC_EXTERN int
 btc_netaddr_is_null(const btc_netaddr_t *addr);
@@ -133,6 +133,9 @@ btc_netaddr_is_rfc6145(const btc_netaddr_t *addr);
 
 BTC_EXTERN int
 btc_netaddr_is_rfc4843(const btc_netaddr_t *addr);
+
+BTC_EXTERN int
+btc_netaddr_is_rfc7343(const btc_netaddr_t *addr);
 
 BTC_EXTERN int
 btc_netaddr_is_local(const btc_netaddr_t *addr);

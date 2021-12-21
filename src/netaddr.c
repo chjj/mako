@@ -17,7 +17,7 @@
  * Constants
  */
 
-static const uint8_t btc_ip4_mapped[12] = {
+static const uint8_t btc_ipv4_mapped[12] = {
   0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0xff, 0xff
@@ -244,7 +244,7 @@ btc_smalladdr_read(btc_netaddr_t *z, const uint8_t **xp, size_t *xn) {
 
 int
 btc_netaddr_is_mapped(const btc_netaddr_t *addr) {
-  return btc_memcmp(addr->raw, btc_ip4_mapped, sizeof(btc_ip4_mapped)) == 0;
+  return btc_memcmp(addr->raw, btc_ipv4_mapped, sizeof(btc_ipv4_mapped)) == 0;
 }
 
 int
@@ -253,18 +253,18 @@ btc_netaddr_is_onion(const btc_netaddr_t *addr) {
 }
 
 int
-btc_netaddr_is_ip4(const btc_netaddr_t *addr) {
+btc_netaddr_is_ipv4(const btc_netaddr_t *addr) {
   return btc_netaddr_is_mapped(addr);
 }
 
 int
-btc_netaddr_is_ip6(const btc_netaddr_t *addr) {
+btc_netaddr_is_ipv6(const btc_netaddr_t *addr) {
   return !btc_netaddr_is_mapped(addr) && !btc_netaddr_is_onion(addr);
 }
 
 int
 btc_netaddr_is_null(const btc_netaddr_t *addr) {
-  if (btc_netaddr_is_ip4(addr)) {
+  if (btc_netaddr_is_ipv4(addr)) {
     /* 0.0.0.0 */
     return addr->raw[12] == 0
         && addr->raw[13] == 0
@@ -279,7 +279,7 @@ btc_netaddr_is_null(const btc_netaddr_t *addr) {
 int
 btc_netaddr_localize(btc_netaddr_t *addr) {
   if (btc_netaddr_is_null(addr)) {
-    if (btc_netaddr_is_ip4(addr)) {
+    if (btc_netaddr_is_ipv4(addr)) {
       addr->raw[12] = 127;
       addr->raw[15] = 1;
     } else {
@@ -292,7 +292,7 @@ btc_netaddr_localize(btc_netaddr_t *addr) {
 
 int
 btc_netaddr_is_broadcast(const btc_netaddr_t *addr) {
-  if (!btc_netaddr_is_ip4(addr))
+  if (!btc_netaddr_is_ipv4(addr))
     return 0;
 
   /* 255.255.255.255 */
@@ -304,7 +304,7 @@ btc_netaddr_is_broadcast(const btc_netaddr_t *addr) {
 
 int
 btc_netaddr_is_rfc1918(const btc_netaddr_t *addr) {
-  if (!btc_netaddr_is_ip4(addr))
+  if (!btc_netaddr_is_ipv4(addr))
     return 0;
 
   if (addr->raw[12] == 10)
@@ -321,13 +321,10 @@ btc_netaddr_is_rfc1918(const btc_netaddr_t *addr) {
 
 int
 btc_netaddr_is_rfc2544(const btc_netaddr_t *addr) {
-  if (!btc_netaddr_is_ip4(addr))
+  if (!btc_netaddr_is_ipv4(addr))
     return 0;
 
   if (addr->raw[12] == 198 && (addr->raw[13] == 18 || addr->raw[13] == 19))
-    return 1;
-
-  if (addr->raw[12] == 169 && addr->raw[13] == 254)
     return 1;
 
   return 0;
@@ -335,7 +332,7 @@ btc_netaddr_is_rfc2544(const btc_netaddr_t *addr) {
 
 int
 btc_netaddr_is_rfc3927(const btc_netaddr_t *addr) {
-  if (!btc_netaddr_is_ip4(addr))
+  if (!btc_netaddr_is_ipv4(addr))
     return 0;
 
   if (addr->raw[12] == 169 && addr->raw[13] == 254)
@@ -346,7 +343,7 @@ btc_netaddr_is_rfc3927(const btc_netaddr_t *addr) {
 
 int
 btc_netaddr_is_rfc6598(const btc_netaddr_t *addr) {
-  if (!btc_netaddr_is_ip4(addr))
+  if (!btc_netaddr_is_ipv4(addr))
     return 0;
 
   if (addr->raw[12] == 100
@@ -359,7 +356,7 @@ btc_netaddr_is_rfc6598(const btc_netaddr_t *addr) {
 
 int
 btc_netaddr_is_rfc5737(const btc_netaddr_t *addr) {
-  if (!btc_netaddr_is_ip4(addr))
+  if (!btc_netaddr_is_ipv4(addr))
     return 0;
 
   if (addr->raw[12] == 192
@@ -438,9 +435,19 @@ btc_netaddr_is_rfc4843(const btc_netaddr_t *addr) {
 }
 
 int
+btc_netaddr_is_rfc7343(const btc_netaddr_t *addr) {
+  if (addr->raw[0] == 0x20 && addr->raw[1] == 0x01
+      && addr->raw[2] == 0x00 && (addr->raw[3] & 0xf0) == 0x20) {
+    return 1;
+  }
+
+  return 0;
+}
+
+int
 btc_netaddr_is_local(const btc_netaddr_t *addr) {
-  if (btc_netaddr_is_ip4(addr)) {
-    if (addr->raw[12] == 127 && addr->raw[13] == 0)
+  if (btc_netaddr_is_ipv4(addr)) {
+    if (addr->raw[12] == 127 || addr->raw[12] == 0)
       return 1;
     return 0;
   }
@@ -453,7 +460,7 @@ btc_netaddr_is_local(const btc_netaddr_t *addr) {
 
 int
 btc_netaddr_is_multicast(const btc_netaddr_t *addr) {
-  if (btc_netaddr_is_ip4(addr)) {
+  if (btc_netaddr_is_ipv4(addr)) {
     if ((addr->raw[12] & 0xf0) == 0xe0)
       return 1;
     return 0;
@@ -508,6 +515,9 @@ btc_netaddr_is_routable(const btc_netaddr_t *addr) {
   if (btc_netaddr_is_rfc4843(addr))
     return 0;
 
+  if (btc_netaddr_is_rfc7343(addr))
+    return 0;
+
   if (btc_netaddr_is_local(addr))
     return 0;
 
@@ -519,7 +529,7 @@ btc_netaddr_network(const btc_netaddr_t *addr) {
   if (!btc_netaddr_is_routable(addr))
     return BTC_IPNET_NONE;
 
-  if (btc_netaddr_is_ip4(addr))
+  if (btc_netaddr_is_ipv4(addr))
     return BTC_IPNET_IPV4;
 
   if (btc_netaddr_is_rfc4380(addr))
@@ -627,8 +637,8 @@ btc_netaddr_groupkey(uint8_t *out, const btc_netaddr_t *addr) {
   } else if (!btc_netaddr_is_routable(addr)) {
     type = 0; /* NET_UNROUTABLE */
     bits = 0;
-  } else if (btc_netaddr_is_ip4(addr)
-          || btc_netaddr_is_ip6(addr)
+  } else if (btc_netaddr_is_ipv4(addr)
+          || btc_netaddr_is_ipv6(addr)
           || btc_netaddr_is_rfc6052(addr)) {
     type = 4; /* NET_IPV4 */
     start = 12;
