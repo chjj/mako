@@ -57,6 +57,8 @@ enum btc_peer_state {
   BTC_PEER_DEAD
 };
 
+static const uint8_t btc_zero_hash[32] = {0};
+
 /*
  * Types
  */
@@ -113,6 +115,8 @@ typedef struct btc_peer_s {
   char agent[256 + 1];
   int relay;
   int prefer_headers;
+  uint8_t last_start[32];
+  uint8_t last_stop[32];
   uint8_t hash_continue[32];
   int64_t fee_rate;
   int compact_mode;
@@ -805,26 +809,38 @@ static int
 btc_peer_send_getblocks(btc_peer_t *peer,
                         const btc_vector_t *locator,
                         const uint8_t *stop) {
-  const uint8_t *tip = NULL;
+  const uint8_t *start = btc_zero_hash;
   btc_getblocks_t msg;
+
+  if (locator->length > 0)
+    start = (const uint8_t *)locator->items[0];
+
+  if (stop == NULL)
+    stop = btc_zero_hash;
+
+  /* Filter out duplicate requests. */
+  if (btc_hash_equal(start, peer->last_start)
+      && btc_hash_equal(stop, peer->last_stop)) {
+    return 1;
+  }
+
+  btc_hash_copy(peer->last_start, start);
+  btc_hash_copy(peer->last_stop, stop);
 
   msg.version = BTC_NET_PROTOCOL_VERSION;
   msg.locator = *locator;
 
-  if (stop != NULL)
-    btc_hash_copy(msg.stop, stop);
-  else
-    btc_hash_init(msg.stop);
+  btc_hash_copy(msg.stop, stop);
 
   peer->gb_time = btc_time_msec();
-
-  if (locator->length > 0)
-    tip = (const uint8_t *)locator->items[0];
 
   btc_peer_log(peer, "Requesting inv message from peer with getblocks (%N).",
                      &peer->addr);
 
-  btc_peer_log(peer, "Sending getblocks (tip=%H, stop=%H).", tip, stop);
+  if (stop != btc_zero_hash)
+    btc_peer_log(peer, "Sending getblocks (start=%H, stop=%H).", start, stop);
+  else
+    btc_peer_log(peer, "Sending getblocks (start=%H).", start);
 
   return btc_peer_sendmsg(peer, BTC_MSG_GETBLOCKS, &msg);
 }
@@ -833,27 +849,27 @@ static int
 btc_peer_send_getheaders(btc_peer_t *peer,
                          const btc_vector_t *locator,
                          const uint8_t *stop) {
-  const uint8_t *tip = NULL;
+  const uint8_t *start = btc_zero_hash;
   btc_getblocks_t msg;
+
+  if (locator->length > 0)
+    start = (const uint8_t *)locator->items[0];
+
+  if (stop == NULL)
+    stop = btc_zero_hash;
 
   msg.version = BTC_NET_PROTOCOL_VERSION;
   msg.locator = *locator;
 
-  if (stop != NULL)
-    btc_hash_copy(msg.stop, stop);
-  else
-    btc_hash_init(msg.stop);
+  btc_hash_copy(msg.stop, stop);
 
   peer->gh_time = btc_time_msec();
-
-  if (locator->length > 0)
-    tip = (const uint8_t *)locator->items[0];
 
   btc_peer_log(peer,
     "Requesting headers message from peer with getheaders (%N).",
     &peer->addr);
 
-  btc_peer_log(peer, "Sending getheaders (tip=%H, stop=%H).", tip, stop);
+  btc_peer_log(peer, "Sending getheaders (start=%H, stop=%H).", start, stop);
 
   return btc_peer_sendmsg(peer, BTC_MSG_GETHEADERS, &msg);
 }
@@ -3133,26 +3149,26 @@ static void
 btc_pool_resolve_orphan(btc_pool_t *pool,
                         btc_peer_t *peer,
                         const uint8_t *orphan) {
-  const uint8_t *root = btc_chain_get_orphan_root(pool->chain, orphan);
+  const uint8_t *stop = btc_chain_get_orphan_root(pool->chain, orphan);
   btc_vector_t locator;
 
-  CHECK(root != NULL);
+  CHECK(stop != NULL);
 
   btc_vector_init(&locator);
   btc_chain_get_locator(pool->chain, &locator, NULL);
-  btc_peer_send_getblocks(peer, &locator, root);
+  btc_peer_send_getblocks(peer, &locator, stop);
   btc_vector_clear(&locator);
 }
 
 static void
 btc_pool_getblocks(btc_pool_t *pool,
                    btc_peer_t *peer,
-                   const uint8_t *tip,
+                   const uint8_t *start,
                    const uint8_t *stop) {
   btc_vector_t locator;
 
   btc_vector_init(&locator);
-  btc_chain_get_locator(pool->chain, &locator, tip);
+  btc_chain_get_locator(pool->chain, &locator, start);
   btc_peer_send_getblocks(peer, &locator, stop);
   btc_vector_clear(&locator);
 }
