@@ -394,7 +394,7 @@ btc_selector_spendable(const btc_selector_t *sel, const btc_utxo_t *utxo) {
 }
 
 static int
-btc_selector_should_fund(btc_selector_t *sel, int64_t fee) {
+btc_selector_should_fund(const btc_selector_t *sel, int64_t fee) {
   if (sel->utxos.length == 0)
     return 0;
 
