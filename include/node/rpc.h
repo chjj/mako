@@ -27,6 +27,9 @@ BTC_EXTERN void
 btc_rpc_destroy(btc_rpc_t *rpc);
 
 BTC_EXTERN void
+btc_rpc_set_port(btc_rpc_t *rpc, int port);
+
+BTC_EXTERN void
 btc_rpc_set_bind(btc_rpc_t *rpc, const btc_netaddr_t *addr);
 
 BTC_EXTERN void

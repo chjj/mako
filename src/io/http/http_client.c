@@ -287,6 +287,8 @@ http_client_close(http_client_t *client) {
   btc_sockaddr_init(&client->addr);
 
   client->connected = 0;
+
+  btc_loop_close(client->loop);
 }
 
 static void

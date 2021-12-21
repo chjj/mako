@@ -20,6 +20,7 @@ extern "C" {
 
 typedef struct btc_loop_s btc_loop_t;
 typedef struct btc_socket_s btc_socket_t;
+typedef struct btc_server_s btc_server_t;
 
 struct btc_sockaddr_s;
 
@@ -135,6 +136,40 @@ btc_loop_poll(btc_loop_t *loop, int timeout);
 
 BTC_EXTERN void
 btc_loop_close(btc_loop_t *loop);
+
+/*
+ * Server
+ */
+
+BTC_EXTERN btc_server_t *
+btc_server_create(btc_loop_t *loop);
+
+BTC_EXTERN void
+btc_server_destroy(btc_server_t *server);
+
+BTC_EXTERN const char *
+btc_server_strerror(btc_server_t *server);
+
+BTC_EXTERN int
+btc_server_listen(btc_server_t *server, const btc_sockaddr_t *addr);
+
+BTC_EXTERN int
+btc_server_listen_local(btc_server_t *server, int port);
+
+BTC_EXTERN int
+btc_server_listen_external(btc_server_t *server, int port);
+
+BTC_EXTERN void
+btc_server_close(btc_server_t *server);
+
+BTC_EXTERN void
+btc_server_on_socket(btc_server_t *server, btc_socket_socket_cb *handler);
+
+BTC_EXTERN void
+btc_server_set_data(btc_server_t *server, void *data);
+
+BTC_EXTERN void
+btc_server_set_nodelay(btc_server_t *server, int value);
 
 #ifdef __cplusplus
 }

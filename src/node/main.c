@@ -23,41 +23,56 @@
  * Config
  */
 
-static int
-get_config(btc_conf_t *args, int argc, char **argv) {
+static btc_conf_t *
+get_config(int argc, char **argv) {
   char prefix[BTC_PATH_MAX];
+  btc_conf_t *conf;
 
   if (!btc_sys_datadir(prefix, sizeof(prefix), "mako")) {
     fprintf(stderr, "Could not find suitable datadir.\n");
-    return 0;
+    return NULL;
   }
 
-  btc_conf_init(args, argc, argv, prefix, 0);
+  conf = btc_conf_create(argc, argv, prefix, 0);
 
   /* Absolute-ify path before we daemonize and call chdir("/"). */
-  if (!btc_path_absolute(args->prefix, sizeof(args->prefix))) {
+  if (!btc_path_absolute(conf->prefix, sizeof(conf->prefix))) {
     fprintf(stderr, "Path for datadir is too long!\n");
-    return 0;
+    btc_conf_destroy(conf);
+    return NULL;
   }
 
-  return 1;
+  return conf;
 }
 
 static void
 set_config(btc_node_t *node, const btc_conf_t *conf) {
+  size_t i;
+
   btc_chain_set_threads(node->chain, conf->workers);
 
   btc_pool_set_port(node->pool, conf->port);
-  btc_pool_set_bind(node->pool, &conf->bind);
-  btc_pool_set_external(node->pool, &conf->external);
-  btc_pool_set_connect(node->pool, &conf->connect);
+
+  for (i = 0; i < conf->bind.length; i++)
+    btc_pool_set_bind(node->pool, conf->bind.items[i]);
+
+  for (i = 0; i < conf->external.length; i++)
+    btc_pool_set_external(node->pool, conf->external.items[i]);
+
+  for (i = 0; i < conf->connect.length; i++)
+    btc_pool_set_connect(node->pool, conf->connect.items[i]);
+
   btc_pool_set_proxy(node->pool, &conf->proxy);
   btc_pool_set_maxinbound(node->pool, conf->max_inbound);
   btc_pool_set_maxoutbound(node->pool, conf->max_outbound);
   btc_pool_set_bantime(node->pool, conf->ban_time);
   btc_pool_set_onlynet(node->pool, conf->only_net);
 
-  btc_rpc_set_bind(node->rpc, &conf->rpc_bind);
+  btc_rpc_set_port(node->rpc, conf->rpc_port);
+
+  for (i = 0; i < conf->rpc_bind.length; i++)
+    btc_rpc_set_bind(node->rpc, conf->rpc_bind.items[i]);
+
   btc_rpc_set_credentials(node->rpc, conf->rpc_user, conf->rpc_pass);
 }
 
@@ -77,10 +92,7 @@ get_node_flags(const btc_conf_t *conf) {
   if (conf->checkpoints)
     flags |= BTC_POOL_CHECKPOINTS;
 
-  if (conf->no_connect)
-    flags |= BTC_POOL_NOCONNECT;
-
-  if (!btc_netaddr_is_null(&conf->connect))
+  if (conf->connect.length > 0 || conf->no_connect)
     flags |= BTC_POOL_CONNECT;
 
   if (!btc_netaddr_is_null(&conf->proxy))
@@ -123,43 +135,39 @@ on_sigterm(void *arg) {
  * Main
  */
 
-int
-main(int argc, char **argv) {
+static int
+btc_main(const btc_conf_t *conf) {
   btc_node_t *node;
-  btc_conf_t args;
 
-  if (!get_config(&args, argc, argv))
-    return EXIT_FAILURE;
-
-  if (args.help) {
+  if (conf->help) {
     puts("Usage: makod [options]");
-    return EXIT_SUCCESS;
+    return 1;
   }
 
-  if (args.version) {
+  if (conf->version) {
     puts("0.0.0");
-    return EXIT_SUCCESS;
+    return 1;
   }
 
-  if (args.daemon) {
+  if (conf->daemon) {
     if (!btc_ps_daemon()) {
       fprintf(stderr, "Could not daemonize process.\n");
-      return EXIT_FAILURE;
+      return 0;
     }
   }
 
-  btc_ps_fdlimit(args.max_inbound + args.max_outbound + 200);
+  btc_ps_fdlimit(conf->max_inbound + conf->max_outbound + 200);
 
   btc_net_startup();
 
-  node = btc_node_create(args.network);
+  node = btc_node_create(conf->network);
 
-  set_config(node, &args);
+  set_config(node, conf);
 
-  if (!btc_node_open(node, args.prefix, get_node_flags(&args))) {
+  if (!btc_node_open(node, conf->prefix, get_node_flags(conf))) {
     btc_node_destroy(node);
     btc_net_cleanup();
-    return EXIT_FAILURE;
+    return 0;
   }
 
   btc_ps_onterm(on_sigterm, node);
@@ -171,5 +179,20 @@ main(int argc, char **argv) {
 
   btc_net_cleanup();
 
-  return EXIT_SUCCESS;
+  return 1;
+}
+
+int
+main(int argc, char **argv) {
+  btc_conf_t *conf = get_config(argc, argv);
+  int ok;
+
+  if (conf == NULL)
+    return EXIT_FAILURE;
+
+  ok = btc_main(conf);
+
+  btc_conf_destroy(conf);
+
+  return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }

@@ -108,7 +108,7 @@ typedef int http_server_request_cb(struct http_server *,
 
 typedef struct http_server {
   btc_loop_t *loop;
-  btc_socket_t *socket;
+  btc_server_t *tcp;
   http_server_request_cb *on_request;
   void *data;
 } http_server_t;
@@ -177,8 +177,17 @@ http_server_create(btc_loop_t *loop);
 BTC_EXTERN void
 http_server_destroy(http_server_t *server);
 
+BTC_EXTERN const char *
+http_server_strerror(http_server_t *server);
+
 BTC_EXTERN int
-http_server_open(http_server_t *server, const btc_sockaddr_t *addr);
+http_server_listen(http_server_t *server, const btc_sockaddr_t *addr);
+
+BTC_EXTERN int
+http_server_listen_local(http_server_t *server, int port);
+
+BTC_EXTERN int
+http_server_listen_external(http_server_t *server, int port);
 
 BTC_EXTERN void
 http_server_close(http_server_t *server);

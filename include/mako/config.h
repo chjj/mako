@@ -30,10 +30,10 @@ struct btc_conf_s {
   int workers;
   int listen;
   int port;
-  btc_netaddr_t bind;
-  btc_netaddr_t external;
+  btc_vector_t bind;
+  btc_vector_t external;
+  btc_vector_t connect;
   int no_connect;
-  btc_netaddr_t connect;
   btc_netaddr_t proxy;
   int max_connections;
   int max_inbound;
@@ -48,7 +48,7 @@ struct btc_conf_s {
   int bip157;
   enum btc_ipnet only_net;
   int rpc_port;
-  btc_netaddr_t rpc_bind;
+  btc_vector_t rpc_bind;
   char rpc_connect[64];
   char rpc_user[64];
   char rpc_pass[64];
@@ -63,12 +63,24 @@ struct btc_conf_s {
  * Config
  */
 
+BTC_EXTERN btc_conf_t *
+btc_conf_create(int argc,
+                char **argv,
+                const char *prefix,
+                int allow_params);
+
+BTC_EXTERN void
+btc_conf_destroy(btc_conf_t *conf);
+
 BTC_EXTERN void
 btc_conf_init(btc_conf_t *conf,
               int argc,
               char **argv,
               const char *prefix,
               int allow_params);
+
+BTC_EXTERN void
+btc_conf_clear(btc_conf_t *conf);
 
 #ifdef __cplusplus
 }

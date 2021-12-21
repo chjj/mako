@@ -590,32 +590,6 @@ default_request_cb(http_server_t *server, http_req_t *req, http_res_t *res) {
 }
 
 static void
-http_server_init(http_server_t *server, btc_loop_t *loop) {
-  server->loop = loop;
-  server->socket = NULL;
-  server->on_request = default_request_cb;
-  server->data = NULL;
-}
-
-static void
-http_server_clear(http_server_t *server) {
-  (void)server;
-}
-
-http_server_t *
-http_server_create(btc_loop_t *loop) {
-  http_server_t *server = http_malloc(sizeof(http_server_t));
-  http_server_init(server, loop);
-  return server;
-}
-
-void
-http_server_destroy(http_server_t *server) {
-  http_server_clear(server);
-  free(server);
-}
-
-static void
 on_socket(btc_socket_t *parent, btc_socket_t *child) {
   http_server_t *server = btc_socket_get_data(parent);
   http_conn_t *conn = http_conn_create(server);
@@ -623,28 +597,48 @@ on_socket(btc_socket_t *parent, btc_socket_t *child) {
   http_conn_accept(conn, child);
 }
 
-static void
-on_server_close(btc_socket_t *socket) {
-  http_server_t *server = btc_socket_get_data(socket);
-  server->socket = NULL;
+http_server_t *
+http_server_create(btc_loop_t *loop) {
+  http_server_t *server = http_malloc(sizeof(http_server_t));
+
+  server->loop = loop;
+  server->tcp = btc_server_create(loop);
+  server->on_request = default_request_cb;
+  server->data = NULL;
+
+  btc_server_set_data(server->tcp, server);
+  btc_server_on_socket(server->tcp, on_socket);
+
+  return server;
+}
+
+void
+http_server_destroy(http_server_t *server) {
+  btc_server_destroy(server->tcp);
+  free(server);
+}
+
+const char *
+http_server_strerror(http_server_t *server) {
+  return btc_server_strerror(server->tcp);
 }
 
 int
-http_server_open(http_server_t *server, const btc_sockaddr_t *addr) {
-  server->socket = btc_loop_listen(server->loop, addr);
+http_server_listen(http_server_t *server, const btc_sockaddr_t *addr) {
+  return btc_server_listen(server->tcp, addr);
+}
 
-  if (server->socket == NULL)
-    return 0;
+int
+http_server_listen_local(http_server_t *server, int port) {
+  return btc_server_listen_local(server->tcp, port);
+}
 
-  btc_socket_set_data(server->socket, server);
-  btc_socket_on_socket(server->socket, on_socket);
-  btc_socket_on_close(server->socket, on_server_close);
-
-  return 1;
+int
+http_server_listen_external(http_server_t *server, int port) {
+  return btc_server_listen_external(server->tcp, port);
 }
 
 void
 http_server_close(http_server_t *server) {
-  if (server->socket != NULL)
-    btc_socket_close(server->socket);
+  btc_server_close(server->tcp);
 }

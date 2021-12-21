@@ -177,13 +177,13 @@ struct btc_pool_s {
   unsigned int flags;
   uint64_t services;
   int port;
-  btc_sockaddr_t bind;
-  btc_netaddr_t connect;
+  btc_vector_t bind;
+  btc_vector_t connect;
   btc_sockaddr_t proxy;
   size_t max_inbound;
   size_t max_outbound;
   enum btc_ipnet only_net;
-  btc_socket_t *server;
+  btc_server_t *server;
   btc_peers_t peers;
   btc_nonces_t nonces;
   btc_hashset_t *block_map;
@@ -412,16 +412,9 @@ static void
 btc_peer_on_parse_error(btc_peer_t *peer);
 
 static void
-on_server_socket(btc_socket_t *server, btc_socket_t *socket) {
+on_server_socket(btc_socket_t *listener, btc_socket_t *socket) {
   btc_socket_set_nodelay(socket, 1);
-  btc_pool_on_socket((btc_pool_t *)btc_socket_get_data(server), socket);
-}
-
-static void
-on_server_close(btc_socket_t *server) {
-  btc_pool_t *pool = (btc_pool_t *)btc_socket_get_data(server);
-
-  pool->server = NULL;
+  btc_pool_on_socket((btc_pool_t *)btc_socket_get_data(listener), socket);
 }
 
 static void
@@ -2140,13 +2133,13 @@ btc_pool_create(const btc_network_t *network,
   pool->flags = BTC_POOL_DEFAULT_FLAGS;
   pool->services = BTC_NET_LOCAL_SERVICES;
   pool->port = network->port;
-  btc_sockaddr_import(&pool->bind, "::", 0);
-  btc_netaddr_set(&pool->connect, "0.0.0.0", 0);
+  btc_vector_init(&pool->bind);
+  btc_vector_init(&pool->connect);
   btc_sockaddr_import(&pool->proxy, "0.0.0.0", 0);
   pool->max_inbound = 128;
   pool->max_outbound = 8;
   pool->only_net = BTC_IPNET_NONE;
-  pool->server = NULL;
+  pool->server = btc_server_create(loop);
   btc_peers_init(&pool->peers);
   btc_nonces_init(&pool->nonces);
   pool->block_map = btc_hashset_create();
@@ -2164,12 +2157,26 @@ btc_pool_create(const btc_network_t *network,
   pool->required_services = BTC_NET_LOCAL_SERVICES;
   pool->synced = 0;
 
+  btc_server_set_data(pool->server, pool);
+  btc_server_on_socket(pool->server, on_server_socket);
+
   return pool;
 }
 
 void
 btc_pool_destroy(btc_pool_t *pool) {
+  size_t i;
+
+  for (i = 0; i < pool->bind.length; i++)
+    btc_free(pool->bind.items[i]);
+
+  for (i = 0; i < pool->connect.length; i++)
+    btc_netaddr_destroy(pool->connect.items[i]);
+
   btc_addrman_destroy(pool->addrman);
+  btc_vector_clear(&pool->bind);
+  btc_vector_clear(&pool->connect);
+  btc_server_destroy(pool->server);
   btc_peers_clear(&pool->peers);
   btc_nonces_clear(&pool->nonces);
   btc_hashset_destroy(pool->block_map);
@@ -2198,21 +2205,23 @@ btc_pool_set_port(btc_pool_t *pool, int port) {
 
 void
 btc_pool_set_bind(btc_pool_t *pool, const btc_netaddr_t *addr) {
-  btc_netaddr_get_sockaddr(&pool->bind, addr);
+  btc_sockaddr_t *sa = btc_malloc(sizeof(btc_sockaddr_t));
 
-  if (!btc_netaddr_is_null(addr))
-    btc_addrman_add_local(pool->addrman, addr, BTC_SCORE_BIND);
+  btc_netaddr_get_sockaddr(sa, addr);
+
+  btc_vector_push(&pool->bind, sa);
+
+  btc_addrman_add_local(pool->addrman, addr, BTC_SCORE_BIND);
 }
 
 void
 btc_pool_set_external(btc_pool_t *pool, const btc_netaddr_t *addr) {
-  if (!btc_netaddr_is_null(addr))
-    btc_addrman_add_local(pool->addrman, addr, BTC_SCORE_MANUAL);
+  btc_addrman_add_local(pool->addrman, addr, BTC_SCORE_MANUAL);
 }
 
 void
 btc_pool_set_connect(btc_pool_t *pool, const btc_netaddr_t *addr) {
-  btc_netaddr_copy(&pool->connect, addr);
+  btc_vector_push(&pool->connect, btc_netaddr_clone(addr));
 }
 
 void
@@ -2251,29 +2260,42 @@ btc_pool_log(btc_pool_t *pool, const char *fmt, ...) {
 
 static int
 btc_pool_listen(btc_pool_t *pool) {
-  btc_sockaddr_t addr = pool->bind;
-  btc_socket_t *server;
+  size_t i;
 
-  if (addr.port == 0)
-    addr.port = pool->port;
+  if (pool->bind.length == 0) {
+    if (!btc_server_listen_external(pool->server, pool->port)) {
+      const char *msg = btc_server_strerror(pool->server);
 
-  server = btc_loop_listen(pool->loop, &addr);
+      btc_pool_log(pool, "Could not listen on port %d: %s.", pool->port, msg);
 
-  if (server == NULL) {
-    const char *msg = btc_loop_strerror(pool->loop);
+      btc_server_close(pool->server);
 
-    btc_pool_log(pool, "Could not listen on %S: %s.", &addr, msg);
+      return 0;
+    }
 
-    return 0;
+    btc_pool_log(pool, "Listening on port %d.", pool->port);
+
+    return 1;
   }
 
-  btc_socket_set_data(server, pool);
-  btc_socket_on_socket(server, on_server_socket);
-  btc_socket_on_close(server, on_server_close);
+  for (i = 0; i < pool->bind.length; i++) {
+    btc_sockaddr_t *addr = pool->bind.items[i];
 
-  pool->server = server;
+    if (addr->port == 0)
+      addr->port = pool->port;
 
-  btc_pool_log(pool, "Listening on %S.", &addr);
+    if (!btc_server_listen(pool->server, addr)) {
+      const char *msg = btc_server_strerror(pool->server);
+
+      btc_pool_log(pool, "Could not listen on %S: %s.", addr, msg);
+
+      btc_server_close(pool->server);
+
+      return 0;
+    }
+
+    btc_pool_log(pool, "Listening on %S.", addr);
+  }
 
   return 1;
 }
@@ -2440,9 +2462,7 @@ btc_pool_close(btc_pool_t *pool) {
 
   btc_loop_off_tick(pool->loop, on_tick, pool);
 
-  if (pool->server != NULL)
-    btc_socket_close(pool->server);
-
+  btc_server_close(pool->server);
   btc_peers_close(&pool->peers);
   btc_pool_clear_chain(pool);
   btc_addrman_close(pool->addrman);
@@ -2453,13 +2473,19 @@ btc_pool_get_addr(btc_pool_t *pool) {
   int64_t now = btc_timedata_now(pool->timedata);
   const btc_addrent_t *entry;
   const btc_netaddr_t *addr;
-  int i;
+  size_t i;
 
   if (pool->flags & BTC_POOL_CONNECT) {
-    if (btc_peers_has(&pool->peers, &pool->connect))
-      return NULL;
+    for (i = 0; i < pool->connect.length; i++) {
+      addr = pool->connect.items[i];
 
-    return &pool->connect;
+      if (btc_peers_has(&pool->peers, addr))
+        continue;
+
+      return addr;
+    }
+
+    return NULL;
   }
 
   for (i = 0; i < 100; i++) {
@@ -2678,24 +2704,21 @@ btc_pool_add_loader(btc_pool_t *pool) {
 
 static int
 btc_pool_fill_outbound(btc_pool_t *pool) {
-  size_t total = btc_addrman_total(pool->addrman);
-  size_t i, need;
-
-  if (pool->flags & BTC_POOL_NOCONNECT)
-    return 0;
+  size_t i, total, need;
 
   if (pool->peers.load == NULL) {
     if (!btc_pool_add_loader(pool))
       return 0;
   }
 
-  if (pool->flags & BTC_POOL_CONNECT)
-    return 0;
-
   if (pool->peers.outbound >= pool->max_outbound)
     return 1;
 
   need = pool->max_outbound - pool->peers.outbound;
+  total = btc_addrman_total(pool->addrman);
+
+  if (pool->flags & BTC_POOL_CONNECT)
+    total = pool->connect.length;
 
   if (need > total)
     need = total;

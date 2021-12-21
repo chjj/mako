@@ -116,14 +116,14 @@ btc_node_create(const btc_network_t *network) {
 
 void
 btc_node_destroy(btc_node_t *node) {
-  btc_loop_destroy(node->loop);
-  btc_logger_destroy(node->logger);
-  btc_timedata_destroy(node->timedata);
-  btc_chain_destroy(node->chain);
-  btc_mempool_destroy(node->mempool);
-  btc_miner_destroy(node->miner);
-  btc_pool_destroy(node->pool);
   btc_rpc_destroy(node->rpc);
+  btc_pool_destroy(node->pool);
+  btc_miner_destroy(node->miner);
+  btc_mempool_destroy(node->mempool);
+  btc_chain_destroy(node->chain);
+  btc_timedata_destroy(node->timedata);
+  btc_logger_destroy(node->logger);
+  btc_loop_destroy(node->loop);
   btc_free(node);
 }
 
@@ -180,6 +180,7 @@ fail2:
   btc_chain_close(node->chain);
 fail1:
   btc_logger_close(node->logger);
+  btc_loop_close(node->loop);
   return 0;
 }
 

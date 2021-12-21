@@ -14,6 +14,7 @@
 #include <mako/netaddr.h>
 #include <mako/network.h>
 #include <mako/util.h>
+#include <mako/vector.h>
 #include "internal.h"
 
 /*
@@ -472,10 +473,10 @@ conf_init(btc_conf_t *conf) {
   conf->workers = 0;
   conf->listen = 1;
   conf->port = 0;
-  btc_netaddr_set(&conf->bind, "::", 0);
-  btc_netaddr_set(&conf->external, "0.0.0.0", 0);
+  btc_vector_init(&conf->bind);
+  btc_vector_init(&conf->external);
+  btc_vector_init(&conf->connect);
   conf->no_connect = 0;
-  btc_netaddr_set(&conf->connect, "0.0.0.0", 0);
   btc_netaddr_set(&conf->proxy, "0.0.0.0", 0);
   conf->max_connections = 0;
   conf->max_inbound = 128;
@@ -490,7 +491,7 @@ conf_init(btc_conf_t *conf) {
   conf->bip157 = 0;
   conf->only_net = BTC_IPNET_NONE;
   conf->rpc_port = 0;
-  btc_netaddr_set(&conf->rpc_bind, "127.0.0.1", 0);
+  btc_vector_init(&conf->rpc_bind);
   btc_str_assign(conf->rpc_connect, "127.0.0.1");
   btc_str_assign(conf->rpc_user, "bitcoinrpc");
   btc_str_assign(conf->rpc_pass, "");
@@ -499,6 +500,28 @@ conf_init(btc_conf_t *conf) {
   conf->method = NULL;
   conf->params[0] = NULL;
   conf->length = 0;
+}
+
+static void
+conf_clear(btc_conf_t *conf) {
+  size_t i;
+
+  for (i = 0; i < conf->bind.length; i++)
+    btc_netaddr_destroy(conf->bind.items[i]);
+
+  for (i = 0; i < conf->external.length; i++)
+    btc_netaddr_destroy(conf->external.items[i]);
+
+  for (i = 0; i < conf->connect.length; i++)
+    btc_netaddr_destroy(conf->connect.items[i]);
+
+  for (i = 0; i < conf->rpc_bind.length; i++)
+    btc_netaddr_destroy(conf->rpc_bind.items[i]);
+
+  btc_vector_clear(&conf->bind);
+  btc_vector_clear(&conf->external);
+  btc_vector_clear(&conf->connect);
+  btc_vector_clear(&conf->rpc_bind);
 }
 
 static int
@@ -543,6 +566,7 @@ conf_find_file(char *buf, size_t size,
 static int
 conf_read_file(btc_conf_t *conf, const char *file) {
   FILE *stream = fopen(file, "r");
+  btc_netaddr_t addr;
   char *zp = NULL;
   size_t zn = 0;
   int len;
@@ -581,21 +605,25 @@ conf_read_file(btc_conf_t *conf, const char *file) {
     if (btc_match_port(&conf->port, zp, "port="))
       continue;
 
-    if (btc_match_netaddr(&conf->bind, zp, "bind=")) {
-      conf->listen = 1;
+    if (btc_match_netaddr(&addr, zp, "bind=")) {
+      btc_vector_push(&conf->bind, btc_netaddr_clone(&addr));
       continue;
     }
 
-    if (btc_match_netaddr(&conf->external, zp, "externalip="))
+    if (btc_match_netaddr(&addr, zp, "externalip=")) {
+      btc_vector_push(&conf->external, btc_netaddr_clone(&addr));
       continue;
+    }
 
     if (btc_match_bool(&conf->no_connect, zp, "connect=")) {
       conf->no_connect ^= 1;
       continue;
     }
 
-    if (btc_match_netaddr(&conf->connect, zp, "connect="))
+    if (btc_match_netaddr(&addr, zp, "connect=")) {
+      btc_vector_push(&conf->connect, btc_netaddr_clone(&addr));
       continue;
+    }
 
     if (btc_match_netaddr(&conf->proxy, zp, "proxy="))
       continue;
@@ -644,8 +672,10 @@ conf_read_file(btc_conf_t *conf, const char *file) {
     if (btc_match_port(&conf->rpc_port, zp, "rpcport="))
       continue;
 
-    if (btc_match_netaddr(&conf->rpc_bind, zp, "rpcbind="))
+    if (btc_match_netaddr(&addr, zp, "rpcbind=")) {
+      btc_vector_push(&conf->rpc_bind, btc_netaddr_clone(&addr));
       continue;
+    }
 
     if (btc_match_str(conf->rpc_connect, zp, "rpcconnect="))
       continue;
@@ -672,6 +702,7 @@ conf_read_file(btc_conf_t *conf, const char *file) {
 
 static int
 conf_parse_args(btc_conf_t *conf, int argc, char **argv, int allow_params) {
+  btc_netaddr_t addr;
   const char *ret;
   int i;
 
@@ -711,21 +742,25 @@ conf_parse_args(btc_conf_t *conf, int argc, char **argv, int allow_params) {
     if (btc_match_port(&conf->port, arg, "-port="))
       continue;
 
-    if (btc_match_netaddr(&conf->bind, arg, "-bind=")) {
-      conf->listen = 1;
+    if (btc_match_netaddr(&addr, arg, "-bind=")) {
+      btc_vector_push(&conf->bind, btc_netaddr_clone(&addr));
       continue;
     }
 
-    if (btc_match_netaddr(&conf->external, arg, "-externalip="))
+    if (btc_match_netaddr(&addr, arg, "-externalip=")) {
+      btc_vector_push(&conf->external, btc_netaddr_clone(&addr));
       continue;
+    }
 
     if (btc_match_argbool(&conf->no_connect, arg, "-connect=")) {
       conf->no_connect ^= 1;
       continue;
     }
 
-    if (btc_match_netaddr(&conf->connect, arg, "-connect="))
+    if (btc_match_netaddr(&addr, arg, "-connect=")) {
+      btc_vector_push(&conf->connect, btc_netaddr_clone(&addr));
       continue;
+    }
 
     if (btc_match_netaddr(&conf->proxy, arg, "-proxy="))
       continue;
@@ -774,8 +809,10 @@ conf_parse_args(btc_conf_t *conf, int argc, char **argv, int allow_params) {
     if (btc_match_port(&conf->rpc_port, arg, "-rpcport="))
       continue;
 
-    if (btc_match_netaddr(&conf->rpc_bind, arg, "-rpcbind="))
+    if (btc_match_netaddr(&addr, arg, "-rpcbind=")) {
+      btc_vector_push(&conf->rpc_bind, btc_netaddr_clone(&addr));
       continue;
+    }
 
     if (btc_match_str(conf->rpc_connect, arg, "-rpcconnect="))
       continue;
@@ -829,6 +866,8 @@ conf_finalize(btc_conf_t *conf, const char *prefix) {
   const btc_network_t *network = conf->network;
   size_t size = sizeof(conf->prefix);
   char *path = conf->prefix;
+  int64_t now = btc_now();
+  size_t i;
 
   if (!*conf->prefix)
     btc_str_set(conf->prefix, prefix);
@@ -840,17 +879,38 @@ conf_finalize(btc_conf_t *conf, const char *prefix) {
     }
   }
 
+  if (conf->bind.length > 0)
+    conf->listen = 1;
+
   if (conf->port == 0)
     conf->port = network->port;
 
-  if (conf->bind.port == 0)
-    conf->bind.port = conf->port;
+  for (i = 0; i < conf->bind.length; i++) {
+    btc_netaddr_t *addr = conf->bind.items[i];
 
-  if (conf->external.port == 0)
-    conf->external.port = conf->port;
+    if (addr->port == 0)
+      addr->port = conf->port;
+  }
 
-  if (conf->connect.port == 0)
-    conf->connect.port = network->port;
+  for (i = 0; i < conf->external.length; i++) {
+    btc_netaddr_t *addr = conf->external.items[i];
+
+    if (addr->port == 0)
+      addr->port = conf->port;
+
+    addr->time = now;
+    addr->services = BTC_NET_LOCAL_SERVICES;
+  }
+
+  for (i = 0; i < conf->connect.length; i++) {
+    btc_netaddr_t *addr = conf->connect.items[i];
+
+    if (addr->port == 0)
+      addr->port = network->port;
+
+    addr->time = now;
+    addr->services = BTC_NET_DEFAULT_SERVICES;
+  }
 
   if (conf->proxy.port == 0)
     conf->proxy.port = conf->onion ? 9050 : 1080;
@@ -858,10 +918,14 @@ conf_finalize(btc_conf_t *conf, const char *prefix) {
   if (conf->rpc_port == 0)
     conf->rpc_port = network->rpc_port;
 
-  if (conf->rpc_bind.port == 0)
-    conf->rpc_bind.port = conf->rpc_port;
+  for (i = 0; i < conf->rpc_bind.length; i++) {
+    btc_netaddr_t *addr = conf->rpc_bind.items[i];
 
-  if (!btc_netaddr_is_null(&conf->external)
+    if (addr->port == 0)
+      addr->port = conf->rpc_port;
+  }
+
+  if (conf->external.length > 0
       || !btc_netaddr_is_null(&conf->proxy)) {
     conf->discover = 0;
   }
@@ -879,17 +943,27 @@ conf_finalize(btc_conf_t *conf, const char *prefix) {
 
   if (conf->max_inbound == 0)
     conf->listen = 0;
-
-  conf->external.time = btc_now();
-  conf->external.services = BTC_NET_LOCAL_SERVICES;
-
-  conf->connect.time = btc_now();
-  conf->connect.services = BTC_NET_DEFAULT_SERVICES;
 }
 
 /*
  * Config
  */
+
+btc_conf_t *
+btc_conf_create(int argc,
+                char **argv,
+                const char *prefix,
+                int allow_params) {
+  btc_conf_t *conf = btc_malloc(sizeof(btc_conf_t));
+  btc_conf_init(conf, argc, argv, prefix, allow_params);
+  return conf;
+}
+
+void
+btc_conf_destroy(btc_conf_t *conf) {
+  btc_conf_clear(conf);
+  btc_free(conf);
+}
 
 void
 btc_conf_init(btc_conf_t *conf,
@@ -920,4 +994,9 @@ btc_conf_init(btc_conf_t *conf,
 
   /* Finalize. */
   conf_finalize(conf, prefix);
+}
+
+void
+btc_conf_clear(btc_conf_t *conf) {
+  conf_clear(conf);
 }

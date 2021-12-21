@@ -191,7 +191,7 @@ int main(void) {
   server = http_server_create(loop);
   server->on_request = on_request;
 
-  ASSERT(http_server_open(server, &addr));
+  ASSERT(http_server_listen(server, &addr));
 
   btc_thread_create(thread, send_requests, lock);
 
@@ -207,9 +207,10 @@ int main(void) {
   btc_thread_free(thread);
   btc_mutex_destroy(lock);
 
+  http_server_close(server);
+
   btc_loop_close(loop);
 
-  http_server_close(server);
   http_server_destroy(server);
 
   btc_loop_destroy(loop);

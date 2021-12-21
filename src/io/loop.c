@@ -251,6 +251,7 @@ struct btc_socket_s {
 #endif
   btc_link_t deferred;
   btc_link_t closed;
+  btc_link_t listener;
   btc_socket_socket_cb *on_socket;
   btc_socket_connect_cb *on_connect;
   btc_socket_close_cb *on_close;
@@ -259,6 +260,7 @@ struct btc_socket_s {
   btc_socket_drain_cb *on_drain;
   btc_socket_message_cb *on_message;
   void *data;
+  void *ptr;
 };
 
 typedef struct btc_tick_s {
@@ -297,6 +299,14 @@ struct btc_loop_s {
   btc_list_t ticks;
   int error;
   int running;
+};
+
+struct btc_server_s {
+  btc_loop_t *loop;
+  btc_list_t sockets;
+  btc_socket_socket_cb *on_socket;
+  void *data;
+  int no_delay;
 };
 
 /*
@@ -497,19 +507,23 @@ safe_socket(int domain, int type, int protocol) {
 static btc_sockfd_t
 safe_listener(int domain, int type, int protocol) {
   btc_sockfd_t fd = safe_socket(domain, type, protocol);
-  btc_sockopt_t yes = 1;
-  btc_sockopt_t no = 0;
+  btc_sockopt_t val;
 
   if (fd == BTC_INVALID_SOCKET)
     return BTC_INVALID_SOCKET;
 
-  setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+  {
+    val = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+  }
 
   /* https://stackoverflow.com/questions/1618240 */
   /* https://datatracker.ietf.org/doc/html/rfc3493#section-5.3 */
 #ifdef IPV6_V6ONLY
-  if (domain == PF_INET6)
-    setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &no, sizeof(no));
+  if (domain == PF_INET6) {
+    val = 1;
+    setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &val, sizeof(val));
+  }
 #endif
 
   return fd;
@@ -664,6 +678,7 @@ btc_socket_create(btc_loop_t *loop) {
 #endif
   socket->deferred.value = socket;
   socket->closed.value = socket;
+  socket->listener.value = socket;
 
   socket->on_socket = default_socket_cb;
   socket->on_connect = default_connect_cb;
@@ -1910,4 +1925,140 @@ btc_loop_close(btc_loop_t *loop) {
   loop->nfds = 0;
 #endif
 #endif /* !BTC_USE_POLL */
+}
+
+/*
+ * Server
+ */
+
+btc_server_t *
+btc_server_create(btc_loop_t *loop) {
+  btc_server_t *server = (btc_server_t *)safe_malloc(sizeof(btc_server_t));
+
+  memset(server, 0, sizeof(*server));
+
+  server->loop = loop;
+  server->no_delay = -1;
+
+  return server;
+}
+
+void
+btc_server_destroy(btc_server_t *server) {
+  CHECK(server->loop->running == 0);
+  CHECK(server->sockets.length == 0);
+
+  free(server);
+}
+
+const char *
+btc_server_strerror(btc_server_t *server) {
+  return btc_loop_strerror(server->loop);
+}
+
+static void
+on_close(btc_socket_t *socket) {
+  btc_server_t *server = socket->ptr;
+
+  btc_list_remove(&server->sockets, &socket->listener);
+}
+
+int
+btc_server_listen(btc_server_t *server, const btc_sockaddr_t *addr) {
+  btc_socket_t *socket = btc_loop_listen(server->loop, addr);
+
+  if (socket == NULL)
+    return 0;
+
+  socket->ptr = server;
+  socket->on_close = on_close;
+
+  if (server->on_socket != NULL)
+    socket->on_socket = server->on_socket;
+
+  if (server->data != NULL)
+    socket->data = server->data;
+
+  if (server->no_delay != -1)
+    btc_socket_set_nodelay(socket, server->no_delay);
+
+  btc_list_push(&server->sockets, &socket->listener);
+
+  return 1;
+}
+
+int
+btc_server_listen_local(btc_server_t *server, int port) {
+  btc_sockaddr_t addr;
+  int ret = 0;
+
+  if (port < 0 || port > 0xffff)
+    return 0;
+
+  btc_sockaddr_import(&addr, "::1", port);
+
+  ret |= btc_server_listen(server, &addr);
+
+  btc_sockaddr_import(&addr, "127.0.0.1", port);
+
+  ret |= btc_server_listen(server, &addr);
+
+  return ret;
+}
+
+int
+btc_server_listen_external(btc_server_t *server, int port) {
+  btc_sockaddr_t addr;
+  int ret = 0;
+
+  if (port < 0 || port > 0xffff)
+    return 0;
+
+  btc_sockaddr_import(&addr, "::", port);
+
+  ret |= btc_server_listen(server, &addr);
+
+  btc_sockaddr_import(&addr, "0.0.0.0", port);
+
+  ret |= btc_server_listen(server, &addr);
+
+  return ret;
+}
+
+void
+btc_server_close(btc_server_t *server) {
+  btc_link_t *it;
+
+  for (it = server->sockets.head; it != NULL; it = it->next)
+    btc_socket_close(it->value);
+}
+
+void
+btc_server_on_socket(btc_server_t *server, btc_socket_socket_cb *handler) {
+  btc_link_t *it;
+
+  server->on_socket = handler;
+
+  for (it = server->sockets.head; it != NULL; it = it->next)
+    btc_socket_on_socket(it->value, handler);
+}
+
+void
+btc_server_set_data(btc_server_t *server, void *data) {
+  btc_link_t *it;
+
+  server->data = data;
+
+  for (it = server->sockets.head; it != NULL; it = it->next)
+    btc_socket_set_data(it->value, data);
+}
+
+void
+btc_server_set_nodelay(btc_server_t *server, int value) {
+  btc_link_t *it;
+
+  server->no_delay = (value != 0);
+
+  for (it = server->sockets.head; it != NULL; it = it->next)
+    btc_socket_set_nodelay(it->value, value);
 }

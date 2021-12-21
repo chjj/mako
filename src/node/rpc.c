@@ -261,7 +261,8 @@ struct btc_rpc_s {
   btc_pool_t *pool;
   http_server_t *http;
   unsigned int flags;
-  btc_sockaddr_t bind;
+  int port;
+  btc_vector_t bind;
   uint8_t auth_hash[32];
 };
 
@@ -286,8 +287,9 @@ btc_rpc_create(btc_node_t *node) {
   rpc->pool = node->pool;
   rpc->http = http_server_create(node->loop);
   rpc->flags = BTC_RPC_DEFAULT_FLAGS;
+  rpc->port = network->rpc_port;
 
-  btc_sockaddr_import(&rpc->bind, "127.0.0.1", network->rpc_port);
+  btc_vector_init(&rpc->bind);
 
   rpc->http->on_request = on_request;
   rpc->http->data = rpc;
@@ -297,13 +299,29 @@ btc_rpc_create(btc_node_t *node) {
 
 void
 btc_rpc_destroy(btc_rpc_t *rpc) {
+  size_t i;
+
+  for (i = 0; i < rpc->bind.length; i++)
+    btc_free(rpc->bind.items[i]);
+
+  btc_vector_clear(&rpc->bind);
   http_server_destroy(rpc->http);
   btc_free(rpc);
 }
 
 void
+btc_rpc_set_port(btc_rpc_t *rpc, int port) {
+  CHECK(port > 0 && port <= 0xffff);
+  rpc->port = port;
+}
+
+void
 btc_rpc_set_bind(btc_rpc_t *rpc, const btc_netaddr_t *addr) {
-  btc_netaddr_get_sockaddr(&rpc->bind, addr);
+  btc_sockaddr_t *sa = btc_malloc(sizeof(btc_sockaddr_t));
+
+  btc_netaddr_get_sockaddr(sa, addr);
+
+  btc_vector_push(&rpc->bind, sa);
 }
 
 void
@@ -322,16 +340,56 @@ btc_rpc_log(btc_rpc_t *rpc, const char *fmt, ...) {
   va_end(ap);
 }
 
+static int
+btc_rpc_listen(btc_rpc_t *rpc) {
+  size_t i;
+
+  if (rpc->bind.length == 0) {
+    if (!http_server_listen_local(rpc->http, rpc->port)) {
+      const char *msg = http_server_strerror(rpc->http);
+
+      btc_rpc_log(rpc, "Could not listen on port %d: %s.", rpc->port, msg);
+
+      http_server_close(rpc->http);
+
+      return 0;
+    }
+
+    btc_rpc_log(rpc, "Listening on port %d.", rpc->port);
+
+    return 1;
+  }
+
+  for (i = 0; i < rpc->bind.length; i++) {
+    btc_sockaddr_t *addr = rpc->bind.items[i];
+
+    if (addr->port == 0)
+      addr->port = rpc->port;
+
+    if (!http_server_listen(rpc->http, addr)) {
+      const char *msg = http_server_strerror(rpc->http);
+
+      btc_rpc_log(rpc, "Could not listen on %S: %s.", addr, msg);
+
+      http_server_close(rpc->http);
+
+      return 0;
+    }
+
+    btc_rpc_log(rpc, "Listening on %S.", addr);
+  }
+
+  return 1;
+}
+
 int
 btc_rpc_open(btc_rpc_t *rpc, unsigned int flags) {
   rpc->flags = flags;
 
   btc_rpc_log(rpc, "Opening RPC.");
 
-  if (!http_server_open(rpc->http, &rpc->bind))
+  if (!btc_rpc_listen(rpc))
     return 0;
-
-  btc_rpc_log(rpc, "RPC listening on %S.", &rpc->bind);
 
   return 1;
 }

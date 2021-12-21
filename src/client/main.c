@@ -78,68 +78,64 @@ find_schema(const char *method) {
  * Config
  */
 
-static int
-get_config(btc_conf_t *args, int argc, char **argv) {
+static btc_conf_t *
+get_config(int argc, char **argv) {
   char prefix[BTC_PATH_MAX];
 
   if (!btc_sys_datadir(prefix, sizeof(prefix), "mako")) {
     fprintf(stderr, "Could not find suitable datadir.\n");
-    return 0;
+    return NULL;
   }
 
-  btc_conf_init(args, argc, argv, prefix, 1);
-
-  return 1;
+  return btc_conf_create(argc, argv, prefix, 1);
 }
 
 /*
  * Main
  */
 
-int
-main(int argc, char **argv) {
+static int
+btc_main(const btc_conf_t *conf) {
   btc_client_t *client = NULL;
   json_value *params = NULL;
   const json_type *schema;
   json_value *result;
-  btc_conf_t args;
-  int ret = EXIT_FAILURE;
+  int ret = 0;
   size_t i;
 
-  if (!get_config(&args, argc, argv))
-    return EXIT_FAILURE;
-
-  if (args.help) {
+  if (conf->help) {
     puts("Usage: mako [options] <command> [params]");
-    return EXIT_SUCCESS;
+    return 1;
   }
 
-  if (args.version) {
+  if (conf->version) {
     puts("0.0.0");
-    return EXIT_SUCCESS;
+    return 1;
   }
 
-  if (args.method == NULL) {
+  if (conf->method == NULL) {
     fprintf(stderr, "Must specify a command.\n");
-    return EXIT_FAILURE;
+    return 0;
   }
 
-  schema = find_schema(args.method);
+  schema = find_schema(conf->method);
 
   if (schema == NULL) {
-    fprintf(stderr, "RPC method '%s' not found.\n", args.method);
-    return EXIT_FAILURE;
+    fprintf(stderr, "RPC method '%s' not found.\n", conf->method);
+    return 0;
   }
 
-  params = json_array_new(args.length);
+  btc_net_startup();
 
-  for (i = 0; i < args.length; i++) {
-    const char *param = args.params[i];
+  params = json_array_new(conf->length);
+
+  for (i = 0; i < conf->length; i++) {
+    const char *param = conf->params[i];
     json_type type = schema[i];
     json_value *obj;
 
     if (type == json_none) {
-      fprintf(stderr, "Too many arguments for %s.\n", args.method);
+      fprintf(stderr, "Too many arguments for %s.\n", conf->method);
       goto fail;
     }
 
@@ -198,19 +194,17 @@ main(int argc, char **argv) {
     goto fail;
   }
 
-  btc_net_startup();
-
   client = btc_client_create();
 
-  btc_client_auth(client, args.rpc_user, args.rpc_pass);
+  btc_client_auth(client, conf->rpc_user, conf->rpc_pass);
 
-  if (!btc_client_open(client, args.rpc_connect, args.rpc_port, 0)) {
+  if (!btc_client_open(client, conf->rpc_connect, conf->rpc_port, 0)) {
     fprintf(stderr, "Could not connect to %s (port=%d).\n",
-                    args.rpc_connect, args.rpc_port);
+                    conf->rpc_connect, conf->rpc_port);
     goto fail;
   }
 
-  result = btc_client_call(client, args.method, params);
+  result = btc_client_call(client, conf->method, params);
   params = NULL;
 
   btc_client_close(client);
@@ -225,7 +219,7 @@ main(int argc, char **argv) {
 
   json_builder_free(result);
 
-  ret = EXIT_SUCCESS;
+  ret = 1;
 fail:
   if (params != NULL)
     json_builder_free(params);
@@ -236,4 +230,19 @@ fail:
   btc_net_cleanup();
 
   return ret;
+}
+
+int
+main(int argc, char **argv) {
+  btc_conf_t *conf = get_config(argc, argv);
+  int ok;
+
+  if (conf == NULL)
+    return EXIT_FAILURE;
+
+  ok = btc_main(conf);
+
+  btc_conf_destroy(conf);
+
+  return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }
