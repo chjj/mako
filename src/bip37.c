@@ -266,9 +266,9 @@ tree_hash(uint8_t *root,
           const btc_merkleblock_t *tree,
           int32_t height,
           uint32_t pos,
-          const btc_vector_t *leaves) {
+          btc_tx_t **leaves) {
   if (height == 0) {
-    btc_hash_copy(root, leaves->items[pos]);
+    btc_hash_copy(root, leaves[pos]->hash);
   } else {
     uint8_t left[32], right[32];
 
@@ -284,19 +284,35 @@ tree_hash(uint8_t *root,
 }
 
 static void
+bit_push(btc_buffer_t *z, int x, int *bits) {
+  size_t p = *bits;
+
+  if ((p >> 3) == z->length) {
+    if (z->length == z->alloc)
+      btc_buffer_grow(z, (z->alloc * 3) / 2 + (z->alloc <= 1));
+
+    z->data[z->length++] = 0;
+  }
+
+  z->data[p >> 3] |= x << (p & 7);
+
+  *bits += 1;
+}
+
+static void
 tree_build(btc_merkleblock_t *tree,
            int32_t height,
            uint32_t pos,
-           const btc_vector_t *leaves,
-           const btc_array_t *matches,
-           btc_array_t *bits) {
+           btc_tx_t **leaves,
+           const uint8_t *matches,
+           int *bits) {
   int parent = 0;
   uint32_t p;
 
   for (p = pos << height; p < ((pos + 1) << height) && p < tree->total; p++)
-    parent |= matches->items[p];
+    parent |= ((matches[p >> 3] >> (p & 7)) & 1);
 
-  btc_array_push(bits, !!parent);
+  bit_push(&tree->flags, parent, bits);
 
   if (height == 0 || !parent) {
     uint8_t *root = (uint8_t *)btc_malloc(32);
@@ -315,16 +331,9 @@ tree_build(btc_merkleblock_t *tree,
 static void
 btc_merkleblock_set_matches(btc_merkleblock_t *tree,
                             const btc_block_t *block,
-                            const btc_array_t *matches) {
-  btc_vector_t leaves;
-  btc_array_t bits;
+                            const uint8_t *matches) {
   int32_t height = 0;
-  size_t i, p;
-
-  CHECK(block->txs.length > 0);
-
-  btc_vector_init(&leaves);
-  btc_array_init(&bits);
+  int bits = 0;
 
   btc_merkleblock_reset(tree);
 
@@ -332,25 +341,10 @@ btc_merkleblock_set_matches(btc_merkleblock_t *tree,
 
   tree->total = block->txs.length;
 
-  btc_vector_resize(&leaves, block->txs.length);
-
-  for (i = 0; i < block->txs.length; i++)
-    leaves.items[i] = block->txs.items[i]->hash;
-
   while (tree_width(tree, height) > 1)
     height += 1;
 
-  tree_build(tree, height, 0, &leaves, matches, &bits);
-
-  btc_buffer_resize(&tree->flags, (bits.length + 7) / 8);
-
-  memset(tree->flags.data, 0, tree->flags.length);
-
-  for (p = 0; p < bits.length; p++)
-    tree->flags.data[p >> 3] |= bits.items[p] << (p & 7);
-
-  btc_vector_clear(&leaves);
-  btc_array_clear(&bits);
+  tree_build(tree, height, 0, block->txs.items, matches, &bits);
 }
 
 btc_vector_t *
@@ -358,25 +352,27 @@ btc_merkleblock_set_block(btc_merkleblock_t *tree,
                           const btc_block_t *block,
                           btc_bloom_t *filter) {
   btc_vector_t *txs = btc_vector_create();
-  btc_array_t matches;
+  size_t size = (block->txs.length + 7) / 8;
+  uint8_t *matches = btc_malloc(size);
   size_t i;
 
-  btc_array_init(&matches);
-  btc_array_resize(&matches, block->txs.length);
+  memset(matches, 0, size);
 
-  for (i = 0; i < block->txs.length; i++) {
-    const btc_tx_t *tx = block->txs.items[i];
-    int match = btc_tx_matches(tx, filter);
+  if (filter != NULL) {
+    for (i = 0; i < block->txs.length; i++) {
+      const btc_tx_t *tx = block->txs.items[i];
+      int match = btc_tx_matches(tx, filter);
 
-    if (match)
-      btc_vector_push(txs, tx);
+      if (match)
+        btc_vector_push(txs, tx);
 
-    matches.items[i] = match;
+      matches[i >> 3] |= match << (i & 7);
+    }
   }
 
-  btc_merkleblock_set_matches(tree, block, &matches);
+  btc_merkleblock_set_matches(tree, block, matches);
 
-  btc_array_clear(&matches);
+  btc_free(matches);
 
   return txs;
 }
@@ -386,24 +382,24 @@ btc_merkleblock_set_hashes(btc_merkleblock_t *tree,
                            const btc_block_t *block,
                            const btc_vector_t *hashes) {
   btc_hashset_t *filter = btc_hashset_create();
-  btc_array_t matches;
+  size_t size = (block->txs.length + 7) / 8;
+  uint8_t *matches = btc_malloc(size);
   size_t i;
 
-  btc_array_init(&matches);
+  memset(matches, 0, size);
 
   for (i = 0; i < hashes->length; i++)
     btc_hashset_put(filter, hashes->items[i]);
 
-  btc_array_resize(&matches, block->txs.length);
-
   for (i = 0; i < block->txs.length; i++) {
     const btc_tx_t *tx = block->txs.items[i];
+    int match = btc_hashset_has(filter, tx->hash);
 
-    matches.items[i] = btc_hashset_has(filter, tx->hash);
+    matches[i >> 3] |= match << (i & 7);
   }
 
-  btc_merkleblock_set_matches(tree, block, &matches);
+  btc_merkleblock_set_matches(tree, block, matches);
 
   btc_hashset_destroy(filter);
-  btc_array_clear(&matches);
+  btc_free(matches);
 }
