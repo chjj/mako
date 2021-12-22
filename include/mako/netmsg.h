@@ -142,7 +142,7 @@ typedef struct btc_zinv_s {
 typedef struct btc_getblocks_s {
   uint32_t version;
   btc_vector_t locator;
-  uint8_t stop[32];
+  const uint8_t *stop;
 } btc_getblocks_t;
 
 typedef struct btc_headers_s {
@@ -159,7 +159,7 @@ typedef struct btc_reject_s {
 } btc_reject_t;
 
 typedef struct btc_filteradd_s {
-  uint8_t data[256];
+  const uint8_t *data;
   size_t length;
 } btc_filteradd_t;
 
@@ -173,7 +173,7 @@ typedef struct btc_sendcmpct_s {
 } btc_sendcmpct_t;
 
 typedef struct btc_unknown_s {
-  uint8_t *data;
+  const uint8_t *data;
   size_t length;
 } btc_unknown_t;
 

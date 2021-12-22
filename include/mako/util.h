@@ -20,6 +20,8 @@ extern "C" {
  * Constants
  */
 
+BTC_EXTERN extern const uint8_t btc_hash_zero[32];
+
 #define BTC_PRECISION 8
 #define BTC_AMOUNT_LEN (1 + (19 - BTC_PRECISION) + 1 + BTC_PRECISION)
 

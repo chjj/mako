@@ -535,7 +535,7 @@ void
 btc_getblocks_init(btc_getblocks_t *msg) {
   msg->version = 0;
   btc_vector_init(&msg->locator);
-  btc_hash_init(msg->stop);
+  msg->stop = btc_hash_zero;
 }
 
 void
@@ -547,7 +547,7 @@ void
 btc_getblocks_copy(btc_getblocks_t *z, const btc_getblocks_t *x) {
   z->version = x->version;
   btc_vector_copy(&z->locator, &x->locator);
-  btc_hash_copy(z->stop, x->stop);
+  z->stop = x->stop;
 }
 
 size_t
@@ -600,7 +600,7 @@ btc_getblocks_read(btc_getblocks_t *z, const uint8_t **xp, size_t *xn) {
     *xn -= 32;
   }
 
-  if (!btc_raw_read(z->stop, 32, xp, xn))
+  if (!btc_zraw_read(&z->stop, 32, xp, xn))
     return 0;
 
   return 1;
@@ -786,12 +786,13 @@ DEFINE_SERIALIZABLE_OBJECT(btc_filteradd, SCOPE_EXTERN)
 
 void
 btc_filteradd_init(btc_filteradd_t *msg) {
-  memset(msg->data, 0, sizeof(msg->data));
+  msg->data = NULL;
   msg->length = 0;
 }
 
 void
 btc_filteradd_clear(btc_filteradd_t *msg) {
+  msg->data = NULL;
   msg->length = 0;
 }
 
@@ -817,10 +818,7 @@ btc_filteradd_read(btc_filteradd_t *z, const uint8_t **xp, size_t *xn) {
   if (!btc_size_read(&z->length, xp, xn))
     return 0;
 
-  if (z->length > 256)
-    return 0;
-
-  if (!btc_raw_read(z->data, z->length, xp, xn))
+  if (!btc_zraw_read(&z->data, z->length, xp, xn))
     return 0;
 
   return 1;
@@ -923,21 +921,13 @@ btc_unknown_init(btc_unknown_t *msg) {
 
 void
 btc_unknown_clear(btc_unknown_t *msg) {
-  if (msg->data != NULL)
-    btc_free(msg->data);
-
   msg->data = NULL;
   msg->length = 0;
 }
 
 void
 btc_unknown_copy(btc_unknown_t *z, const btc_unknown_t *x) {
-  if (x->length > 0) {
-    z->data = (uint8_t *)btc_realloc(z->data, x->length);
-
-    memcpy(z->data, x->data, x->length);
-  }
-
+  z->data = x->data;
   z->length = x->length;
 }
 
@@ -953,12 +943,7 @@ btc_unknown_write(uint8_t *zp, const btc_unknown_t *x) {
 
 int
 btc_unknown_read(btc_unknown_t *z, const uint8_t **xp, size_t *xn) {
-  if (*xn > 0) {
-    z->data = (uint8_t *)btc_realloc(z->data, *xn);
-
-    memcpy(z->data, *xp, *xn);
-  }
-
+  z->data = *xp;
   z->length = *xn;
 
   *xp += *xn;

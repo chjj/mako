@@ -16,6 +16,12 @@
 #include "internal.h"
 
 /*
+ * Constants
+ */
+
+const uint8_t btc_hash_zero[32] = {0};
+
+/*
  * Memory Zero
  */
 

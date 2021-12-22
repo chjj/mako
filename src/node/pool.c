@@ -57,8 +57,6 @@ enum btc_peer_state {
   BTC_PEER_DEAD
 };
 
-static const uint8_t btc_zero_hash[32] = {0};
-
 /*
  * Types
  */
@@ -797,14 +795,14 @@ static int
 btc_peer_send_getblocks(btc_peer_t *peer,
                         const btc_vector_t *locator,
                         const uint8_t *stop) {
-  const uint8_t *start = btc_zero_hash;
+  const uint8_t *start = btc_hash_zero;
   btc_getblocks_t msg;
 
   if (locator->length > 0)
     start = locator->items[0];
 
   if (stop == NULL)
-    stop = btc_zero_hash;
+    stop = btc_hash_zero;
 
   /* Filter out duplicate requests. */
   if (btc_hash_equal(start, peer->last_start)
@@ -817,15 +815,14 @@ btc_peer_send_getblocks(btc_peer_t *peer,
 
   msg.version = BTC_NET_PROTOCOL_VERSION;
   msg.locator = *locator;
-
-  btc_hash_copy(msg.stop, stop);
+  msg.stop = stop;
 
   peer->gb_time = btc_time_msec();
 
   btc_peer_log(peer, "Requesting inv message from peer with getblocks (%N).",
                      &peer->addr);
 
-  if (stop != btc_zero_hash)
+  if (stop != btc_hash_zero)
     btc_peer_log(peer, "Sending getblocks (start=%H, stop=%H).", start, stop);
   else
     btc_peer_log(peer, "Sending getblocks (start=%H).", start);
@@ -837,19 +834,18 @@ static int
 btc_peer_send_getheaders(btc_peer_t *peer,
                          const btc_vector_t *locator,
                          const uint8_t *stop) {
-  const uint8_t *start = btc_zero_hash;
+  const uint8_t *start = btc_hash_zero;
   btc_getblocks_t msg;
 
   if (locator->length > 0)
     start = locator->items[0];
 
   if (stop == NULL)
-    stop = btc_zero_hash;
+    stop = btc_hash_zero;
 
   msg.version = BTC_NET_PROTOCOL_VERSION;
   msg.locator = *locator;
-
-  btc_hash_copy(msg.stop, stop);
+  msg.stop = stop;
 
   peer->gh_time = btc_time_msec();
 

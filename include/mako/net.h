@@ -113,7 +113,7 @@ enum btc_net_services {
  * Default user agent.
  */
 
-#define BTC_NET_USER_AGENT "/testing:0.0.0/"
+#define BTC_NET_USER_AGENT "/mako:0.0.0/"
 
 /**
  * Max message size (~4mb with segwit, formerly 2mb)
