@@ -471,7 +471,7 @@ btc_addrman_resolve(btc_addrman_t *man) {
 
     btc_addrman_log(man, "Resolving %s...", seed);
 
-    if (btc_getaddrinfo(&res, seed)) {
+    if (btc_getaddrinfo(&res, seed, network->port)) {
       int total = 0;
 
       for (it = res; it != NULL; it = it->next) {
@@ -479,7 +479,6 @@ btc_addrman_resolve(btc_addrman_t *man) {
 
         addr.time = now;
         addr.services = BTC_NET_DEFAULT_SERVICES;
-        addr.port = network->port;
 
         btc_addrman_add(man, &addr, NULL);
 

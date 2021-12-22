@@ -44,7 +44,7 @@
  */
 
 int
-btc_getaddrinfo(btc_sockaddr_t **res, const char *name) {
+btc_getaddrinfo(btc_sockaddr_t **res, const char *name, int port) {
   struct addrinfo hints, *info, *it;
   btc_sockaddr_t *addr = NULL;
   btc_sockaddr_t *prev = NULL;
@@ -80,6 +80,8 @@ btc_getaddrinfo(btc_sockaddr_t **res, const char *name) {
     if (!btc_sockaddr_set(addr, it->ai_addr))
       abort(); /* LCOV_EXCL_LINE */
 
+    addr->port = port;
+
     if (*res == NULL)
       *res = addr;
 
@@ -106,7 +108,7 @@ btc_freeaddrinfo(btc_sockaddr_t *res) {
 }
 
 int
-btc_getifaddrs(btc_sockaddr_t **res) {
+btc_getifaddrs(btc_sockaddr_t **res, int port) {
 #if defined(_WIN32)
   char name[256];
 
@@ -115,7 +117,7 @@ btc_getifaddrs(btc_sockaddr_t **res) {
   if (gethostname(name, sizeof(name)) == SOCKET_ERROR)
     return 0;
 
-  return btc_getaddrinfo(res, name);
+  return btc_getaddrinfo(res, name, port);
 #elif defined(HAVE_GETIFADDRS)
   btc_sockaddr_t *addr = NULL;
   btc_sockaddr_t *prev = NULL;
@@ -151,6 +153,8 @@ btc_getifaddrs(btc_sockaddr_t **res) {
 
     if (!btc_sockaddr_set(addr, it->ifa_addr))
       abort(); /* LCOV_EXCL_LINE */
+
+    addr->port = port;
 
     if (*res == NULL)
       *res = addr;

@@ -2307,13 +2307,11 @@ btc_pool_discover_local(btc_pool_t *pool) {
 
   btc_pool_log(pool, "Looking up local addresses...");
 
-  if (btc_getifaddrs(&res)) {
+  if (btc_getifaddrs(&res, pool->port)) {
     int total = 0;
 
     for (it = res; it != NULL; it = it->next) {
       btc_netaddr_set_sockaddr(&addr, it);
-
-      addr.port = pool->port;
 
       btc_pool_log(pool, "Local address found: %N.", &addr);
 

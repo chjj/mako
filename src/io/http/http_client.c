@@ -179,7 +179,7 @@ http_resolve(btc_sockaddr_t *addr, const char *hostname, int port, int family) {
   if (btc_sockaddr_import(addr, hostname, port))
     return 1;
 
-  if (!btc_getaddrinfo(&res, hostname))
+  if (!btc_getaddrinfo(&res, hostname, port))
     return 0;
 
   if (family == BTC_AF_UNSPEC) {
@@ -214,7 +214,6 @@ http_resolve(btc_sockaddr_t *addr, const char *hostname, int port, int family) {
   }
 
   *addr = *it;
-  addr->port = port;
 
   btc_freeaddrinfo(res);
 
