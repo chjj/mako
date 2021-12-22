@@ -252,6 +252,7 @@ struct btc_socket_s {
   btc_link_t deferred;
   btc_link_t closed;
   btc_link_t listener;
+  struct btc_server_s *server;
   btc_socket_socket_cb *on_socket;
   btc_socket_connect_cb *on_connect;
   btc_socket_close_cb *on_close;
@@ -260,7 +261,6 @@ struct btc_socket_s {
   btc_socket_drain_cb *on_drain;
   btc_socket_message_cb *on_message;
   void *data;
-  void *ptr;
 };
 
 typedef struct btc_tick_s {
@@ -1957,8 +1957,8 @@ btc_server_strerror(btc_server_t *server) {
 }
 
 static void
-on_close(btc_socket_t *socket) {
-  btc_server_t *server = socket->ptr;
+btc_server_on_close(btc_socket_t *socket) {
+  btc_server_t *server = socket->server;
 
   btc_list_remove(&server->sockets, &socket->listener);
 }
@@ -1970,8 +1970,8 @@ btc_server_listen(btc_server_t *server, const btc_sockaddr_t *addr) {
   if (socket == NULL)
     return 0;
 
-  socket->ptr = server;
-  socket->on_close = on_close;
+  socket->server = server;
+  socket->on_close = btc_server_on_close;
 
   if (server->on_socket != NULL)
     socket->on_socket = server->on_socket;
@@ -1995,11 +1995,11 @@ btc_server_listen_local(btc_server_t *server, int port) {
   if (port < 0 || port > 0xffff)
     return 0;
 
-  btc_sockaddr_import(&addr, "::1", port);
+  CHECK(btc_sockaddr_import(&addr, "::1", port));
 
   ret |= btc_server_listen(server, &addr);
 
-  btc_sockaddr_import(&addr, "127.0.0.1", port);
+  CHECK(btc_sockaddr_import(&addr, "127.0.0.1", port));
 
   ret |= btc_server_listen(server, &addr);
 
@@ -2014,11 +2014,11 @@ btc_server_listen_external(btc_server_t *server, int port) {
   if (port < 0 || port > 0xffff)
     return 0;
 
-  btc_sockaddr_import(&addr, "::", port);
+  CHECK(btc_sockaddr_import(&addr, "::", port));
 
   ret |= btc_server_listen(server, &addr);
 
-  btc_sockaddr_import(&addr, "0.0.0.0", port);
+  CHECK(btc_sockaddr_import(&addr, "0.0.0.0", port));
 
   ret |= btc_server_listen(server, &addr);
 
@@ -2035,30 +2035,21 @@ btc_server_close(btc_server_t *server) {
 
 void
 btc_server_on_socket(btc_server_t *server, btc_socket_socket_cb *handler) {
-  btc_link_t *it;
+  CHECK(server->sockets.length == 0);
 
   server->on_socket = handler;
-
-  for (it = server->sockets.head; it != NULL; it = it->next)
-    btc_socket_on_socket(it->value, handler);
 }
 
 void
 btc_server_set_data(btc_server_t *server, void *data) {
-  btc_link_t *it;
+  CHECK(server->sockets.length == 0);
 
   server->data = data;
-
-  for (it = server->sockets.head; it != NULL; it = it->next)
-    btc_socket_set_data(it->value, data);
 }
 
 void
 btc_server_set_nodelay(btc_server_t *server, int value) {
-  btc_link_t *it;
+  CHECK(server->sockets.length == 0);
 
   server->no_delay = (value != 0);
-
-  for (it = server->sockets.head; it != NULL; it = it->next)
-    btc_socket_set_nodelay(it->value, value);
 }
