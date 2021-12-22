@@ -1097,6 +1097,28 @@ btc_peer_get_full_block(btc_peer_t *peer, const uint8_t *hash) {
 }
 
 static int
+btc_peer_send_merkleblock(btc_peer_t *peer, const btc_block_t *block) {
+  btc_merkleblock_t mrkl;
+  btc_vector_t *txs;
+  int rc = 1;
+  size_t i;
+
+  btc_merkleblock_init(&mrkl);
+
+  txs = btc_merkleblock_set_block(&mrkl, block, peer->spv_filter);
+
+  rc &= btc_peer_sendmsg(peer, BTC_MSG_MERKLEBLOCK, &mrkl);
+
+  for (i = 0; i < txs->length; i++)
+    rc &= btc_peer_sendmsg(peer, BTC_MSG_TX_BASE, txs->items[i]);
+
+  btc_merkleblock_clear(&mrkl);
+  btc_vector_destroy(txs);
+
+  return rc;
+}
+
+static int
 btc_peer_send_cmpctblock(btc_peer_t *peer, const btc_block_t *block) {
   enum btc_msgtype type = BTC_MSG_CMPCTBLOCK_BASE;
   btc_cmpct_t msg;
@@ -1738,10 +1760,7 @@ btc_peer_flush_data(btc_peer_t *peer) {
 
       case BTC_INV_FILTERED_BLOCK: {
         const btc_entry_t *entry;
-        btc_merkleblock_t mrkl;
         btc_block_t *block;
-        btc_vector_t *txs;
-        size_t i;
 
         if (!(peer->pool->flags & BTC_POOL_BIP37)) {
           btc_peer_log(peer,
@@ -1752,7 +1771,7 @@ btc_peer_flush_data(btc_peer_t *peer) {
         }
 
         if (peer->spv_filter == NULL) {
-          btc_invitem_destroy(item);
+          btc_inv_push(&nf, item);
           break;
         }
 
@@ -1770,22 +1789,12 @@ btc_peer_flush_data(btc_peer_t *peer) {
           break;
         }
 
-        btc_merkleblock_init(&mrkl);
+        btc_peer_send_merkleblock(peer, block);
 
-        txs = btc_merkleblock_set_block(&mrkl, block, peer->spv_filter);
-
-        btc_peer_sendmsg(peer, BTC_MSG_MERKLEBLOCK, &mrkl);
-
-        for (i = 0; i < txs->length; i++)
-          btc_peer_sendmsg(peer, BTC_MSG_TX_BASE, txs->items[i]);
-
-        blk_count += 1;
-        tx_count += txs->length;
-
-        btc_merkleblock_clear(&mrkl);
-        btc_vector_destroy(txs);
         btc_block_destroy(block);
         btc_invitem_destroy(item);
+
+        blk_count += 1;
 
         break;
       }
