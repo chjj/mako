@@ -440,7 +440,8 @@ try_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
 
 #ifdef SO_NOSIGPIPE
   if (fd != -1) {
-    int yes = 1;
+    btc_sockopt_t yes = 1;
+
     setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &yes, sizeof(yes));
   }
 #endif
@@ -492,7 +493,8 @@ safe_socket(int domain, int type, int protocol) {
 
 #ifdef SO_NOSIGPIPE
   if (fd != -1) {
-    int yes = 1;
+    btc_sockopt_t yes = 1;
+
     setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &yes, sizeof(yes));
   }
 #endif
@@ -507,23 +509,18 @@ safe_socket(int domain, int type, int protocol) {
 static btc_sockfd_t
 safe_listener(int domain, int type, int protocol) {
   btc_sockfd_t fd = safe_socket(domain, type, protocol);
-  btc_sockopt_t val;
+  btc_sockopt_t yes = 1;
 
   if (fd == BTC_INVALID_SOCKET)
     return BTC_INVALID_SOCKET;
 
-  {
-    val = 1;
-    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
-  }
+  setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
 
   /* https://stackoverflow.com/questions/1618240 */
   /* https://datatracker.ietf.org/doc/html/rfc3493#section-5.3 */
 #ifdef IPV6_V6ONLY
-  if (domain == PF_INET6) {
-    val = 1;
-    setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &val, sizeof(val));
-  }
+  if (domain == PF_INET6)
+    setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &yes, sizeof(yes));
 #endif
 
   return fd;
