@@ -53,11 +53,17 @@ btc_buffer_rocopy(btc_buffer_t *z, const btc_buffer_t *x);
 BTC_EXTERN void
 btc_buffer_rwset(btc_buffer_t *z, uint8_t *zp, size_t zn);
 
+BTC_EXTERN uint32_t
+btc_buffer_hash(const btc_buffer_t *x);
+
 BTC_EXTERN int
 btc_buffer_equal(const btc_buffer_t *x, const btc_buffer_t *y);
 
 BTC_EXTERN int
 btc_buffer_compare(const btc_buffer_t *x, const btc_buffer_t *y);
+
+BTC_EXTERN void
+btc_buffer_push(btc_buffer_t *z, int x);
 
 BTC_EXTERN size_t
 btc_buffer_size(const btc_buffer_t *x);

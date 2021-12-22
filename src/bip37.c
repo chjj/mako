@@ -287,12 +287,8 @@ static void
 bit_push(btc_buffer_t *z, int x, int *bits) {
   size_t p = *bits;
 
-  if ((p >> 3) == z->length) {
-    if (z->length == z->alloc)
-      btc_buffer_grow(z, (z->alloc * 3) / 2 + (z->alloc <= 1));
-
-    z->data[z->length++] = 0;
-  }
+  if ((p >> 3) == z->length)
+    btc_buffer_push(z, 0);
 
   z->data[p >> 3] |= x << (p & 7);
 

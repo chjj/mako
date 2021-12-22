@@ -93,6 +93,11 @@ btc_buffer_rwset(btc_buffer_t *z, uint8_t *zp, size_t zn) {
   z->length = 0;
 }
 
+uint32_t
+btc_buffer_hash(const btc_buffer_t *x) {
+  return btc_murmur3_sum(x->data, x->length, 0xfba4c795);
+}
+
 int
 btc_buffer_equal(const btc_buffer_t *x, const btc_buffer_t *y) {
   if (x->length != y->length)
@@ -107,6 +112,14 @@ btc_buffer_equal(const btc_buffer_t *x, const btc_buffer_t *y) {
 int
 btc_buffer_compare(const btc_buffer_t *x, const btc_buffer_t *y) {
   return btc_memcmp4(x->data, x->length, y->data, y->length);
+}
+
+void
+btc_buffer_push(btc_buffer_t *z, int x) {
+  if (z->length == z->alloc)
+    btc_buffer_grow(z, (z->alloc * 3) / 2 + (z->alloc <= 1));
+
+  z->data[z->length++] = x & 0xff;
 }
 
 size_t
