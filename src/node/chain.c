@@ -1079,7 +1079,7 @@ btc_chain_verify(btc_chain_t *chain,
 
   /* Extra sanity check. */
   if (!btc_hash_equal(hdr->prev_block, prev->hash))
-    return btc_chain_throw(chain, hdr, "invalid", "bad-prevblk", 0, 0);
+    return btc_chain_throw(chain, hdr, "invalid", "bad-prevblk", 10, 0);
 
   /* Verify a checkpoint if there is one. */
   btc_header_hash(hash, hdr);
@@ -1968,8 +1968,16 @@ btc_chain_add(btc_chain_t *chain,
     int64_t now = btc_timedata_now(chain->timedata);
     btc_verify_error_t err;
 
-    if (!btc_block_check_sanity(&err, block, now))
-      return btc_chain_throw(chain, hdr, "invalid", err.reason, err.score, 1);
+    if (!btc_block_check_sanity(&err, block, now)) {
+      if (!err.malleated)
+        btc_chain_set_invalid(chain, hash);
+
+      return btc_chain_throw(chain, hdr,
+                             "invalid",
+                             err.reason,
+                             err.score,
+                             err.malleated);
+    }
   }
 
   /* Prevent orphan and alternate chain attacks. */

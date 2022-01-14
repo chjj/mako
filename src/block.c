@@ -58,7 +58,7 @@ btc_block_has_witness(const btc_block_t *blk) {
 int
 btc_block_merkle_root(uint8_t *root, const btc_block_t *blk) {
   size_t length = blk->txs.length;
-  uint8_t *hashes = btc_malloc(length * 32);
+  uint8_t *hashes = btc_malloc((length + 1) * 32);
   size_t i;
   int ret;
 
@@ -75,7 +75,7 @@ btc_block_merkle_root(uint8_t *root, const btc_block_t *blk) {
 int
 btc_block_witness_root(uint8_t *root, const btc_block_t *blk) {
   size_t length = blk->txs.length;
-  uint8_t *hashes = btc_malloc(length * 32);
+  uint8_t *hashes = btc_malloc((length + 1) * 32);
   size_t i;
   int ret;
 
@@ -153,15 +153,25 @@ btc_block_get_commitment_hash(const btc_block_t *blk) {
   return NULL;
 }
 
-#define THROW(r, s) do {      \
-  if (err != NULL) {          \
-    btc_hash_init(err->hash); \
-    err->code = "invalid";    \
-    err->reason = (r);        \
-    err->score = (s);         \
-    err->malleated = 0;       \
-  }                           \
-  return 0;                   \
+static int
+btc_block_throw(btc_verify_error_t *err,
+                const char *reason,
+                int score,
+                int malleated) {
+  if (err != NULL) {
+    btc_hash_init(err->hash);
+
+    err->code = "invalid";
+    err->reason = reason;
+    err->score = score;
+    err->malleated = malleated;
+  }
+
+  return 0;
+}
+
+#define THROW(reason, score, malleated) do {             \
+  return btc_block_throw(err, reason, score, malleated); \
 } while (0)
 
 int
@@ -172,47 +182,48 @@ btc_block_check_sanity(btc_verify_error_t *err,
   int sigops = 0;
   size_t i;
 
+  /* Check timestamp. */
+  if (blk->header.time > now + 2 * 60 * 60)
+    THROW("time-too-new", 0, 1);
+
+  /* Compute merkle root. */
+  if (!btc_block_merkle_root(root, blk))
+    THROW("bad-txns-duplicate", 100, 1);
+
+  /* Check merkle root. */
+  if (!btc_hash_equal(blk->header.merkle_root, root))
+    THROW("bad-txnmrklroot", 100, 1);
+
   /* Check base size. */
   if (blk->txs.length == 0
       || blk->txs.length > BTC_MAX_BLOCK_SIZE
       || btc_block_base_size(blk) > BTC_MAX_BLOCK_SIZE) {
-    THROW("bad-blk-length", 100);
+    THROW("bad-blk-length", 100, 0);
   }
 
-  /* Check timestamp. */
-  if (blk->header.time > now + 2 * 60 * 60)
-    THROW("time-too-new", 0);
-
-  /* First TX must be a coinbase. */
-  if (blk->txs.length == 0 || !btc_tx_is_coinbase(blk->txs.items[0]))
-    THROW("bad-cb-missing", 100);
-
-  /* If the merkle is mutated, we have duplicate txs. */
-  if (!btc_block_merkle_root(root, blk))
-    THROW("bad-txns-duplicate", 100);
-
-  /* Check merkle root. */
-  if (!btc_hash_equal(blk->header.merkle_root, root))
-    THROW("bad-txnmrklroot", 100);
+  /* First transaction must be a coinbase. */
+  if (!btc_tx_is_coinbase(blk->txs.items[0]))
+    THROW("bad-cb-missing", 100, 0);
 
   /* Test all transactions. */
   for (i = 0; i < blk->txs.length; i++) {
     const btc_tx_t *tx = blk->txs.items[i];
 
-    /* The rest of the txs must not be coinbases. */
+    /* Remaining transactions must not be coinbases. */
     if (i > 0 && btc_tx_is_coinbase(tx))
-      THROW("bad-cb-multiple", 100);
+      THROW("bad-cb-multiple", 100, 0);
 
-    /* Sanity checks. */
+    /* Transaction sanity checks. */
     if (!btc_tx_check_sanity(err, tx))
       return 0;
 
     /* Count legacy sigops (do not count scripthash or witness). */
     sigops += btc_tx_legacy_sigops(tx);
-
-    if (sigops * BTC_WITNESS_SCALE_FACTOR > BTC_MAX_BLOCK_SIGOPS_COST)
-      THROW("bad-blk-sigops", 100);
   }
+
+  /* Check legacy sigops. */
+  if (sigops * BTC_WITNESS_SCALE_FACTOR > BTC_MAX_BLOCK_SIGOPS_COST)
+    THROW("bad-blk-sigops", 100, 0);
 
   return 1;
 }

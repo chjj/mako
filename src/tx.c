@@ -649,15 +649,25 @@ btc_tx_has_duplicate_inputs(const btc_tx_t *tx) {
   return 0;
 }
 
-#define THROW(r, s, v) do {   \
-  if (err != NULL) {          \
-    btc_hash_init(err->hash); \
-    err->code = "invalid";    \
-    err->reason = (r);        \
-    err->score = (s);         \
-    err->malleated = 0;       \
-  }                           \
-  return (v);                 \
+static int
+btc_tx_throw(btc_verify_error_t *err,
+             const char *reason,
+             int score,
+             int result) {
+  if (err != NULL) {
+    btc_hash_init(err->hash);
+
+    err->code = "invalid";
+    err->reason = reason;
+    err->score = score;
+    err->malleated = 0;
+  }
+
+  return result;
+}
+
+#define THROW(reason, score, result) do {          \
+  return btc_tx_throw(err, reason, score, result); \
 } while (0)
 
 int
