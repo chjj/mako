@@ -1246,6 +1246,7 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   fee = btc_tx_check_inputs(&err, tx, view, height + 1);
 
   if (fee == -1) {
+    btc_view_destroy(view);
     return btc_mempool_throw(mp, tx,
                              "invalid",
                              err.reason,
