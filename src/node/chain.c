@@ -57,7 +57,6 @@ btc_deployment_state_init(btc_deployment_state_t *state) {
 typedef struct btc_orphan_s {
   uint8_t hash[32];
   btc_block_t *block;
-  unsigned int flags;
   unsigned int id;
   int64_t time;
 } btc_orphan_t;
@@ -364,15 +363,8 @@ static void
 btc_chain_get_deployment_state(btc_chain_t *chain,
                                btc_deployment_state_t *state) {
   const btc_entry_t *tip = chain->tip;
-  const btc_entry_t *prev = tip->prev;
 
-  if (prev == NULL) {
-    CHECK(tip->height == 0);
-    btc_deployment_state_init(state);
-    return;
-  }
-
-  btc_chain_get_deployments(chain, state, tip->header.time, prev);
+  btc_chain_get_deployments(chain, state, tip->header.time, tip->prev);
 }
 
 static void
@@ -470,7 +462,7 @@ btc_chain_limit_orphans(btc_chain_t *chain) {
   btc_vector_t orphans;
   size_t i;
 
-  if (btc_hashmap_size(chain->orphan_map) <= 20)
+  if (btc_hashmap_size(chain->orphan_map) < 20)
     return;
 
   btc_vector_init(&orphans);
@@ -533,7 +525,6 @@ btc_chain_resolve_orphan(btc_chain_t *chain, const uint8_t *hash) {
 static void
 btc_chain_store_orphan(btc_chain_t *chain,
                        const btc_block_t *block,
-                       unsigned int flags,
                        unsigned int id) {
   const btc_header_t *hdr = &block->header;
   int32_t height = btc_block_coinbase_height(block);
@@ -549,13 +540,10 @@ btc_chain_store_orphan(btc_chain_t *chain,
 
     btc_chain_remove_orphan(chain, orphan);
     btc_orphan_destroy(orphan);
-
-    return;
   }
 
   orphan = btc_orphan_create();
   orphan->block = btc_block_refconst(block);
-  orphan->flags = flags;
   orphan->id = id;
   orphan->time = btc_now();
 
@@ -650,6 +638,28 @@ btc_chain_verify_checkpoint(btc_chain_t *chain,
   return 0;
 }
 
+static const btc_entry_t *
+btc_chain_last_checkpoint(btc_chain_t *chain) {
+  const btc_network_t *network = chain->network;
+  int length = network->checkpoints.length;
+  const btc_checkpoint_t *chk;
+  const btc_entry_t *entry;
+  int i;
+
+  if (!(chain->flags & BTC_CHAIN_CHECKPOINTS))
+    return NULL;
+
+  for (i = length - 1; i >= 0; i--) {
+    chk = &network->checkpoints.items[i];
+    entry = btc_chaindb_by_hash(chain->db, chk->hash);
+
+    if (entry != NULL)
+      return entry;
+  }
+
+  return NULL;
+}
+
 static int
 btc_chain_is_historical(btc_chain_t *chain, const btc_entry_t *prev) {
   if (chain->flags & BTC_CHAIN_CHECKPOINTS) {
@@ -676,6 +686,40 @@ btc_chain_get_ancestor(btc_chain_t *chain,
     entry = entry->prev;
 
   return entry;
+}
+
+static uint32_t
+btc_chain_max_target(btc_chain_t *chain, uint32_t base, int64_t delta) {
+  const btc_network_t *net = chain->network;
+  mpz_t limit, target;
+  uint32_t bits;
+
+  if (net->pow.no_retargeting)
+    return net->pow.bits;
+
+  if (net->pow.target_reset && delta > net->pow.target_spacing * 2)
+    return net->pow.bits;
+
+  mpz_init(limit);
+  mpz_import(limit, net->pow.limit, 32, -1);
+
+  mpz_init_set_compact(target, base);
+
+  while (delta > 0 && mpz_cmp(target, limit) < 0) {
+    mpz_mul_ui(target, target, 4);
+
+    delta -= net->pow.target_timespan * 4;
+  }
+
+  if (mpz_cmp(target, limit) > 0)
+    mpz_swap(target, limit);
+
+  bits = mpz_get_compact(target);
+
+  mpz_clear(limit);
+  mpz_clear(target);
+
+  return bits;
 }
 
 static uint32_t
@@ -786,6 +830,9 @@ btc_chain_get_state(btc_chain_t *chain,
 
   if (deployment->window != -1)
     window = deployment->window;
+
+  if (prev == NULL)
+    return BTC_STATE_DEFINED;
 
   if (((prev->height + 1) % window) != 0) {
     height = prev->height - ((prev->height + 1) % window);
@@ -910,8 +957,8 @@ btc_chain_get_deployments(btc_chain_t *chain,
                           btc_deployment_state_t *state,
                           int64_t time,
                           const btc_entry_t *prev) {
+  int32_t height = prev != NULL ? prev->height + 1 : 0;
   const btc_network_t *network = chain->network;
-  int32_t height = prev->height + 1;
   const btc_deployment_t *deploy;
   int active;
 
@@ -996,45 +1043,49 @@ btc_chain_throw(btc_chain_t *chain,
 }
 
 static int
-btc_chain_check_merkle(btc_chain_t *chain,
-                       const btc_block_t *block,
-                       unsigned int flags) {
-  const btc_header_t *hdr = &block->header;
+btc_chain_check_target(btc_chain_t *chain, const btc_header_t *hdr) {
+  const btc_entry_t *chk;
+  mpz_t target, required;
+  uint32_t bits;
+  int64_t delta;
+  int cmp;
 
-  if (flags & BTC_BLOCK_VERIFY_BODY) {
-    uint8_t root[32];
+  if (btc_hash_equal(hdr->prev_block, chain->tip->hash))
+    return 1;
 
-    if (!btc_block_merkle_root(root, block)) {
-      return btc_chain_throw(chain, hdr,
-                             "invalid",
-                             "bad-txns-duplicate",
-                             100,
-                             1);
-    }
+  chk = btc_chain_last_checkpoint(chain);
 
-    if (!btc_hash_equal(hdr->merkle_root, root)) {
-      return btc_chain_throw(chain, hdr,
-                             "invalid",
-                             "bad-txnmrklroot",
-                             100,
-                             1);
-    }
+  if (chk == NULL)
+    return 1;
+
+  delta = hdr->time - chk->header.time;
+
+  if (delta < 0) {
+    /* Block with timestamp before last checkpoint. */
+    return btc_chain_throw(chain, hdr,
+                           "checkpoint",
+                           "time-too-old",
+                           100,
+                           1);
   }
 
-  return 1;
-}
+  bits = btc_chain_max_target(chain, chk->header.bits, delta);
 
-static int
-btc_chain_check_body(btc_chain_t *chain,
-                     const btc_block_t *block,
-                     unsigned int flags) {
-  const btc_header_t *hdr = &block->header;
+  mpz_init_set_compact(target, hdr->bits);
+  mpz_init_set_compact(required, bits);
 
-  if (flags & BTC_BLOCK_VERIFY_BODY) {
-    btc_verify_error_t err;
+  cmp = mpz_cmp(target, required);
 
-    if (!btc_block_check_body(&err, block))
-      return btc_chain_throw(chain, hdr, "invalid", err.reason, err.score, 1);
+  mpz_clear(target);
+  mpz_clear(required);
+
+  if (cmp > 0) {
+    /* Block with too little proof-of-work. */
+    return btc_chain_throw(chain, hdr,
+                           "invalid",
+                           "bad-diffbits",
+                           100,
+                           1);
   }
 
   return 1;
@@ -1044,8 +1095,7 @@ static int
 btc_chain_verify(btc_chain_t *chain,
                  btc_deployment_state_t *state,
                  const btc_block_t *block,
-                 const btc_entry_t *prev,
-                 unsigned int flags) {
+                 const btc_entry_t *prev) {
   const btc_header_t *hdr = &block->header;
   const btc_network_t *network = chain->network;
   const uint8_t *commit_hash = NULL;
@@ -1073,27 +1123,6 @@ btc_chain_verify(btc_chain_t *chain,
                            0);
   }
 
-  /* Skip everything when using checkpoints.
-     We can do this safely because every
-     block in between each checkpoint was
-     validated outside in the header chain. */
-  if (btc_chain_is_historical(chain, prev)) {
-    /* Check merkle root. */
-    if (!btc_chain_check_merkle(chain, block, flags))
-      return 0;
-
-    /* Once segwit is active, we will still
-       need to check for block mutability. */
-    if (!btc_block_has_witness(block)) {
-      if (!btc_block_get_commitment_hash(block))
-        return 1;
-    }
-  } else {
-    /* Non-contextual checks. */
-    if (!btc_chain_check_body(chain, block, flags))
-      return 0;
-  }
-
   /* Ensure the POW is what we expect. */
   bits = btc_chain_get_target(chain, hdr->time, prev);
 
@@ -1105,12 +1134,6 @@ btc_chain_verify(btc_chain_t *chain,
 
   if (hdr->time <= mtp)
     return btc_chain_throw(chain, hdr, "invalid", "time-too-old", 0, 0);
-
-  /* Check timestamp against adjtime+2hours.
-     If this fails we may be able to accept
-     the block later. */
-  if (hdr->time > btc_timedata_now(chain->timedata) + 2 * 60 * 60)
-    return btc_chain_throw(chain, hdr, "invalid", "time-too-new", 0, 1);
 
   /* Calculate height of current block. */
   height = prev->height + 1;
@@ -1505,10 +1528,9 @@ static btc_view_t *
 btc_chain_verify_context(btc_chain_t *chain,
                          btc_deployment_state_t *state,
                          const btc_block_t *block,
-                         const btc_entry_t *prev,
-                         unsigned int flags) {
-  /* Initial non-contextual verification. */
-  if (!btc_chain_verify(chain, state, block, prev, flags))
+                         const btc_entry_t *prev) {
+  /* Initial semi-contextual verification. */
+  if (!btc_chain_verify(chain, state, block, prev))
     return NULL;
 
   /* Skip everything if we're using checkpoints. */
@@ -1530,9 +1552,7 @@ btc_chain_verify_context(btc_chain_t *chain,
 static int
 btc_chain_reconnect(btc_chain_t *chain, btc_entry_t *entry) {
   const btc_header_t *hdr = &entry->header;
-  unsigned int flags = BTC_BLOCK_VERIFY_NONE;
   btc_deployment_state_t state;
-  btc_entry_t *prev;
   btc_block_t *block;
   btc_view_t *view;
   int ret = 0;
@@ -1545,16 +1565,12 @@ btc_chain_reconnect(btc_chain_t *chain, btc_entry_t *entry) {
 
     return btc_chain_throw(chain, hdr,
                            "internal",
-                           "block-data-not-found",
+                           "blk-notfound",
                            0,
                            1);
   }
 
-  prev = entry->prev;
-
-  CHECK(prev != NULL);
-
-  view = btc_chain_verify_context(chain, &state, block, prev, flags);
+  view = btc_chain_verify_context(chain, &state, block, entry->prev);
 
   if (view == NULL) {
     if (!chain->error.malleated)
@@ -1586,7 +1602,8 @@ fail:
 static int
 btc_chain_disconnect(btc_chain_t *chain, btc_entry_t *entry) {
   const btc_header_t *hdr = &entry->header;
-  btc_entry_t *prev;
+  btc_entry_t *tip = entry->prev;
+  btc_deployment_state_t state;
   btc_block_t *block;
   btc_view_t *view;
 
@@ -1598,21 +1615,20 @@ btc_chain_disconnect(btc_chain_t *chain, btc_entry_t *entry) {
 
     return btc_chain_throw(chain, hdr,
                            "internal",
-                           "block-data-not-found",
+                           "blk-notfound",
                            0,
                            1);
   }
-
-  prev = entry->prev;
-
-  CHECK(prev != NULL);
 
   view = btc_chaindb_disconnect(chain->db, entry, block);
 
   CHECK(view != NULL);
 
-  chain->tip = prev;
-  chain->height = prev->height;
+  btc_chain_get_deployments(chain, &state, tip->header.time, tip->prev);
+
+  chain->tip = tip;
+  chain->height = tip->height;
+  chain->state = state;
 
   if (chain->on_disconnect != NULL)
     chain->on_disconnect(entry, block, view, chain->arg);
@@ -1765,8 +1781,7 @@ done:
 static int
 btc_chain_save_alternate(btc_chain_t *chain,
                          btc_entry_t *entry,
-                         const btc_block_t *block,
-                         unsigned int flags) {
+                         const btc_block_t *block) {
   const btc_header_t *hdr = &block->header;
   btc_deployment_state_t state;
 
@@ -1782,7 +1797,7 @@ btc_chain_save_alternate(btc_chain_t *chain,
   }
 
   /* Do as much verification as we can before saving. */
-  if (!btc_chain_verify(chain, &state, block, entry->prev, flags)) {
+  if (!btc_chain_verify(chain, &state, block, entry->prev)) {
     if (!chain->error.malleated)
       btc_chain_set_invalid(chain, entry->hash);
 
@@ -1812,8 +1827,7 @@ btc_chain_save_alternate(btc_chain_t *chain,
 static int
 btc_chain_set_best_chain(btc_chain_t *chain,
                          btc_entry_t *entry,
-                         const btc_block_t *block,
-                         unsigned int flags) {
+                         const btc_block_t *block) {
   const btc_entry_t *fork = NULL;
   btc_entry_t *tip = chain->tip;
   btc_deployment_state_t state;
@@ -1822,7 +1836,7 @@ btc_chain_set_best_chain(btc_chain_t *chain,
   /* A higher fork has arrived. Time to reorganize the chain. */
   if (!btc_hash_equal(entry->header.prev_block, tip->hash)) {
     /* Do as much verification as we can before reorganizing. */
-    if (!btc_chain_verify(chain, &state, block, entry->prev, flags)) {
+    if (!btc_chain_verify(chain, &state, block, entry->prev)) {
       if (!chain->error.malleated)
         btc_chain_set_invalid(chain, entry->hash);
 
@@ -1843,7 +1857,7 @@ btc_chain_set_best_chain(btc_chain_t *chain,
   /* Otherwise, everything is in order. Do "contextual" verification
      on our block now that we're certain its previous block is in
      the chain. */
-  view = btc_chain_verify_context(chain, &state, block, entry->prev, flags);
+  view = btc_chain_verify_context(chain, &state, block, entry->prev);
 
   if (view == NULL) {
     if (!chain->error.malleated)
@@ -1881,8 +1895,7 @@ btc_chain_set_best_chain(btc_chain_t *chain,
 static const btc_entry_t *
 btc_chain_connect(btc_chain_t *chain,
                   const btc_entry_t *prev,
-                  const btc_block_t *block,
-                  unsigned int flags) {
+                  const btc_block_t *block) {
   const btc_network_t *network = chain->network;
   const btc_header_t *hdr = &block->header;
   btc_entry_t *entry = btc_entry_create();
@@ -1899,13 +1912,13 @@ btc_chain_connect(btc_chain_t *chain,
      but do _not_ connect the inputs. */
   if (btc_hash_compare(entry->chainwork, chain->tip->chainwork) <= 0) {
     /* Save block to an alternate chain. */
-    if (!btc_chain_save_alternate(chain, entry, block, flags)) {
+    if (!btc_chain_save_alternate(chain, entry, block)) {
       btc_entry_destroy(entry);
       return NULL;
     }
   } else {
     /* Attempt to add block to the chain index. */
-    if (!btc_chain_set_best_chain(chain, entry, block, flags)) {
+    if (!btc_chain_set_best_chain(chain, entry, block)) {
       btc_entry_destroy(entry);
       return NULL;
     }
@@ -1927,7 +1940,7 @@ btc_chain_handle_orphans(btc_chain_t *chain, const btc_entry_t *entry) {
   btc_orphan_t *orphan = btc_chain_resolve_orphan(chain, entry->hash);
 
   while (orphan != NULL) {
-    entry = btc_chain_connect(chain, entry, orphan->block, orphan->flags);
+    entry = btc_chain_connect(chain, entry, orphan->block);
 
     btc_orphan_destroy(orphan);
 
@@ -1981,17 +1994,30 @@ btc_chain_add(btc_chain_t *chain,
     return btc_chain_throw(chain, hdr, "duplicate", "duplicate", 100, 0);
   }
 
+  /* Do we already have this block? */
+  if (btc_chaindb_by_hash(chain->db, hash) != NULL) {
+    btc_chain_log(chain, "Already have block: %H.", hash);
+    return btc_chain_throw(chain, hdr, "duplicate", "duplicate", 0, 0);
+  }
+
   /* Check the PoW before doing anything. */
   if (flags & BTC_BLOCK_VERIFY_POW) {
     if (!btc_header_verify(hdr))
       return btc_chain_throw(chain, hdr, "invalid", "high-hash", 50, 0);
   }
 
-  /* Do we already have this block? */
-  if (btc_chaindb_by_hash(chain->db, hash) != NULL) {
-    btc_chain_log(chain, "Already have block: %H.", hash);
-    return btc_chain_throw(chain, hdr, "duplicate", "duplicate", 0, 0);
+  /* Non-contextual checks. */
+  if (flags & BTC_BLOCK_VERIFY_BODY) {
+    int64_t now = btc_timedata_now(chain->timedata);
+    btc_verify_error_t err;
+
+    if (!btc_block_check_sanity(&err, block, now))
+      return btc_chain_throw(chain, hdr, "invalid", err.reason, err.score, 1);
   }
+
+  /* Prevent orphan and alternate chain attacks. */
+  if (!btc_chain_check_target(chain, hdr))
+    return 0;
 
   /* Find the previous block entry. */
   prev = btc_chaindb_by_hash(chain->db, hdr->prev_block);
@@ -1999,16 +2025,12 @@ btc_chain_add(btc_chain_t *chain,
   /* If previous block wasn't ever seen,
      add it current to orphans and return. */
   if (prev == NULL) {
-    if (!btc_chain_check_body(chain, block, flags))
-      return 0;
-
-    btc_chain_store_orphan(chain, block, flags, id);
-
+    btc_chain_store_orphan(chain, block, id);
     return 1;
   }
 
   /* Connect the block. */
-  entry = btc_chain_connect(chain, prev, block, flags);
+  entry = btc_chain_connect(chain, prev, block);
 
   if (entry == NULL)
     return 0;

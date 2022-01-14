@@ -165,7 +165,9 @@ btc_block_get_commitment_hash(const btc_block_t *blk) {
 } while (0)
 
 int
-btc_block_check_body(btc_verify_error_t *err, const btc_block_t *blk) {
+btc_block_check_sanity(btc_verify_error_t *err,
+                       const btc_block_t *blk,
+                       int64_t now) {
   const btc_tx_t *tx;
   uint8_t root[32];
   int sigops = 0;
@@ -177,6 +179,10 @@ btc_block_check_body(btc_verify_error_t *err, const btc_block_t *blk) {
       || btc_block_base_size(blk) > BTC_MAX_BLOCK_SIZE) {
     THROW("bad-blk-length", 100);
   }
+
+  /* Check timestamp. */
+  if (blk->header.time > now + 2 * 60 * 60)
+    THROW("time-too-new", 0);
 
   /* First TX must be a coinbase. */
   if (blk->txs.length == 0 || !btc_tx_is_coinbase(blk->txs.items[0]))
@@ -237,8 +243,6 @@ btc_block_coinbase_height(const btc_block_t *blk) {
 int64_t
 btc_block_claimed(const btc_block_t *blk) {
   CHECK(blk->txs.length > 0);
-  CHECK(btc_tx_is_coinbase(blk->txs.items[0]));
-
   return btc_tx_output_value(blk->txs.items[0]);
 }
 
