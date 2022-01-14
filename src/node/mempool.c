@@ -587,11 +587,9 @@ btc_mempool_handle_orphans(btc_mempool_t *mp, const uint8_t *parent) {
   for (i = 0; i < resolved->length; i++) {
     btc_orphan_t *orphan = resolved->items[i];
 
-    btc_hash_copy(hash, orphan->hash);
-
     if (!btc_mempool_add(mp, orphan->tx, orphan->id)) {
       btc_mempool_log(mp, "Could not resolve orphan %H: %s.",
-                          hash, mp->error.reason);
+                          orphan->hash, mp->error.reason);
 
       if (mp->on_badorphan != NULL)
         mp->on_badorphan(&mp->error, orphan->id, mp->arg);
@@ -600,6 +598,8 @@ btc_mempool_handle_orphans(btc_mempool_t *mp, const uint8_t *parent) {
 
       continue;
     }
+
+    btc_hash_copy(hash, orphan->hash);
 
     btc_orphan_destroy(orphan);
 
