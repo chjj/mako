@@ -996,6 +996,51 @@ btc_chain_throw(btc_chain_t *chain,
 }
 
 static int
+btc_chain_check_merkle(btc_chain_t *chain,
+                       const btc_block_t *block,
+                       unsigned int flags) {
+  const btc_header_t *hdr = &block->header;
+
+  if (flags & BTC_BLOCK_VERIFY_BODY) {
+    uint8_t root[32];
+
+    if (!btc_block_merkle_root(root, block)) {
+      return btc_chain_throw(chain, hdr,
+                             "invalid",
+                             "bad-txns-duplicate",
+                             100,
+                             1);
+    }
+
+    if (!btc_hash_equal(hdr->merkle_root, root)) {
+      return btc_chain_throw(chain, hdr,
+                             "invalid",
+                             "bad-txnmrklroot",
+                             100,
+                             1);
+    }
+  }
+
+  return 1;
+}
+
+static int
+btc_chain_check_body(btc_chain_t *chain,
+                     const btc_block_t *block,
+                     unsigned int flags) {
+  const btc_header_t *hdr = &block->header;
+
+  if (flags & BTC_BLOCK_VERIFY_BODY) {
+    btc_verify_error_t err;
+
+    if (!btc_block_check_body(&err, block))
+      return btc_chain_throw(chain, hdr, "invalid", err.reason, err.score, 1);
+  }
+
+  return 1;
+}
+
+static int
 btc_chain_verify(btc_chain_t *chain,
                  btc_deployment_state_t *state,
                  const btc_block_t *block,
@@ -1034,36 +1079,19 @@ btc_chain_verify(btc_chain_t *chain,
      validated outside in the header chain. */
   if (btc_chain_is_historical(chain, prev)) {
     /* Check merkle root. */
-    if (flags & BTC_BLOCK_VERIFY_BODY) {
-      int rc = btc_block_merkle_root(root, block);
-
-      if (rc == 0 || !btc_hash_equal(hdr->merkle_root, root)) {
-        return btc_chain_throw(chain, hdr,
-                               "invalid",
-                               "bad-txnmrklroot",
-                               100,
-                               1);
-      }
-
-      flags &= ~BTC_BLOCK_VERIFY_BODY;
-    }
+    if (!btc_chain_check_merkle(chain, block, flags))
+      return 0;
 
     /* Once segwit is active, we will still
        need to check for block mutability. */
     if (!btc_block_has_witness(block)) {
-      if (!btc_block_get_commitment_hash(block)) {
-        btc_deployment_state_init(state);
+      if (!btc_block_get_commitment_hash(block))
         return 1;
-      }
     }
-  }
-
-  /* Non-contextual checks. */
-  if (flags & BTC_BLOCK_VERIFY_BODY) {
-    btc_verify_error_t err;
-
-    if (!btc_block_check_body(&err, block))
-      return btc_chain_throw(chain, hdr, "invalid", err.reason, err.score, 1);
+  } else {
+    /* Non-contextual checks. */
+    if (!btc_chain_check_body(chain, block, flags))
+      return 0;
   }
 
   /* Ensure the POW is what we expect. */
@@ -1971,7 +1999,11 @@ btc_chain_add(btc_chain_t *chain,
   /* If previous block wasn't ever seen,
      add it current to orphans and return. */
   if (prev == NULL) {
+    if (!btc_chain_check_body(chain, block, flags))
+      return 0;
+
     btc_chain_store_orphan(chain, block, flags, id);
+
     return 1;
   }
 
