@@ -1670,18 +1670,18 @@ find_fork(const btc_entry_t *fork, const btc_entry_t *longer) {
   return fork;
 }
 
-static const btc_entry_t *
-btc_chain_reorganize(btc_chain_t *chain, btc_entry_t *competitor) {
+static int
+btc_chain_reorganize(btc_chain_t *chain,
+                     const btc_entry_t *fork,
+                     btc_entry_t *competitor) {
   btc_entry_t *tip = chain->tip;
   btc_vector_t disconnect, connect;
-  const btc_entry_t *fork;
   btc_entry_t *entry;
+  int ret = 0;
   size_t i;
 
   btc_vector_init(&disconnect);
   btc_vector_init(&connect);
-
-  fork = find_fork(tip, competitor);
 
   /* Blocks to disconnect. */
   for (entry = tip; entry != fork; entry = entry->prev)
@@ -1713,8 +1713,7 @@ btc_chain_reorganize(btc_chain_t *chain, btc_entry_t *competitor) {
       if (btc_hash_compare(chain->tip->chainwork, tip->chainwork) < 0)
         btc_chain_unreorganize(chain, fork, tip);
 
-      fork = NULL;
-      goto done;
+      goto fail;
     }
   }
 
@@ -1729,10 +1728,11 @@ btc_chain_reorganize(btc_chain_t *chain, btc_entry_t *competitor) {
   if (chain->on_reorganize != NULL)
     chain->on_reorganize(tip, competitor, chain->arg);
 
-done:
+  ret = 1;
+fail:
   btc_vector_clear(&disconnect);
   btc_vector_clear(&connect);
-  return fork;
+  return ret;
 }
 
 static int
@@ -1792,22 +1792,11 @@ btc_chain_set_best_chain(btc_chain_t *chain,
 
   /* A higher fork has arrived. Time to reorganize the chain. */
   if (!btc_hash_equal(entry->header.prev_block, tip->hash)) {
-    /* Do as much verification as we can before reorganizing. */
-    if (!btc_chain_verify(chain, &state, block, entry->prev)) {
-      if (!chain->error.malleated)
-        btc_chain_set_invalid(chain, entry->hash);
-
-      btc_chain_log(chain, "Tried to connect invalid block: %H (%d).",
-                           entry->hash, entry->height);
-
-      return 0;
-    }
-
     btc_chain_log(chain, "WARNING: Reorganizing chain.");
 
-    fork = btc_chain_reorganize(chain, entry);
+    fork = find_fork(tip, entry);
 
-    if (fork == NULL)
+    if (!btc_chain_reorganize(chain, fork, entry))
       return 0;
   }
 
