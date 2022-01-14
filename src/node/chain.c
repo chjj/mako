@@ -240,7 +240,7 @@ struct btc_chain_s {
 
 btc_chain_t *
 btc_chain_create(const btc_network_t *network) {
-  btc_chain_t *chain = (btc_chain_t *)btc_malloc(sizeof(btc_chain_t));
+  btc_chain_t *chain = btc_malloc(sizeof(btc_chain_t));
 
   memset(chain, 0, sizeof(*chain));
 
@@ -458,7 +458,6 @@ static void
 btc_chain_limit_orphans(btc_chain_t *chain) {
   btc_hashmapiter_t iter;
   btc_orphan_t *oldest = NULL;
-  btc_orphan_t *orphan;
   btc_vector_t orphans;
   size_t i;
 
@@ -470,7 +469,7 @@ btc_chain_limit_orphans(btc_chain_t *chain) {
   btc_hashmap_iterate(&iter, chain->orphan_map);
 
   while (btc_hashmap_next(&iter)) {
-    orphan = iter.val;
+    btc_orphan_t *orphan = iter.val;
 
     if (oldest == NULL || orphan->time < oldest->time)
       oldest = orphan;
@@ -479,7 +478,7 @@ btc_chain_limit_orphans(btc_chain_t *chain) {
   }
 
   for (i = 0; i < orphans.length; i++) {
-    orphan = (btc_orphan_t *)orphans.items[i];
+    btc_orphan_t *orphan = orphans.items[i];
 
     if (orphan == oldest)
       continue;
@@ -874,7 +873,7 @@ btc_chain_get_state(btc_chain_t *chain,
   }
 
   while (compute.length > 0) {
-    entry = (const btc_entry_t *)btc_vector_pop(&compute);
+    entry = btc_vector_pop(&compute);
 
     switch (state) {
       case BTC_STATE_DEFINED: {
@@ -1247,15 +1246,14 @@ btc_chain_verify_duplicates(btc_chain_t *chain,
    */
   const btc_network_t *network = chain->network;
   const btc_header_t *hdr = &block->header;
-  const btc_checkpoint_t *chk;
-  const btc_tx_t *tx;
   uint8_t hash[32];
   size_t i;
 
   btc_header_hash(hash, hdr);
 
   for (i = 0; i < block->txs.length; i++) {
-    tx = block->txs.items[i];
+    const btc_tx_t *tx = block->txs.items[i];
+    const btc_checkpoint_t *chk;
 
     if (!btc_chaindb_has_coins(chain->db, tx))
       continue;
@@ -1660,18 +1658,12 @@ btc_chain_unreorganize(btc_chain_t *chain,
     btc_vector_push(&connect, entry);
 
   /* Disconnect blocks and transactions. */
-  for (i = 0; i < disconnect.length; i++) {
-    entry = (btc_entry_t *)disconnect.items[i];
-
-    CHECK(btc_chain_disconnect(chain, entry));
-  }
+  for (i = 0; i < disconnect.length; i++)
+    CHECK(btc_chain_disconnect(chain, disconnect.items[i]));
 
   /* Connect blocks and transactions. */
-  for (i = connect.length - 1; i != (size_t)-1; i--) {
-    entry = (btc_entry_t *)connect.items[i];
-
-    CHECK(btc_chain_reconnect(chain, entry));
-  }
+  for (i = connect.length - 1; i != (size_t)-1; i--)
+    CHECK(btc_chain_reconnect(chain, connect.items[i]));
 
   btc_chain_log(chain,
     "Chain un-reorganization: old=%H(%d) new=%H(%d)",
@@ -1730,11 +1722,8 @@ btc_chain_reorganize(btc_chain_t *chain, btc_entry_t *competitor) {
     btc_vector_push(&connect, entry);
 
   /* Disconnect blocks and transactions. */
-  for (i = 0; i < disconnect.length; i++) {
-    entry = (btc_entry_t *)disconnect.items[i];
-
-    CHECK(btc_chain_disconnect(chain, entry));
-  }
+  for (i = 0; i < disconnect.length; i++)
+    CHECK(btc_chain_disconnect(chain, disconnect.items[i]));
 
   /* Sanity check. */
   CHECK(connect.length > 0);
@@ -1743,12 +1732,10 @@ btc_chain_reorganize(btc_chain_t *chain, btc_entry_t *competitor) {
      we don't want to connect the new tip here.
      That will be done outside in set_best_chain. */
   for (i = connect.length - 1; i != 0; i--) {
-    entry = (btc_entry_t *)connect.items[i];
-
-    if (!btc_chain_reconnect(chain, entry)) {
+    if (!btc_chain_reconnect(chain, connect.items[i])) {
       if (!chain->error.malleated) {
         while (i--) {
-          entry = (btc_entry_t *)connect.items[i];
+          entry = connect.items[i];
           btc_chain_set_invalid(chain, entry->hash);
         }
       }
@@ -2194,12 +2181,10 @@ btc_chain_get_locator(btc_chain_t *chain,
 const btc_entry_t *
 btc_chain_find_locator(btc_chain_t *chain, const btc_vector_t *locator) {
   const btc_entry_t *entry;
-  const uint8_t *hash;
   size_t i;
 
   for (i = 0; i < locator->length; i++) {
-    hash = (const uint8_t *)locator->items[i];
-    entry = btc_chaindb_by_hash(chain->db, hash);
+    entry = btc_chaindb_by_hash(chain->db, locator->items[i]);
 
     if (entry == NULL)
       continue;

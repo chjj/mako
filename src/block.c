@@ -58,7 +58,7 @@ btc_block_has_witness(const btc_block_t *blk) {
 int
 btc_block_merkle_root(uint8_t *root, const btc_block_t *blk) {
   size_t length = blk->txs.length;
-  uint8_t *hashes = (uint8_t *)btc_malloc(length * 32);
+  uint8_t *hashes = btc_malloc(length * 32);
   size_t i;
   int ret;
 
@@ -75,7 +75,7 @@ btc_block_merkle_root(uint8_t *root, const btc_block_t *blk) {
 int
 btc_block_witness_root(uint8_t *root, const btc_block_t *blk) {
   size_t length = blk->txs.length;
-  uint8_t *hashes = (uint8_t *)btc_malloc(length * 32);
+  uint8_t *hashes = btc_malloc(length * 32);
   size_t i;
   int ret;
 
@@ -168,7 +168,6 @@ int
 btc_block_check_sanity(btc_verify_error_t *err,
                        const btc_block_t *blk,
                        int64_t now) {
-  const btc_tx_t *tx;
   uint8_t root[32];
   int sigops = 0;
   size_t i;
@@ -197,10 +196,8 @@ btc_block_check_sanity(btc_verify_error_t *err,
     THROW("bad-txnmrklroot", 100);
 
   /* Test all transactions. */
-  sigops = 0;
-
   for (i = 0; i < blk->txs.length; i++) {
-    tx = blk->txs.items[i];
+    const btc_tx_t *tx = blk->txs.items[i];
 
     /* The rest of the txs must not be coinbases. */
     if (i > 0 && btc_tx_is_coinbase(tx))
