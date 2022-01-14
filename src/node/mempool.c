@@ -119,11 +119,11 @@ static void
 btc_mpentry_set(btc_mpentry_t *entry,
                 const btc_tx_t *tx,
                 const btc_view_t *view,
-                int32_t height) {
+                int32_t height,
+                int64_t fee) {
   unsigned int flags = BTC_SCRIPT_STANDARD_VERIFY_FLAGS;
   int sigops = btc_tx_sigops_cost(tx, view, flags);
   size_t size = btc_tx_sigops_size(tx, sigops);
-  int64_t fee = btc_tx_fee(tx, view);
   int coinbase = 0;
   int locks = 0;
   size_t i;
@@ -590,7 +590,8 @@ btc_mempool_handle_orphans(btc_mempool_t *mp, const uint8_t *parent) {
     btc_hash_copy(hash, orphan->hash);
 
     if (!btc_mempool_add(mp, orphan->tx, orphan->id)) {
-      btc_mempool_log(mp, "Could not resolve orphan %H.", hash);
+      btc_mempool_log(mp, "Could not resolve orphan %H: %s.",
+                          hash, mp->error.reason);
 
       if (mp->on_badorphan != NULL)
         mp->on_badorphan(&mp->error, orphan->id, mp->arg);
@@ -1003,9 +1004,7 @@ btc_mempool_verify(btc_mempool_t *mp,
   unsigned int lock_flags = BTC_STANDARD_LOCKTIME_FLAGS;
   const btc_deployment_state_t *state = btc_chain_state(mp->chain);
   const btc_entry_t *tip = btc_chain_tip(mp->chain);
-  int32_t height = tip->height + 1;
   const btc_tx_t *tx = entry->tx;
-  btc_verify_error_t err;
   unsigned int flags;
   int64_t minfee;
 
@@ -1077,15 +1076,6 @@ btc_mempool_verify(btc_mempool_t *mp,
                              0);
   }
 
-  /* Contextual sanity checks. */
-  if (btc_tx_check_inputs(&err, tx, view, height) == -1) {
-    return btc_mempool_throw(mp, tx,
-                             "invalid",
-                             err.reason,
-                             err.score,
-                             0);
-  }
-
   /* Script verification. */
   flags = BTC_SCRIPT_STANDARD_VERIFY_FLAGS;
 
@@ -1132,6 +1122,7 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   btc_verify_error_t err;
   btc_mpentry_t *entry;
   btc_view_t *view;
+  int64_t fee;
 
   /* Basic sanity checks. */
   if (!btc_tx_check_sanity(&err, tx)) {
@@ -1251,10 +1242,21 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
     return 1;
   }
 
+  /* Contextual sanity checks. */
+  fee = btc_tx_check_inputs(&err, tx, view, height + 1);
+
+  if (fee == -1) {
+    return btc_mempool_throw(mp, tx,
+                             "invalid",
+                             err.reason,
+                             err.score,
+                             0);
+  }
+
   /* Create a new mempool entry at current chain height. */
   entry = btc_mpentry_create();
 
-  btc_mpentry_set(entry, tx, view, height);
+  btc_mpentry_set(entry, tx, view, height, fee);
 
   /* Contextual verification. */
   if (!btc_mempool_verify(mp, entry, view)) {
