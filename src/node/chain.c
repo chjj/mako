@@ -456,57 +456,31 @@ btc_chain_has_orphan(btc_chain_t *chain, const uint8_t *hash) {
 
 static void
 btc_chain_limit_orphans(btc_chain_t *chain) {
-  btc_hashmapiter_t iter;
+  int64_t now = btc_time_msec();
   btc_orphan_t *oldest = NULL;
-  btc_vector_t orphans;
-  size_t i;
-
-  if (btc_hashmap_size(chain->orphan_map) < 20)
-    return;
-
-  btc_vector_init(&orphans);
+  btc_hashmapiter_t iter;
 
   btc_hashmap_iterate(&iter, chain->orphan_map);
 
   while (btc_hashmap_next(&iter)) {
     btc_orphan_t *orphan = iter.val;
 
+    if (now >= orphan->time + 60 * 60 * 1000) {
+      btc_chain_remove_orphan(chain, orphan);
+      btc_orphan_destroy(orphan);
+      continue;
+    }
+
     if (oldest == NULL || orphan->time < oldest->time)
       oldest = orphan;
-
-    btc_vector_push(&orphans, orphan);
   }
 
-  for (i = 0; i < orphans.length; i++) {
-    btc_orphan_t *orphan = orphans.items[i];
-
-    if (orphan == oldest)
-      continue;
-
-    btc_chain_remove_orphan(chain, orphan);
-    btc_orphan_destroy(orphan);
+  if (btc_hashmap_size(chain->orphan_map) >= 20) {
+    if (oldest != NULL) {
+      btc_chain_remove_orphan(chain, oldest);
+      btc_orphan_destroy(oldest);
+    }
   }
-
-  btc_vector_clear(&orphans);
-}
-
-static void
-btc_chain_purge_orphans(btc_chain_t *chain) {
-  size_t count = btc_hashmap_size(chain->orphan_map);
-  btc_hashmapiter_t iter;
-
-  if (count == 0)
-    return;
-
-  btc_hashmap_iterate(&iter, chain->orphan_map);
-
-  while (btc_hashmap_next(&iter))
-    btc_orphan_destroy(iter.val);
-
-  btc_hashmap_reset(chain->orphan_map);
-  btc_hashmap_reset(chain->orphan_prev);
-
-  btc_chain_log(chain, "Purged %zu orphans.", count);
 }
 
 static btc_orphan_t *
@@ -541,14 +515,15 @@ btc_chain_store_orphan(btc_chain_t *chain,
     btc_orphan_destroy(orphan);
   }
 
+  btc_chain_limit_orphans(chain);
+
   orphan = btc_orphan_create();
   orphan->block = btc_block_refconst(block);
   orphan->id = id;
-  orphan->time = btc_now();
+  orphan->time = btc_time_msec();
 
   btc_header_hash(orphan->hash, hdr);
 
-  btc_chain_limit_orphans(chain);
   btc_chain_add_orphan(chain, orphan);
 
   btc_chain_log(chain,
@@ -583,12 +558,9 @@ btc_chain_has_invalid(btc_chain_t *chain, const uint8_t *hash) {
 }
 
 static int
-btc_chain_is_invalid(btc_chain_t *chain, const btc_block_t *block) {
-  const btc_header_t *hdr = &block->header;
-  uint8_t hash[32];
-
-  btc_header_hash(hash, hdr);
-
+btc_chain_is_invalid(btc_chain_t *chain,
+                     const uint8_t *hash,
+                     const btc_header_t *hdr) {
   if (btc_hashset_has(chain->invalid, hash))
     return 1;
 
@@ -631,8 +603,6 @@ btc_chain_verify_checkpoint(btc_chain_t *chain,
     chk->hash,
     hash
   );
-
-  btc_chain_purge_orphans(chain);
 
   return 0;
 }
@@ -1155,7 +1125,7 @@ btc_chain_verify(btc_chain_t *chain,
   /* Get the new deployment state. */
   btc_chain_get_deployments(chain, state, hdr->time, prev);
 
-  /* Get timestamp for tx.isFinal(). */
+  /* Get timestamp for tx_is_final(). */
   time = hdr->time;
 
   if (state->lock_flags & BTC_LOCKTIME_MEDIAN_TIME_PAST)
@@ -1976,7 +1946,7 @@ btc_chain_add(btc_chain_t *chain,
   }
 
   /* Do not revalidate known invalid blocks. */
-  if (btc_chain_is_invalid(chain, block)) {
+  if (btc_chain_is_invalid(chain, hash, hdr)) {
     btc_chain_log(chain, "Invalid ancestors for block: %H.", hash);
     return btc_chain_throw(chain, hdr, "duplicate", "duplicate", 100, 0);
   }
