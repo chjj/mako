@@ -1959,8 +1959,10 @@ btc_chain_add(btc_chain_t *chain,
 
   /* Check the PoW before doing anything. */
   if (flags & BTC_BLOCK_VERIFY_POW) {
-    if (!btc_header_verify(hdr))
+    if (!btc_header_verify(hdr)) {
+      btc_chain_set_invalid(chain, hash);
       return btc_chain_throw(chain, hdr, "invalid", "high-hash", 50, 0);
+    }
   }
 
   /* Non-contextual checks. */
