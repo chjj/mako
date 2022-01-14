@@ -1899,18 +1899,19 @@ btc_chain_handle_orphans(btc_chain_t *chain, const btc_entry_t *entry) {
   while (orphan != NULL) {
     entry = btc_chain_connect(chain, entry, orphan->block);
 
-    btc_orphan_destroy(orphan);
-
     if (entry == NULL) {
-      btc_chain_log(chain,
-        "Could not resolve orphan block %H: %s.",
-        orphan->hash, chain->error.reason);
+      btc_chain_log(chain, "Could not resolve orphan block %H: %s.",
+                           orphan->hash, chain->error.reason);
 
       if (chain->on_badorphan != NULL)
         chain->on_badorphan(&chain->error, orphan->id, chain->arg);
 
+      btc_orphan_destroy(orphan);
+
       break;
     }
+
+    btc_orphan_destroy(orphan);
 
     btc_chain_log(chain,
       "Orphan block was resolved: %H (%d).",
