@@ -29,11 +29,17 @@
 #  endif
 #  define BTC_REALTIME CLOCK_REALTIME
 #  define BTC_MONOTONIC CLOCK_MONOTONIC
+#  if defined(__linux__) && defined(CLOCK_MONOTONIC_COARSE)
+#    define BTC_MONOTONIC_COARSE CLOCK_MONOTONIC_COARSE
+#  else
+#    define BTC_MONOTONIC_COARSE CLOCK_MONOTONIC
+#  endif
 typedef clockid_t btc_clockid_t;
 #else
 typedef enum btc_clockid {
   BTC_REALTIME,
-  BTC_MONOTONIC
+  BTC_MONOTONIC,
+  BTC_MONOTONIC_COARSE
 } btc_clockid_t;
 #endif
 
@@ -90,7 +96,7 @@ int64_t
 btc_time_sec(void) {
   btc_timespec_t ts;
 
-  btc_clock_gettime(BTC_MONOTONIC, &ts);
+  btc_clock_gettime(BTC_MONOTONIC_COARSE, &ts);
 
   return ts.tv_sec;
 }
