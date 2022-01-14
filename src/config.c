@@ -105,74 +105,37 @@ btc_join(char *buf, size_t size, ...) {
 }
 
 static int
-btc_getline(char **zp, size_t *zn, FILE *stream) {
-  char *xp = *zp;
-  int xn = *zn;
-  int saw = 0;
-  int i = 0;
-  int ch;
+btc_fgets(char *buf, size_t size, FILE *stream) {
+  char *xp, *sp;
+  size_t xn;
 
-  if (xn == 0) {
-    xn = 64;
-    xp = btc_malloc(xn + 1);
-  }
+  while (fgets(buf, size, stream) != NULL) {
+    xp = buf;
+    sp = strchr(xp, '#');
 
-  for (;;) {
-    ch = getc(stream);
+    if (sp != NULL)
+      *sp = '\0';
 
-    if (ch == '\r')
+    while (*xp != '\0' && *xp <= ' ')
+      xp++;
+
+    xn = strlen(xp);
+
+    while (xn > 0 && xp[xn - 1] <= ' ')
+      xn--;
+
+    xp[xn] = '\0';
+
+    if (xn == 0)
       continue;
 
-    if (ch == '#') {
-      for (;;) {
-        ch = getc(stream);
+    if (xp != buf)
+      memmove(buf, xp, xn + 1);
 
-        if (ch == '\n' || ch == EOF)
-          break;
-      }
-    }
-
-    if (ch == '\n') {
-      if (i == 0)
-        continue;
-
-      break;
-    }
-
-    if (ch == EOF) {
-      if (i == 0) {
-        i = -1;
-        goto done;
-      }
-
-      break;
-    }
-
-    if (!saw) {
-      if (ch == ' ' || ch == '\t')
-        continue;
-
-      saw = 1;
-    }
-
-    if (i == xn) {
-      xn = (xn * 3) / 2 + (xn <= 1);
-      xp = btc_realloc(xp, xn + 1);
-    }
-
-    xp[i++] = ch;
+    return 1;
   }
 
-  while (i > 0 && (xp[i - 1] == ' ' || xp[i - 1] == '\t'))
-    i -= 1;
-
-  xp[i] = '\0';
-
-done:
-  *zp = xp;
-  *zn = xn;
-
-  return i;
+  return 0;
 }
 
 /*
@@ -208,7 +171,7 @@ btc_match__str(char *zp, size_t zn, const char *xp, const char *yp) {
   len = strlen(val);
 
   if (len + 1 > zn)
-    return btc_die("Invalid option: `%s`", xp);
+    return 0;
 
   memcpy(zp, val, len + 1);
 
@@ -235,10 +198,7 @@ btc_match__path(char *zp, size_t zn, const char *xp, const char *yp) {
     if (ret < 1 || ret >= sizeof(home))
       btc_str_assign(home, "C:\\");
 
-    if (!btc_join(zp, zn, home, val + 2, NULL))
-      return btc_die("Invalid option: `%s`", xp);
-
-    return 1;
+    return btc_join(zp, zn, home, val + 2, NULL);
   }
 #else
   if (val[0] == '~' && val[1] == '/' && val[2] != '\0') {
@@ -247,17 +207,14 @@ btc_match__path(char *zp, size_t zn, const char *xp, const char *yp) {
     if (home == NULL)
       home = "/";
 
-    if (!btc_join(zp, zn, home, val + 2, NULL))
-      return btc_die("Invalid option: `%s`", xp);
-
-    return 1;
+    return btc_join(zp, zn, home, val + 2, NULL);
   }
 #endif
 
   len = strlen(val);
 
   if (len + 1 > zn)
-    return btc_die("Invalid option: `%s`", xp);
+    return 0;
 
   memcpy(zp, val, len + 1);
 
@@ -362,7 +319,7 @@ btc_match_int(int *z, const char *xp, const char *yp) {
     return 0;
 
   if (!btc_parse_int(z, val))
-    return btc_die("Invalid option: `%s`", xp);
+    return 0;
 
   return 1;
 }
@@ -373,7 +330,7 @@ btc_match_uint(int *z, const char *xp, const char *yp) {
     return 0;
 
   if (*z < 0)
-    return btc_die("Invalid option: `%s`", xp);
+    return 0;
 
   return 1;
 }
@@ -384,20 +341,14 @@ btc_match_range(int *z, const char *xp, const char *yp, int min, int max) {
     return 0;
 
   if (*z < min || *z > max)
-    return btc_die("Invalid option: `%s`", xp);
+    return 0;
 
   return 1;
 }
 
 static int
 btc_match_port(int *z, const char *xp, const char *yp) {
-  if (!btc_match_int(z, xp, yp))
-    return 0;
-
-  if (*z < 0 || *z > 0xffff)
-    return btc_die("Invalid option: `%s`", xp);
-
-  return 1;
+  return btc_match_range(z, xp, yp, 0, 0xffff);
 }
 
 static int
@@ -418,7 +369,7 @@ btc_match_network(const btc_network_t **z, const char *xp, const char *yp) {
   else if (strcmp(val, "signet") == 0)
     *z = btc_signet;
   else
-    return btc_die("Invalid option: `%s`", xp);
+    return 0;
 
   return 1;
 }
@@ -431,7 +382,7 @@ btc_match_netaddr(btc_netaddr_t *z, const char *xp, const char *yp) {
     return 0;
 
   if (!btc_netaddr_set_str(z, val))
-    return btc_die("Invalid option: `%s`", xp);
+    return 0;
 
   return 1;
 }
@@ -450,7 +401,7 @@ btc_match_net(enum btc_ipnet *z, const char *xp, const char *yp) {
   else if (strcmp(val, "onion") == 0)
     *z = BTC_IPNET_ONION;
   else
-    return btc_die("Invalid option: `%s`", xp);
+    return 0;
 
   return 1;
 }
@@ -567,133 +518,132 @@ static int
 conf_read_file(btc_conf_t *conf, const char *file) {
   FILE *stream = fopen(file, "r");
   btc_netaddr_t addr;
-  char *zp = NULL;
-  size_t zn = 0;
-  int len;
+  char opt[1024];
 
   if (stream == NULL)
     return 0;
 
-  while ((len = btc_getline(&zp, &zn, stream)) != -1) {
-    if (btc_match_path(conf->prefix, zp, "datadir="))
+  while (btc_fgets(opt, sizeof(opt), stream)) {
+    if (btc_match_path(conf->prefix, opt, "datadir="))
       continue;
 
-    if (btc_match_network(&conf->network, zp, "chain="))
+    if (btc_match_network(&conf->network, opt, "chain="))
       continue;
 
-    if (btc_match_bool(&conf->daemon, zp, "daemon="))
+    if (btc_match_bool(&conf->daemon, opt, "daemon="))
       continue;
 
-    if (btc_match_bool(&conf->network_active, zp, "networkactive="))
+    if (btc_match_bool(&conf->network_active, opt, "networkactive="))
       continue;
 
-    if (btc_match_bool(&conf->disable_wallet, zp, "disablewallet="))
+    if (btc_match_bool(&conf->disable_wallet, opt, "disablewallet="))
       continue;
 
-    if (btc_match_bool(&conf->checkpoints, zp, "checkpoints="))
+    if (btc_match_bool(&conf->checkpoints, opt, "checkpoints="))
       continue;
 
-    if (btc_match_bool(&conf->prune, zp, "prune="))
+    if (btc_match_bool(&conf->prune, opt, "prune="))
       continue;
 
-    if (btc_match_range(&conf->workers, zp, "par=", -6, 15))
+    if (btc_match_range(&conf->workers, opt, "par=", -6, 15))
       continue;
 
-    if (btc_match_bool(&conf->listen, zp, "listen="))
+    if (btc_match_bool(&conf->listen, opt, "listen="))
       continue;
 
-    if (btc_match_port(&conf->port, zp, "port="))
+    if (btc_match_port(&conf->port, opt, "port="))
       continue;
 
-    if (btc_match_netaddr(&addr, zp, "bind=")) {
+    if (btc_match_netaddr(&addr, opt, "bind=")) {
       btc_vector_push(&conf->bind, btc_netaddr_clone(&addr));
       continue;
     }
 
-    if (btc_match_netaddr(&addr, zp, "externalip=")) {
+    if (btc_match_netaddr(&addr, opt, "externalip=")) {
       btc_vector_push(&conf->external, btc_netaddr_clone(&addr));
       continue;
     }
 
-    if (btc_match_bool(&conf->no_connect, zp, "connect=")) {
+    if (btc_match_bool(&conf->no_connect, opt, "connect=")) {
       conf->no_connect ^= 1;
       continue;
     }
 
-    if (btc_match_netaddr(&addr, zp, "connect=")) {
+    if (btc_match_netaddr(&addr, opt, "connect=")) {
       btc_vector_push(&conf->connect, btc_netaddr_clone(&addr));
       continue;
     }
 
-    if (btc_match_netaddr(&conf->proxy, zp, "proxy="))
+    if (btc_match_netaddr(&conf->proxy, opt, "proxy="))
       continue;
 
-    if (btc_match_uint(&conf->max_connections, zp, "maxconnections="))
+    if (btc_match_uint(&conf->max_connections, opt, "maxconnections="))
       continue;
 
-    if (btc_match_uint(&conf->max_inbound, zp, "maxinbound="))
+    if (btc_match_uint(&conf->max_inbound, opt, "maxinbound="))
       continue;
 
-    if (btc_match_uint(&conf->max_outbound, zp, "maxoutbound="))
+    if (btc_match_uint(&conf->max_outbound, opt, "maxoutbound="))
       continue;
 
-    if (btc_match_uint(&conf->ban_time, zp, "bantime="))
+    if (btc_match_uint(&conf->ban_time, opt, "bantime="))
       continue;
 
-    if (btc_match_bool(&conf->discover, zp, "discover="))
+    if (btc_match_bool(&conf->discover, opt, "discover="))
       continue;
 
-    if (btc_match_bool(&conf->upnp, zp, "upnp="))
+    if (btc_match_bool(&conf->upnp, opt, "upnp="))
       continue;
 
-    if (btc_match_bool(&conf->onion, zp, "onion="))
+    if (btc_match_bool(&conf->onion, opt, "onion="))
       continue;
 
-    if (btc_match_netaddr(&conf->proxy, zp, "onion=")) {
+    if (btc_match_netaddr(&conf->proxy, opt, "onion=")) {
       conf->onion = 1;
       continue;
     }
 
-    if (btc_match_bool(&conf->blocks_only, zp, "blocksonly="))
+    if (btc_match_bool(&conf->blocks_only, opt, "blocksonly="))
       continue;
 
-    if (btc_match_bool(&conf->bip37, zp, "peerbloomfilters="))
+    if (btc_match_bool(&conf->bip37, opt, "peerbloomfilters="))
       continue;
 
-    if (btc_match_bool(&conf->bip152, zp, "compactblocks="))
+    if (btc_match_bool(&conf->bip152, opt, "compactblocks="))
       continue;
 
-    if (btc_match_bool(&conf->bip157, zp, "peerblockfilters="))
+    if (btc_match_bool(&conf->bip157, opt, "peerblockfilters="))
       continue;
 
-    if (btc_match_net(&conf->only_net, zp, "onlynet="))
+    if (btc_match_net(&conf->only_net, opt, "onlynet="))
       continue;
 
-    if (btc_match_port(&conf->rpc_port, zp, "rpcport="))
+    if (btc_match_port(&conf->rpc_port, opt, "rpcport="))
       continue;
 
-    if (btc_match_netaddr(&addr, zp, "rpcbind=")) {
+    if (btc_match_netaddr(&addr, opt, "rpcbind=")) {
       btc_vector_push(&conf->rpc_bind, btc_netaddr_clone(&addr));
       continue;
     }
 
-    if (btc_match_str(conf->rpc_connect, zp, "rpcconnect="))
+    if (btc_match_str(conf->rpc_connect, opt, "rpcconnect="))
       continue;
 
-    if (btc_match_str(conf->rpc_user, zp, "rpcuser="))
+    if (btc_match_str(conf->rpc_user, opt, "rpcuser="))
       continue;
 
-    if (btc_match_str(conf->rpc_pass, zp, "rpcpassword="))
+    if (btc_match_str(conf->rpc_pass, opt, "rpcpassword="))
       continue;
-
-    btc_free(zp);
 
     fclose(stream);
 
-    return btc_die("Invalid option: `%s`", zp);
+    return btc_die("Invalid option: `%s`", opt);
   }
 
-  btc_free(zp);
+  if (ferror(stream)) {
+    fclose(stream);
+    return btc_die("Could not read file: %s", file);
+  }
 
   fclose(stream);
 
