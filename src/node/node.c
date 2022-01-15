@@ -4,7 +4,6 @@
  * https://github.com/chjj/mako
  */
 
-#include <stdarg.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -74,6 +73,8 @@ on_bad_tx_orphan(const btc_verify_error_t *err, unsigned int id, void *arg);
  * Node
  */
 
+BTC_DEFINE_LOGGER(btc_log, btc_node_t, "node");
+
 btc_node_t *
 btc_node_create(const btc_network_t *network) {
   btc_node_t *node = (btc_node_t *)btc_malloc(sizeof(btc_node_t));
@@ -127,14 +128,6 @@ btc_node_destroy(btc_node_t *node) {
   btc_free(node);
 }
 
-static void
-btc_node_log(btc_node_t *node, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  btc_logger_write(node->logger, "node", fmt, ap);
-  va_end(ap);
-}
-
 int
 btc_node_open(btc_node_t *node, const char *prefix, unsigned int flags) {
   char path[BTC_PATH_MAX];
@@ -152,7 +145,7 @@ btc_node_open(btc_node_t *node, const char *prefix, unsigned int flags) {
   if (!btc_logger_open(node->logger, file))
     return 0;
 
-  btc_node_log(node, "Opening node.");
+  btc_log_info(node, "Opening node.");
 
   if (!btc_chain_open(node->chain, path, flags))
     goto fail1;
@@ -186,7 +179,7 @@ fail1:
 
 void
 btc_node_close(btc_node_t *node) {
-  btc_node_log(node, "Closing node.");
+  btc_log_info(node, "Closing node.");
 
   btc_rpc_close(node->rpc);
   btc_pool_close(node->pool);

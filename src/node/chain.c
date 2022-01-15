@@ -4,7 +4,6 @@
  * https://github.com/chjj/mako
  */
 
-#include <stdarg.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -239,6 +238,8 @@ struct btc_chain_s {
   void *arg;
 };
 
+BTC_DEFINE_LOGGER(btc_log, btc_chain_t, "chain");
+
 btc_chain_t *
 btc_chain_create(const btc_network_t *network) {
   btc_chain_t *chain = btc_malloc(sizeof(btc_chain_t));
@@ -353,14 +354,6 @@ btc_chain_set_context(btc_chain_t *chain, void *arg) {
 }
 
 static void
-btc_chain_log(btc_chain_t *chain, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  btc_logger_write(chain->logger, "chain", fmt, ap);
-  va_end(ap);
-}
-
-static void
 btc_chain_get_deployment_state(btc_chain_t *chain,
                                btc_deployment_state_t *state) {
   const btc_entry_t *tip = chain->tip;
@@ -389,14 +382,14 @@ btc_chain_maybe_sync(btc_chain_t *chain) {
   if (chain->tip->header.time < now - network->block.max_tip_age)
     return;
 
-  btc_chain_log(chain, "Chain is fully synced (height=%d).", chain->height);
+  btc_log_info(chain, "Chain is fully synced (height=%d).", chain->height);
 
   chain->synced = 1;
 }
 
 int
 btc_chain_open(btc_chain_t *chain, const char *prefix, unsigned int flags) {
-  btc_chain_log(chain, "Chain is loading.");
+  btc_log_info(chain, "Chain is loading.");
 
   chain->flags = flags;
 
@@ -413,9 +406,9 @@ btc_chain_open(btc_chain_t *chain, const char *prefix, unsigned int flags) {
   btc_chain_get_deployment_state(chain, &chain->state);
 
   if (chain->flags & BTC_CHAIN_CHECKPOINTS)
-    btc_chain_log(chain, "Checkpoints are enabled.");
+    btc_log_info(chain, "Checkpoints are enabled.");
 
-  btc_chain_log(chain, "Chain Height: %d", chain->height);
+  btc_log_info(chain, "Chain Height: %d", chain->height);
 
   btc_chain_maybe_sync(chain);
 
@@ -424,7 +417,7 @@ btc_chain_open(btc_chain_t *chain, const char *prefix, unsigned int flags) {
 
 void
 btc_chain_close(btc_chain_t *chain) {
-  btc_chain_log(chain, "Closing chain.");
+  btc_log_info(chain, "Closing chain.");
 
   if (chain->workers != NULL) {
     btc_workers_destroy(chain->workers);
@@ -508,9 +501,8 @@ btc_chain_store_orphan(btc_chain_t *chain,
 
   /* The orphan chain forked. */
   if (orphan != NULL) {
-    btc_chain_log(chain,
-      "Removing forked orphan block: %H (%d).",
-      orphan->hash, height);
+    btc_log_warn(chain, "Removing forked orphan block: %H (%d).",
+                        orphan->hash, height);
 
     btc_chain_remove_orphan(chain, orphan);
     btc_orphan_destroy(orphan);
@@ -527,9 +519,8 @@ btc_chain_store_orphan(btc_chain_t *chain,
 
   btc_chain_add_orphan(chain, orphan);
 
-  btc_chain_log(chain,
-    "Storing orphan block: %H (%d).",
-    orphan->hash, height);
+  btc_log_debug(chain, "Storing orphan block: %H (%d).",
+                       orphan->hash, height);
 }
 
 static int
@@ -590,7 +581,7 @@ btc_chain_verify_checkpoint(btc_chain_t *chain,
     return 1;
 
   if (btc_hash_equal(hash, chk->hash)) {
-    btc_chain_log(chain, "Hit checkpoint block %H (%d).", hash, height);
+    btc_log_debug(chain, "Hit checkpoint block %H (%d).", hash, height);
     return 1;
   }
 
@@ -598,12 +589,8 @@ btc_chain_verify_checkpoint(btc_chain_t *chain,
      an old block for no reason, or the
      consensus protocol is broken and
      there was a 20k+ block reorg. */
-  btc_chain_log(chain,
-    "Checkpoint mismatch at height %d: expected=%H received=%H",
-    height,
-    chk->hash,
-    hash
-  );
+  btc_log_warn(chain, "Checkpoint mismatch: height=%d expected=%H received=%H",
+                      height, chk->hash, hash);
 
   return 0;
 }
@@ -726,7 +713,7 @@ btc_chain_retarget(btc_chain_t *chain,
   else
     ret = net->pow.bits;
 
-  btc_chain_log(chain, "Retargeting to: %#.8x.", ret);
+  btc_log_debug(chain, "Retargeting to: %#.8x.", ret);
 
   mpz_clear(limit);
   mpz_clear(target);
@@ -1006,9 +993,8 @@ btc_chain_throw(btc_chain_t *chain,
   chain->error.score = score;
   chain->error.malleated = malleated;
 
-  btc_chain_log(chain, "Verification error: %s "
-                       "(code=%s score=%d hash=%H)",
-                reason, str, score, hash);
+  btc_log_warn(chain, "Verification error: %s (code=%s score=%d hash=%H)",
+                      reason, str, score, hash);
 
   return 0;
 }
@@ -1570,7 +1556,7 @@ btc_chain_reconnect(btc_chain_t *chain, btc_entry_t *entry) {
   block = btc_chaindb_get_block(chain->db, entry);
 
   if (block == NULL) {
-    btc_chain_log(chain, "Block data not found: %H (%d).",
+    btc_log_error(chain, "Block data not found: %H (%d).",
                          entry->hash, entry->height);
 
     return btc_chain_throw(chain, hdr,
@@ -1586,8 +1572,8 @@ btc_chain_reconnect(btc_chain_t *chain, btc_entry_t *entry) {
     if (!chain->error.malleated)
       btc_chain_set_invalid(chain, entry->hash);
 
-    btc_chain_log(chain, "Tried to connect invalid block: %H (%d).",
-                         entry->hash, entry->height);
+    btc_log_warn(chain, "Tried to reconnect invalid block: %H (%d).",
+                        entry->hash, entry->height);
 
     goto fail;
   }
@@ -1620,7 +1606,7 @@ btc_chain_disconnect(btc_chain_t *chain, btc_entry_t *entry) {
   block = btc_chaindb_get_block(chain->db, entry);
 
   if (block == NULL) {
-    btc_chain_log(chain, "Block data not found: %H (%d).",
+    btc_log_error(chain, "Block data not found: %H (%d).",
                          entry->hash, entry->height);
 
     return btc_chain_throw(chain, hdr,
@@ -1677,13 +1663,8 @@ btc_chain_unreorganize(btc_chain_t *chain,
   for (i = connect.length - 1; i != (size_t)-1; i--)
     CHECK(btc_chain_reconnect(chain, connect.items[i]));
 
-  btc_chain_log(chain,
-    "Chain un-reorganization: old=%H(%d) new=%H(%d)",
-    tip->hash,
-    tip->height,
-    last->hash,
-    last->height
-  );
+  btc_log_warn(chain, "Chain un-reorganization: old=%H(%d) new=%H(%d)",
+                      tip->hash, tip->height, last->hash, last->height);
 
   if (chain->on_reorganize != NULL)
     chain->on_reorganize(tip, last, chain->arg);
@@ -1759,13 +1740,9 @@ btc_chain_reorganize(btc_chain_t *chain,
     }
   }
 
-  btc_chain_log(chain,
-    "Chain reorganization: old=%H(%d) new=%H(%d)",
-    tip->hash,
-    tip->height,
-    competitor->hash,
-    competitor->height
-  );
+  btc_log_warn(chain, "Chain reorganization: old=%H(%d) new=%H(%d)",
+                      tip->hash, tip->height,
+                      competitor->hash, competitor->height);
 
   if (chain->on_reorganize != NULL)
     chain->on_reorganize(tip, competitor, chain->arg);
@@ -1800,25 +1777,25 @@ btc_chain_save_alternate(btc_chain_t *chain,
     if (!chain->error.malleated)
       btc_chain_set_invalid(chain, entry->hash);
 
-    btc_chain_log(chain, "Invalid block on alternate chain: %H (%d).",
-                         entry->hash, entry->height);
+    btc_log_warn(chain, "Invalid block on alternate chain: %H (%d).",
+                        entry->hash, entry->height);
 
     return 0;
   }
 
   CHECK(btc_chaindb_save(chain->db, entry, block, NULL));
 
-  btc_chain_log(chain, "Heads up: Competing chain at height %d:"
-                       " tip-height=%d competitor-height=%d"
-                       " tip-hash=%H competitor-hash=%H"
-                       " tip-chainwork=%H competitor-chainwork=%H",
-                       entry->height,
-                       chain->tip->height,
-                       entry->height,
-                       chain->tip->hash,
-                       entry->hash,
-                       chain->tip->chainwork,
-                       entry->chainwork);
+  btc_log_warn(chain, "Heads up: Competing chain at height %d:"
+                      " tip-height=%d competitor-height=%d"
+                      " tip-hash=%H competitor-hash=%H"
+                      " tip-chainwork=%H competitor-chainwork=%H",
+                      entry->height,
+                      chain->tip->height,
+                      entry->height,
+                      chain->tip->hash,
+                      entry->hash,
+                      chain->tip->chainwork,
+                      entry->chainwork);
 
   return 1;
 }
@@ -1834,7 +1811,7 @@ btc_chain_set_best_chain(btc_chain_t *chain,
 
   /* A higher fork has arrived. Time to reorganize the chain. */
   if (!btc_hash_equal(entry->header.prev_block, tip->hash)) {
-    btc_chain_log(chain, "WARNING: Reorganizing chain.");
+    btc_log_warn(chain, "WARNING: Reorganizing chain.");
 
     fork = find_fork(tip, entry);
 
@@ -1851,8 +1828,8 @@ btc_chain_set_best_chain(btc_chain_t *chain,
     if (!chain->error.malleated)
       btc_chain_set_invalid(chain, entry->hash);
 
-    btc_chain_log(chain, "Tried to connect invalid block: %H (%d).",
-                         entry->hash, entry->height);
+    btc_log_warn(chain, "Tried to connect invalid block: %H (%d).",
+                        entry->hash, entry->height);
 
     if (fork != NULL) {
       if (btc_hash_compare(chain->tip->chainwork, tip->chainwork) < 0)
@@ -1913,9 +1890,9 @@ btc_chain_connect(btc_chain_t *chain,
   }
 
   if (entry->height % 20 == 0 || entry->height >= network->block.slow_height) {
-    btc_chain_log(chain, "Block %H (%d) added to chain (txs=%zu time=%.2f).",
-                         entry->hash, entry->height, block->txs.length,
-                         (double)(btc_time_usec() - now) / 1000.0);
+    btc_log_info(chain, "Block %H (%d) added to chain (txs=%zu time=%.2f).",
+                        entry->hash, entry->height, block->txs.length,
+                        (double)(btc_time_usec() - now) / 1000.0);
   }
 
   btc_chain_maybe_sync(chain);
@@ -1931,8 +1908,8 @@ btc_chain_handle_orphans(btc_chain_t *chain, const btc_entry_t *entry) {
     entry = btc_chain_connect(chain, entry, orphan->block);
 
     if (entry == NULL) {
-      btc_chain_log(chain, "Could not resolve orphan block %H: %s.",
-                           orphan->hash, chain->error.reason);
+      btc_log_warn(chain, "Could not resolve orphan block %H: %s.",
+                          orphan->hash, chain->error.reason);
 
       if (chain->on_badorphan != NULL)
         chain->on_badorphan(&chain->error, orphan->id, chain->arg);
@@ -1944,9 +1921,8 @@ btc_chain_handle_orphans(btc_chain_t *chain, const btc_entry_t *entry) {
 
     btc_orphan_destroy(orphan);
 
-    btc_chain_log(chain,
-      "Orphan block was resolved: %H (%d).",
-      entry->hash, entry->height);
+    btc_log_debug(chain, "Orphan block was resolved: %H (%d).",
+                         entry->hash, entry->height);
 
     orphan = btc_chain_resolve_orphan(chain, entry->hash);
   }
@@ -1966,7 +1942,7 @@ btc_chain_add(btc_chain_t *chain,
 
   /* Special case for genesis block. */
   if (btc_hash_equal(hash, network->genesis.hash)) {
-    btc_chain_log(chain, "Saw genesis block: %H.", hash);
+    btc_log_debug(chain, "Saw genesis block: %H.", hash);
     return btc_chain_throw(chain, hdr,
                            BTC_REJECT_DUPLICATE,
                            "duplicate",
@@ -1977,7 +1953,7 @@ btc_chain_add(btc_chain_t *chain,
   /* If the block is already known to be
      an orphan, ignore it. */
   if (btc_chain_has_orphan(chain, hash)) {
-    btc_chain_log(chain, "Already have orphan block: %H.", hash);
+    btc_log_debug(chain, "Already have orphan block: %H.", hash);
     return btc_chain_throw(chain, hdr,
                            BTC_REJECT_DUPLICATE,
                            "duplicate",
@@ -1987,7 +1963,7 @@ btc_chain_add(btc_chain_t *chain,
 
   /* Do not revalidate known invalid blocks. */
   if (btc_chain_is_invalid(chain, hash, hdr)) {
-    btc_chain_log(chain, "Invalid ancestors for block: %H.", hash);
+    btc_log_debug(chain, "Invalid ancestors for block: %H.", hash);
     return btc_chain_throw(chain, hdr,
                            BTC_REJECT_DUPLICATE,
                            "duplicate",
@@ -1997,7 +1973,7 @@ btc_chain_add(btc_chain_t *chain,
 
   /* Do we already have this block? */
   if (btc_chaindb_by_hash(chain->db, hash) != NULL) {
-    btc_chain_log(chain, "Already have block: %H.", hash);
+    btc_log_debug(chain, "Already have block: %H.", hash);
     return btc_chain_throw(chain, hdr,
                            BTC_REJECT_DUPLICATE,
                            "duplicate",

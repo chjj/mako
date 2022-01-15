@@ -4,7 +4,6 @@
  * https://github.com/chjj/mako
  */
 
-#include <stdarg.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -232,6 +231,8 @@ struct btc_mempool_s {
   void *arg;
 };
 
+BTC_DEFINE_LOGGER(btc_log, btc_mempool_t, "mempool");
+
 btc_mempool_t *
 btc_mempool_create(const btc_network_t *network, btc_chain_t *chain) {
   btc_mempool_t *mp = (btc_mempool_t *)btc_malloc(sizeof(btc_mempool_t));
@@ -309,14 +310,6 @@ btc_mempool_set_context(btc_mempool_t *mp, void *arg) {
   mp->arg = arg;
 }
 
-static void
-btc_mempool_log(btc_mempool_t *mp, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  btc_logger_write(mp->logger, "mempool", fmt, ap);
-  va_end(ap);
-}
-
 int
 btc_mempool_open(btc_mempool_t *mp, const char *prefix, unsigned int flags) {
   mp->flags = flags;
@@ -328,14 +321,14 @@ btc_mempool_open(btc_mempool_t *mp, const char *prefix, unsigned int flags) {
     }
   }
 
-  btc_mempool_log(mp, "Opening mempool.");
+  btc_log_info(mp, "Opening mempool.");
 
   return 1;
 }
 
 void
 btc_mempool_close(btc_mempool_t *mp) {
-  btc_mempool_log(mp, "Closing mempool.");
+  btc_log_info(mp, "Closing mempool.");
 }
 
 static int
@@ -364,9 +357,8 @@ btc_mempool_throw(btc_mempool_t *mp,
                   int malleated) {
   const char *str = btc_reject_code(code);
 
-  btc_mempool_log(mp, "Verification error: %s "
-                      "(code=%s score=%d hash=%H)",
-                  reason, str, score, tx->hash);
+  btc_log_warn(mp, "Verification error: %s (code=%s score=%d hash=%H)",
+                   reason, str, score, tx->hash);
 
   return btc_mempool_fail(mp, tx, code, reason, score, malleated);
 }
@@ -432,7 +424,7 @@ btc_mempool_limit_orphans(btc_mempool_t *mp) {
 
   CHECK(hash != NULL);
 
-  btc_mempool_log(mp, "Removing orphan %H from mempool.", hash);
+  btc_log_debug(mp, "Removing orphan %H from mempool.", hash);
 
   btc_mempool_remove_orphan(mp, hash);
 
@@ -467,8 +459,8 @@ btc_mempool_check_orphan(btc_mempool_t *mp,
       continue;
 
     if (btc_mempool_has_reject(mp, prevout->hash)) {
-      btc_mempool_log(mp, "Not storing orphan %H (rejected parents).",
-                          tx->hash);
+      btc_log_debug(mp, "Not storing orphan %H (rejected parents).",
+                        tx->hash);
       return btc_mempool_fail(mp, tx,
                               BTC_REJECT_DUPLICATE,
                               "duplicate",
@@ -477,8 +469,8 @@ btc_mempool_check_orphan(btc_mempool_t *mp,
     }
 
     if (btc_mempool_has(mp, prevout->hash)) {
-      btc_mempool_log(mp, "Not storing orphan %H (non-existent output).",
-                          tx->hash);
+      btc_log_debug(mp, "Not storing orphan %H (non-existent output).",
+                        tx->hash);
       return btc_mempool_throw(mp, tx,
                                BTC_REJECT_INVALID,
                                "bad-txns-inputs-missingorspent",
@@ -489,7 +481,7 @@ btc_mempool_check_orphan(btc_mempool_t *mp,
 
   /* Weight limit for orphans. */
   if (btc_tx_weight(tx) > BTC_MAX_TX_WEIGHT) {
-    btc_mempool_log(mp, "Ignoring large orphan %H.", tx->hash);
+    btc_log_debug(mp, "Ignoring large orphan %H.", tx->hash);
     return btc_mempool_throw(mp, tx,
                              BTC_REJECT_INVALID,
                              "tx-size",
@@ -541,7 +533,7 @@ btc_mempool_add_orphan(btc_mempool_t *mp,
 
   CHECK(btc_hashmap_put(mp->orphans, orphan->hash, orphan));
 
-  btc_mempool_log(mp, "Added orphan %H to mempool.", tx->hash);
+  btc_log_debug(mp, "Added orphan %H to mempool.", tx->hash);
 }
 
 static btc_vector_t *
@@ -591,8 +583,8 @@ btc_mempool_handle_orphans(btc_mempool_t *mp, const uint8_t *parent) {
     btc_orphan_t *orphan = resolved->items[i];
 
     if (!btc_mempool_add(mp, orphan->tx, orphan->id)) {
-      btc_mempool_log(mp, "Could not resolve orphan %H: %s.",
-                          orphan->hash, mp->error.reason);
+      btc_log_debug(mp, "Could not resolve orphan %H: %s.",
+                        orphan->hash, mp->error.reason);
 
       if (mp->on_badorphan != NULL)
         mp->on_badorphan(&mp->error, orphan->id, mp->arg);
@@ -610,13 +602,13 @@ btc_mempool_handle_orphans(btc_mempool_t *mp, const uint8_t *parent) {
        evicted in the interim between fetching
        the non-present parents. */
     if (btc_hashmap_has(mp->orphans, hash)) {
-      btc_mempool_log(mp, "Transaction %H was double-orphaned in mempool.",
-                          hash);
+      btc_log_debug(mp, "Transaction %H was double-orphaned in mempool.",
+                        hash);
       btc_mempool_remove_orphan(mp, hash);
       continue;
     }
 
-    btc_mempool_log(mp, "Resolved orphan %H in mempool.", hash);
+    btc_log_debug(mp, "Resolved orphan %H in mempool.", hash);
   }
 
   btc_vector_destroy(resolved);
@@ -785,8 +777,8 @@ btc_mempool_add_entry(btc_mempool_t *mp,
   if (mp->on_tx != NULL)
     mp->on_tx(entry, view, mp->arg);
 
-  btc_mempool_log(mp, "Added %H to mempool (txs=%zu).",
-                      entry->hash, btc_hashmap_size(mp->map));
+  btc_log_debug(mp, "Added %H to mempool (txs=%zu).",
+                    entry->hash, btc_hashmap_size(mp->map));
 
   btc_mempool_handle_orphans(mp, entry->hash);
 }
@@ -853,8 +845,8 @@ btc_mempool_remove_double_spends(btc_mempool_t *mp, const btc_tx_t *tx) {
     if (spent == NULL)
       continue;
 
-    btc_mempool_log(mp, "Removing double spender from mempool: %H.",
-                        spent->hash);
+    btc_log_debug(mp, "Removing double spender from mempool: %H.",
+                      spent->hash);
 
     btc_mempool_evict_entry(mp, spent);
   }
@@ -935,8 +927,8 @@ btc_mempool_limit_size(btc_mempool_t *mp, const uint8_t *added) {
       continue;
 
     if (now >= entry->time + BTC_MEMPOOL_EXPIRY_TIME) {
-      btc_mempool_log(mp, "Removing package %H from mempool (too old).",
-                          entry->hash);
+      btc_log_debug(mp, "Removing package %H from mempool (too old).",
+                        entry->hash);
 
       btc_mempool_evict_entry(mp, entry);
 
@@ -949,8 +941,8 @@ btc_mempool_limit_size(btc_mempool_t *mp, const uint8_t *added) {
   while (queue.length > 0 && mp->size > BTC_MEMPOOL_THRESHOLD) {
     btc_mpentry_t *entry = btc_heap_shift(&queue, cmp_rate);
 
-    btc_mempool_log(mp, "Removing package %H from mempool (low fee).",
-                        entry->hash);
+    btc_log_debug(mp, "Removing package %H from mempool (low fee).",
+                      entry->hash);
 
     btc_mempool_evict_entry(mp, entry);
   }
@@ -1336,8 +1328,8 @@ btc_mempool_add_block(btc_mempool_t *mp,
   btc_filter_reset(&mp->rejects);
 
   if (total > 0) {
-    btc_mempool_log(mp, "Removed %d txs from mempool for block %d.",
-                        total, entry->height);
+    btc_log_debug(mp, "Removed %d txs from mempool for block %d.",
+                      total, entry->height);
   }
 }
 
@@ -1363,8 +1355,8 @@ btc_mempool_remove_block(btc_mempool_t *mp,
   btc_filter_reset(&mp->rejects);
 
   if (total > 0) {
-    btc_mempool_log(mp, "Added %d txs back into the mempool for block %d.",
-                        total, entry->height);
+    btc_log_debug(mp, "Added %d txs back into the mempool for block %d.",
+                      total, entry->height);
   }
 }
 

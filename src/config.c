@@ -406,6 +406,33 @@ btc_match_net(enum btc_ipnet *z, const char *xp, const char *yp) {
   return 1;
 }
 
+static int
+btc_match_level(int *z, const char *xp, const char *yp) {
+  static const char *levels[] = {
+    "none",
+    "error",
+    "warning",
+    "info",
+    "debug",
+    "spam"
+  };
+
+  const char *val;
+  size_t i;
+
+  if (!btc_match(&val, xp, yp))
+    return 0;
+
+  for (i = 0; i < lengthof(levels); i++) {
+    if (strcmp(val, levels[i]) == 0) {
+      *z = i;
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
 /*
  * Config Helpers
  */
@@ -417,6 +444,7 @@ conf_init(btc_conf_t *conf) {
   conf->network = btc_mainnet;
   conf->prefix[0] = '\0';
   conf->daemon = 0;
+  conf->level = 4; /* BTC_LOG_DEBUG */
   conf->network_active = 1;
   conf->disable_wallet = 0;
   conf->checkpoints = 1;
@@ -531,6 +559,9 @@ conf_read_file(btc_conf_t *conf, const char *file) {
       continue;
 
     if (btc_match_bool(&conf->daemon, opt, "daemon="))
+      continue;
+
+    if (btc_match_level(&conf->level, opt, "loglevel="))
       continue;
 
     if (btc_match_bool(&conf->network_active, opt, "networkactive="))
@@ -669,6 +700,9 @@ conf_parse_args(btc_conf_t *conf, int argc, char **argv, int allow_params) {
       continue;
 
     if (btc_match_argbool(&conf->daemon, arg, "-daemon="))
+      continue;
+
+    if (btc_match_level(&conf->level, arg, "-loglevel="))
       continue;
 
     if (btc_match_argbool(&conf->network_active, arg, "-networkactive="))

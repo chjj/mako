@@ -4,7 +4,6 @@
  * https://github.com/chjj/mako
  */
 
-#include <stdarg.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -199,6 +198,9 @@ struct btc_pool_s {
   uint64_t required_services;
   int synced;
 };
+
+BTC_DEFINE_LOGGER(btc_pool, btc_pool_t, "pool");
+BTC_DEFINE_LOGGER(btc_peer, btc_peer_t, "peer");
 
 /*
  * Nonce List
@@ -559,14 +561,6 @@ btc_peer_destroy(btc_peer_t *peer) {
   btc_free(peer);
 }
 
-static void
-btc_peer_log(btc_peer_t *peer, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  btc_logger_write(peer->logger, "peer", fmt, ap);
-  va_end(ap);
-}
-
 static int
 btc_peer_open(btc_peer_t *peer, const btc_netaddr_t *addr) {
   btc_socket_t *socket;
@@ -618,7 +612,7 @@ btc_peer_accept(btc_peer_t *peer, btc_socket_t *socket) {
   btc_socket_on_data(socket, on_data);
   btc_socket_on_drain(socket, on_drain);
 
-  btc_peer_log(peer, "Connected to %N.", &peer->addr);
+  btc_peer_info(peer, "Accepted connection from %N.", &peer->addr);
 
   return 1;
 }
@@ -638,7 +632,7 @@ btc_peer_increase_ban(btc_peer_t *peer, int score) {
   peer->ban_score += score;
 
   if (peer->ban_score >= BTC_NET_BAN_SCORE) {
-    btc_peer_log(peer, "Ban threshold exceeded (%N).", &peer->addr);
+    btc_peer_debug(peer, "Ban threshold exceeded (%N).", &peer->addr);
     btc_pool_ban(peer->pool, &peer->addr);
     return 1;
   }
@@ -653,7 +647,7 @@ btc_peer_write(btc_peer_t *peer, uint8_t *data, size_t length) {
   if (rc == -1) {
     const char *msg = btc_socket_strerror(peer->socket);
 
-    btc_peer_log(peer, "Write error (%N): %s", &peer->addr, msg);
+    btc_peer_error(peer, "Write error (%N): %s", &peer->addr, msg);
     btc_peer_close(peer);
 
     return 0;
@@ -741,7 +735,7 @@ btc_peer_send_ping(btc_peer_t *peer) {
   }
 
   if (peer->challenge != 0) {
-    btc_peer_log(peer, "Peer has not responded to ping (%N).", &peer->addr);
+    btc_peer_debug(peer, "Peer has not responded to ping (%N).", &peer->addr);
     return 1;
   }
 
@@ -819,13 +813,13 @@ btc_peer_send_getblocks(btc_peer_t *peer,
 
   peer->gb_time = btc_time_msec();
 
-  btc_peer_log(peer, "Requesting inv message from peer with getblocks (%N).",
-                     &peer->addr);
+  btc_peer_debug(peer, "Requesting inv message from peer with getblocks (%N).",
+                       &peer->addr);
 
   if (stop != btc_hash_zero)
-    btc_peer_log(peer, "Sending getblocks (start=%H, stop=%H).", start, stop);
+    btc_peer_debug(peer, "Sending getblocks (start=%H, stop=%H).", start, stop);
   else
-    btc_peer_log(peer, "Sending getblocks (start=%H).", start);
+    btc_peer_debug(peer, "Sending getblocks (start=%H).", start);
 
   return btc_peer_sendmsg(peer, BTC_MSG_GETBLOCKS, &msg);
 }
@@ -849,11 +843,10 @@ btc_peer_send_getheaders(btc_peer_t *peer,
 
   peer->gh_time = btc_time_msec();
 
-  btc_peer_log(peer,
-    "Requesting headers message from peer with getheaders (%N).",
-    &peer->addr);
+  btc_peer_debug(peer, "Requesting headers message from peer with getheaders (%N).",
+                       &peer->addr);
 
-  btc_peer_log(peer, "Sending getheaders (start=%H, stop=%H).", start, stop);
+  btc_peer_debug(peer, "Sending getheaders (start=%H, stop=%H).", start, stop);
 
   return btc_peer_sendmsg(peer, BTC_MSG_GETHEADERS, &msg);
 }
@@ -877,13 +870,13 @@ btc_peer_send_getheaders_1(btc_peer_t *peer,
 BTC_UNUSED static int
 btc_peer_send_mempool(btc_peer_t *peer) {
   if (!(peer->services & BTC_NET_SERVICE_BLOOM)) {
-    btc_peer_log(peer,
+    btc_peer_debug(peer,
       "Cannot request mempool for non-bloom peer (%N).",
       &peer->addr);
     return 1;
   }
 
-  btc_peer_log(peer,
+  btc_peer_debug(peer,
     "Requesting inv message from peer with mempool (%N).",
     &peer->addr);
 
@@ -898,9 +891,8 @@ btc_peer_send_sendcmpct(btc_peer_t *peer, uint8_t mode) {
 
   if (peer->services & BTC_NET_SERVICE_WITNESS) {
     if (peer->version >= BTC_NET_COMPACT_WITNESS_VERSION) {
-      btc_peer_log(peer,
-        "Initializing witness compact blocks (%N).",
-        &peer->addr);
+      btc_peer_info(peer, "Initializing witness compact blocks (%N).",
+                          &peer->addr);
 
       msg.version = 2;
 
@@ -910,9 +902,8 @@ btc_peer_send_sendcmpct(btc_peer_t *peer, uint8_t mode) {
 
 #if 0
   if (peer->version >= BTC_NET_COMPACT_VERSION) {
-    btc_peer_log(peer,
-      "Initializing normal compact blocks (%N).",
-      &peer->addr);
+    btc_peer_info(peer, "Initializing normal compact blocks (%N).",
+                        &peer->addr);
 
     msg.version = 1;
 
@@ -933,8 +924,8 @@ btc_peer_send_inv(btc_peer_t *peer, const btc_zinv_t *msg) {
     btc_filter_add(&peer->inv_filter, item->hash, 32);
   }
 
-  btc_peer_log(peer, "Serving %zu inv items to %N.",
-                     msg->length, &peer->addr);
+  btc_peer_spam(peer, "Serving %zu inv items to %N.",
+                      msg->length, &peer->addr);
 
   return btc_peer_sendmsg(peer, BTC_MSG_INV, msg);
 }
@@ -960,7 +951,7 @@ btc_peer_send_inv_0(btc_peer_t *peer,
 static int
 btc_peer_send_inv_1(btc_peer_t *peer, uint32_t type, const uint8_t *hash) {
   btc_filter_add(&peer->inv_filter, hash, 32);
-  btc_peer_log(peer, "Serving 1 inv items to %N.", &peer->addr);
+  btc_peer_spam(peer, "Serving 1 inv items to %N.", &peer->addr);
   return btc_peer_send_inv_0(peer, BTC_MSG_INV, type, hash);
 }
 
@@ -1005,12 +996,12 @@ btc_peer_send_headers_1(btc_peer_t *peer, const btc_header_t *hdr) {
 
 static int
 btc_peer_send_reject(btc_peer_t *peer, const btc_reject_t *msg) {
-  btc_peer_log(peer, "Rejecting %s %H (%N): code=%s reason=%s.",
-                     msg->message,
-                     msg->hash,
-                     &peer->addr,
-                     btc_reject_code(msg->code),
-                     msg->reason);
+  btc_peer_debug(peer, "Rejecting %s %H (%N): code=%s reason=%s.",
+                       msg->message,
+                       msg->hash,
+                       &peer->addr,
+                       btc_reject_code(msg->code),
+                       msg->reason);
 
   return btc_peer_sendmsg(peer, BTC_MSG_REJECT, msg);
 }
@@ -1199,8 +1190,8 @@ btc_peer_flush_inv(btc_peer_t *peer) {
   peer->inv_queue.length = 0;
 
   if (inv.length > 0) {
-    btc_peer_log(peer, "Serving %zu inv items to %N.",
-                       inv.length, &peer->addr);
+    btc_peer_spam(peer, "Serving %zu inv items to %N.",
+                        inv.length, &peer->addr);
 
     rc = btc_peer_sendmsg(peer, BTC_MSG_INV_FULL, &inv);
   }
@@ -1303,7 +1294,7 @@ btc_pool_on_complete(btc_pool_t *pool, btc_peer_t *peer);
 static void
 btc_peer_on_version(btc_peer_t *peer, const btc_version_t *msg) {
   if (peer->state != BTC_PEER_WAIT_VERSION) {
-    btc_peer_log(peer, "Peer sent unsolicited version (%N).", &peer->addr);
+    btc_peer_debug(peer, "Peer sent unsolicited version (%N).", &peer->addr);
     btc_peer_close(peer);
     return;
   }
@@ -1317,47 +1308,47 @@ btc_peer_on_version(btc_peer_t *peer, const btc_version_t *msg) {
 
   if (!peer->network->self_connect) {
     if (btc_nonces_has(&peer->pool->nonces, msg->nonce)) {
-      btc_peer_log(peer, "We connected to ourself. Oops (%N).", &peer->addr);
+      btc_peer_warn(peer, "We connected to ourself. Oops (%N).", &peer->addr);
       btc_peer_close(peer);
       return;
     }
   }
 
   if (peer->version < BTC_NET_MIN_VERSION) {
-    btc_peer_log(peer, "Peer does not support required protocol version (%N).",
-                       &peer->addr);
+    btc_peer_debug(peer, "Peer does not support required protocol version (%N).",
+                         &peer->addr);
     btc_peer_close(peer);
     return;
   }
 
   if (peer->outbound) {
     if ((peer->services & BTC_NET_SERVICE_NETWORK) == 0) {
-      btc_peer_log(peer, "Peer does not support network services (%N).",
-                         &peer->addr);
+      btc_peer_debug(peer, "Peer does not support network services (%N).",
+                           &peer->addr);
       btc_peer_close(peer);
       return;
     }
 
     if (peer->pool->flags & BTC_POOL_CHECKPOINTS) {
       if (peer->version < BTC_NET_HEADERS_VERSION) {
-        btc_peer_log(peer, "Peer does not support getheaders (%N).",
-                           &peer->addr);
+        btc_peer_debug(peer, "Peer does not support getheaders (%N).",
+                             &peer->addr);
         btc_peer_close(peer);
         return;
       }
     }
 
     if ((peer->services & BTC_NET_SERVICE_WITNESS) == 0) {
-      btc_peer_log(peer, "Peer does not support segregated witness (%N).",
-                         &peer->addr);
+      btc_peer_debug(peer, "Peer does not support segregated witness (%N).",
+                           &peer->addr);
       btc_peer_close(peer);
       return;
     }
 
     if (peer->pool->flags & BTC_POOL_BIP152) {
       if (!btc_peer_has_compact_support(peer)) {
-        btc_peer_log(peer, "Peer does not support compact blocks (%N).",
-                           &peer->addr);
+        btc_peer_debug(peer, "Peer does not support compact blocks (%N).",
+                             &peer->addr);
       }
     }
   }
@@ -1373,14 +1364,14 @@ btc_peer_on_version(btc_peer_t *peer, const btc_version_t *msg) {
 static void
 btc_peer_on_verack(btc_peer_t *peer) {
   if (peer->state != BTC_PEER_WAIT_VERACK) {
-    btc_peer_log(peer, "Peer sent unsolicited verack (%N).", &peer->addr);
+    btc_peer_debug(peer, "Peer sent unsolicited verack (%N).", &peer->addr);
     btc_peer_close(peer);
     return;
   }
 
   peer->state = BTC_PEER_CONNECTED;
 
-  btc_peer_log(peer, "Version handshake complete (%N).", &peer->addr);
+  btc_peer_debug(peer, "Version handshake complete (%N).", &peer->addr);
   btc_pool_on_complete(peer->pool, peer);
 }
 
@@ -1397,17 +1388,17 @@ btc_peer_on_pong(btc_peer_t *peer, const btc_pong_t *msg) {
   int64_t now = btc_time_msec();
 
   if (peer->challenge == 0) {
-    btc_peer_log(peer, "Peer sent an unsolicited pong (%N).", &peer->addr);
+    btc_peer_debug(peer, "Peer sent an unsolicited pong (%N).", &peer->addr);
     return;
   }
 
   if (msg->nonce != peer->challenge) {
     if (msg->nonce == 0) {
-      btc_peer_log(peer, "Peer sent a zero nonce (%N).", &peer->addr);
+      btc_peer_debug(peer, "Peer sent a zero nonce (%N).", &peer->addr);
       peer->challenge = 0;
       return;
     }
-    btc_peer_log(peer, "Peer sent the wrong nonce (%N).", &peer->addr);
+    btc_peer_debug(peer, "Peer sent the wrong nonce (%N).", &peer->addr);
     return;
   }
 
@@ -1422,7 +1413,7 @@ btc_peer_on_pong(btc_peer_t *peer, const btc_pong_t *msg) {
     if (now < peer->min_ping)
       peer->min_ping = now;
   } else {
-    btc_peer_log(peer, "Timing mismatch (what?) (%N).", &peer->addr);
+    btc_peer_debug(peer, "Timing mismatch (what?) (%N).", &peer->addr);
   }
 
   peer->challenge = 0;
@@ -1431,7 +1422,8 @@ btc_peer_on_pong(btc_peer_t *peer, const btc_pong_t *msg) {
 static void
 btc_peer_on_sendheaders(btc_peer_t *peer) {
   if (peer->prefer_headers) {
-    btc_peer_log(peer, "Peer sent a duplicate sendheaders (%N).", &peer->addr);
+    btc_peer_debug(peer, "Peer sent a duplicate sendheaders (%N).",
+                         &peer->addr);
     return;
   }
 
@@ -1443,8 +1435,8 @@ btc_peer_on_filterload(btc_peer_t *peer, const btc_bloom_t *filter) {
   btc_pool_t *pool = peer->pool;
 
   if (!(pool->flags & BTC_POOL_BIP37)) {
-    btc_peer_log(peer, "Peer loaded filter without bip37 enabled (%N).",
-                       &peer->addr);
+    btc_peer_debug(peer, "Peer loaded filter without bip37 enabled (%N).",
+                         &peer->addr);
     btc_peer_close(peer);
     return;
   }
@@ -1468,8 +1460,8 @@ btc_peer_on_filteradd(btc_peer_t *peer, const btc_filteradd_t *msg) {
   btc_pool_t *pool = peer->pool;
 
   if (!(pool->flags & BTC_POOL_BIP37)) {
-    btc_peer_log(peer, "Peer added to filter without bip37 enabled (%N).",
-                       &peer->addr);
+    btc_peer_debug(peer, "Peer added to filter without bip37 enabled (%N).",
+                         &peer->addr);
     btc_peer_close(peer);
     return;
   }
@@ -1490,8 +1482,8 @@ btc_peer_on_filterclear(btc_peer_t *peer) {
   btc_pool_t *pool = peer->pool;
 
   if (!(pool->flags & BTC_POOL_BIP37)) {
-    btc_peer_log(peer, "Peer cleared filter without bip37 enabled (%N).",
-                       &peer->addr);
+    btc_peer_debug(peer, "Peer cleared filter without bip37 enabled (%N).",
+                         &peer->addr);
     btc_peer_close(peer);
     return;
   }
@@ -1515,25 +1507,25 @@ btc_peer_on_feefilter(btc_peer_t *peer, const btc_feefilter_t *msg) {
 static void
 btc_peer_on_sendcmpct(btc_peer_t *peer, const btc_sendcmpct_t *msg) {
   if (peer->compact_mode != -1) {
-    btc_peer_log(peer, "Peer sent a duplicate sendcmpct (%N).", &peer->addr);
+    btc_peer_debug(peer, "Peer sent a duplicate sendcmpct (%N).", &peer->addr);
     return;
   }
 
   if (msg->version > 2) {
     /* Ignore. */
-    btc_peer_log(peer, "Peer requested compact blocks version %llu (%N).",
-                       msg->version, &peer->addr);
+    btc_peer_info(peer, "Peer requested compact blocks version %llu (%N).",
+                        msg->version, &peer->addr);
     return;
   }
 
   if (msg->mode > 1) {
     /* Ignore. */
-    btc_peer_log(peer, "Peer requested compact blocks mode %hhu (%N).",
-                       msg->mode, &peer->addr);
+    btc_peer_info(peer, "Peer requested compact blocks mode %hhu (%N).",
+                        msg->mode, &peer->addr);
     return;
   }
 
-  btc_peer_log(peer,
+  btc_peer_info(peer,
     "Peer initialized compact blocks (mode=%hhu, version=%llu) (%N).",
     msg->mode, msg->version, &peer->addr);
 
@@ -1543,7 +1535,7 @@ btc_peer_on_sendcmpct(btc_peer_t *peer, const btc_sendcmpct_t *msg) {
 
 static void
 btc_peer_on_error(btc_peer_t *peer, const char *msg) {
-  btc_peer_log(peer, "Socket error (%N): %s", &peer->addr, msg);
+  btc_peer_error(peer, "Socket error (%N): %s", &peer->addr, msg);
   btc_peer_close(peer);
 }
 
@@ -1553,7 +1545,7 @@ btc_peer_on_data(btc_peer_t *peer, const uint8_t *data, size_t size) {
     return 0;
 
   if (size == 0) {
-    btc_peer_log(peer, "Peer sent EOF (%N).", &peer->addr);
+    btc_peer_error(peer, "Socket hangup (%N).", &peer->addr);
     btc_peer_close(peer);
     return 0;
   }
@@ -1625,14 +1617,15 @@ btc_peer_on_parse_error(btc_peer_t *peer) {
   if (peer->state == BTC_PEER_DEAD)
     return;
 
-  btc_peer_log(peer, "Parse error (%N).", &peer->addr);
+  btc_peer_error(peer, "Parse error (%N).", &peer->addr);
   btc_peer_increase_ban(peer, 10);
 }
 
 static int
 btc_peer_flush_data(btc_peer_t *peer) {
-  btc_chain_t *chain = peer->pool->chain;
-  btc_mempool_t *mempool = peer->pool->mempool;
+  btc_pool_t *pool = peer->pool;
+  btc_chain_t *chain = pool->chain;
+  btc_mempool_t *mempool = pool->mempool;
   btc_invitem_t *item, *next;
   int blk_count = 0;
   int tx_count = 0;
@@ -1758,10 +1751,9 @@ btc_peer_flush_data(btc_peer_t *peer) {
         const btc_entry_t *entry;
         btc_block_t *block;
 
-        if (!(peer->pool->flags & BTC_POOL_BIP37)) {
-          btc_peer_log(peer,
-            "Peer requested a merkleblock without bip37 enabled (%N).",
-            &peer->addr);
+        if (!(pool->flags & BTC_POOL_BIP37)) {
+          btc_peer_debug(peer, "Peer requested a merkleblock without bip37 enabled (%N).",
+                               &peer->addr);
           btc_peer_close(peer);
           break;
         }
@@ -1839,21 +1831,19 @@ btc_peer_flush_data(btc_peer_t *peer) {
     btc_peer_send_notfound(peer, &nf);
 
   if (blk_count > 0) {
-    btc_peer_log(peer,
+    btc_pool_debug(pool,
       "Served %d blocks with getdata (notfound=%zu, cmpct=%d) (%N).",
       blk_count, nf.length, cmpct_count, &peer->addr);
   }
 
   if (tx_count > 0) {
-    btc_peer_log(peer,
-      "Served %d txs with getdata (notfound=%zu) (%N).",
-      tx_count, nf.length, &peer->addr);
+    btc_pool_debug(pool, "Served %d txs with getdata (notfound=%zu) (%N).",
+                         tx_count, nf.length, &peer->addr);
   }
 
   if (unknown != -1) {
-    btc_peer_log(peer,
-      "Peer sent an unknown getdata type: %u (%N).",
-      (uint32_t)unknown, &peer->addr);
+    btc_pool_debug(pool, "Peer sent an unknown getdata type: %u (%N).",
+                         (uint32_t)unknown, &peer->addr);
   }
 
   btc_inv_clear(&nf);
@@ -1893,21 +1883,21 @@ btc_peer_maybe_timeout(btc_peer_t *peer, int64_t now) {
 
   if (!btc_chain_synced(chain)) {
     if (peer->gb_time != -1 && now > peer->gb_time + 30000) {
-      btc_peer_log(peer, "Peer is stalling (inv) (%N).", &peer->addr);
+      btc_peer_error(peer, "Peer is stalling (inv) (%N).", &peer->addr);
       btc_peer_close(peer);
       return;
     }
   }
 
   if (peer->gh_time != -1 && now > peer->gh_time + 60000) {
-    btc_peer_log(peer, "Peer is stalling (headers) (%N).", &peer->addr);
+    btc_peer_error(peer, "Peer is stalling (headers) (%N).", &peer->addr);
     btc_peer_close(peer);
     return;
   }
 
   if (peer->syncing && peer->loader && !btc_chain_synced(chain)) {
     if (now > peer->block_time + 120000) {
-      btc_peer_log(peer, "Peer is stalling (block) (%N).", &peer->addr);
+      btc_peer_error(peer, "Peer is stalling (block) (%N).", &peer->addr);
       btc_peer_close(peer);
       return;
     }
@@ -1921,7 +1911,7 @@ btc_peer_maybe_timeout(btc_peer_t *peer, int64_t now) {
 
     while (btc_hashtab_next(&tabit)) {
       if (now > tabit.val + 120000) {
-        btc_peer_log(peer, "Peer is stalling (block) (%N).", &peer->addr);
+        btc_peer_error(peer, "Peer is stalling (block) (%N).", &peer->addr);
         btc_peer_close(peer);
         return;
       }
@@ -1931,7 +1921,7 @@ btc_peer_maybe_timeout(btc_peer_t *peer, int64_t now) {
 
     while (btc_hashtab_next(&tabit)) {
       if (now > tabit.val + 120000) {
-        btc_peer_log(peer, "Peer is stalling (tx) (%N).", &peer->addr);
+        btc_peer_error(peer, "Peer is stalling (tx) (%N).", &peer->addr);
         btc_peer_close(peer);
         return;
       }
@@ -1941,7 +1931,7 @@ btc_peer_maybe_timeout(btc_peer_t *peer, int64_t now) {
 
     while (btc_hashmap_next(&mapit)) {
       if (now > ((btc_cmpct_t *)mapit.val)->now + 30000) {
-        btc_peer_log(peer, "Peer is stalling (blocktxn) (%N).", &peer->addr);
+        btc_peer_error(peer, "Peer is stalling (blocktxn) (%N).", &peer->addr);
         btc_peer_close(peer);
         return;
       }
@@ -1952,25 +1942,25 @@ btc_peer_maybe_timeout(btc_peer_t *peer, int64_t now) {
     int mult = (peer->version <= BTC_NET_PONG_VERSION ? 4 : 1);
 
     if (peer->last_recv == 0 || peer->last_send == 0) {
-      btc_peer_log(peer, "Peer is stalling (no message) (%N).", &peer->addr);
+      btc_peer_error(peer, "Peer is stalling (no message) (%N).", &peer->addr);
       btc_peer_close(peer);
       return;
     }
 
     if (now > peer->last_send + 20 * 60000) {
-      btc_peer_log(peer, "Peer is stalling (send) (%N).", &peer->addr);
+      btc_peer_error(peer, "Peer is stalling (send) (%N).", &peer->addr);
       btc_peer_close(peer);
       return;
     }
 
     if (now > peer->last_recv + 20 * 60000 * mult) {
-      btc_peer_log(peer, "Peer is stalling (recv) (%N).", &peer->addr);
+      btc_peer_error(peer, "Peer is stalling (recv) (%N).", &peer->addr);
       btc_peer_close(peer);
       return;
     }
 
     if (peer->challenge && now > peer->last_ping + 20 * 60000) {
-      btc_peer_log(peer, "Peer is stalling (ping) (%N).", &peer->addr);
+      btc_peer_error(peer, "Peer is stalling (ping) (%N).", &peer->addr);
       btc_peer_close(peer);
       return;
     }
@@ -1984,7 +1974,7 @@ btc_peer_on_tick(btc_peer_t *peer, int64_t now) {
 
   if (peer->state != BTC_PEER_CONNECTED) {
     if (now > peer->time + 5000) {
-      btc_peer_log(peer, "Peer stalled (connect) (%N).", &peer->addr);
+      btc_peer_debug(peer, "Peer stalled (connect) (%N).", &peer->addr);
       btc_peer_close(peer);
       return;
     }
@@ -2009,7 +1999,7 @@ btc_peer_on_tick(btc_peer_t *peer, int64_t now) {
   btc_peer_flush_data(peer);
 
   if (btc_socket_buffered(peer->socket) > (30 << 20)) {
-    btc_peer_log(peer, "Peer stalled (drain) (%N).", &peer->addr);
+    btc_peer_error(peer, "Peer stalled (drain) (%N).", &peer->addr);
     btc_peer_close(peer);
     return;
   }
@@ -2253,14 +2243,6 @@ btc_pool_set_onlynet(btc_pool_t *pool, enum btc_ipnet only_net) {
   pool->only_net = only_net;
 }
 
-static void
-btc_pool_log(btc_pool_t *pool, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  btc_logger_write(pool->logger, "pool", fmt, ap);
-  va_end(ap);
-}
-
 static int
 btc_pool_listen(btc_pool_t *pool) {
   size_t i;
@@ -2269,14 +2251,14 @@ btc_pool_listen(btc_pool_t *pool) {
     if (!btc_server_listen_external(pool->server, pool->port)) {
       const char *msg = btc_server_strerror(pool->server);
 
-      btc_pool_log(pool, "Could not listen on port %d: %s.", pool->port, msg);
+      btc_pool_error(pool, "Could not listen on port %d: %s.", pool->port, msg);
 
       btc_server_close(pool->server);
 
       return 0;
     }
 
-    btc_pool_log(pool, "Listening on port %d.", pool->port);
+    btc_pool_info(pool, "Listening on port %d.", pool->port);
 
     return 1;
   }
@@ -2290,14 +2272,14 @@ btc_pool_listen(btc_pool_t *pool) {
     if (!btc_server_listen(pool->server, addr)) {
       const char *msg = btc_server_strerror(pool->server);
 
-      btc_pool_log(pool, "Could not listen on %S: %s.", addr, msg);
+      btc_pool_error(pool, "Could not listen on %S: %s.", addr, msg);
 
       btc_server_close(pool->server);
 
       return 0;
     }
 
-    btc_pool_log(pool, "Listening on %S.", addr);
+    btc_pool_info(pool, "Listening on %S.", addr);
   }
 
   return 1;
@@ -2308,7 +2290,7 @@ btc_pool_discover_local(btc_pool_t *pool) {
   btc_sockaddr_t *res, *it;
   btc_netaddr_t addr;
 
-  btc_pool_log(pool, "Looking up local addresses...");
+  btc_pool_info(pool, "Looking up local addresses...");
 
   if (btc_getifaddrs(&res, pool->port)) {
     int total = 0;
@@ -2316,18 +2298,18 @@ btc_pool_discover_local(btc_pool_t *pool) {
     for (it = res; it != NULL; it = it->next) {
       btc_netaddr_set_sockaddr(&addr, it);
 
-      btc_pool_log(pool, "Local address found: %N.", &addr);
+      btc_pool_info(pool, "Local address found: %N.", &addr);
 
       btc_addrman_add_local(pool->addrman, &addr, BTC_SCORE_IF);
 
       total += 1;
     }
 
-    btc_pool_log(pool, "Found %d local addresses.", total);
+    btc_pool_info(pool, "Found %d local addresses.", total);
 
     btc_freeifaddrs(res);
   } else {
-    btc_pool_log(pool, "Local addresses not found.");
+    btc_pool_debug(pool, "Local addresses not found.");
   }
 }
 
@@ -2336,24 +2318,24 @@ btc_pool_discover_external(btc_pool_t *pool) {
   btc_sockaddr_t sa;
   btc_netaddr_t na;
 
-  btc_pool_log(pool, "Looking up IPv4 address...");
+  btc_pool_info(pool, "Looking up IPv4 address...");
 
   if (btc_net_external(&sa, BTC_AF_INET, pool->port)) {
-    btc_pool_log(pool, "IPv4 address found: %S.", &sa);
+    btc_pool_info(pool, "IPv4 address found: %S.", &sa);
     btc_netaddr_set_sockaddr(&na, &sa);
     btc_addrman_add_local(pool->addrman, &na, BTC_SCORE_DNS);
   } else {
-    btc_pool_log(pool, "IPv4 address not found.");
+    btc_pool_debug(pool, "IPv4 address not found.");
   }
 
-  btc_pool_log(pool, "Looking up IPv6 address...");
+  btc_pool_info(pool, "Looking up IPv6 address...");
 
   if (btc_net_external(&sa, BTC_AF_INET6, pool->port)) {
-    btc_pool_log(pool, "IPv6 address found: %S.", &sa);
+    btc_pool_info(pool, "IPv6 address found: %S.", &sa);
     btc_netaddr_set_sockaddr(&na, &sa);
     btc_addrman_add_local(pool->addrman, &na, BTC_SCORE_DNS);
   } else {
-    btc_pool_log(pool, "IPv6 address not found.");
+    btc_pool_debug(pool, "IPv6 address not found.");
   }
 }
 
@@ -2412,9 +2394,8 @@ btc_pool_reset_chain(btc_pool_t *pool) {
     pool->header_head = btc_hdrnode_create(tip->hash, tip->height);
     pool->header_tail = pool->header_head;
 
-    btc_pool_log(pool,
-      "Initialized header chain to height %d (checkpoint=%H).",
-      tip->height, pool->header_tip->hash);
+    btc_pool_info(pool, "Initialized header chain to height %d (checkpoint=%H).",
+                        tip->height, pool->header_tip->hash);
   }
 }
 
@@ -2428,7 +2409,7 @@ btc_pool_open(btc_pool_t *pool, const char *prefix, unsigned int flags) {
   if (pool->flags & BTC_POOL_BIP37)
     pool->services |= BTC_NET_SERVICE_BLOOM;
 
-  btc_pool_log(pool, "Opening pool.");
+  btc_pool_info(pool, "Opening pool.");
 
   if (!btc_path_resolve(file, sizeof(file), prefix, "peers.dat", NULL))
     return 0;
@@ -2459,7 +2440,7 @@ btc_pool_open(btc_pool_t *pool, const char *prefix, unsigned int flags) {
 
 void
 btc_pool_close(btc_pool_t *pool) {
-  btc_pool_log(pool, "Closing pool.");
+  btc_pool_info(pool, "Closing pool.");
 
   btc_loop_off_tick(pool->loop, on_tick, pool);
 
@@ -2538,7 +2519,7 @@ static void
 btc_pool_ban(btc_pool_t *pool, const btc_netaddr_t *addr) {
   btc_peer_t *peer = btc_peers_get(&pool->peers, addr);
 
-  btc_pool_log(pool, "Banning peer (%N).", addr);
+  btc_pool_debug(pool, "Banning peer (%N).", addr);
 
   btc_addrman_ban(pool->addrman, addr);
   btc_addrman_remove(pool->addrman, addr);
@@ -2553,12 +2534,12 @@ btc_pool_create_outbound(btc_pool_t *pool, const btc_netaddr_t *addr) {
 
   btc_addrman_mark_attempt(pool->addrman, addr);
 
-  btc_pool_log(pool, "Connecting to %N.", addr);
+  btc_pool_debug(pool, "Connecting to %N.", addr);
 
   if (!btc_peer_open(peer, addr)) {
     const char *msg = btc_loop_strerror(pool->loop);
 
-    btc_pool_log(pool, "Connection failed: %s (%N).", msg, addr);
+    btc_pool_debug(pool, "Connection failed: %s (%N).", msg, addr);
     btc_peer_destroy(peer);
 
     return NULL;
@@ -2677,7 +2658,7 @@ btc_pool_add_loader(btc_pool_t *pool) {
     if (!peer->outbound)
       continue;
 
-    btc_pool_log(pool, "Repurposing peer for loader (%N).", &peer->addr);
+    btc_pool_info(pool, "Repurposing peer for loader (%N).", &peer->addr);
 
     btc_pool_set_loader(pool, peer);
 
@@ -2694,7 +2675,7 @@ btc_pool_add_loader(btc_pool_t *pool) {
   if (peer == NULL)
     return 0;
 
-  btc_pool_log(pool, "Adding loader peer (%N).", &peer->addr);
+  btc_pool_info(pool, "Adding loader peer (%N).", &peer->addr);
 
   btc_peers_add(&pool->peers, peer);
 
@@ -2727,8 +2708,8 @@ btc_pool_fill_outbound(btc_pool_t *pool) {
   if (need == 0)
     return 0;
 
-  btc_pool_log(pool, "Refilling %zu peers (%zu/%zu).", need,
-               pool->peers.outbound, pool->max_outbound);
+  btc_pool_debug(pool, "Refilling %zu peers (%zu/%zu).", need,
+                 pool->peers.outbound, pool->max_outbound);
 
   for (i = 0; i < need; i++)
     btc_pool_add_outbound(pool);
@@ -2758,7 +2739,7 @@ btc_pool_on_socket(btc_pool_t *pool, btc_socket_t *socket) {
   btc_socket_address(&sa, socket);
 
   if (pool->peers.length >= pool->max_inbound) {
-    btc_pool_log(pool, "Ignoring inbound peer (%S).", &sa);
+    btc_pool_debug(pool, "Ignoring inbound peer (%S).", &sa);
     btc_socket_close(socket);
     return;
   }
@@ -2766,19 +2747,19 @@ btc_pool_on_socket(btc_pool_t *pool, btc_socket_t *socket) {
   btc_netaddr_set_sockaddr(&na, &sa);
 
   if (btc_addrman_is_banned(pool->addrman, &na)) {
-    btc_pool_log(pool, "Ignoring banned peer (%S).", &sa);
+    btc_pool_debug(pool, "Ignoring banned peer (%S).", &sa);
     btc_socket_close(socket);
     return;
   }
 
-  btc_pool_log(pool, "Accepting inbound peer (%S).", &sa);
+  btc_pool_info(pool, "Accepting inbound peer (%S).", &sa);
 
   peer = btc_peer_create(pool);
 
   if (!btc_peer_accept(peer, socket)) {
     const char *msg = btc_loop_strerror(pool->loop);
 
-    btc_pool_log(pool, "Connection failed: %s (%S).", msg, &sa);
+    btc_pool_debug(pool, "Connection failed: %s (%S).", msg, &sa);
     btc_peer_destroy(peer);
 
     return;
@@ -2789,7 +2770,7 @@ btc_pool_on_socket(btc_pool_t *pool, btc_socket_t *socket) {
 
 static void
 btc_pool_on_connect(btc_pool_t *pool, btc_peer_t *peer) {
-  btc_pool_log(pool, "Connected to %N.", &peer->addr);
+  btc_pool_info(pool, "Connected to %N.", &peer->addr);
 
   if (peer->outbound)
     btc_addrman_mark_success(pool->addrman, &peer->addr);
@@ -2944,7 +2925,8 @@ btc_pool_on_close(btc_pool_t *pool, btc_peer_t *peer) {
   btc_pool_remove_peer(pool, peer);
 
   if (loader) {
-    btc_pool_log(pool, "Removed loader peer (%N).", &peer->addr);
+    btc_pool_info(pool, "Removed loader peer (%N).", &peer->addr);
+
     if (pool->checkpoints)
       btc_pool_reset_chain(pool);
   }
@@ -2952,9 +2934,9 @@ btc_pool_on_close(btc_pool_t *pool, btc_peer_t *peer) {
   btc_nonces_remove(&pool->nonces, peer->nonce);
 
   if (btc_chain_synced(pool->chain) && size > 0) {
-    btc_pool_log(pool, "Peer disconnected with requested blocks (%N).",
+    btc_pool_warn(pool, "Peer disconnected with requested blocks (%N).",
                        &peer->addr);
-    btc_pool_log(pool, "Resending sync...");
+    btc_pool_warn(pool, "Resending sync...");
     btc_pool_resync(pool, 1);
   }
 
@@ -2965,7 +2947,7 @@ static void
 btc_pool_on_version(btc_pool_t *pool,
                     btc_peer_t *peer,
                     const btc_version_t *msg) {
-  btc_pool_log(pool,
+  btc_pool_info(pool,
     "Received version (%N): version=%d height=%d services=%#.16llx agent=%s",
     &peer->addr,
     msg->version,
@@ -2978,21 +2960,21 @@ btc_pool_on_version(btc_pool_t *pool,
     int64_t offset = pool->timedata->offset;
 
     if (!btc_timedata_add(pool->timedata, msg->time)) {
-      btc_pool_log(pool, "Adjusted time mismatch!");
-      btc_pool_log(pool, "Please make sure your system clock is correct!");
+      btc_pool_warn(pool, "Adjusted time mismatch!");
+      btc_pool_warn(pool, "Please make sure your system clock is correct!");
     }
 
     if (pool->timedata->length != length) {
       int64_t sample = msg->time - btc_now();
 
-      btc_pool_log(pool, "Added time data: total=%zu, sample=%T (%T minutes).",
-                         pool->timedata->length, sample, sample / 60);
+      btc_pool_debug(pool, "Added time data: total=%zu, sample=%T (%T minutes).",
+                           pool->timedata->length, sample, sample / 60);
     }
 
     if (pool->timedata->offset != offset) {
-      btc_pool_log(pool, "Time offset: %T (%T minutes).",
-                         pool->timedata->offset,
-                         pool->timedata->offset / 60);
+      btc_pool_info(pool, "Time offset: %T (%T minutes).",
+                          pool->timedata->offset,
+                          pool->timedata->offset / 60);
     }
   }
 
@@ -3033,14 +3015,14 @@ btc_pool_on_getaddr(btc_pool_t *pool, btc_peer_t *peer) {
   size_t i;
 
   if (peer->outbound) {
-    btc_pool_log(pool, "Ignoring getaddr from outbound node (%N).",
-                       &peer->addr);
+    btc_pool_debug(pool, "Ignoring getaddr from outbound node (%N).",
+                         &peer->addr);
     return;
   }
 
   if (peer->sent_addr) {
-    btc_pool_log(pool, "Ignoring repeated getaddr (%N).",
-                       &peer->addr);
+    btc_pool_debug(pool, "Ignoring repeated getaddr (%N).",
+                         &peer->addr);
     return;
   }
 
@@ -3065,8 +3047,8 @@ btc_pool_on_getaddr(btc_pool_t *pool, btc_peer_t *peer) {
   }
 
   if (addrs.length > 0) {
-    btc_pool_log(pool, "Sending %zu addrs to peer (%N)",
-                       addrs.length, &peer->addr);
+    btc_pool_debug(pool, "Sending %zu addrs to peer (%N)",
+                         addrs.length, &peer->addr);
 
     btc_peer_send_addr(peer, &addrs);
 
@@ -3125,18 +3107,15 @@ btc_pool_on_addr(btc_pool_t *pool,
   if (addrs->length < 1000)
     peer->getting_addr = 0;
 
-  btc_pool_log(pool,
-    "Received %zu addrs (hosts=%zu, peers=%zu) (%N).",
-    addrs->length,
-    btc_addrman_total(pool->addrman),
-    pool->peers.length,
-    &peer->addr);
+  btc_pool_info(pool, "Received %zu addrs (hosts=%zu, peers=%zu) (%N).",
+                      addrs->length, btc_addrman_total(pool->addrman),
+                      pool->peers.length, &peer->addr);
 
   if (relay.length > 0) {
     btc_vector_t peers;
     btc_peer_t *it;
 
-    btc_pool_log(pool, "Relaying %zu addrs to random peers.", relay.length);
+    btc_pool_debug(pool, "Relaying %zu addrs to random peers.", relay.length);
 
     btc_vector_init(&peers);
 
@@ -3206,8 +3185,8 @@ btc_pool_request_blocks(btc_pool_t *pool,
   size_t i;
 
   if (peer->state != BTC_PEER_CONNECTED) {
-    btc_pool_log(pool, "Peer handshake not complete (getdata) (%N).",
-                       &peer->addr);
+    btc_pool_debug(pool, "Peer handshake not complete (getdata) (%N).",
+                         &peer->addr);
     return;
   }
 
@@ -3241,14 +3220,14 @@ btc_pool_request_blocks(btc_pool_t *pool,
 
   if (btc_hashtab_size(peer->block_map) >= BTC_NET_MAX_BLOCK_REQUEST) {
     btc_zinv_clear(&inv);
-    btc_pool_log(pool, "Peer advertised too many blocks (%N).",
-                       &peer->addr);
+    btc_pool_warn(pool, "Peer advertised too many blocks (%N).",
+                        &peer->addr);
     btc_peer_close(peer);
     return;
   }
 
-  btc_pool_log(pool, "Requesting %zu/%zu blocks from peer with getdata (%N).",
-                     inv.length, btc_hashset_size(pool->block_map), &peer->addr);
+  btc_pool_debug(pool, "Requesting %zu/%zu blocks from peer with getdata (%N).",
+                       inv.length, btc_hashset_size(pool->block_map), &peer->addr);
 
   btc_peer_send_getdata(peer, &inv);
 
@@ -3274,8 +3253,8 @@ btc_pool_on_blockinv(btc_pool_t *pool,
   if (pool->checkpoints)
     return;
 
-  btc_pool_log(pool, "Received %zu block hashes from peer (%N).",
-                     hashes->length, &peer->addr);
+  btc_pool_debug(pool, "Received %zu block hashes from peer (%N).",
+                       hashes->length, &peer->addr);
 
   btc_vector_init(&out);
 
@@ -3288,7 +3267,7 @@ btc_pool_on_blockinv(btc_pool_t *pool,
 
     /* Resolve orphan chain. */
     if (btc_chain_has_orphan(pool->chain, hash)) {
-      btc_pool_log(pool, "Received known orphan hash (%N).", &peer->addr);
+      btc_pool_debug(pool, "Received known orphan hash (%N).", &peer->addr);
       btc_pool_resolve_orphan(pool, peer, hash);
       continue;
     }
@@ -3306,7 +3285,7 @@ btc_pool_on_blockinv(btc_pool_t *pool,
        continue the sync, or do a getblocks
        from the last hash. */
     if (i == hashes->length - 1) {
-      btc_pool_log(pool, "Received existing hash (%N).", &peer->addr);
+      btc_pool_debug(pool, "Received existing hash (%N).", &peer->addr);
       btc_pool_getblocks(pool, peer, hash, NULL);
     }
   }
@@ -3325,8 +3304,8 @@ btc_pool_request_txs(btc_pool_t *pool,
   size_t i;
 
   if (peer->state != BTC_PEER_CONNECTED) {
-    btc_pool_log(pool, "Peer handshake not complete (getdata) (%N).",
-                       &peer->addr);
+    btc_pool_debug(pool, "Peer handshake not complete (getdata) (%N).",
+                         &peer->addr);
     return;
   }
 
@@ -3360,14 +3339,14 @@ btc_pool_request_txs(btc_pool_t *pool,
 
   if (btc_hashtab_size(peer->tx_map) >= BTC_NET_MAX_TX_REQUEST) {
     btc_zinv_clear(&inv);
-    btc_pool_log(pool, "Peer advertised too many txs (%N).",
-                       &peer->addr);
+    btc_pool_warn(pool, "Peer advertised too many txs (%N).",
+                        &peer->addr);
     btc_peer_close(peer);
     return;
   }
 
-  btc_pool_log(pool, "Requesting %zu/%zu txs from peer with getdata (%N).",
-                     inv.length, btc_hashset_size(pool->tx_map), &peer->addr);
+  btc_pool_debug(pool, "Requesting %zu/%zu txs from peer with getdata (%N).",
+                       inv.length, btc_hashset_size(pool->tx_map), &peer->addr);
 
   btc_peer_send_getdata(peer, &inv);
 
@@ -3386,7 +3365,7 @@ btc_pool_has_tx(btc_pool_t *pool, const uint8_t *hash) {
 
   /* If we recently rejected this item. Ignore. */
   if (btc_mempool_has_reject(pool->mempool, hash)) {
-    btc_pool_log(pool, "Saw known reject of %H.", hash);
+    btc_pool_spam(pool, "Saw known reject of %H.", hash);
     return 1;
   }
 
@@ -3459,14 +3438,13 @@ btc_pool_on_inv(btc_pool_t *pool,
     btc_filter_add(&peer->inv_filter, item->hash, 32);
   }
 
-  btc_pool_log(pool,
+  btc_pool_spam(pool,
     "Received inv message with %zu items: blocks=%zu txs=%zu (%N).",
     inv->length, blocks.length, txs.length, &peer->addr);
 
   if (unknown != -1) {
-    btc_pool_log(pool,
-      "Peer sent an unknown inv type: %u (%N).",
-      (uint32_t)unknown, &peer->addr);
+    btc_pool_debug(pool, "Peer sent an unknown inv type: %u (%N).",
+                         (uint32_t)unknown, &peer->addr);
   }
 
   if (blocks.length > 0)
@@ -3486,8 +3464,8 @@ btc_pool_on_getdata(btc_pool_t *pool,
   size_t i;
 
   if (msg->length > BTC_NET_MAX_INV) {
-    btc_pool_log(pool, "Peer sent inv with >50k items (%n).",
-                       &peer->addr);
+    btc_pool_warn(pool, "Peer sent inv with >50k items (%n).",
+                        &peer->addr);
     btc_peer_increase_ban(peer, 20);
     return;
   }
@@ -3498,7 +3476,7 @@ btc_pool_on_getdata(btc_pool_t *pool,
   btc_peer_flush_data(peer);
 
   if (peer->sending.length > BTC_NET_MAX_INV) {
-    btc_peer_log(peer, "Peer exceeded getdata queue (%N).", &peer->addr);
+    btc_peer_warn(peer, "Peer exceeded getdata queue (%N).", &peer->addr);
     btc_peer_close(peer);
     return;
   }
@@ -3514,9 +3492,8 @@ btc_pool_on_notfound(btc_pool_t *pool,
     const btc_zinvitem_t *item = &msg->items[i];
 
     if (!btc_pool_resolve_item(pool, peer, item)) {
-      btc_pool_log(pool,
-        "Peer sent notfound for unrequested item: %H (%N).",
-        item->hash, &peer->addr);
+      btc_pool_warn(pool, "Peer sent notfound for unrequested item: %H (%N).",
+                          item->hash, &peer->addr);
       btc_peer_close(peer);
       return;
     }
@@ -3694,8 +3671,8 @@ btc_pool_resolve_chain(btc_pool_t *pool,
   CHECK(node != NULL);
 
   if (!btc_hash_equal(hash, node->hash)) {
-    btc_pool_log(pool, "Header hash mismatch %H != %H (%N).",
-                       hash, node->hash, &peer->addr);
+    btc_pool_warn(pool, "Header hash mismatch %H != %H (%N).",
+                        hash, node->hash, &peer->addr);
 
     btc_peer_close(peer);
 
@@ -3704,8 +3681,8 @@ btc_pool_resolve_chain(btc_pool_t *pool,
 
   if (node->height < pool->network->last_checkpoint) {
     if (node->height == pool->header_tip->height) {
-      btc_pool_log(pool, "Received checkpoint %H (%d).",
-                         node->hash, node->height);
+      btc_pool_info(pool, "Received checkpoint %H (%d).",
+                          node->hash, node->height);
 
       pool->header_tip = btc_pool_next_tip(pool, node->height);
 
@@ -3720,8 +3697,8 @@ btc_pool_resolve_chain(btc_pool_t *pool,
     return;
   }
 
-  btc_pool_log(pool, "Switching to getblocks (%N).",
-                     &peer->addr);
+  btc_pool_info(pool, "Switching to getblocks (%N).",
+                      &peer->addr);
 
   btc_pool_clear_chain(pool);
 
@@ -3761,15 +3738,15 @@ btc_pool_on_headers(btc_pool_t *pool,
     uint8_t hash[32];
 
     if (!btc_header_verify(hdr)) {
-      btc_pool_log(pool, "Peer sent an invalid header (%N).",
-                         &peer->addr);
+      btc_pool_warn(pool, "Peer sent an invalid header (%N).",
+                          &peer->addr);
       btc_peer_increase_ban(peer, 100);
       return;
     }
 
     if (!btc_hash_equal(hdr->prev_block, last->hash)) {
-      btc_pool_log(pool, "Peer sent a bad header chain (%N).",
-                         &peer->addr);
+      btc_pool_warn(pool, "Peer sent a bad header chain (%N).",
+                          &peer->addr);
       btc_peer_close(peer);
       return;
     }
@@ -3778,8 +3755,8 @@ btc_pool_on_headers(btc_pool_t *pool,
 
     if (height == pool->header_tip->height) {
       if (!btc_hash_equal(hash, pool->header_tip->hash)) {
-        btc_pool_log(pool, "Peer sent an invalid checkpoint (%N).",
-                           &peer->addr);
+        btc_pool_warn(pool, "Peer sent an invalid checkpoint (%N).",
+                            &peer->addr);
         btc_peer_close(peer);
         return;
       }
@@ -3800,8 +3777,8 @@ btc_pool_on_headers(btc_pool_t *pool,
     pool->header_tail = node;
   }
 
-  btc_pool_log(pool, "Received %zu headers from peer (%N).",
-                     msg->length, &peer->addr);
+  btc_pool_debug(pool, "Received %zu headers from peer (%N).",
+                       msg->length, &peer->addr);
 
   /* If we received a valid header
      chain, consider this a "block". */
@@ -3858,13 +3835,13 @@ btc_pool_handle_badorphan(btc_pool_t *pool,
   btc_peer_t *peer = btc_peers_find(&pool->peers, id);
 
   if (peer == NULL) {
-    btc_pool_log(pool, "Could not find offending peer for orphan: %H (%u).",
-                       err->hash, id);
+    btc_pool_warn(pool, "Could not find offending peer for orphan: %H (%u).",
+                        err->hash, id);
     return;
   }
 
-  btc_pool_log(pool, "Punishing peer for sending a bad orphan (%N).",
-                     &peer->addr);
+  btc_pool_debug(pool, "Punishing peer for sending a bad orphan (%N).",
+                       &peer->addr);
 
   /* Punish the original peer who sent this. */
   btc_peer_reject(peer, msg, err);
@@ -3881,8 +3858,8 @@ btc_pool_add_block(btc_pool_t *pool,
   btc_header_hash(hash, &block->header);
 
   if (!btc_pool_resolve_block(pool, peer, hash)) {
-    btc_pool_log(pool, "Received unrequested block: %H (%N).",
-                       hash, &peer->addr);
+    btc_pool_warn(pool, "Received unrequested block: %H (%N).",
+                        hash, &peer->addr);
     btc_peer_close(peer);
     return;
   }
@@ -3897,12 +3874,12 @@ btc_pool_add_block(btc_pool_t *pool,
   /* Block was orphaned. */
   if (btc_chain_has_orphan(pool->chain, hash)) {
     if (pool->checkpoints) {
-      btc_pool_log(pool, "Peer sent orphan block with getheaders (%N).",
-                         &peer->addr);
+      btc_pool_warn(pool, "Peer sent orphan block with getheaders (%N).",
+                          &peer->addr);
       return;
     }
 
-    btc_pool_log(pool, "Peer sent an orphan block. Resolving.");
+    btc_pool_debug(pool, "Peer sent an orphan block. Resolving.");
     btc_pool_resolve_orphan(pool, peer, hash);
 
     return;
@@ -3916,10 +3893,10 @@ btc_pool_add_block(btc_pool_t *pool,
   height = btc_chain_height(pool->chain);
 
   if (height % 20 == 0) {
-    btc_pool_log(pool, "Status:"
-                       " time=%D height=%d progress=%.2f%%"
-                       " orphans=%d active=%zu"
-                       " target=%#.8x peers=%zu",
+    btc_pool_debug(pool, "Status:"
+                         " time=%D height=%d progress=%.2f%%"
+                         " orphans=%d active=%zu"
+                         " target=%#.8x peers=%zu",
       block->header.time,
       height,
       btc_chain_progress(pool->chain) * 100.0,
@@ -3930,8 +3907,8 @@ btc_pool_add_block(btc_pool_t *pool,
   }
 
   if (height % 2000 == 0) {
-    btc_pool_log(pool, "Received 2000 more blocks (height=%d, hash=%H).",
-                       height, hash);
+    btc_pool_info(pool, "Received 2000 more blocks (height=%d, hash=%H).",
+                        height, hash);
   }
 
   btc_pool_resolve_chain(pool, peer, hash);
@@ -3947,8 +3924,8 @@ btc_pool_on_block(btc_pool_t *pool,
 static void
 btc_pool_on_tx(btc_pool_t *pool, btc_peer_t *peer, const btc_tx_t *tx) {
   if (!btc_pool_resolve_tx(pool, peer, tx->hash)) {
-    btc_pool_log(pool, "Peer sent unrequested tx: %H (%N).",
-                       tx->hash, &peer->addr);
+    btc_pool_warn(pool, "Peer sent unrequested tx: %H (%N).",
+                        tx->hash, &peer->addr);
     btc_peer_close(peer);
     return;
   }
@@ -3962,8 +3939,8 @@ btc_pool_on_tx(btc_pool_t *pool, btc_peer_t *peer, const btc_tx_t *tx) {
     btc_vector_t *missing = btc_mempool_missing(pool->mempool, tx);
 
     if (missing->length > 0) {
-      btc_pool_log(pool, "Requesting %zu missing transactions (%N).",
-                         missing->length, &peer->addr);
+      btc_pool_debug(pool, "Requesting %zu missing transactions (%N).",
+                           missing->length, &peer->addr);
 
       btc_pool_request_txs(pool, peer, missing);
     }
@@ -3978,12 +3955,12 @@ static void
 btc_pool_on_reject(btc_pool_t *pool,
                    btc_peer_t *peer,
                    const btc_reject_t *msg) {
-  btc_pool_log(pool, "Received reject (%N): msg=%s code=%s reason=%s hash=%H.",
-                     &peer->addr,
-                     msg->message,
-                     btc_reject_code(msg->code),
-                     msg->reason,
-                     msg->hash);
+  btc_pool_debug(pool, "Received reject (%N): msg=%s code=%s reason=%s hash=%H.",
+                       &peer->addr,
+                       msg->message,
+                       btc_reject_code(msg->code),
+                       msg->reason,
+                       msg->hash);
 }
 
 static void
@@ -3996,13 +3973,13 @@ btc_pool_on_mempool(btc_pool_t *pool, btc_peer_t *peer) {
     return;
 
   if (!(pool->flags & BTC_POOL_BIP37)) {
-    btc_pool_log(pool, "Peer requested mempool without bip37 enabled (%N).",
-                       &peer->addr);
+    btc_pool_debug(pool, "Peer requested mempool without bip37 enabled (%N).",
+                         &peer->addr);
     btc_peer_close(peer);
     return;
   }
 
-  btc_pool_log(pool, "Sending mempool snapshot (%N).", &peer->addr);
+  btc_pool_debug(pool, "Sending mempool snapshot (%N).", &peer->addr);
 
   btc_zinv_init(&items);
   btc_zinv_grow(&items, 1000);
@@ -4054,8 +4031,8 @@ btc_pool_on_merkleblock(btc_pool_t *pool,
                         const btc_merkleblock_t *msg) {
   (void)msg;
 
-  btc_pool_log(pool, "Peer sent unsolicited merkleblock (%N).",
-                     &peer->addr);
+  btc_pool_warn(pool, "Peer sent unsolicited merkleblock (%N).",
+                      &peer->addr);
 
   btc_peer_increase_ban(peer, 100);
 }
@@ -4086,31 +4063,28 @@ btc_pool_on_cmpctblock(btc_pool_t *pool,
   int rc;
 
   if (!(pool->flags & BTC_POOL_BIP152)) {
-    btc_pool_log(pool, "Peer sent unsolicited cmpctblock (%N).",
-                       &peer->addr);
+    btc_pool_debug(pool, "Peer sent unsolicited cmpctblock (%N).",
+                         &peer->addr);
     btc_peer_close(peer);
     return;
   }
 
   if (!btc_peer_has_compact_support(peer) || !btc_peer_has_compact(peer)) {
-    btc_pool_log(pool,
-      "Peer sent unsolicited cmpctblock (%N).",
-      &peer->addr);
+    btc_pool_debug(pool, "Peer sent unsolicited cmpctblock (%N).",
+                         &peer->addr);
     btc_peer_close(peer);
     return;
   }
 
   if (btc_hashmap_has(peer->compact_map, block->hash)) {
-    btc_pool_log(pool,
-      "Peer sent us a duplicate compact block (%N).",
-      &peer->addr);
+    btc_pool_debug(pool, "Peer sent us a duplicate compact block (%N).",
+                         &peer->addr);
     return;
   }
 
   if (btc_hashset_has(pool->compact_map, block->hash)) {
-    btc_pool_log(pool,
-      "Already waiting for compact block %H (%N).",
-      block->hash, &peer->addr);
+    btc_pool_debug(pool, "Already waiting for compact block %H (%N).",
+                         block->hash, &peer->addr);
     return;
   }
 
@@ -4118,9 +4092,8 @@ btc_pool_on_cmpctblock(btc_pool_t *pool,
     uint8_t *hash;
 
     if (pool->block_mode != 1) {
-      btc_pool_log(pool,
-        "Peer sent us an unrequested compact block (%N).",
-        &peer->addr);
+      btc_pool_debug(pool, "Peer sent us an unrequested compact block (%N).",
+                           &peer->addr);
       btc_peer_close(peer);
       return;
     }
@@ -4136,9 +4109,8 @@ btc_pool_on_cmpctblock(btc_pool_t *pool,
   }
 
   if (!btc_header_verify(&block->header)) {
-    btc_pool_log(pool,
-      "Peer sent an invalid compact block (%N).",
-      &peer->addr);
+    btc_pool_info(pool, "Peer sent an invalid compact block (%N).",
+                        &peer->addr);
     btc_peer_increase_ban(peer, 100);
     return;
   }
@@ -4146,17 +4118,15 @@ btc_pool_on_cmpctblock(btc_pool_t *pool,
   rc = btc_cmpct_setup(block);
 
   if (rc == -1) {
-    btc_pool_log(pool,
-      "Peer sent an invalid compact block (%N).",
-      &peer->addr);
+    btc_pool_debug(pool, "Peer sent an invalid compact block (%N).",
+                         &peer->addr);
     btc_peer_increase_ban(peer, 100);
     return;
   }
 
   if (rc == 0) {
-    btc_pool_log(pool,
-      "Siphash collision for %H. Requesting full block (%N).",
-      block->hash, &peer->addr);
+    btc_pool_warn(pool, "Siphash collision for %H. Requesting full block (%N).",
+                        block->hash, &peer->addr);
     btc_peer_get_full_block(peer, block->hash);
     btc_peer_increase_ban(peer, 10);
     return;
@@ -4167,9 +4137,8 @@ btc_pool_on_cmpctblock(btc_pool_t *pool,
   if (btc_cmpct_fill_mempool(block, &iter, peer->compact_witness)) {
     btc_block_t *blk = btc_block_create();
 
-    btc_pool_log(pool,
-      "Received full compact block %H (%N).",
-      block->hash, &peer->addr);
+    btc_pool_debug(pool, "Received full compact block %H (%N).",
+                         block->hash, &peer->addr);
 
     btc_cmpct_finalize(blk, block);
     btc_pool_add_block(pool, peer, blk, BTC_BLOCK_VERIFY_BODY);
@@ -4179,7 +4148,7 @@ btc_pool_on_cmpctblock(btc_pool_t *pool,
   }
 
   if (btc_hashmap_size(peer->compact_map) >= 15) {
-    btc_pool_log(pool, "Compact block DoS attempt (%N).", &peer->addr);
+    btc_pool_warn(pool, "Compact block DoS attempt (%N).", &peer->addr);
     btc_peer_close(peer);
     return;
   }
@@ -4189,9 +4158,9 @@ btc_pool_on_cmpctblock(btc_pool_t *pool,
   CHECK(btc_hashset_put(pool->compact_map, block->hash));
   CHECK(btc_hashmap_put(peer->compact_map, block->hash, btc_cmpct_ref(block)));
 
-  btc_pool_log(pool,
-    "Received non-full compact block %H tx=%zu/%zu (%N).",
-    block->hash, block->count, block->avail.length, &peer->addr);
+  btc_pool_debug(pool, "Received non-full compact block %H tx=%zu/%zu (%N).",
+                       block->hash, block->count, block->avail.length,
+                       &peer->addr);
 
   btc_peer_send_getblocktxn(peer, block);
 }
@@ -4209,29 +4178,29 @@ btc_pool_on_getblocktxn(btc_pool_t *pool,
   entry = btc_chain_by_hash(pool->chain, req->hash);
 
   if (entry == NULL) {
-    btc_pool_log(pool, "Peer sent getblocktxn for non-existent block (%N).",
-                       &peer->addr);
+    btc_pool_debug(pool, "Peer sent getblocktxn for non-existent block (%N).",
+                         &peer->addr);
     btc_peer_increase_ban(peer, 100);
     return;
   }
 
   if (entry->height < btc_chain_height(pool->chain) - 15) {
-    btc_pool_log(pool, "Peer sent a getblocktxn for a block > 15 deep (%N)",
-                       &peer->addr);
+    btc_pool_debug(pool, "Peer sent a getblocktxn for a block > 15 deep (%N)",
+                         &peer->addr);
     return;
   }
 
   block = btc_chain_get_block(pool->chain, entry);
 
   if (block == NULL) {
-    btc_pool_log(pool, "Block data not found for %H (%N)",
-                       entry->hash, &peer->addr);
+    btc_pool_error(pool, "Block data not found for %H (%N)",
+                         entry->hash, &peer->addr);
     btc_peer_send_notfound_1(peer, BTC_INV_BLOCK, entry->hash);
     return;
   }
 
-  btc_pool_log(pool, "Sending blocktxn for %H to peer (%N).",
-                     entry->hash, &peer->addr);
+  btc_pool_debug(pool, "Sending blocktxn for %H to peer (%N).",
+                       entry->hash, &peer->addr);
 
   btc_peer_send_blocktxn(peer, block, req);
   btc_block_destroy(block);
@@ -4245,8 +4214,8 @@ btc_pool_on_blocktxn(btc_pool_t *pool,
   btc_block_t *blk;
 
   if (block == NULL) {
-    btc_pool_log(pool, "Peer sent unsolicited blocktxn (%N).",
-                       &peer->addr);
+    btc_pool_debug(pool, "Peer sent unsolicited blocktxn (%N).",
+                         &peer->addr);
     return;
   }
 
@@ -4254,17 +4223,17 @@ btc_pool_on_blocktxn(btc_pool_t *pool,
   CHECK(btc_hashmap_del(peer->compact_map, res->hash));
 
   if (!btc_cmpct_fill_missing(block, res)) {
-    btc_pool_log(pool, "Peer sent non-full blocktxn for %H. "
-                       "Requesting full block (%N).",
-                       block->hash, &peer->addr);
+    btc_pool_warn(pool, "Peer sent non-full blocktxn for %H. "
+                        "Requesting full block (%N).",
+                        block->hash, &peer->addr);
     btc_peer_get_full_block(peer, res->hash);
     btc_peer_increase_ban(peer, 10);
     btc_cmpct_destroy(block);
     return;
   }
 
-  btc_pool_log(pool, "Filled compact block %H (%N).",
-                     block->hash, &peer->addr);
+  btc_pool_debug(pool, "Filled compact block %H (%N).",
+                       block->hash, &peer->addr);
 
   blk = btc_block_create();
 
@@ -4278,7 +4247,7 @@ static void
 btc_pool_on_unknown(btc_pool_t *pool,
                     btc_peer_t *peer,
                     const btc_msg_t *msg) {
-  btc_pool_log(pool, "Unknown message: %s (%N).", msg->cmd, &peer->addr);
+  btc_pool_debug(pool, "Unknown message: %s (%N).", msg->cmd, &peer->addr);
 }
 
 static void

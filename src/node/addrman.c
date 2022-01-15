@@ -7,7 +7,6 @@
  */
 
 #include <math.h>
-#include <stdarg.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -324,6 +323,8 @@ struct btc_addrman_s {
   int needs_flush;
 };
 
+BTC_DEFINE_LOGGER(btc_log, btc_addrman_t, "addrman");
+
 btc_addrman_t *
 btc_addrman_create(const btc_network_t *network) {
   btc_addrman_t *man = btc_malloc(sizeof(btc_addrman_t));
@@ -416,14 +417,6 @@ btc_addrman_set_bantime(btc_addrman_t *man, int64_t ban_time) {
   man->ban_time = ban_time;
 }
 
-static void
-btc_addrman_log(btc_addrman_t *man, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  btc_logger_write(man->logger, "addrman", fmt, ap);
-  va_end(ap);
-}
-
 static int
 btc_addrman_read_file(btc_addrman_t *man, const char *file) {
   uint8_t *xp;
@@ -469,7 +462,7 @@ btc_addrman_resolve(btc_addrman_t *man) {
     if (btc_netmap_size(man->map) >= 10)
       continue;
 
-    btc_addrman_log(man, "Resolving %s...", seed);
+    btc_log_info(man, "Resolving %s...", seed);
 
     if (btc_getaddrinfo(&res, seed, network->port)) {
       int total = 0;
@@ -485,15 +478,15 @@ btc_addrman_resolve(btc_addrman_t *man) {
         total += 1;
       }
 
-      btc_addrman_log(man, "Resolved %d seeds from %s", total, seed);
+      btc_log_info(man, "Resolved %d seeds from %s", total, seed);
 
       btc_freeaddrinfo(res);
     } else {
-      btc_addrman_log(man, "Could not resolve %s", seed);
+      btc_log_info(man, "Could not resolve %s", seed);
     }
   }
 
-  btc_addrman_log(man, "Resolved %zu seeds.", btc_addrman_total(man));
+  btc_log_info(man, "Resolved %zu seeds.", btc_addrman_total(man));
 
   return btc_addrman_total(man) > 0;
 }
@@ -509,7 +502,7 @@ btc_addrman_open(btc_addrman_t *man, const char *file, unsigned int flags) {
     if (btc_addrman_read_file(man, man->file))
       return 1;
 
-    btc_addrman_log(man, "Could not read %s.", man->file);
+    btc_log_warn(man, "Could not read %s.", man->file);
   } else {
     man->file[0] = '\0';
   }
@@ -540,9 +533,14 @@ btc_addrman_write_file(btc_addrman_t *man, const char *file) {
 void
 btc_addrman_flush(btc_addrman_t *man) {
   if (man->needs_flush && *man->file) {
-    btc_addrman_log(man, "Flushing %zu addresses to disk.",
-                         btc_addrman_total(man));
-    btc_addrman_write_file(man, man->file);
+    btc_log_debug(man, "Flushing %zu addresses to disk.",
+                       btc_addrman_total(man));
+
+    if (!btc_addrman_write_file(man, man->file)) {
+      btc_log_warn(man, "Could not write %s.", man->file);
+      return;
+    }
+
     man->needs_flush = 0;
   }
 }

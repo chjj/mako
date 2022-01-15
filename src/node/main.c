@@ -12,6 +12,7 @@
 #include <io/core.h>
 
 #include <node/chain.h>
+#include <node/logger.h>
 #include <node/node.h>
 #include <node/pool.h>
 #include <node/rpc.h>
@@ -48,6 +49,8 @@ get_config(int argc, char **argv) {
 static void
 set_config(btc_node_t *node, const btc_conf_t *conf) {
   size_t i;
+
+  btc_logger_set_level(node->logger, conf->level);
 
   btc_chain_set_threads(node->chain, conf->workers);
 

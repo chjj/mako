@@ -4,7 +4,6 @@
  * https://github.com/chjj/mako
  */
 
-#include <stdarg.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -266,6 +265,8 @@ struct btc_rpc_s {
   uint8_t auth_hash[32];
 };
 
+BTC_DEFINE_LOGGER(btc_log, btc_rpc_t, "rpc");
+
 static int
 on_request(http_server_t *server, http_req_t *req, http_res_t *res);
 
@@ -332,14 +333,6 @@ btc_rpc_set_credentials(btc_rpc_t *rpc, const char *user, const char *pass) {
     btc_hash_init(rpc->auth_hash);
 }
 
-static void
-btc_rpc_log(btc_rpc_t *rpc, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  btc_logger_write(rpc->logger, "rpc", fmt, ap);
-  va_end(ap);
-}
-
 static int
 btc_rpc_listen(btc_rpc_t *rpc) {
   size_t i;
@@ -348,14 +341,14 @@ btc_rpc_listen(btc_rpc_t *rpc) {
     if (!http_server_listen_local(rpc->http, rpc->port)) {
       const char *msg = http_server_strerror(rpc->http);
 
-      btc_rpc_log(rpc, "Could not listen on port %d: %s.", rpc->port, msg);
+      btc_log_error(rpc, "Could not listen on port %d: %s.", rpc->port, msg);
 
       http_server_close(rpc->http);
 
       return 0;
     }
 
-    btc_rpc_log(rpc, "Listening on port %d.", rpc->port);
+    btc_log_info(rpc, "Listening on port %d.", rpc->port);
 
     return 1;
   }
@@ -369,14 +362,14 @@ btc_rpc_listen(btc_rpc_t *rpc) {
     if (!http_server_listen(rpc->http, addr)) {
       const char *msg = http_server_strerror(rpc->http);
 
-      btc_rpc_log(rpc, "Could not listen on %S: %s.", addr, msg);
+      btc_log_error(rpc, "Could not listen on %S: %s.", addr, msg);
 
       http_server_close(rpc->http);
 
       return 0;
     }
 
-    btc_rpc_log(rpc, "Listening on %S.", addr);
+    btc_log_info(rpc, "Listening on %S.", addr);
   }
 
   return 1;
@@ -386,7 +379,7 @@ int
 btc_rpc_open(btc_rpc_t *rpc, unsigned int flags) {
   rpc->flags = flags;
 
-  btc_rpc_log(rpc, "Opening RPC.");
+  btc_log_info(rpc, "Opening RPC.");
 
   if (!btc_rpc_listen(rpc))
     return 0;
@@ -396,7 +389,7 @@ btc_rpc_open(btc_rpc_t *rpc, unsigned int flags) {
 
 void
 btc_rpc_close(btc_rpc_t *rpc) {
-  btc_rpc_log(rpc, "Closing RPC.");
+  btc_log_info(rpc, "Closing RPC.");
 
   http_server_close(rpc->http);
 }
@@ -840,7 +833,7 @@ btc_rpc_handle(btc_rpc_t *rpc, const rpc_req_t *req, rpc_res_t *res) {
     return;
   }
 
-  btc_rpc_log(rpc, "Incoming RPC request: %s.", req->method);
+  btc_log_debug(rpc, "Handling RPC call: %s.", req->method);
 
   if (req->params == NULL || req->params->type == json_null) {
     params.length = 0;

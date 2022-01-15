@@ -4,7 +4,6 @@
  * https://github.com/chjj/mako
  */
 
-#include <stdarg.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -97,6 +96,8 @@ struct btc_miner_s {
   btc_vector_t addrs;
   btc_cpuminer_t cpu;
 };
+
+BTC_DEFINE_LOGGER(btc_log, btc_miner_t, "miner");
 
 /*
  * Block Entry
@@ -956,17 +957,9 @@ btc_miner_set_timedata(btc_miner_t *miner, const btc_timedata_t *td) {
   miner->timedata = td;
 }
 
-static void
-btc_miner_log(btc_miner_t *miner, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  btc_logger_write(miner->logger, "miner", fmt, ap);
-  va_end(ap);
-}
-
 int
 btc_miner_open(btc_miner_t *miner, unsigned int flags) {
-  btc_miner_log(miner, "Opening miner.");
+  btc_log_info(miner, "Opening miner.");
 
   miner->flags = flags;
 
@@ -975,7 +968,7 @@ btc_miner_open(btc_miner_t *miner, unsigned int flags) {
 
 void
 btc_miner_close(btc_miner_t *miner) {
-  btc_miner_log(miner, "Closing miner.");
+  btc_log_info(miner, "Closing miner.");
 
   if (miner->cpu.mining)
     btc_cpuminer_stop(&miner->cpu);
@@ -1159,12 +1152,9 @@ btc_miner_template(btc_miner_t *miner) {
   if (miner->mempool != NULL)
     btc_miner_assemble(miner, bt);
 
-  btc_miner_log(miner,
+  btc_log_debug(miner,
     "Created block tmpl (height=%d, weight=%zu, fees=%v, txs=%zu).",
-    bt->height,
-    bt->weight,
-    bt->fees,
-    bt->txs.length + 1);
+    bt->height, bt->weight, bt->fees, bt->txs.length + 1);
 
   return bt;
 }

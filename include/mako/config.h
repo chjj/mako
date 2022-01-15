@@ -23,6 +23,7 @@ struct btc_conf_s {
   const btc_network_t *network;
   char prefix[1024];
   int daemon;
+  int level;
   int network_active;
   int disable_wallet;
   int checkpoints;
