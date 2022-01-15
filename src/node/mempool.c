@@ -931,32 +931,25 @@ btc_mempool_limit_size(btc_mempool_t *mp, const uint8_t *added) {
     if (btc_mempool_has_dependencies(mp, entry->tx))
       continue;
 
-    if (now < entry->time + BTC_MEMPOOL_EXPIRY_TIME) {
-      btc_heap_insert(&queue, entry, cmp_rate);
+    if (now >= entry->time + BTC_MEMPOOL_EXPIRY_TIME) {
+      btc_mempool_log(mp, "Removing package %H from mempool (too old).",
+                          entry->hash);
+
+      btc_mempool_evict_entry(mp, entry);
+
       continue;
     }
 
-    btc_mempool_log(mp, "Removing package %H from mempool (too old).",
-                        entry->hash);
-
-    btc_mempool_evict_entry(mp, entry);
+    btc_heap_insert(&queue, entry, cmp_rate);
   }
 
-  if (mp->size <= BTC_MEMPOOL_THRESHOLD) {
-    btc_vector_clear(&queue);
-    return !btc_hashmap_has(mp->map, added);
-  }
-
-  while (queue.length > 0) {
+  while (queue.length > 0 && mp->size > BTC_MEMPOOL_THRESHOLD) {
     btc_mpentry_t *entry = btc_heap_shift(&queue, cmp_rate);
 
     btc_mempool_log(mp, "Removing package %H from mempool (low fee).",
                         entry->hash);
 
     btc_mempool_evict_entry(mp, entry);
-
-    if (mp->size <= BTC_MEMPOOL_THRESHOLD)
-      break;
   }
 
   btc_vector_clear(&queue);
