@@ -33,7 +33,7 @@ test_chain(const btc_network_t *network, const char **vectors, size_t length) {
     btc_block_init(&block);
 
     ASSERT(btc_block_import(&block, data, size));
-    ASSERT(btc_chain_add(chain, &block, flags, -1));
+    ASSERT(btc_chain_add(chain, &block, flags, -1) == 0);
 
     btc_block_clear(&block);
   }

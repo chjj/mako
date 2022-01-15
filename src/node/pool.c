@@ -27,6 +27,7 @@
 #include <mako/crypto/hash.h>
 #include <mako/crypto/rand.h>
 #include <mako/entry.h>
+#include <mako/error.h>
 #include <mako/header.h>
 #include <mako/list.h>
 #include <mako/map.h>
@@ -992,41 +993,6 @@ btc_peer_send_headers_1(btc_peer_t *peer, const btc_header_t *hdr) {
   msg.length = 1;
 
   return btc_peer_sendmsg(peer, BTC_MSG_HEADERS, &msg);
-}
-
-static int
-btc_peer_send_reject(btc_peer_t *peer, const btc_reject_t *msg) {
-  btc_peer_debug(peer, "Rejecting %s %H (%N): code=%s reason=%s.",
-                       msg->message,
-                       msg->hash,
-                       &peer->addr,
-                       btc_reject_code(msg->code),
-                       msg->reason);
-
-  return btc_peer_sendmsg(peer, BTC_MSG_REJECT, msg);
-}
-
-static int
-btc_peer_reject(btc_peer_t *peer,
-                const char *message,
-                const btc_verify_error_t *err) {
-  btc_reject_t reject;
-
-  if (err->code < BTC_REJECT_INTERNAL) {
-    btc_reject_init(&reject);
-
-    strcpy(reject.message, message);
-
-    reject.code = err->code;
-
-    strcpy(reject.reason, err->reason);
-
-    btc_hash_copy(reject.hash, err->hash);
-
-    btc_peer_send_reject(peer, &reject);
-  }
-
-  return btc_peer_increase_ban(peer, err->score);
 }
 
 static int
@@ -3829,14 +3795,14 @@ btc_pool_announce_tx(btc_pool_t *pool, const btc_mpentry_t *entry) {
 
 void
 btc_pool_handle_badorphan(btc_pool_t *pool,
-                          const char *msg,
-                          const btc_verify_error_t *err,
+                          const uint8_t *hash,
+                          btc_errno_t code,
                           unsigned int id) {
   btc_peer_t *peer = btc_peers_find(&pool->peers, id);
 
   if (peer == NULL) {
     btc_pool_warn(pool, "Could not find offending peer for orphan: %H (%u).",
-                        err->hash, id);
+                        hash, id);
     return;
   }
 
@@ -3844,7 +3810,7 @@ btc_pool_handle_badorphan(btc_pool_t *pool,
                        &peer->addr);
 
   /* Punish the original peer who sent this. */
-  btc_peer_reject(peer, msg, err);
+  btc_peer_increase_ban(peer, btc_error_score(code));
 }
 
 static void
@@ -3854,6 +3820,7 @@ btc_pool_add_block(btc_pool_t *pool,
                    unsigned int flags) {
   uint8_t hash[32];
   int32_t height;
+  int rc;
 
   btc_header_hash(hash, &block->header);
 
@@ -3866,8 +3833,8 @@ btc_pool_add_block(btc_pool_t *pool,
 
   peer->block_time = btc_time_msec();
 
-  if (!btc_chain_add(pool->chain, block, flags, peer->id)) {
-    btc_peer_reject(peer, "block", btc_chain_error(pool->chain));
+  if ((rc = btc_chain_add(pool->chain, block, flags, peer->id))) {
+    btc_peer_increase_ban(peer, btc_error_score(rc));
     return;
   }
 
@@ -3923,6 +3890,8 @@ btc_pool_on_block(btc_pool_t *pool,
 
 static void
 btc_pool_on_tx(btc_pool_t *pool, btc_peer_t *peer, const btc_tx_t *tx) {
+  int rc;
+
   if (!btc_pool_resolve_tx(pool, peer, tx->hash)) {
     btc_pool_warn(pool, "Peer sent unrequested tx: %H (%N).",
                         tx->hash, &peer->addr);
@@ -3930,8 +3899,8 @@ btc_pool_on_tx(btc_pool_t *pool, btc_peer_t *peer, const btc_tx_t *tx) {
     return;
   }
 
-  if (!btc_mempool_add(pool->mempool, tx, peer->id)) {
-    btc_peer_reject(peer, "tx", btc_mempool_error(pool->mempool));
+  if ((rc = btc_mempool_add(pool->mempool, tx, peer->id))) {
+    btc_peer_increase_ban(peer, btc_error_score(rc));
     return;
   }
 
@@ -3949,18 +3918,6 @@ btc_pool_on_tx(btc_pool_t *pool, btc_peer_t *peer, const btc_tx_t *tx) {
 
     return;
   }
-}
-
-static void
-btc_pool_on_reject(btc_pool_t *pool,
-                   btc_peer_t *peer,
-                   const btc_reject_t *msg) {
-  btc_pool_debug(pool, "Received reject (%N): msg=%s code=%s reason=%s hash=%H.",
-                       &peer->addr,
-                       msg->message,
-                       btc_reject_code(msg->code),
-                       msg->reason,
-                       msg->hash);
 }
 
 static void
@@ -4300,9 +4257,6 @@ btc_pool_on_msg(btc_pool_t *pool, btc_peer_t *peer, btc_msg_t *msg) {
       break;
     case BTC_MSG_TX:
       btc_pool_on_tx(pool, peer, (const btc_tx_t *)msg->body);
-      break;
-    case BTC_MSG_REJECT:
-      btc_pool_on_reject(pool, peer, (const btc_reject_t *)msg->body);
       break;
     case BTC_MSG_MEMPOOL:
       btc_pool_on_mempool(pool, peer);

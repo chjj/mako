@@ -28,7 +28,8 @@ typedef void btc_mempool_tx_cb(const btc_mpentry_t *entry,
                                const btc_view_t *view,
                                void *arg);
 
-typedef void btc_mempool_badorphan_cb(const btc_verify_error_t *err,
+typedef void btc_mempool_badorphan_cb(const uint8_t *hash,
+                                      btc_errno_t code,
                                       unsigned int id,
                                       void *arg);
 
@@ -64,7 +65,7 @@ btc_mempool_open(btc_mempool_t *mp, const char *prefix, unsigned int flags);
 BTC_EXTERN void
 btc_mempool_close(btc_mempool_t *mp);
 
-BTC_EXTERN int
+BTC_EXTERN btc_errno_t
 btc_mempool_add(btc_mempool_t *mp,
                 const btc_tx_t *tx,
                 unsigned int id);
@@ -81,9 +82,6 @@ btc_mempool_remove_block(btc_mempool_t *mp,
 
 BTC_EXTERN void
 btc_mempool_handle_reorg(btc_mempool_t *mp);
-
-BTC_EXTERN const btc_verify_error_t *
-btc_mempool_error(btc_mempool_t *mp);
 
 BTC_EXTERN size_t
 btc_mempool_size(btc_mempool_t *mp);

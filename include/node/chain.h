@@ -60,7 +60,8 @@ typedef void btc_chain_reorganize_cb(const btc_entry_t *old,
                                      const btc_entry_t *new_,
                                      void *arg);
 
-typedef void btc_chain_badorphan_cb(const btc_verify_error_t *err,
+typedef void btc_chain_badorphan_cb(const uint8_t *hash,
+                                    btc_errno_t code,
                                     unsigned int id,
                                     void *arg);
 
@@ -140,7 +141,7 @@ btc_chain_verify_locks(btc_chain_t *chain,
                        const btc_view_t *view,
                        unsigned int flags);
 
-BTC_EXTERN int
+BTC_EXTERN btc_errno_t
 btc_chain_add(btc_chain_t *chain,
               const btc_block_t *block,
               unsigned int flags,
@@ -154,9 +155,6 @@ btc_chain_height(btc_chain_t *chain);
 
 BTC_EXTERN const btc_deployment_state_t *
 btc_chain_state(btc_chain_t *chain);
-
-BTC_EXTERN const btc_verify_error_t *
-btc_chain_error(btc_chain_t *chain);
 
 BTC_EXTERN double
 btc_chain_progress(btc_chain_t *chain);

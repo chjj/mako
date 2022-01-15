@@ -74,8 +74,8 @@ btc_pool_announce_tx(btc_pool_t *pool, const btc_mpentry_t *entry);
 
 BTC_EXTERN void
 btc_pool_handle_badorphan(btc_pool_t *pool,
-                          const char *msg,
-                          const btc_verify_error_t *err,
+                          const uint8_t *hash,
+                          btc_errno_t code,
                           unsigned int id);
 
 #ifdef __cplusplus

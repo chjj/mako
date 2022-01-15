@@ -544,7 +544,7 @@ btc_script_find_and_delete(btc_script_t *z, const btc_buffer_t *item);
 BTC_EXTERN void
 btc_script_update_v0(btc__hash256_t *ctx, const btc_script_t *x);
 
-BTC_EXTERN int
+BTC_EXTERN btc_errno_t
 btc_script_execute(const btc_script_t *script,
                    btc_stack_t *stack,
                    unsigned int flags,
@@ -554,7 +554,7 @@ btc_script_execute(const btc_script_t *script,
                    int version,
                    btc_tx_cache_t *cache);
 
-BTC_EXTERN int
+BTC_EXTERN btc_errno_t
 btc_script_verify(const btc_script_t *input,
                   const btc_stack_t *witness,
                   const btc_script_t *output,

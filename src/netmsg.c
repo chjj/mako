@@ -47,7 +47,6 @@ static const char *btc_cmds[] = {
   "notfound",
   "ping",
   "pong",
-  "reject",
   "sendcmpct",
   "sendheaders",
   "tx",
@@ -659,111 +658,6 @@ btc_hdr_read(btc_header_t *z, const uint8_t **xp, size_t *xn) {
 DEFINE_SERIALIZABLE_VECTOR(btc_headers, btc_hdr, SCOPE_EXTERN)
 
 /*
- * Reject
- */
-
-DEFINE_SERIALIZABLE_OBJECT(btc_reject, SCOPE_EXTERN)
-
-void
-btc_reject_init(btc_reject_t *msg) {
-  memset(msg->message, 0, sizeof(msg->message));
-
-  msg->code = BTC_REJECT_INVALID;
-
-  memset(msg->reason, 0, sizeof(msg->reason));
-
-  btc_hash_init(msg->hash);
-}
-
-void
-btc_reject_clear(btc_reject_t *msg) {
-  (void)msg;
-}
-
-void
-btc_reject_copy(btc_reject_t *z, const btc_reject_t *x) {
-  *z = *x;
-}
-
-size_t
-btc_reject_size(const btc_reject_t *x) {
-  size_t size = 0;
-
-  size += btc_string_size(x->message);
-  size += 1;
-  size += btc_string_size(x->reason);
-
-  if (!btc_hash_is_null(x->hash))
-    size += 32;
-
-  return size;
-}
-
-uint8_t *
-btc_reject_write(uint8_t *zp, const btc_reject_t *x) {
-  zp = btc_string_write(zp, x->message);
-  zp = btc_uint8_write(zp, x->code);
-  zp = btc_string_write(zp, x->reason);
-
-  if (!btc_hash_is_null(x->hash))
-    zp = btc_raw_write(zp, x->hash, 32);
-
-  return zp;
-}
-
-int
-btc_reject_read(btc_reject_t *z, const uint8_t **xp, size_t *xn) {
-  if (!btc_string_read(z->message, xp, xn, sizeof(z->message)))
-    return 0;
-
-  if (!btc_uint8_read(&z->code, xp, xn))
-    return 0;
-
-  if (!btc_string_read(z->reason, xp, xn, sizeof(z->reason)))
-    return 0;
-
-  if (strcmp(z->message, "block") == 0 || strcmp(z->message, "tx") == 0) {
-    if (!btc_raw_read(z->hash, 32, xp, xn))
-      return 0;
-  } else {
-    btc_hash_init(z->hash);
-  }
-
-  return 1;
-}
-
-const char *
-btc_reject_code(unsigned int code) {
-  switch (code) {
-    case BTC_REJECT_MALFORMED:
-      return "malformed";
-    case BTC_REJECT_INVALID:
-      return "invalid";
-    case BTC_REJECT_OBSOLETE:
-      return "obsolete";
-    case BTC_REJECT_DUPLICATE:
-      return "duplicate";
-    case BTC_REJECT_NONSTANDARD:
-      return "nonstandard";
-    case BTC_REJECT_DUST:
-      return "dust";
-    case BTC_REJECT_INSUFFICIENTFEE:
-      return "insufficientfee";
-    case BTC_REJECT_CHECKPOINT:
-      return "checkpoint";
-    case BTC_REJECT_INTERNAL:
-      return "internal";
-    case BTC_REJECT_HIGHFEE:
-      return "highfee";
-    case BTC_REJECT_ALREADYKNOWN:
-      return "alreadyknown";
-    case BTC_REJECT_CONFLICT:
-      return "conflict";
-  }
-  return "invalid";
-}
-
-/*
  * FilterAdd
  */
 
@@ -999,9 +893,6 @@ btc_msg_clear(btc_msg_t *msg) {
     case BTC_MSG_TX_BASE:
       btc_tx_destroy((btc_tx_t *)msg->body);
       break;
-    case BTC_MSG_REJECT:
-      btc_reject_destroy((btc_reject_t *)msg->body);
-      break;
     case BTC_MSG_MEMPOOL:
       break;
     case BTC_MSG_FILTERLOAD:
@@ -1114,9 +1005,6 @@ btc_msg_alloc(btc_msg_t *msg) {
     case BTC_MSG_TX_BASE:
       msg->body = btc_tx_create();
       break;
-    case BTC_MSG_REJECT:
-      msg->body = btc_reject_create();
-      break;
     case BTC_MSG_MEMPOOL:
       msg->body = NULL;
       break;
@@ -1196,8 +1084,6 @@ btc_msg_size(const btc_msg_t *x) {
       return btc_tx_size((const btc_tx_t *)x->body);
     case BTC_MSG_TX_BASE:
       return btc_tx_base_size((const btc_tx_t *)x->body);
-    case BTC_MSG_REJECT:
-      return btc_reject_size((const btc_reject_t *)x->body);
     case BTC_MSG_MEMPOOL:
       return 0;
     case BTC_MSG_FILTERLOAD:
@@ -1267,8 +1153,6 @@ btc_msg_write(uint8_t *zp, const btc_msg_t *x) {
       return btc_tx_write(zp, (const btc_tx_t *)x->body);
     case BTC_MSG_TX_BASE:
       return btc_tx_base_write(zp, (const btc_tx_t *)x->body);
-    case BTC_MSG_REJECT:
-      return btc_reject_write(zp, (const btc_reject_t *)x->body);
     case BTC_MSG_MEMPOOL:
       return zp;
     case BTC_MSG_FILTERLOAD:
@@ -1336,8 +1220,6 @@ btc_msg_read(btc_msg_t *z, const uint8_t **xp, size_t *xn) {
     case BTC_MSG_TX:
     case BTC_MSG_TX_BASE:
       return btc_tx_read((btc_tx_t *)z->body, xp, xn);
-    case BTC_MSG_REJECT:
-      return btc_reject_read((btc_reject_t *)z->body, xp, xn);
     case BTC_MSG_MEMPOOL:
       return 1;
     case BTC_MSG_FILTERLOAD:

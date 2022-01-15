@@ -42,7 +42,6 @@ enum btc_msgtype {
   BTC_MSG_NOTFOUND,
   BTC_MSG_PING,
   BTC_MSG_PONG,
-  BTC_MSG_REJECT,
   BTC_MSG_SENDCMPCT,
   BTC_MSG_SENDHEADERS,
   BTC_MSG_TX,
@@ -70,22 +69,6 @@ enum btc_invtype {
   BTC_INV_WITNESS_BLOCK = 2 | (1 << 30),
   BTC_INV_WITNESS_FILTERED_BLOCK = 3 | (1 << 30),
   BTC_INV_WITNESS_FLAG = 1 << 30
-};
-
-enum btc_reject_code {
-  BTC_REJECT_MALFORMED = 0x01,
-  BTC_REJECT_INVALID = 0x10,
-  BTC_REJECT_OBSOLETE = 0x11,
-  BTC_REJECT_DUPLICATE = 0x12,
-  BTC_REJECT_NONSTANDARD = 0x40,
-  BTC_REJECT_DUST = 0x41,
-  BTC_REJECT_INSUFFICIENTFEE = 0x42,
-  BTC_REJECT_CHECKPOINT = 0x43,
-  /* Internal codes (NOT FOR USE ON NETWORK) */
-  BTC_REJECT_INTERNAL = 0x100,
-  BTC_REJECT_HIGHFEE = 0x101,
-  BTC_REJECT_ALREADYKNOWN = 0x102,
-  BTC_REJECT_CONFLICT = 0x103
 };
 
 /*
@@ -150,13 +133,6 @@ typedef struct btc_headers_s {
   size_t alloc;
   size_t length;
 } btc_headers_t;
-
-typedef struct btc_reject_s {
-  char message[12 + 1];
-  uint8_t code;
-  char reason[111 + 1];
-  uint8_t hash[32];
-} btc_reject_t;
 
 typedef struct btc_filteradd_s {
   const uint8_t *data;
@@ -407,33 +383,6 @@ BTC_DEFINE_SERIALIZABLE_VECTOR(btc_headers, btc_header, BTC_EXTERN)
  */
 
 /* already implemented */
-
-/*
- * Reject
- */
-
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_reject, BTC_EXTERN)
-
-BTC_EXTERN void
-btc_reject_init(btc_reject_t *msg);
-
-BTC_EXTERN void
-btc_reject_clear(btc_reject_t *msg);
-
-BTC_EXTERN void
-btc_reject_copy(btc_reject_t *z, const btc_reject_t *x);
-
-BTC_EXTERN size_t
-btc_reject_size(const btc_reject_t *x);
-
-BTC_EXTERN uint8_t *
-btc_reject_write(uint8_t *zp, const btc_reject_t *x);
-
-BTC_EXTERN int
-btc_reject_read(btc_reject_t *z, const uint8_t **xp, size_t *xn);
-
-BTC_EXTERN const char *
-btc_reject_code(unsigned int code);
 
 /*
  * Mempool

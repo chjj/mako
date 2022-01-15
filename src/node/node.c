@@ -61,13 +61,19 @@ static void
 on_block(const btc_block_t *block, const btc_entry_t *entry, void *arg);
 
 static void
-on_bad_block_orphan(const btc_verify_error_t *err, unsigned int id, void *arg);
+on_bad_block_orphan(const uint8_t *hash,
+                    btc_errno_t code,
+                    unsigned int id,
+                    void *arg);
 
 static void
 on_tx(const btc_mpentry_t *entry, const btc_view_t *view, void *arg);
 
 static void
-on_bad_tx_orphan(const btc_verify_error_t *err, unsigned int id, void *arg);
+on_bad_tx_orphan(const uint8_t *hash,
+                 btc_errno_t code,
+                 unsigned int id,
+                 void *arg);
 
 /*
  * Node
@@ -246,10 +252,13 @@ on_block(const btc_block_t *block, const btc_entry_t *entry, void *arg) {
 }
 
 static void
-on_bad_block_orphan(const btc_verify_error_t *err, unsigned int id, void *arg) {
+on_bad_block_orphan(const uint8_t *hash,
+                    btc_errno_t code,
+                    unsigned int id,
+                    void *arg) {
   btc_node_t *node = (btc_node_t *)arg;
 
-  btc_pool_handle_badorphan(node->pool, "block", err, id);
+  btc_pool_handle_badorphan(node->pool, hash, code, id);
 }
 
 static void
@@ -262,8 +271,11 @@ on_tx(const btc_mpentry_t *entry, const btc_view_t *view, void *arg) {
 }
 
 static void
-on_bad_tx_orphan(const btc_verify_error_t *err, unsigned int id, void *arg) {
+on_bad_tx_orphan(const uint8_t *hash,
+                 btc_errno_t code,
+                 unsigned int id,
+                 void *arg) {
   btc_node_t *node = (btc_node_t *)arg;
 
-  btc_pool_handle_badorphan(node->pool, "tx", err, id);
+  btc_pool_handle_badorphan(node->pool, hash, code, id);
 }

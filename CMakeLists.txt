@@ -76,6 +76,7 @@ list(APPEND mako_sources src/crypto/chacha20.c
                          src/config.c
                          src/consensus.c
                          src/entry.c
+                         src/error.c
                          src/header.c
                          src/heap.c
                          src/input.c

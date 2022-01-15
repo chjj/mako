@@ -55,7 +55,7 @@ test_tx_valid_vector(const test_valid_vector_t *vec, size_t index) {
   }
 
   if (strstr(vec->comments, "Coinbase") == vec->comments)
-    ASSERT(btc_tx_check_sanity(NULL, &tx));
+    ASSERT(btc_tx_check_sanity(&tx) == 0);
   else
     ASSERT(btc_tx_verify(&tx, view, vec->flags));
 
@@ -102,12 +102,12 @@ test_tx_invalid_vector(const test_invalid_vector_t *vec, size_t index) {
 
   if (strcmp(vec->comments, "Duplicate inputs") == 0) {
     ASSERT(btc_tx_verify(&tx, view, vec->flags));
-    ASSERT(!btc_tx_check_sanity(NULL, &tx));
+    ASSERT(btc_tx_check_sanity(&tx) != 0);
   } else if (strcmp(vec->comments, "Negative output") == 0) {
     ASSERT(btc_tx_verify(&tx, view, vec->flags));
-    ASSERT(!btc_tx_check_sanity(NULL, &tx));
+    ASSERT(btc_tx_check_sanity(&tx) != 0);
   } else if (strstr(vec->comments, "Coinbase") == vec->comments) {
-    ASSERT(!btc_tx_check_sanity(NULL, &tx));
+    ASSERT(btc_tx_check_sanity(&tx) != 0);
   } else {
     ASSERT(!btc_tx_verify(&tx, view, vec->flags));
   }

@@ -1535,7 +1535,7 @@ is_compressed_encoding(const btc_buffer_t *key) {
   return key->data[0] == 0x02 || key->data[0] == 0x03;
 }
 
-static int
+static btc_errno_t
 validate_signature(const btc_buffer_t *sig, unsigned int flags) {
   /* Allow empty sigs. */
   if (sig->length == 0)
@@ -1561,7 +1561,7 @@ validate_signature(const btc_buffer_t *sig, unsigned int flags) {
   return BTC_SCRIPT_ERR_OK;
 }
 
-static int
+static btc_errno_t
 validate_key(const btc_buffer_t *key, unsigned int flags, int version) {
   if (flags & BTC_SCRIPT_VERIFY_STRICTENC) {
     if (!is_key_encoding(key))
@@ -1596,7 +1596,7 @@ checksig(const uint8_t *msg, const btc_buffer_t *sig, const btc_buffer_t *key) {
 
 #define THROW(x) do { err = (x); goto done; } while (0)
 
-int
+btc_errno_t
 btc_script_execute(const btc_script_t *script,
                    btc_stack_t *stack,
                    unsigned int flags,
@@ -2504,7 +2504,7 @@ done:
   return err;
 }
 
-static int
+static btc_errno_t
 btc_script_verify_program(const btc_stack_t *witness,
                           const btc_script_t *output,
                           unsigned int flags,
@@ -2575,7 +2575,7 @@ done:
   return err;
 }
 
-int
+btc_errno_t
 btc_script_verify(const btc_script_t *input,
                   const btc_stack_t *witness,
                   const btc_script_t *output,

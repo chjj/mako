@@ -22,10 +22,10 @@
 #include <mako/crypto/hash.h>
 #include <mako/crypto/rand.h>
 #include <mako/entry.h>
+#include <mako/error.h>
 #include <mako/header.h>
 #include <mako/heap.h>
 #include <mako/map.h>
-#include <mako/netmsg.h>
 #include <mako/network.h>
 #include <mako/policy.h>
 #include <mako/script.h>
@@ -223,7 +223,6 @@ struct btc_mempool_s {
   btc_hashmap_t *orphans;
   btc_outmap_t *spents;
   btc_filter_t rejects;
-  btc_verify_error_t error;
   unsigned int flags;
   char file[BTC_PATH_MAX];
   btc_mempool_tx_cb *on_tx;
@@ -331,38 +330,6 @@ btc_mempool_close(btc_mempool_t *mp) {
   btc_log_info(mp, "Closing mempool.");
 }
 
-static int
-btc_mempool_fail(btc_mempool_t *mp,
-                 const btc_tx_t *tx,
-                 unsigned int code,
-                 const char *reason,
-                 int score,
-                 int malleated) {
-  btc_hash_copy(mp->error.hash, tx->hash);
-
-  mp->error.code = code;
-  mp->error.reason = reason;
-  mp->error.score = score;
-  mp->error.malleated = malleated;
-
-  return 0;
-}
-
-static int
-btc_mempool_throw(btc_mempool_t *mp,
-                  const btc_tx_t *tx,
-                  unsigned int code,
-                  const char *reason,
-                  int score,
-                  int malleated) {
-  const char *str = btc_reject_code(code);
-
-  btc_log_warn(mp, "Verification error: %s (code=%s score=%d hash=%H)",
-                   reason, str, score, tx->hash);
-
-  return btc_mempool_fail(mp, tx, code, reason, score, malleated);
-}
-
 /*
  * Orphan Handling
  */
@@ -445,7 +412,7 @@ btc_tx_has_coins(const btc_tx_t *tx, const btc_view_t *view) {
   return 1;
 }
 
-static int
+static btc_errno_t
 btc_mempool_check_orphan(btc_mempool_t *mp,
                          const btc_tx_t *tx,
                          const btc_view_t *view) {
@@ -461,35 +428,23 @@ btc_mempool_check_orphan(btc_mempool_t *mp,
     if (btc_mempool_has_reject(mp, prevout->hash)) {
       btc_log_debug(mp, "Not storing orphan %H (rejected parents).",
                         tx->hash);
-      return btc_mempool_fail(mp, tx,
-                              BTC_REJECT_DUPLICATE,
-                              "duplicate",
-                              0,
-                              0);
+      return BTC_ERR_DUPLICATE; /* Need better error here (with 0, 0). */
     }
 
     if (btc_mempool_has(mp, prevout->hash)) {
       btc_log_debug(mp, "Not storing orphan %H (non-existent output).",
                         tx->hash);
-      return btc_mempool_throw(mp, tx,
-                               BTC_REJECT_INVALID,
-                               "bad-txns-inputs-missingorspent",
-                               100,
-                               0);
+      return BTC_ERR_INPUTS_MISSING;
     }
   }
 
   /* Weight limit for orphans. */
   if (btc_tx_weight(tx) > BTC_MAX_TX_WEIGHT) {
     btc_log_debug(mp, "Ignoring large orphan %H.", tx->hash);
-    return btc_mempool_throw(mp, tx,
-                             BTC_REJECT_INVALID,
-                             "tx-size",
-                             0,
-                             1);
+    return BTC_ERR_TX_WEIGHT;
   }
 
-  return 1;
+  return BTC_OK;
 }
 
 static void
@@ -575,6 +530,7 @@ btc_mempool_handle_orphans(btc_mempool_t *mp, const uint8_t *parent) {
   btc_vector_t *resolved = btc_mempool_resolve_orphans(mp, parent);
   uint8_t hash[32];
   size_t i;
+  int rc;
 
   if (resolved == NULL)
     return;
@@ -582,12 +538,12 @@ btc_mempool_handle_orphans(btc_mempool_t *mp, const uint8_t *parent) {
   for (i = 0; i < resolved->length; i++) {
     btc_orphan_t *orphan = resolved->items[i];
 
-    if (!btc_mempool_add(mp, orphan->tx, orphan->id)) {
+    if ((rc = btc_mempool_add(mp, orphan->tx, orphan->id))) {
       btc_log_debug(mp, "Could not resolve orphan %H: %s.",
-                        orphan->hash, mp->error.reason);
+                        orphan->hash, btc_error_reason(rc));
 
       if (mp->on_badorphan != NULL)
-        mp->on_badorphan(&mp->error, orphan->id, mp->arg);
+        mp->on_badorphan(orphan->hash, rc, orphan->id, mp->arg);
 
       btc_orphan_destroy(orphan);
 
@@ -956,36 +912,26 @@ btc_mempool_limit_size(btc_mempool_t *mp, const uint8_t *added) {
  * TX Handling
  */
 
-static int
-btc_mempool_verify_inputs(btc_mempool_t *mp,
-                          const btc_mpentry_t *entry,
-                          const btc_view_t *view,
-                          unsigned int flags) {
+static btc_errno_t
+btc_mpentry_verify(const btc_mpentry_t *entry,
+                   const btc_view_t *view,
+                   unsigned int flags) {
   const btc_tx_t *tx = entry->tx;
 
   if (btc_tx_verify(tx, view, flags))
-    return 1;
+    return BTC_OK;
 
   if (flags & BTC_SCRIPT_ONLY_STANDARD_VERIFY_FLAGS) {
     flags &= ~BTC_SCRIPT_ONLY_STANDARD_VERIFY_FLAGS;
 
-    if (btc_tx_verify(tx, view, flags)) {
-      return btc_mempool_throw(mp, tx,
-                               BTC_REJECT_INVALID,
-                               "non-mandatory-script-verify-flag",
-                               0,
-                               0);
-    }
+    if (btc_tx_verify(tx, view, flags))
+      return BTC_ERR_SCRIPT_POLICY;
   }
 
-  return btc_mempool_throw(mp, tx,
-                           BTC_REJECT_INVALID,
-                           "mandatory-script-verify-flag-failed",
-                           100,
-                           0);
+  return BTC_ERR_SCRIPT_CONSENSUS;
 }
 
-static int
+static btc_errno_t
 btc_mempool_verify(btc_mempool_t *mp,
                    const btc_mpentry_t *entry,
                    const btc_view_t *view) {
@@ -995,81 +941,47 @@ btc_mempool_verify(btc_mempool_t *mp,
   const btc_tx_t *tx = entry->tx;
   unsigned int flags;
   int64_t minfee;
+  int rc;
 
   /* Verify sequence locks. */
-  if (!btc_chain_verify_locks(mp->chain, tip, tx, view, lock_flags)) {
-    return btc_mempool_throw(mp, tx,
-                             BTC_REJECT_NONSTANDARD,
-                             "non-BIP68-final",
-                             0,
-                             0);
-  }
+  if (!btc_chain_verify_locks(mp->chain, tip, tx, view, lock_flags))
+    return BTC_ERR_FINALITY;
 
   /* Check input and witness standardness. */
   if (mp->network->require_standard) {
-    if (!btc_tx_has_standard_inputs(tx, view)) {
-      return btc_mempool_throw(mp, tx,
-                               BTC_REJECT_NONSTANDARD,
-                               "bad-txns-nonstandard-inputs",
-                               0,
-                               0);
-    }
+    if (!btc_tx_has_standard_inputs(tx, view))
+      return BTC_ERR_INPUTS_NONSTANDARD;
 
     if (state->flags & BTC_SCRIPT_VERIFY_WITNESS) {
-      if (!btc_tx_has_standard_witness(tx, view)) {
-        return btc_mempool_throw(mp, tx,
-                                 BTC_REJECT_NONSTANDARD,
-                                 "bad-witness-nonstandard",
-                                 0,
-                                 1);
-      }
+      if (!btc_tx_has_standard_witness(tx, view))
+        return BTC_ERR_WITNESS_NONSTANDARD;
     }
   }
 
   /* Annoying process known as sigops counting. */
-  if (entry->sigops > BTC_MAX_TX_SIGOPS_COST) {
-    return btc_mempool_throw(mp, tx,
-                             BTC_REJECT_NONSTANDARD,
-                             "bad-txns-too-many-sigops",
-                             0,
-                             0);
-  }
+  if (entry->sigops > BTC_MAX_TX_SIGOPS_COST)
+    return BTC_ERR_TX_SIGOPS;
 
   /* Make sure this guy gave a decent fee. */
   minfee = btc_get_fee(mp->network->min_relay, entry->size);
 
-  if (entry->fee < minfee) {
-    return btc_mempool_throw(mp, tx,
-                             BTC_REJECT_INSUFFICIENTFEE,
-                             "insufficient fee",
-                             0,
-                             0);
-  }
+  if (entry->fee < minfee)
+    return BTC_ERR_FEE_LOW;
 
   /* Important safety feature. */
-  if (entry->fee > minfee * 10000) {
-    return btc_mempool_throw(mp, tx,
-                             BTC_REJECT_HIGHFEE,
-                             "absurdly-high-fee",
-                             0,
-                             0);
-  }
+  if (entry->fee > minfee * 10000)
+    return BTC_ERR_FEE_HIGH;
 
   /* Check ancestor depth. */
-  if (btc_mempool_count_ancestors(mp, entry) + 1 > BTC_MEMPOOL_MAX_ANCESTORS) {
-    return btc_mempool_throw(mp, tx,
-                             BTC_REJECT_NONSTANDARD,
-                             "too-long-mempool-chain",
-                             0,
-                             0);
-  }
+  if (btc_mempool_count_ancestors(mp, entry) + 1 > BTC_MEMPOOL_MAX_ANCESTORS)
+    return BTC_ERR_MEMPOOL_CHAIN;
 
   /* Script verification. */
   flags = BTC_SCRIPT_STANDARD_VERIFY_FLAGS;
 
-  if (!btc_mempool_verify_inputs(mp, entry, view, flags)) {
+  if ((rc = btc_mpentry_verify(entry, view, flags))) {
     if (btc_tx_has_witness(tx))
-      return 0;
+      return rc;
 
     /* Try without segwit and cleanstack. */
     flags &= ~BTC_SCRIPT_VERIFY_WITNESS;
@@ -1078,7 +990,7 @@ btc_mempool_verify(btc_mempool_t *mp,
     /* If it failed, the first verification
        was the only result we needed. */
     if (!btc_tx_verify(tx, view, flags))
-      return 0;
+      return rc;
 
     /* If it succeeded, segwit may be causing the
        failure. Try with segwit but without cleanstack. */
@@ -1086,131 +998,80 @@ btc_mempool_verify(btc_mempool_t *mp,
 
     /* Cleanstack was causing the failure. */
     if (btc_tx_verify(tx, view, flags))
-      return 0;
+      return rc;
 
     /* Do not insert into reject cache. */
-    mp->error.malleated = 1;
-
-    return 0;
+    return -rc;
   }
 
   /* Paranoid checks. */
   if (mp->flags & BTC_MEMPOOL_PARANOID)
     CHECK(btc_tx_verify(tx, view, BTC_SCRIPT_MANDATORY_VERIFY_FLAGS));
 
-  return 1;
+  return BTC_OK;
 }
 
-static int
+static btc_errno_t
 btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   const btc_deployment_state_t *state = btc_chain_state(mp->chain);
   unsigned int lock_flags = BTC_STANDARD_LOCKTIME_FLAGS;
   const btc_entry_t *tip = btc_chain_tip(mp->chain);
   int32_t height = tip->height;
-  btc_verify_error_t err;
   btc_mpentry_t *entry;
   btc_view_t *view;
   int64_t fee;
+  int rc;
 
   /* Basic sanity checks. */
-  if (!btc_tx_check_sanity(&err, tx)) {
-    return btc_mempool_throw(mp, tx,
-                             BTC_REJECT_INVALID,
-                             err.reason,
-                             err.score,
-                             0);
-  }
+  if ((rc = btc_tx_check_sanity(tx)))
+    return rc;
 
   /* Coinbases are an insta-ban. */
-  if (btc_tx_is_coinbase(tx)) {
-    return btc_mempool_throw(mp, tx,
-                             BTC_REJECT_INVALID,
-                             "coinbase",
-                             100,
-                             0);
-  }
+  if (btc_tx_is_coinbase(tx))
+    return BTC_ERR_COINBASE;
 
   /* Do not allow CSV until it's activated. */
   if (mp->network->require_standard) {
     if (!(state->flags & BTC_SCRIPT_VERIFY_CHECKSEQUENCEVERIFY)) {
-      if (tx->version >= 2) {
-        return btc_mempool_throw(mp, tx,
-                                 BTC_REJECT_NONSTANDARD,
-                                 "premature-version2-tx",
-                                 0,
-                                 0);
-      }
+      if (tx->version >= 2)
+        return BTC_ERR_PREMATURE_CSV;
     }
   }
 
   /* Do not allow segwit until it's activated. */
   if (!(state->flags & BTC_SCRIPT_VERIFY_WITNESS)) {
-    if (btc_tx_has_witness(tx)) {
-      return btc_mempool_throw(mp, tx,
-                               BTC_REJECT_NONSTANDARD,
-                               "no-witness-yet",
-                               0,
-                               1);
-    }
+    if (btc_tx_has_witness(tx))
+      return BTC_ERR_PREMATURE_WITNESS;
   }
 
   /* Non-contextual standardness checks. */
   if (mp->network->require_standard) {
-    if (!btc_tx_check_standard(&err, tx)) {
-      return btc_mempool_throw(mp, tx,
-                               BTC_REJECT_INVALID,
-                               err.reason,
-                               err.score,
-                               err.malleated);
-    }
+    if ((rc = btc_tx_check_standard(tx)))
+      return rc;
   }
 
   /* Verify transaction finality. */
-  if (!btc_chain_verify_final(mp->chain, tip, tx, lock_flags)) {
-    return btc_mempool_throw(mp, tx,
-                             BTC_REJECT_NONSTANDARD,
-                             "non-final",
-                             0,
-                             0);
-  }
+  if (!btc_chain_verify_final(mp->chain, tip, tx, lock_flags))
+    return BTC_ERR_FINALITY;
 
   /* We can maybe ignore this. */
-  if (btc_mempool_exists(mp, tx->hash)) {
-    return btc_mempool_throw(mp, tx,
-                             BTC_REJECT_ALREADYKNOWN,
-                             "txn-already-in-mempool",
-                             0,
-                             0);
-  }
+  if (btc_mempool_exists(mp, tx->hash))
+    return BTC_ERR_TX_IN_MEMPOOL;
 
   /* We can test whether this is an
      non-fully-spent transaction on
      the chain. */
-  if (btc_chain_has_coins(mp->chain, tx)) {
-    return btc_mempool_throw(mp, tx,
-                             BTC_REJECT_ALREADYKNOWN,
-                             "txn-already-known",
-                             0,
-                             0);
-  }
+  if (btc_chain_has_coins(mp->chain, tx))
+    return BTC_ERR_TX_KNOWN;
 
   /* Quick and dirty test to verify we're
      not double-spending an output in the
      mempool. */
   if (btc_mempool_is_double_spend(mp, tx)) {
-    if (btc_tx_is_rbf(tx)) {
-      return btc_mempool_fail(mp, tx,
-                              BTC_REJECT_DUPLICATE,
-                              "replace-by-fee",
-                              0,
-                              0);
-    }
+    if (btc_tx_is_rbf(tx))
+      return BTC_ERR_REPLACEMENT;
 
-    return btc_mempool_throw(mp, tx,
-                             BTC_REJECT_DUPLICATE,
-                             "bad-txns-inputs-spent",
-                             0,
-                             0);
+    return BTC_ERR_INPUTS_SPENT;
   }
 
   /* Get coin viewpoint as it pertains to the mempool. */
@@ -1219,27 +1080,21 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   /* Maybe store as an orphan. */
   if (!btc_tx_has_coins(tx, view)) {
     /* Preliminary orphan checks. */
-    if (!btc_mempool_check_orphan(mp, tx, view)) {
+    if ((rc = btc_mempool_check_orphan(mp, tx, view))) {
       btc_view_destroy(view);
-      return 0;
+      return rc;
     }
 
     btc_mempool_add_orphan(mp, tx, view, id);
     btc_view_destroy(view);
 
-    return 1;
+    return BTC_OK;
   }
 
   /* Contextual sanity checks. */
-  fee = btc_tx_check_inputs(&err, tx, view, height + 1);
-
-  if (fee == -1) {
+  if ((rc = btc_tx_check_inputs(tx, view, height + 1, &fee))) {
     btc_view_destroy(view);
-    return btc_mempool_throw(mp, tx,
-                             BTC_REJECT_INVALID,
-                             err.reason,
-                             err.score,
-                             0);
+    return rc;
   }
 
   /* Create a new mempool entry at current chain height. */
@@ -1248,10 +1103,10 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   btc_mpentry_set(entry, tx, view, height, fee);
 
   /* Contextual verification. */
-  if (!btc_mempool_verify(mp, entry, view)) {
+  if ((rc = btc_mempool_verify(mp, entry, view))) {
     btc_view_destroy(view);
     btc_mpentry_destroy(entry);
-    return 0;
+    return rc;
   }
 
   /* Add and index the entry. */
@@ -1259,34 +1114,40 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   btc_view_destroy(view);
 
   /* Trim size if we're too big. */
-  if (btc_mempool_limit_size(mp, tx->hash)) {
-    return btc_mempool_throw(mp, tx,
-                             BTC_REJECT_INSUFFICIENTFEE,
-                             "mempool full",
-                             0,
-                             0);
-  }
+  if (btc_mempool_limit_size(mp, tx->hash))
+    return BTC_ERR_MEMPOOL_FULL;
 
-  return 1;
+  return BTC_OK;
 }
 
-int
+btc_errno_t
 btc_mempool_add(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
-  if (!btc_mempool_insert(mp, tx, id)) {
-    const btc_verify_error_t *err = &mp->error;
+  int rc = btc_mempool_insert(mp, tx, id);
 
-    if (strstr(err->reason, "script-verify-flag") != NULL) {
-      if (!btc_tx_has_witness(tx) && !err->malleated)
+  if (rc != 0) {
+    int mutated = btc_error_malleable(rc);
+
+    if (rc < 0) {
+      mutated = 1;
+      rc = -rc;
+    }
+
+    if (rc == BTC_ERR_SCRIPT_CONSENSUS || rc == BTC_ERR_SCRIPT_POLICY) {
+      if (!btc_tx_has_witness(tx) && !mutated)
         btc_filter_add(&mp->rejects, tx->hash, 32);
     } else {
-      if (!err->malleated)
+      if (!mutated)
         btc_filter_add(&mp->rejects, tx->hash, 32);
     }
 
-    return 0;
+    btc_log_warn(mp, "Verification error: %s (score=%d hash=%H)",
+                     btc_error_reason(rc), btc_error_score(rc),
+                     tx->hash);
+
+    return rc;
   }
 
-  return 1;
+  return BTC_OK;
 }
 
 /*
@@ -1349,7 +1210,7 @@ btc_mempool_remove_block(btc_mempool_t *mp,
     if (btc_hashmap_has(mp->map, tx->hash))
       continue;
 
-    total += btc_mempool_insert(mp, tx, -1);
+    total += (btc_mempool_insert(mp, tx, -1) == 0);
   }
 
   btc_filter_reset(&mp->rejects);
@@ -1422,11 +1283,6 @@ btc_mempool_handle_reorg(btc_mempool_t *mp) {
 /*
  * API
  */
-
-const btc_verify_error_t *
-btc_mempool_error(btc_mempool_t *mp) {
-  return &mp->error;
-}
 
 size_t
 btc_mempool_size(btc_mempool_t *mp) {

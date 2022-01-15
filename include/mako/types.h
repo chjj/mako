@@ -36,6 +36,8 @@ typedef struct name##iter_s {                    \
  * Types
  */
 
+typedef int btc_errno_t;
+
 typedef struct btc_buffer_s {
   uint8_t *data;
   size_t alloc;
@@ -191,14 +193,6 @@ typedef struct btc_tx_cache_s {
   int has_sequences;
   int has_outputs;
 } btc_tx_cache_t;
-
-typedef struct btc_verify_error_s {
-  uint8_t hash[32];
-  unsigned int code;
-  const char *reason;
-  int score;
-  int malleated;
-} btc_verify_error_t;
 
 typedef struct btc_network_s btc_network_t;
 typedef struct btc_view_s btc_view_t;

@@ -13,8 +13,8 @@
 #include <mako/consensus.h>
 #include <mako/crypto/ecc.h>
 #include <mako/crypto/hash.h>
+#include <mako/error.h>
 #include <mako/map.h>
-#include <mako/netmsg.h>
 #include <mako/policy.h>
 #include <mako/script.h>
 #include <mako/tx.h>
@@ -650,84 +650,62 @@ btc_tx_has_duplicate_inputs(const btc_tx_t *tx) {
   return 0;
 }
 
-static int
-btc_tx_throw(btc_verify_error_t *err,
-             const char *reason,
-             int score,
-             int malleated,
-             int result) {
-  if (err != NULL) {
-    btc_hash_init(err->hash);
-
-    err->code = BTC_REJECT_INVALID;
-    err->reason = reason;
-    err->score = score;
-    err->malleated = malleated;
-  }
-
-  return result;
-}
-
-#define THROW(reason, score, malleated, result) do {          \
-  return btc_tx_throw(err, reason, score, malleated, result); \
-} while (0)
-
-int
-btc_tx_check_sanity(btc_verify_error_t *err, const btc_tx_t *tx) {
+btc_errno_t
+btc_tx_check_sanity(const btc_tx_t *tx) {
   const btc_input_t *input;
   const btc_output_t *output;
   int64_t outval = 0;
   size_t i, size;
 
   if (tx->inputs.length == 0)
-    THROW("bad-txns-vin-empty", 100, 0, 0);
+    return BTC_ERR_INPUTS_EMPTY;
 
   if (tx->outputs.length == 0)
-    THROW("bad-txns-vout-empty", 100, 0, 0);
+    return BTC_ERR_OUTPUTS_EMPTY;
 
   if (btc_tx_base_size(tx) > BTC_MAX_BLOCK_SIZE)
-    THROW("bad-txns-oversize", 100, 0, 0);
+    return BTC_ERR_TX_SIZE;
 
   for (i = 0; i < tx->outputs.length; i++) {
     output = tx->outputs.items[i];
 
     if (output->value < 0)
-      THROW("bad-txns-vout-negative", 100, 0, 0);
+      return BTC_ERR_OUTPUT_RANGE;
 
     if (output->value > BTC_MAX_MONEY)
-      THROW("bad-txns-vout-toolarge", 100, 0, 0);
+      return BTC_ERR_OUTPUT_RANGE;
 
     outval += output->value;
 
     if (outval < 0 || outval > BTC_MAX_MONEY)
-      THROW("bad-txns-txouttotal-toolarge", 100, 0, 0);
+      return BTC_ERR_OUTPUT_RANGE;
   }
 
   if (btc_tx_has_duplicate_inputs(tx))
-    THROW("bad-txns-inputs-duplicate", 100, 0, 0);
+    return BTC_ERR_INPUTS_DUPLICATE;
 
   if (btc_tx_is_coinbase(tx)) {
     size = tx->inputs.items[0]->script.length;
 
     if (size < 2 || size > 100)
-      THROW("bad-cb-length", 100, 0, 0);
+      return BTC_ERR_CB_SIZE;
   } else {
     for (i = 0; i < tx->inputs.length; i++) {
       input = tx->inputs.items[i];
 
       if (btc_outpoint_is_null(&input->prevout))
-        THROW("bad-txns-prevout-null", 10, 0, 0);
+        return BTC_ERR_PREVOUT_NULL;
     }
   }
 
-  return 1;
+  return BTC_OK;
 }
 
-int64_t
-btc_tx_check_inputs(btc_verify_error_t *err,
-                    const btc_tx_t *tx,
+btc_errno_t
+btc_tx_check_inputs(const btc_tx_t *tx,
                     const btc_view_t *view,
-                    int32_t height) {
+                    int32_t height,
+                    int64_t *result) {
   const btc_input_t *input;
   const btc_coin_t *coin;
   int64_t outval, fee;
@@ -739,71 +717,74 @@ btc_tx_check_inputs(btc_verify_error_t *err,
     coin = btc_view_get(view, &input->prevout);
 
     if (coin == NULL)
-      THROW("bad-txns-inputs-missingorspent", 0, 0, -1);
+      return BTC_ERR_INPUTS_SPENT;
 
     if (coin->coinbase) {
       if (height - coin->height < BTC_COINBASE_MATURITY)
-        THROW("bad-txns-premature-spend-of-coinbase", 0, 0, -1);
+        return BTC_ERR_PREMATURE_SPEND;
     }
 
     if (coin->output.value < 0 || coin->output.value > BTC_MAX_MONEY)
-      THROW("bad-txns-inputvalues-outofrange", 100, 0, -1);
+      return BTC_ERR_INPUT_RANGE;
 
     inpval += coin->output.value;
 
     if (inpval < 0 || inpval > BTC_MAX_MONEY)
-      THROW("bad-txns-inputvalues-outofrange", 100, 0, -1);
+      return BTC_ERR_INPUT_RANGE;
   }
 
   /* Overflows already checked in `btc_tx_check_sanity`. */
   outval = btc_tx_output_value(tx);
 
   if (inpval < outval)
-    THROW("bad-txns-in-belowout", 100, 0, -1);
+    return BTC_ERR_FEE_RANGE;
 
   fee = inpval - outval;
 
   if (fee < 0)
-    THROW("bad-txns-fee-negative", 100, 0, -1);
+    return BTC_ERR_FEE_RANGE;
 
   if (fee > BTC_MAX_MONEY)
-    THROW("bad-txns-fee-outofrange", 100, 0, -1);
+    return BTC_ERR_FEE_RANGE;
 
-  return fee;
+  if (result != NULL)
+    *result = fee;
+
+  return BTC_OK;
 }
 
-int
-btc_tx_check_standard(btc_verify_error_t *err, const btc_tx_t *tx) {
+btc_errno_t
+btc_tx_check_standard(const btc_tx_t *tx) {
   const btc_input_t *input;
   const btc_output_t *output;
   int nulldata = 0;
   size_t i;
 
   if (tx->version < 1 || tx->version > BTC_MAX_TX_VERSION)
-    THROW("version", 0, 0, 0);
+    return BTC_ERR_TX_VERSION;
 
   if (btc_tx_weight(tx) > BTC_MAX_TX_WEIGHT) {
     if (btc_tx_base_size(tx) * BTC_WITNESS_SCALE_FACTOR > BTC_MAX_TX_WEIGHT)
-      THROW("tx-size", 0, 0, 0);
+      return BTC_ERR_TX_BASE;
 
-    THROW("tx-size", 0, 1, 0);
+    return BTC_ERR_TX_WEIGHT;
   }
 
   for (i = 0; i < tx->inputs.length; i++) {
     input = tx->inputs.items[i];
 
     if (input->script.length > 1650)
-      THROW("scriptsig-size", 0, 0, 0);
+      return BTC_ERR_SCRIPTSIG_SIZE;
 
     if (!btc_script_is_push_only(&input->script))
-      THROW("scriptsig-not-pushonly", 0, 0, 0);
+      return BTC_ERR_SCRIPTSIG_PUSH;
   }
 
   for (i = 0; i < tx->outputs.length; i++) {
     output = tx->outputs.items[i];
 
     if (!btc_script_is_standard(&output->script))
-      THROW("scriptpubkey", 0, 0, 0);
+      return BTC_ERR_SCRIPTPUBKEY;
 
     if (btc_script_is_nulldata(&output->script)) {
       nulldata++;
@@ -812,20 +793,18 @@ btc_tx_check_standard(btc_verify_error_t *err, const btc_tx_t *tx) {
 
 #if !BTC_BARE_MULTISIG
     if (btc_script_is_multisig(&output->script))
-      THROW("bare-multisig", 0, 0, 0);
+      return BTC_ERR_MULTISIG;
 #endif
 
     if (btc_output_is_dust(output, BTC_MIN_RELAY))
-      THROW("dust", 0, 0, 0);
+      return BTC_ERR_DUST;
   }
 
   if (nulldata > 1)
-    THROW("multi-op-return", 0, 0, 0);
+    return BTC_ERR_NULLDATA;
 
-  return 1;
+  return BTC_OK;
 }
-
-#undef THROW
 
 int
 btc_tx_has_standard_inputs(const btc_tx_t *tx, const btc_view_t *view) {

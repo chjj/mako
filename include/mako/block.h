@@ -50,10 +50,8 @@ btc_block_create_commitment_hash(uint8_t *hash, const btc_block_t *blk);
 BTC_EXTERN const uint8_t *
 btc_block_get_commitment_hash(const btc_block_t *blk);
 
-BTC_EXTERN int
-btc_block_check_sanity(btc_verify_error_t *err,
-                       const btc_block_t *blk,
-                       int64_t now);
+BTC_EXTERN btc_errno_t
+btc_block_check_sanity(const btc_block_t *blk, int64_t now);
 
 BTC_EXTERN int32_t
 btc_block_coinbase_height(const btc_block_t *blk);
