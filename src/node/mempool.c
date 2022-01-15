@@ -490,8 +490,8 @@ btc_mempool_check_orphan(btc_mempool_t *mp,
     return btc_mempool_throw(mp, tx,
                              "invalid",
                              "tx-size",
-                             100,
-                             0);
+                             0,
+                             1);
   }
 
   return 1;
@@ -1166,7 +1166,7 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
                                "invalid",
                                err.reason,
                                err.score,
-                               0);
+                               err.malleated);
     }
   }
 
@@ -1280,8 +1280,13 @@ btc_mempool_add(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   if (!btc_mempool_insert(mp, tx, id)) {
     const btc_verify_error_t *err = &mp->error;
 
-    if (!btc_tx_has_witness(tx) && !err->malleated)
-      btc_filter_add(&mp->rejects, tx->hash, 32);
+    if (strstr(err->reason, "script-verify-flag") != NULL) {
+      if (!btc_tx_has_witness(tx) && !err->malleated)
+        btc_filter_add(&mp->rejects, tx->hash, 32);
+    } else {
+      if (!err->malleated)
+        btc_filter_add(&mp->rejects, tx->hash, 32);
+    }
 
     return 0;
   }
