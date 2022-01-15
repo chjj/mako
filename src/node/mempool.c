@@ -26,6 +26,7 @@
 #include <mako/header.h>
 #include <mako/heap.h>
 #include <mako/map.h>
+#include <mako/netmsg.h>
 #include <mako/network.h>
 #include <mako/policy.h>
 #include <mako/script.h>
@@ -340,7 +341,7 @@ btc_mempool_close(btc_mempool_t *mp) {
 static int
 btc_mempool_fail(btc_mempool_t *mp,
                  const btc_tx_t *tx,
-                 const char *code,
+                 unsigned int code,
                  const char *reason,
                  int score,
                  int malleated) {
@@ -357,13 +358,15 @@ btc_mempool_fail(btc_mempool_t *mp,
 static int
 btc_mempool_throw(btc_mempool_t *mp,
                   const btc_tx_t *tx,
-                  const char *code,
+                  unsigned int code,
                   const char *reason,
                   int score,
                   int malleated) {
+  const char *str = btc_reject_code(code);
+
   btc_mempool_log(mp, "Verification error: %s "
                       "(code=%s score=%d hash=%H)",
-                  reason, code, score, tx->hash);
+                  reason, str, score, tx->hash);
 
   return btc_mempool_fail(mp, tx, code, reason, score, malleated);
 }
@@ -467,7 +470,7 @@ btc_mempool_check_orphan(btc_mempool_t *mp,
       btc_mempool_log(mp, "Not storing orphan %H (rejected parents).",
                           tx->hash);
       return btc_mempool_fail(mp, tx,
-                              "duplicate",
+                              BTC_REJECT_DUPLICATE,
                               "duplicate",
                               0,
                               0);
@@ -477,7 +480,7 @@ btc_mempool_check_orphan(btc_mempool_t *mp,
       btc_mempool_log(mp, "Not storing orphan %H (non-existent output).",
                           tx->hash);
       return btc_mempool_throw(mp, tx,
-                               "invalid",
+                               BTC_REJECT_INVALID,
                                "bad-txns-inputs-missingorspent",
                                100,
                                0);
@@ -488,7 +491,7 @@ btc_mempool_check_orphan(btc_mempool_t *mp,
   if (btc_tx_weight(tx) > BTC_MAX_TX_WEIGHT) {
     btc_mempool_log(mp, "Ignoring large orphan %H.", tx->hash);
     return btc_mempool_throw(mp, tx,
-                             "invalid",
+                             BTC_REJECT_INVALID,
                              "tx-size",
                              0,
                              1);
@@ -976,7 +979,7 @@ btc_mempool_verify_inputs(btc_mempool_t *mp,
 
     if (btc_tx_verify(tx, view, flags)) {
       return btc_mempool_throw(mp, tx,
-                               "invalid",
+                               BTC_REJECT_INVALID,
                                "non-mandatory-script-verify-flag",
                                0,
                                0);
@@ -984,7 +987,7 @@ btc_mempool_verify_inputs(btc_mempool_t *mp,
   }
 
   return btc_mempool_throw(mp, tx,
-                           "invalid",
+                           BTC_REJECT_INVALID,
                            "mandatory-script-verify-flag-failed",
                            100,
                            0);
@@ -1004,7 +1007,7 @@ btc_mempool_verify(btc_mempool_t *mp,
   /* Verify sequence locks. */
   if (!btc_chain_verify_locks(mp->chain, tip, tx, view, lock_flags)) {
     return btc_mempool_throw(mp, tx,
-                             "nonstandard",
+                             BTC_REJECT_NONSTANDARD,
                              "non-BIP68-final",
                              0,
                              0);
@@ -1014,7 +1017,7 @@ btc_mempool_verify(btc_mempool_t *mp,
   if (mp->network->require_standard) {
     if (!btc_tx_has_standard_inputs(tx, view)) {
       return btc_mempool_throw(mp, tx,
-                               "nonstandard",
+                               BTC_REJECT_NONSTANDARD,
                                "bad-txns-nonstandard-inputs",
                                0,
                                0);
@@ -1023,7 +1026,7 @@ btc_mempool_verify(btc_mempool_t *mp,
     if (state->flags & BTC_SCRIPT_VERIFY_WITNESS) {
       if (!btc_tx_has_standard_witness(tx, view)) {
         return btc_mempool_throw(mp, tx,
-                                 "nonstandard",
+                                 BTC_REJECT_NONSTANDARD,
                                  "bad-witness-nonstandard",
                                  0,
                                  1);
@@ -1034,7 +1037,7 @@ btc_mempool_verify(btc_mempool_t *mp,
   /* Annoying process known as sigops counting. */
   if (entry->sigops > BTC_MAX_TX_SIGOPS_COST) {
     return btc_mempool_throw(mp, tx,
-                             "nonstandard",
+                             BTC_REJECT_NONSTANDARD,
                              "bad-txns-too-many-sigops",
                              0,
                              0);
@@ -1045,7 +1048,7 @@ btc_mempool_verify(btc_mempool_t *mp,
 
   if (entry->fee < minfee) {
     return btc_mempool_throw(mp, tx,
-                             "insufficientfee",
+                             BTC_REJECT_INSUFFICIENTFEE,
                              "insufficient fee",
                              0,
                              0);
@@ -1054,7 +1057,7 @@ btc_mempool_verify(btc_mempool_t *mp,
   /* Important safety feature. */
   if (entry->fee > minfee * 10000) {
     return btc_mempool_throw(mp, tx,
-                             "highfee",
+                             BTC_REJECT_HIGHFEE,
                              "absurdly-high-fee",
                              0,
                              0);
@@ -1063,7 +1066,7 @@ btc_mempool_verify(btc_mempool_t *mp,
   /* Check ancestor depth. */
   if (btc_mempool_count_ancestors(mp, entry) + 1 > BTC_MEMPOOL_MAX_ANCESTORS) {
     return btc_mempool_throw(mp, tx,
-                             "nonstandard",
+                             BTC_REJECT_NONSTANDARD,
                              "too-long-mempool-chain",
                              0,
                              0);
@@ -1120,7 +1123,7 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   /* Basic sanity checks. */
   if (!btc_tx_check_sanity(&err, tx)) {
     return btc_mempool_throw(mp, tx,
-                             "invalid",
+                             BTC_REJECT_INVALID,
                              err.reason,
                              err.score,
                              0);
@@ -1129,7 +1132,7 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   /* Coinbases are an insta-ban. */
   if (btc_tx_is_coinbase(tx)) {
     return btc_mempool_throw(mp, tx,
-                             "invalid",
+                             BTC_REJECT_INVALID,
                              "coinbase",
                              100,
                              0);
@@ -1140,7 +1143,7 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
     if (!(state->flags & BTC_SCRIPT_VERIFY_CHECKSEQUENCEVERIFY)) {
       if (tx->version >= 2) {
         return btc_mempool_throw(mp, tx,
-                                 "nonstandard",
+                                 BTC_REJECT_NONSTANDARD,
                                  "premature-version2-tx",
                                  0,
                                  0);
@@ -1152,7 +1155,7 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   if (!(state->flags & BTC_SCRIPT_VERIFY_WITNESS)) {
     if (btc_tx_has_witness(tx)) {
       return btc_mempool_throw(mp, tx,
-                               "nonstandard",
+                               BTC_REJECT_NONSTANDARD,
                                "no-witness-yet",
                                0,
                                1);
@@ -1163,7 +1166,7 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   if (mp->network->require_standard) {
     if (!btc_tx_check_standard(&err, tx)) {
       return btc_mempool_throw(mp, tx,
-                               "invalid",
+                               BTC_REJECT_INVALID,
                                err.reason,
                                err.score,
                                err.malleated);
@@ -1173,7 +1176,7 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   /* Verify transaction finality. */
   if (!btc_chain_verify_final(mp->chain, tip, tx, lock_flags)) {
     return btc_mempool_throw(mp, tx,
-                             "nonstandard",
+                             BTC_REJECT_NONSTANDARD,
                              "non-final",
                              0,
                              0);
@@ -1182,7 +1185,7 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   /* We can maybe ignore this. */
   if (btc_mempool_exists(mp, tx->hash)) {
     return btc_mempool_throw(mp, tx,
-                             "alreadyknown",
+                             BTC_REJECT_ALREADYKNOWN,
                              "txn-already-in-mempool",
                              0,
                              0);
@@ -1193,7 +1196,7 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
      the chain. */
   if (btc_chain_has_coins(mp->chain, tx)) {
     return btc_mempool_throw(mp, tx,
-                             "alreadyknown",
+                             BTC_REJECT_ALREADYKNOWN,
                              "txn-already-known",
                              0,
                              0);
@@ -1205,14 +1208,14 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   if (btc_mempool_is_double_spend(mp, tx)) {
     if (btc_tx_is_rbf(tx)) {
       return btc_mempool_fail(mp, tx,
-                              "duplicate",
+                              BTC_REJECT_DUPLICATE,
                               "replace-by-fee",
                               0,
                               0);
     }
 
     return btc_mempool_throw(mp, tx,
-                             "duplicate",
+                             BTC_REJECT_DUPLICATE,
                              "bad-txns-inputs-spent",
                              0,
                              0);
@@ -1241,7 +1244,7 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   if (fee == -1) {
     btc_view_destroy(view);
     return btc_mempool_throw(mp, tx,
-                             "invalid",
+                             BTC_REJECT_INVALID,
                              err.reason,
                              err.score,
                              0);
@@ -1266,7 +1269,7 @@ btc_mempool_insert(btc_mempool_t *mp, const btc_tx_t *tx, unsigned int id) {
   /* Trim size if we're too big. */
   if (btc_mempool_limit_size(mp, tx->hash)) {
     return btc_mempool_throw(mp, tx,
-                             "insufficientfee",
+                             BTC_REJECT_INSUFFICIENTFEE,
                              "mempool full",
                              0,
                              0);

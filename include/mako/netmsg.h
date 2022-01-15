@@ -423,12 +423,6 @@ btc_reject_clear(btc_reject_t *msg);
 BTC_EXTERN void
 btc_reject_copy(btc_reject_t *z, const btc_reject_t *x);
 
-BTC_EXTERN void
-btc_reject_set_code(btc_reject_t *z, const char *code);
-
-BTC_EXTERN const char *
-btc_reject_get_code(const btc_reject_t *x);
-
 BTC_EXTERN size_t
 btc_reject_size(const btc_reject_t *x);
 
@@ -437,6 +431,9 @@ btc_reject_write(uint8_t *zp, const btc_reject_t *x);
 
 BTC_EXTERN int
 btc_reject_read(btc_reject_t *z, const uint8_t **xp, size_t *xn);
+
+BTC_EXTERN const char *
+btc_reject_code(unsigned int code);
 
 /*
  * Mempool

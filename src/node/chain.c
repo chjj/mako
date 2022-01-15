@@ -27,6 +27,7 @@
 #include <mako/list.h>
 #include <mako/map.h>
 #include <mako/mpi.h>
+#include <mako/netmsg.h>
 #include <mako/network.h>
 #include <mako/script.h>
 #include <mako/tx.h>
@@ -991,10 +992,11 @@ btc_chain_get_deployments(btc_chain_t *chain,
 static int
 btc_chain_throw(btc_chain_t *chain,
                 const btc_header_t *header,
-                const char *code,
+                unsigned int code,
                 const char *reason,
                 int score,
                 int malleated) {
+  const char *str = btc_reject_code(code);
   uint8_t *hash = chain->error.hash;
 
   btc_header_hash(hash, header);
@@ -1006,7 +1008,7 @@ btc_chain_throw(btc_chain_t *chain,
 
   btc_chain_log(chain, "Verification error: %s "
                        "(code=%s score=%d hash=%H)",
-                reason, code, score, hash);
+                reason, str, score, hash);
 
   return 0;
 }
@@ -1032,7 +1034,7 @@ btc_chain_check_target(btc_chain_t *chain, const btc_header_t *hdr) {
   if (delta < 0) {
     /* Block with timestamp before last checkpoint. */
     return btc_chain_throw(chain, hdr,
-                           "checkpoint",
+                           BTC_REJECT_CHECKPOINT,
                            "time-too-old",
                            100,
                            1);
@@ -1051,7 +1053,7 @@ btc_chain_check_target(btc_chain_t *chain, const btc_header_t *hdr) {
   if (cmp > 0) {
     /* Block with too little proof-of-work. */
     return btc_chain_throw(chain, hdr,
-                           "invalid",
+                           BTC_REJECT_INVALID,
                            "bad-diffbits",
                            100,
                            1);
@@ -1078,15 +1080,20 @@ btc_chain_verify(btc_chain_t *chain,
   btc_deployment_state_init(state);
 
   /* Extra sanity check. */
-  if (!btc_hash_equal(hdr->prev_block, prev->hash))
-    return btc_chain_throw(chain, hdr, "invalid", "bad-prevblk", 10, 0);
+  if (!btc_hash_equal(hdr->prev_block, prev->hash)) {
+    return btc_chain_throw(chain, hdr,
+                           BTC_REJECT_INVALID,
+                           "bad-prevblk",
+                           10,
+                           0);
+  }
 
   /* Verify a checkpoint if there is one. */
   btc_header_hash(hash, hdr);
 
   if (!btc_chain_verify_checkpoint(chain, prev, hash)) {
     return btc_chain_throw(chain, hdr,
-                           "checkpoint",
+                           BTC_REJECT_CHECKPOINT,
                            "checkpoint mismatch",
                            100,
                            0);
@@ -1095,32 +1102,57 @@ btc_chain_verify(btc_chain_t *chain,
   /* Ensure the POW is what we expect. */
   bits = btc_chain_get_target(chain, hdr->time, prev);
 
-  if (hdr->bits != bits)
-    return btc_chain_throw(chain, hdr, "invalid", "bad-diffbits", 100, 0);
+  if (hdr->bits != bits) {
+    return btc_chain_throw(chain, hdr,
+                           BTC_REJECT_INVALID,
+                           "bad-diffbits",
+                           100,
+                           0);
+  }
 
   /* Ensure the timestamp is correct. */
   mtp = btc_entry_median_time(prev);
 
-  if (hdr->time <= mtp)
-    return btc_chain_throw(chain, hdr, "invalid", "time-too-old", 0, 0);
+  if (hdr->time <= mtp) {
+    return btc_chain_throw(chain, hdr,
+                           BTC_REJECT_INVALID,
+                           "time-too-old",
+                           0,
+                           0);
+  }
 
   /* Calculate height of current block. */
   height = prev->height + 1;
 
   /* Only allow version 2 blocks (coinbase height)
      once the majority of blocks are using it. */
-  if (hdr->version < 2 && height >= network->softforks.bip34.height)
-    return btc_chain_throw(chain, hdr, "obsolete", "bad-version", 0, 0);
+  if (hdr->version < 2 && height >= network->softforks.bip34.height) {
+    return btc_chain_throw(chain, hdr,
+                           BTC_REJECT_OBSOLETE,
+                           "bad-version",
+                           0,
+                           0);
+  }
 
   /* Only allow version 3 blocks (sig validation)
      once the majority of blocks are using it. */
-  if (hdr->version < 3 && height >= network->softforks.bip66.height)
-    return btc_chain_throw(chain, hdr, "obsolete", "bad-version", 0, 0);
+  if (hdr->version < 3 && height >= network->softforks.bip66.height) {
+    return btc_chain_throw(chain, hdr,
+                           BTC_REJECT_OBSOLETE,
+                           "bad-version",
+                           0,
+                           0);
+  }
 
   /* Only allow version 4 blocks (checklocktimeverify)
      once the majority of blocks are using it. */
-  if (hdr->version < 4 && height >= network->softforks.bip65.height)
-    return btc_chain_throw(chain, hdr, "obsolete", "bad-version", 0, 0);
+  if (hdr->version < 4 && height >= network->softforks.bip65.height) {
+    return btc_chain_throw(chain, hdr,
+                           BTC_REJECT_OBSOLETE,
+                           "bad-version",
+                           0,
+                           0);
+  }
 
   /* Get the new deployment state. */
   btc_chain_get_deployments(chain, state, hdr->time, prev);
@@ -1136,15 +1168,25 @@ btc_chain_verify(btc_chain_t *chain,
   for (i = 0; i < block->txs.length; i++) {
     const btc_tx_t *tx = block->txs.items[i];
 
-    if (!btc_tx_is_final(tx, height, time))
-      return btc_chain_throw(chain, hdr, "invalid", "bad-txns-nonfinal", 10, 0);
+    if (!btc_tx_is_final(tx, height, time)) {
+      return btc_chain_throw(chain, hdr,
+                             BTC_REJECT_INVALID,
+                             "bad-txns-nonfinal",
+                             10,
+                             0);
+    }
   }
 
   /* Make sure the height contained
      in the coinbase is correct. */
   if (state->bip34) {
-    if (btc_block_coinbase_height(block) != height)
-      return btc_chain_throw(chain, hdr, "invalid", "bad-cb-height", 100, 0);
+    if (btc_block_coinbase_height(block) != height) {
+      return btc_chain_throw(chain, hdr,
+                             BTC_REJECT_INVALID,
+                             "bad-cb-height",
+                             100,
+                             0);
+    }
   }
 
   /* Check the commitment hash for segwit. */
@@ -1160,7 +1202,7 @@ btc_chain_verify(btc_chain_t *chain,
          fail. */
       if (!btc_block_witness_nonce(block)) {
         return btc_chain_throw(chain, hdr,
-                               "invalid",
+                               BTC_REJECT_INVALID,
                                "bad-witness-nonce-size",
                                100,
                                1);
@@ -1170,7 +1212,7 @@ btc_chain_verify(btc_chain_t *chain,
 
       if (!btc_hash_equal(commit_hash, root)) {
         return btc_chain_throw(chain, hdr,
-                               "invalid",
+                               BTC_REJECT_INVALID,
                                "bad-witness-merkle-match",
                                100,
                                1);
@@ -1183,7 +1225,7 @@ btc_chain_verify(btc_chain_t *chain,
   if (!commit_hash) {
     if (btc_block_has_witness(block)) {
       return btc_chain_throw(chain, hdr,
-                             "invalid",
+                             BTC_REJECT_INVALID,
                              "unexpected-witness",
                              100,
                              1);
@@ -1194,7 +1236,7 @@ btc_chain_verify(btc_chain_t *chain,
      check in non-contextual verification). */
   if (btc_block_weight(block) > BTC_MAX_BLOCK_WEIGHT) {
     return btc_chain_throw(chain, hdr,
-                           "invalid",
+                           BTC_REJECT_INVALID,
                            "bad-blk-weight",
                            100,
                            0);
@@ -1235,7 +1277,7 @@ btc_chain_verify_duplicates(btc_chain_t *chain,
        and extraNonce. */
     if (chk == NULL || !btc_hash_equal(hash, chk->hash)) {
       return btc_chain_throw(chain, hdr,
-                             "invalid",
+                             BTC_REJECT_INVALID,
                              "bad-txns-BIP30",
                              100,
                              0);
@@ -1378,7 +1420,7 @@ btc_chain_verify_inputs(btc_chain_t *chain,
     if (i > 0) {
       if (!btc_chaindb_spend(chain->db, view, tx)) {
         btc_chain_throw(chain, hdr,
-                        "invalid",
+                        BTC_REJECT_INVALID,
                         "bad-txns-inputs-missingorspent",
                         100,
                         0);
@@ -1390,7 +1432,7 @@ btc_chain_verify_inputs(btc_chain_t *chain,
     if (i > 0 && tx->version >= 2) {
       if (!btc_chain_verify_locks(chain, prev, tx, view, state->lock_flags)) {
         btc_chain_throw(chain, hdr,
-                        "invalid",
+                        BTC_REJECT_INVALID,
                         "bad-txns-nonfinal",
                         100,
                         0);
@@ -1403,7 +1445,7 @@ btc_chain_verify_inputs(btc_chain_t *chain,
 
     if (sigops > BTC_MAX_BLOCK_SIGOPS_COST) {
       btc_chain_throw(chain, hdr,
-                      "invalid",
+                      BTC_REJECT_INVALID,
                       "bad-blk-sigops",
                       100,
                       0);
@@ -1416,7 +1458,7 @@ btc_chain_verify_inputs(btc_chain_t *chain,
 
       if (fee == -1) {
         btc_chain_throw(chain, hdr,
-                        "invalid",
+                        BTC_REJECT_INVALID,
                         err.reason,
                         err.score,
                         0);
@@ -1427,7 +1469,7 @@ btc_chain_verify_inputs(btc_chain_t *chain,
 
       if (reward < 0 || reward > BTC_MAX_MONEY) {
         btc_chain_throw(chain, hdr,
-                        "invalid",
+                        BTC_REJECT_INVALID,
                         "bad-cb-amount",
                         100,
                         0);
@@ -1443,7 +1485,7 @@ btc_chain_verify_inputs(btc_chain_t *chain,
 
   if (btc_block_claimed(block) > reward) {
     btc_chain_throw(chain, hdr,
-                    "invalid",
+                    BTC_REJECT_INVALID,
                     "bad-cb-amount",
                     100,
                     0);
@@ -1464,7 +1506,7 @@ btc_chain_verify_inputs(btc_chain_t *chain,
 
     if (!btc_checker_verify(&checker)) {
       btc_chain_throw(chain, hdr,
-                      "invalid",
+                      BTC_REJECT_INVALID,
                       "mandatory-script-verify-flag-failed",
                       100,
                       0);
@@ -1477,7 +1519,7 @@ btc_chain_verify_inputs(btc_chain_t *chain,
 
       if (!btc_tx_verify(tx, view, state->flags)) {
         btc_chain_throw(chain, hdr,
-                        "invalid",
+                        BTC_REJECT_INVALID,
                         "mandatory-script-verify-flag-failed",
                         100,
                         0);
@@ -1532,7 +1574,7 @@ btc_chain_reconnect(btc_chain_t *chain, btc_entry_t *entry) {
                          entry->hash, entry->height);
 
     return btc_chain_throw(chain, hdr,
-                           "internal",
+                           BTC_REJECT_INTERNAL,
                            "blk-notfound",
                            0,
                            1);
@@ -1582,7 +1624,7 @@ btc_chain_disconnect(btc_chain_t *chain, btc_entry_t *entry) {
                          entry->hash, entry->height);
 
     return btc_chain_throw(chain, hdr,
-                           "internal",
+                           BTC_REJECT_INTERNAL,
                            "blk-notfound",
                            0,
                            1);
@@ -1746,7 +1788,7 @@ btc_chain_save_alternate(btc_chain_t *chain,
   if (chain->flags & BTC_CHAIN_CHECKPOINTS) {
     if (entry->height < chain->network->last_checkpoint) {
       return btc_chain_throw(chain, hdr,
-                             "checkpoint",
+                             BTC_REJECT_CHECKPOINT,
                              "bad-fork-prior-to-checkpoint",
                              100,
                              0);
@@ -1925,33 +1967,53 @@ btc_chain_add(btc_chain_t *chain,
   /* Special case for genesis block. */
   if (btc_hash_equal(hash, network->genesis.hash)) {
     btc_chain_log(chain, "Saw genesis block: %H.", hash);
-    return btc_chain_throw(chain, hdr, "duplicate", "duplicate", 0, 0);
+    return btc_chain_throw(chain, hdr,
+                           BTC_REJECT_DUPLICATE,
+                           "duplicate",
+                           0,
+                           0);
   }
 
   /* If the block is already known to be
      an orphan, ignore it. */
   if (btc_chain_has_orphan(chain, hash)) {
     btc_chain_log(chain, "Already have orphan block: %H.", hash);
-    return btc_chain_throw(chain, hdr, "duplicate", "duplicate", 0, 0);
+    return btc_chain_throw(chain, hdr,
+                           BTC_REJECT_DUPLICATE,
+                           "duplicate",
+                           0,
+                           0);
   }
 
   /* Do not revalidate known invalid blocks. */
   if (btc_chain_is_invalid(chain, hash, hdr)) {
     btc_chain_log(chain, "Invalid ancestors for block: %H.", hash);
-    return btc_chain_throw(chain, hdr, "duplicate", "duplicate", 100, 0);
+    return btc_chain_throw(chain, hdr,
+                           BTC_REJECT_DUPLICATE,
+                           "duplicate",
+                           100,
+                           0);
   }
 
   /* Do we already have this block? */
   if (btc_chaindb_by_hash(chain->db, hash) != NULL) {
     btc_chain_log(chain, "Already have block: %H.", hash);
-    return btc_chain_throw(chain, hdr, "duplicate", "duplicate", 0, 0);
+    return btc_chain_throw(chain, hdr,
+                           BTC_REJECT_DUPLICATE,
+                           "duplicate",
+                           0,
+                           0);
   }
 
   /* Check the PoW before doing anything. */
   if (flags & BTC_BLOCK_VERIFY_POW) {
     if (!btc_header_verify(hdr)) {
       btc_chain_set_invalid(chain, hash);
-      return btc_chain_throw(chain, hdr, "invalid", "high-hash", 50, 0);
+      return btc_chain_throw(chain, hdr,
+                             BTC_REJECT_INVALID,
+                             "high-hash",
+                             50,
+                             0);
     }
   }
 
@@ -1965,7 +2027,7 @@ btc_chain_add(btc_chain_t *chain,
         btc_chain_set_invalid(chain, hash);
 
       return btc_chain_throw(chain, hdr,
-                             "invalid",
+                             BTC_REJECT_INVALID,
                              err.reason,
                              err.score,
                              err.malleated);

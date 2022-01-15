@@ -12,6 +12,7 @@
 #include <mako/crypto/hash.h>
 #include <mako/crypto/merkle.h>
 #include <mako/header.h>
+#include <mako/netmsg.h>
 #include <mako/script.h>
 #include <mako/tx.h>
 #include <mako/util.h>
@@ -161,7 +162,7 @@ btc_block_throw(btc_verify_error_t *err,
   if (err != NULL) {
     btc_hash_init(err->hash);
 
-    err->code = "invalid";
+    err->code = BTC_REJECT_INVALID;
     err->reason = reason;
     err->score = score;
     err->malleated = malleated;

@@ -1009,7 +1009,7 @@ btc_peer_send_reject(btc_peer_t *peer, const btc_reject_t *msg) {
                      msg->message,
                      msg->hash,
                      &peer->addr,
-                     btc_reject_get_code(msg),
+                     btc_reject_code(msg->code),
                      msg->reason);
 
   return btc_peer_sendmsg(peer, BTC_MSG_REJECT, msg);
@@ -1021,14 +1021,19 @@ btc_peer_reject(btc_peer_t *peer,
                 const btc_verify_error_t *err) {
   btc_reject_t reject;
 
-  btc_reject_init(&reject);
+  if (err->code < BTC_REJECT_INTERNAL) {
+    btc_reject_init(&reject);
 
-  strcpy(reject.message, message);
-  btc_reject_set_code(&reject, err->code);
-  strcpy(reject.reason, err->reason);
-  btc_hash_copy(reject.hash, err->hash);
+    strcpy(reject.message, message);
 
-  btc_peer_send_reject(peer, &reject);
+    reject.code = err->code;
+
+    strcpy(reject.reason, err->reason);
+
+    btc_hash_copy(reject.hash, err->hash);
+
+    btc_peer_send_reject(peer, &reject);
+  }
 
   return btc_peer_increase_ban(peer, err->score);
 }
@@ -3976,7 +3981,7 @@ btc_pool_on_reject(btc_pool_t *pool,
   btc_pool_log(pool, "Received reject (%N): msg=%s code=%s reason=%s hash=%H.",
                      &peer->addr,
                      msg->message,
-                     btc_reject_get_code(msg),
+                     btc_reject_code(msg->code),
                      msg->reason,
                      msg->hash);
 }

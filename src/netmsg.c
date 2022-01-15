@@ -685,52 +685,6 @@ btc_reject_copy(btc_reject_t *z, const btc_reject_t *x) {
   *z = *x;
 }
 
-void
-btc_reject_set_code(btc_reject_t *z, const char *code) {
-  if (strcmp(code, "malformed") == 0)
-    z->code = BTC_REJECT_MALFORMED;
-  else if (strcmp(code, "invalid") == 0)
-    z->code = BTC_REJECT_INVALID;
-  else if (strcmp(code, "obsolete") == 0)
-    z->code = BTC_REJECT_OBSOLETE;
-  else if (strcmp(code, "duplicate") == 0)
-    z->code = BTC_REJECT_DUPLICATE;
-  else if (strcmp(code, "nonstandard") == 0)
-    z->code = BTC_REJECT_NONSTANDARD;
-  else if (strcmp(code, "dust") == 0)
-    z->code = BTC_REJECT_DUST;
-  else if (strcmp(code, "insufficientfee") == 0)
-    z->code = BTC_REJECT_INSUFFICIENTFEE;
-  else if (strcmp(code, "checkpoint") == 0)
-    z->code = BTC_REJECT_CHECKPOINT;
-  else
-    z->code = BTC_REJECT_INVALID;
-}
-
-const char *
-btc_reject_get_code(const btc_reject_t *x) {
-  switch (x->code) {
-    case BTC_REJECT_MALFORMED:
-      return "malformed";
-    case BTC_REJECT_INVALID:
-      return "invalid";
-    case BTC_REJECT_OBSOLETE:
-      return "obsolete";
-    case BTC_REJECT_DUPLICATE:
-      return "duplicate";
-    case BTC_REJECT_NONSTANDARD:
-      return "nonstandard";
-    case BTC_REJECT_DUST:
-      return "dust";
-    case BTC_REJECT_INSUFFICIENTFEE:
-      return "insufficientfee";
-    case BTC_REJECT_CHECKPOINT:
-      return "checkpoint";
-    default:
-      return "invalid";
-  }
-}
-
 size_t
 btc_reject_size(const btc_reject_t *x) {
   size_t size = 0;
@@ -776,6 +730,37 @@ btc_reject_read(btc_reject_t *z, const uint8_t **xp, size_t *xn) {
   }
 
   return 1;
+}
+
+const char *
+btc_reject_code(unsigned int code) {
+  switch (code) {
+    case BTC_REJECT_MALFORMED:
+      return "malformed";
+    case BTC_REJECT_INVALID:
+      return "invalid";
+    case BTC_REJECT_OBSOLETE:
+      return "obsolete";
+    case BTC_REJECT_DUPLICATE:
+      return "duplicate";
+    case BTC_REJECT_NONSTANDARD:
+      return "nonstandard";
+    case BTC_REJECT_DUST:
+      return "dust";
+    case BTC_REJECT_INSUFFICIENTFEE:
+      return "insufficientfee";
+    case BTC_REJECT_CHECKPOINT:
+      return "checkpoint";
+    case BTC_REJECT_INTERNAL:
+      return "internal";
+    case BTC_REJECT_HIGHFEE:
+      return "highfee";
+    case BTC_REJECT_ALREADYKNOWN:
+      return "alreadyknown";
+    case BTC_REJECT_CONFLICT:
+      return "conflict";
+  }
+  return "invalid";
 }
 
 /*

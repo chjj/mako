@@ -194,7 +194,7 @@ typedef struct btc_tx_cache_s {
 
 typedef struct btc_verify_error_s {
   uint8_t hash[32];
-  const char *code;
+  unsigned int code;
   const char *reason;
   int score;
   int malleated;
