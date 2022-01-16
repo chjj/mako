@@ -474,11 +474,12 @@ btc_chain_limit_orphans(btc_chain_t *chain) {
       oldest = orphan;
   }
 
-  if (btc_hashmap_size(chain->orphan_map) >= 20) {
-    if (oldest != NULL) {
-      btc_chain_remove_orphan(chain, oldest);
-      btc_orphan_destroy(oldest);
-    }
+  if (btc_hashmap_size(chain->orphan_map) < 20)
+    return;
+
+  if (oldest != NULL) {
+    btc_chain_remove_orphan(chain, oldest);
+    btc_orphan_destroy(oldest);
   }
 }
 
@@ -680,7 +681,7 @@ btc_chain_max_target(btc_chain_t *chain, uint32_t base, int64_t delta) {
 
 static uint32_t
 btc_chain_retarget(btc_chain_t *chain,
-                   const btc_entry_t *prev,
+                   const btc_entry_t *last,
                    const btc_entry_t *first) {
   const btc_network_pow_t *pow = &chain->network->pow;
   int64_t target_timespan = pow->target_timespan;
@@ -689,11 +690,11 @@ btc_chain_retarget(btc_chain_t *chain,
   mpz_t target;
 
   if (pow->no_retargeting)
-    return prev->header.bits;
+    return last->header.bits;
 
-  mpz_init_set_compact(target, prev->header.bits);
+  mpz_init_set_compact(target, last->header.bits);
 
-  actual_timespan = prev->header.time - first->header.time;
+  actual_timespan = last->header.time - first->header.time;
 
   if (actual_timespan < target_timespan / 4)
     actual_timespan = target_timespan / 4;
@@ -707,7 +708,7 @@ btc_chain_retarget(btc_chain_t *chain,
   if (mpz_cmp(target, chain->limit) < 0)
     bits = mpz_get_compact(target);
 
-  if (bits != prev->header.bits)
+  if (bits != last->header.bits)
     btc_log_debug(chain, "Retargeting to: %#.8x.", bits);
 
   mpz_clear(target);
@@ -721,41 +722,46 @@ btc_chain_get_target(btc_chain_t *chain,
                      const btc_entry_t *prev) {
   const btc_network_t *network = chain->network;
   const btc_network_pow_t *pow = &network->pow;
+  const btc_entry_t *last = prev;
   const btc_entry_t *first;
   int32_t height;
 
-  if (prev == NULL) {
+  if (last == NULL) {
     CHECK(time == network->genesis.header.time);
     return pow->bits;
   }
 
   /* Do not retarget. */
-  if ((prev->height + 1) % pow->retarget_interval != 0) {
+  if ((last->height + 1) % pow->retarget_interval != 0) {
     if (pow->target_reset) {
       /* Special behavior for testnet. */
-      if (time > prev->header.time + pow->target_spacing * 2)
+      if (time > last->header.time + pow->target_spacing * 2)
         return pow->bits;
 
-      while (prev->prev != NULL
-             && prev->height % pow->retarget_interval != 0
-             && prev->header.bits == pow->bits) {
-        prev = prev->prev;
+      while (last->prev != NULL) {
+        if (last->height % pow->retarget_interval == 0)
+          break;
+
+        if (last->header.bits != pow->bits)
+          break;
+
+        last = last->prev;
       }
     }
 
-    return prev->header.bits;
+    return last->header.bits;
   }
 
   /* Back 2 weeks. */
-  height = prev->height - (pow->retarget_interval - 1);
+  height = last->height - (pow->retarget_interval - 1);
 
   CHECK(height >= 0);
 
-  first = btc_chain_get_ancestor(chain, prev, height);
+  first = btc_chain_get_ancestor(chain, last, height);
 
   CHECK(first != NULL);
 
-  return btc_chain_retarget(chain, prev, first);
+  return btc_chain_retarget(chain, last, first);
 }
 
 uint32_t
