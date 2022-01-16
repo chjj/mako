@@ -197,7 +197,7 @@ btc_value_compress(uint64_t n) {
   if (e < 9) {
     d = (n % 10);
 
-    CHECK(d >= 1 && d <= 9);
+    ASSERT(d >= 1 && d <= 9);
 
     n /= 10;
 
