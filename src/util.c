@@ -161,6 +161,11 @@ btc_strdup(const char *xp) {
  */
 
 uint8_t *
+btc_hash_create(void) {
+  return (uint8_t *)memset(btc_malloc(32), 0, 32);
+}
+
+uint8_t *
 btc_hash_clone(const uint8_t *xp) {
   return (uint8_t *)memcpy(btc_malloc(32), xp, 32);
 }

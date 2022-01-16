@@ -127,6 +127,9 @@ btc_strdup(const char *xp);
 #define btc_hash_equal(xp, yp) (memcmp(xp, yp, 32) == 0)
 
 BTC_EXTERN uint8_t *
+btc_hash_create(void);
+
+BTC_EXTERN uint8_t *
 btc_hash_clone(const uint8_t *xp);
 
 BTC_EXTERN int

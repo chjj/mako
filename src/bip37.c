@@ -311,7 +311,7 @@ tree_build(btc_merkleblock_t *tree,
   bit_push(&tree->flags, parent, bits);
 
   if (height == 0 || !parent) {
-    uint8_t *root = (uint8_t *)btc_malloc(32);
+    uint8_t *root = btc_hash_create();
 
     tree_hash(root, tree, height, pos, leaves);
 
