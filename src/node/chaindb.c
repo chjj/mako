@@ -1135,6 +1135,10 @@ btc_chaindb_read(btc_chaindb_t *db,
     goto fail;
 
   size = 24 + btc_read32le(tmp);
+
+  if (size < 24 || size > (64 << 20))
+    goto fail;
+
   data = (uint8_t *)malloc(size);
 
   if (data == NULL)
