@@ -997,10 +997,8 @@ btc_chain_throw(btc_chain_t *chain,
 static int
 btc_chain_check_target(btc_chain_t *chain, const btc_header_t *hdr) {
   const btc_entry_t *chk;
-  mpz_t target, required;
-  uint32_t bits;
   int64_t delta;
-  int cmp;
+  uint32_t max;
 
   if (btc_hash_equal(hdr->prev_block, chain->tip->hash))
     return 1;
@@ -1021,17 +1019,9 @@ btc_chain_check_target(btc_chain_t *chain, const btc_header_t *hdr) {
                            1);
   }
 
-  bits = btc_chain_max_target(chain, chk->header.bits, delta);
+  max = btc_chain_max_target(chain, chk->header.bits, delta);
 
-  mpz_init_set_compact(target, hdr->bits);
-  mpz_init_set_compact(required, bits);
-
-  cmp = mpz_cmp(target, required);
-
-  mpz_clear(target);
-  mpz_clear(required);
-
-  if (cmp > 0) {
+  if (btc_compact_compare(hdr->bits, max) > 0) {
     /* Block with too little proof-of-work. */
     return btc_chain_throw(chain, hdr,
                            BTC_REJECT_INVALID,

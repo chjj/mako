@@ -17,6 +17,22 @@
  */
 
 int
+btc_compact_compare(uint32_t x, uint32_t y) {
+  mpz_t u, v;
+  int ret;
+
+  mpz_init_set_compact(u, x);
+  mpz_init_set_compact(v, y);
+
+  ret = mpz_cmp(u, v);
+
+  mpz_clear(u);
+  mpz_clear(v);
+
+  return ret;
+}
+
+int
 btc_compact_export(uint8_t *target, uint32_t bits) {
   int ret = 0;
   mpz_t z;

@@ -49,6 +49,9 @@ btc_amount_inspect(int64_t x);
  */
 
 BTC_EXTERN int
+btc_compact_compare(uint32_t x, uint32_t y);
+
+BTC_EXTERN int
 btc_compact_export(uint8_t *target, uint32_t bits);
 
 BTC_EXTERN uint32_t
