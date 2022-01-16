@@ -56,13 +56,6 @@ static const char *log_colors[] = {
 };
 
 /*
- * Declarations
- */
-
-static int
-strip_ansi(char *sp);
-
-/*
  * Logger
  */
 
@@ -124,8 +117,6 @@ btc_logger_write(btc_logger_t *logger,
                  const char *fmt,
                  va_list ap) {
   char line[1024];
-  int len = 0;
-  int pos = 0;
 
   if (logger == NULL)
     logger = &default_logger;
@@ -133,41 +124,10 @@ btc_logger_write(btc_logger_t *logger,
   if (logger->level < level)
     return;
 
-  if (logger->output || logger->stream != NULL) {
-    int rem = sizeof(line) - 1;
-    char *ptr = line;
+  if (!logger->output && logger->stream == NULL)
+    return;
 
-    if (logger->stream != NULL) {
-      len = btc_sprintf(ptr, "%D ", btc_now());
-      ptr += len;
-      rem -= len;
-      pos = len; /* Save for later. */
-    }
-
-    if (logger->output && logger->colors) {
-      len = btc_sprintf(ptr, "\x1b[%sm[%s]\x1b[m (%s) ",
-                             log_colors[level],
-                             log_levels[level],
-                             name);
-    } else {
-      len = btc_sprintf(ptr, "[%s] (%s) ", log_levels[level], name);
-    }
-
-    ptr += len;
-    rem -= len;
-
-    len = btc_vsnprintf(ptr, rem, fmt, ap);
-
-    if (len >= rem)
-      len = rem - 1;
-
-    ptr += len;
-
-    *ptr++ = '\n';
-    *ptr++ = '\0';
-
-    len = (ptr - line) - 1;
-  }
+  btc_vsnprintf(line, sizeof(line), fmt, ap);
 
   if (logger->output) {
     FILE *stream = stdout;
@@ -175,44 +135,23 @@ btc_logger_write(btc_logger_t *logger,
     if (level == BTC_LOG_ERROR)
       stream = stderr;
 
-    fwrite(line + pos, 1, len - pos, stream);
+    if (logger->colors) {
+      fprintf(stream, "\x1b[%sm[%s]\x1b[m (%s) %s\n",
+                      log_colors[level],
+                      log_levels[level],
+                      name,
+                      line);
+    } else {
+      fprintf(stream, "[%s] (%s) %s\n", log_levels[level], name, line);
+    }
   }
 
   if (logger->stream != NULL) {
-    if (logger->output && logger->colors)
-      len = strip_ansi(line);
+    int ch = log_levels[level][0] & ~32;
+    char date[32];
 
-    fwrite(line, 1, len, logger->stream);
+    btc_snprintf(date, sizeof(date), "%D", btc_now());
+
+    fprintf(logger->stream, "[%c:%s] (%s) %s\n", ch, date, name, line);
   }
-}
-
-/*
- * Helpers
- */
-
-static int
-strip_ansi(char *sp) {
-  char *xp = sp;
-  char *zp = xp;
-
-  for (;;) {
-    while (xp[0] == '\x1b' && xp[1] == '[') {
-      while (*xp && *xp != 'm')
-        xp++;
-
-      if (*xp != 'm')
-        break;
-
-      xp++;
-    }
-
-    if (*xp == '\0')
-      break;
-
-    *zp++ = *xp++;
-  }
-
-  *zp = '\0';
-
-  return zp - sp;
 }
