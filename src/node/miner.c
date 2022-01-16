@@ -170,6 +170,62 @@ btc_blockentry_set_mpentry(btc_blockentry_t *z, const btc_mpentry_t *x) {
 }
 
 /*
+ * Merkle Steps
+ */
+
+static void
+btc_steps_init(btc_steps_t *steps) {
+  memset(steps, 0, sizeof(*steps));
+}
+
+static void
+btc_steps_push(btc_steps_t *steps, const uint8_t *step) {
+  CHECK(steps->length * 32 < sizeof(steps->hashes));
+
+  memcpy(&steps->hashes[steps->length * 32], step, 32);
+
+  steps->length++;
+}
+
+static void
+btc_steps_compute(btc_steps_t *steps, uint8_t *nodes, size_t size) {
+  uint8_t *left, *right, *last;
+  size_t i;
+
+  btc_steps_init(steps);
+
+  while (size > 1) {
+    btc_steps_push(steps, &nodes[1 * 32]);
+
+    memset(&nodes[0 * 32], 0, 32);
+
+    for (i = 2; i < size; i += 2) {
+      left = &nodes[(i + 0) * 32];
+      right = left;
+
+      if (i + 1 < size)
+        right = &nodes[(i + 1) * 32];
+
+      last = &nodes[(i / 2) * 32];
+
+      btc_hash256_root(last, left, right);
+    }
+
+    size = (size + 1) / 2;
+  }
+}
+
+static void
+btc_steps_root(uint8_t *root, const btc_steps_t *steps, const uint8_t *hash) {
+  size_t i;
+
+  memcpy(root, hash, 32);
+
+  for (i = 0; i < steps->length; i++)
+    btc_hash256_root(root, root, &steps->hashes[i * 32]);
+}
+
+/*
  * Block Template
  */
 
@@ -189,6 +245,7 @@ btc_tmpl_init(btc_tmpl_t *bt) {
   bt->sigops = 400;
   bt->chain_nonce = btc_random();
 
+  btc_steps_init(&bt->steps);
   btc_buffer_init(&bt->cbflags);
   btc_address_init(&bt->address);
   btc_vector_init(&bt->txs);
@@ -234,6 +291,25 @@ btc_tmpl_locktime(const btc_tmpl_t *bt) {
 }
 
 static void
+btc_tmpl_precompute(btc_steps_t *steps, btc_tmpl_t *bt) {
+  size_t length = bt->txs.length + 1;
+  uint8_t *hashes = (uint8_t *)btc_malloc(length * 32);
+  size_t i;
+
+  btc_hash_init(&hashes[0 * 32]);
+
+  for (i = 0; i < bt->txs.length; i++) {
+    const btc_blockentry_t *entry = bt->txs.items[i];
+
+    btc_hash_copy(&hashes[(i + 1) * 32], entry->hash);
+  }
+
+  btc_steps_compute(steps, hashes, length);
+
+  btc_free(hashes);
+}
+
+static void
 btc_tmpl_witness_hash(uint8_t *hash, const btc_tmpl_t *bt) {
   size_t length = bt->txs.length + 1;
   uint8_t *hashes = (uint8_t *)btc_malloc(length * 32);
@@ -242,10 +318,10 @@ btc_tmpl_witness_hash(uint8_t *hash, const btc_tmpl_t *bt) {
 
   btc_hash_init(&hashes[0 * 32]);
 
-  for (i = 1; i < length; i++) {
-    const btc_blockentry_t *entry = bt->txs.items[i - 1];
+  for (i = 0; i < bt->txs.length; i++) {
+    const btc_blockentry_t *entry = bt->txs.items[i];
 
-    btc_hash_copy(&hashes[i * 32], entry->whash);
+    btc_hash_copy(&hashes[(i + 1) * 32], entry->whash);
   }
 
   CHECK(btc_merkle_root(root, hashes, length));
@@ -258,6 +334,7 @@ btc_tmpl_witness_hash(uint8_t *hash, const btc_tmpl_t *bt) {
 void
 btc_tmpl_refresh(btc_tmpl_t *bt) {
   btc_tmpl_witness_hash(bt->commitment, bt);
+  btc_tmpl_precompute(&bt->steps, bt);
 }
 
 btc_tx_t *
@@ -331,21 +408,7 @@ btc_tmpl_coinbase(const btc_tmpl_t *bt, uint32_t nonce1, uint32_t nonce2) {
 
 void
 btc_tmpl_compute(uint8_t *root, const btc_tmpl_t *bt, const uint8_t *hash) {
-  size_t length = bt->txs.length + 1;
-  uint8_t *hashes = (uint8_t *)btc_malloc(length * 32);
-  size_t i;
-
-  btc_hash_copy(&hashes[0 * 32], hash);
-
-  for (i = 1; i < length; i++) {
-    const btc_blockentry_t *entry = bt->txs.items[i - 1];
-
-    btc_hash_copy(&hashes[i * 32], entry->hash);
-  }
-
-  CHECK(btc_merkle_root(root, hashes, length));
-
-  btc_free(hashes);
+  btc_steps_root(root, &bt->steps, hash);
 }
 
 void
@@ -672,6 +735,8 @@ btc_cpuminer_start(btc_cpuminer_t *cpu, int active) {
   btc_miner_t *miner = cpu->miner;
   int i;
 
+  btc_log_info(miner, "Starting miner.");
+
   if (active < 1)
     active = 1;
 
@@ -699,6 +764,8 @@ static void
 btc_cpuminer_stop(btc_cpuminer_t *cpu) {
   btc_miner_t *miner = cpu->miner;
 
+  btc_log_info(miner, "Stopping miner...");
+
   CHECK(cpu->mining == 1);
 
   btc_mutex_lock(cpu->lock);
@@ -723,6 +790,8 @@ btc_cpuminer_stop(btc_cpuminer_t *cpu) {
   cpu->mining = 0;
 
   btc_loop_off_tick(miner->loop, on_tick, cpu);
+
+  btc_log_info(miner, "Miner stopped.");
 }
 
 static void
@@ -751,7 +820,7 @@ on_tick(void *arg) {
 
   CHECK(cpu->mining == 1);
 
-  if (now < cpu->last_check + 25)
+  if (now < cpu->last_check + 250)
     return;
 
   cpu->last_check = now;
@@ -872,7 +941,7 @@ mining_thread(void *arg) {
 
     CHECK(thread->result == -1);
 
-    if (result != -1) {
+    if (!cpu->stop && result != -1) {
       thread->result = result;
       thread->nonce = hdr.nonce;
     }
@@ -894,7 +963,7 @@ mining_thread(void *arg) {
 
     btc_mutex_unlock(cpu->lock);
 
-    result = btc_header_mine(&hdr, 1 << 24);
+    result = btc_header_mine(&hdr, 3 << 20);
   }
 
   if (--cpu->active == 0)

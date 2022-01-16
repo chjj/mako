@@ -42,6 +42,11 @@ typedef struct btc_blockproof_s {
   uint32_t nonce;
 } btc_blockproof_t;
 
+typedef struct btc_steps_s {
+  uint8_t hashes[16 * 32]; /* ceil(log2(16665+1)) == 15 */
+  size_t length;
+} btc_steps_t;
+
 typedef struct btc_tmpl_s {
   uint32_t version;
   uint8_t prev_block[32];
@@ -56,6 +61,7 @@ typedef struct btc_tmpl_s {
   int64_t fees;
   uint8_t commitment[32];
   uint32_t chain_nonce;
+  btc_steps_t steps;
   btc_buffer_t cbflags;
   btc_address_t address;
   btc_vector_t txs;
