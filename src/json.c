@@ -48,7 +48,7 @@ json_hash_get(uint8_t *hash, const json_value *obj) {
   if (obj->u.string.length != 64)
     return 0;
 
-  return btc_hash_import(hash, obj->u.string.ptr);
+  return btc_base16le_decode(hash, obj->u.string.ptr, 64);
 }
 
 int
@@ -117,15 +117,24 @@ json_buffer_new(const btc_buffer_t *item) {
 
 int
 json_buffer_get(btc_buffer_t *item, const json_value *obj) {
+  const char *ptr;
+  size_t len;
+
   if (obj->type != json_string)
     return 0;
 
-  btc_buffer_grow(item, obj->u.string.length / 2);
+  ptr = obj->u.string.ptr;
+  len = obj->u.string.length;
 
-  if (!btc_base16_decode(item->data, obj->u.string.ptr, obj->u.string.length))
+  if (len & 1)
     return 0;
 
-  item->length = obj->u.string.length / 2;
+  btc_buffer_grow(item, len / 2);
+
+  if (!btc_base16_decode(item->data, ptr, len))
+    return 0;
+
+  item->length = len / 2;
 
   return 1;
 }
