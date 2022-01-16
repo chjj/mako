@@ -48,11 +48,6 @@ BTC_EXTERN int
 btc_entry_read(btc_entry_t *z, const uint8_t **xp, size_t *xn);
 
 BTC_EXTERN void
-btc_entry_get_chainwork(uint8_t *chainwork,
-                        const btc_entry_t *entry,
-                        const btc_entry_t *prev);
-
-BTC_EXTERN void
 btc_entry_set_header(btc_entry_t *entry,
                      const btc_header_t *hdr,
                      const btc_entry_t *prev);

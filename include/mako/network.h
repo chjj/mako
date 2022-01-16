@@ -298,6 +298,12 @@ struct btc_network_s {
   int request_mempool;
 };
 
+#if defined(__cplusplus)
+typedef struct btc_network_s::btc_network_pow_s btc_network_pow_t;
+#else
+typedef struct btc_network_pow_s btc_network_pow_t;
+#endif
+
 /*
  * Helpers
  */

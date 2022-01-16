@@ -225,6 +225,7 @@ struct btc_chain_s {
   btc_statecache_t cache;
   btc_entry_t *tip;
   int32_t height;
+  mpz_t limit;
   btc_deployment_state_t state;
   btc_verify_error_t error;
   int synced;
@@ -257,6 +258,8 @@ btc_chain_create(const btc_network_t *network) {
   chain->tip = NULL;
   chain->height = -1;
 
+  mpz_init_import(chain->limit, network->pow.limit, 32, -1);
+
   btc_deployment_state_init(&chain->state);
 
   chain->flags = BTC_CHAIN_DEFAULT_FLAGS;
@@ -287,6 +290,8 @@ btc_chain_destroy(btc_chain_t *chain) {
   btc_statecache_clear(&chain->cache);
 
   btc_chaindb_destroy(chain->db);
+
+  mpz_clear(chain->limit);
 
   btc_free(chain);
 }
@@ -647,33 +652,27 @@ btc_chain_get_ancestor(btc_chain_t *chain,
 
 static uint32_t
 btc_chain_max_target(btc_chain_t *chain, uint32_t base, int64_t delta) {
-  const btc_network_t *net = chain->network;
-  mpz_t limit, target;
-  uint32_t bits;
+  const btc_network_pow_t *pow = &chain->network->pow;
+  uint32_t bits = pow->bits;
+  mpz_t target;
 
-  if (net->pow.no_retargeting)
-    return net->pow.bits;
+  if (pow->no_retargeting)
+    return pow->bits;
 
-  if (net->pow.target_reset && delta > net->pow.target_spacing * 2)
-    return net->pow.bits;
-
-  mpz_init(limit);
-  mpz_import(limit, net->pow.limit, 32, -1);
+  if (pow->target_reset && delta > pow->target_spacing * 2)
+    return pow->bits;
 
   mpz_init_set_compact(target, base);
 
-  while (delta > 0 && mpz_cmp(target, limit) < 0) {
-    mpz_mul_ui(target, target, 4);
+  while (delta > 0 && mpz_cmp(target, chain->limit) < 0) {
+    mpz_mul_2exp(target, target, 2);
 
-    delta -= net->pow.target_timespan * 4;
+    delta -= pow->target_timespan * 4;
   }
 
-  if (mpz_cmp(target, limit) > 0)
-    mpz_swap(target, limit);
+  if (mpz_cmp(target, chain->limit) < 0)
+    bits = mpz_get_compact(target);
 
-  bits = mpz_get_compact(target);
-
-  mpz_clear(limit);
   mpz_clear(target);
 
   return bits;
@@ -683,17 +682,14 @@ static uint32_t
 btc_chain_retarget(btc_chain_t *chain,
                    const btc_entry_t *prev,
                    const btc_entry_t *first) {
-  const btc_network_t *net = chain->network;
-  int64_t target_timespan = net->pow.target_timespan;
+  const btc_network_pow_t *pow = &chain->network->pow;
+  int64_t target_timespan = pow->target_timespan;
   int64_t actual_timespan;
-  mpz_t limit, target;
-  uint32_t ret;
+  uint32_t bits = pow->bits;
+  mpz_t target;
 
-  if (net->pow.no_retargeting)
+  if (pow->no_retargeting)
     return prev->header.bits;
-
-  mpz_init(limit);
-  mpz_import(limit, net->pow.limit, 32, -1);
 
   mpz_init_set_compact(target, prev->header.bits);
 
@@ -708,42 +704,41 @@ btc_chain_retarget(btc_chain_t *chain,
   mpz_mul_ui(target, target, actual_timespan);
   mpz_quo_ui(target, target, target_timespan);
 
-  if (mpz_cmp(target, limit) <= 0)
-    ret = mpz_get_compact(target);
-  else
-    ret = net->pow.bits;
+  if (mpz_cmp(target, chain->limit) < 0)
+    bits = mpz_get_compact(target);
 
-  btc_log_debug(chain, "Retargeting to: %#.8x.", ret);
+  if (bits != prev->header.bits)
+    btc_log_debug(chain, "Retargeting to: %#.8x.", bits);
 
-  mpz_clear(limit);
   mpz_clear(target);
 
-  return ret;
+  return bits;
 }
 
 uint32_t
 btc_chain_get_target(btc_chain_t *chain,
                      int64_t time,
                      const btc_entry_t *prev) {
-  const btc_network_t *net = chain->network;
+  const btc_network_t *network = chain->network;
+  const btc_network_pow_t *pow = &network->pow;
   const btc_entry_t *first;
   int32_t height;
 
   if (prev == NULL) {
-    CHECK(time == net->genesis.header.time);
-    return net->pow.bits;
+    CHECK(time == network->genesis.header.time);
+    return pow->bits;
   }
 
   /* Do not retarget. */
-  if ((prev->height + 1) % net->pow.retarget_interval != 0) {
-    if (net->pow.target_reset) {
+  if ((prev->height + 1) % pow->retarget_interval != 0) {
+    if (pow->target_reset) {
       /* Special behavior for testnet. */
-      if (time > prev->header.time + net->pow.target_spacing * 2)
-        return net->pow.bits;
+      if (time > prev->header.time + pow->target_spacing * 2)
+        return pow->bits;
 
       while (prev->prev != NULL
-             && prev->height % net->pow.retarget_interval != 0
-             && prev->header.bits == net->pow.bits) {
+             && prev->height % pow->retarget_interval != 0
+             && prev->header.bits == pow->bits) {
         prev = prev->prev;
       }
     }
@@ -752,7 +747,7 @@ btc_chain_get_target(btc_chain_t *chain,
   }
 
   /* Back 2 weeks. */
-  height = prev->height - (net->pow.retarget_interval - 1);
+  height = prev->height - (pow->retarget_interval - 1);
 
   CHECK(height >= 0);
 

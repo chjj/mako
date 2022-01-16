@@ -130,6 +130,7 @@ extern "C" {
 #define mpz_init_set_si btc__mpz_init_set_si
 #define mpz_init_set_compact btc__mpz_init_set_compact
 #define mpz_init_set_str btc__mpz_init_set_str
+#define mpz_init_import btc__mpz_init_import
 #define mpz_clear btc__mpz_clear
 #define mpz_clears btc__mpz_clears
 #define mpz_cleanse btc__mpz_cleanse
@@ -1006,6 +1007,9 @@ mpz_init_set_compact(mpz_ptr z, mp_limb_t x);
 
 MP_EXTERN int
 mpz_init_set_str(mpz_ptr z, const char *str, int base);
+
+MP_EXTERN void
+mpz_init_import(mpz_ptr z, const unsigned char *raw, size_t size, int endian);
 
 /*
  * Uninitialization

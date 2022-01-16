@@ -112,40 +112,42 @@ btc_entry_read(btc_entry_t *z, const uint8_t **xp, size_t *xn) {
   return 1;
 }
 
-void
+static void
+mpz_work(mpz_ptr z, mp_limb_t x) {
+  /* Compute z = 2^256 / (target + 1). */
+#if MP_LIMB_BITS == 64
+  static mp_limb_t mp[5] = {0, 0, 0, 0, 1};
+  static const mpz_t m = MPZ_ROINIT_N(mp, 5);
+#else
+  static mp_limb_t mp[9] = {0, 0, 0, 0, 0, 0, 0, 0, 1};
+  static const mpz_t m = MPZ_ROINIT_N(mp, 9);
+#endif
+
+  mpz_set_compact(z, x);
+
+  CHECK(mpz_sgn(z) >= 0);
+  CHECK(mpz_bitlen(z) <= 256);
+
+  mpz_add_ui(z, z, 1);
+  mpz_quo(z, m, z);
+}
+
+static void
 btc_entry_get_chainwork(uint8_t *chainwork,
                         const btc_entry_t *entry,
                         const btc_entry_t *prev) {
-#if MP_LIMB_BITS == 64
-  static mp_limb_t limbs[5] = {0, 0, 0, 0, 1};
-  static const mpz_t max = MPZ_ROINIT_N(limbs, 5);
-#else
-  static mp_limb_t limbs[9] = {0, 0, 0, 0, 0, 0, 0, 0, 1};
-  static const mpz_t max = MPZ_ROINIT_N(limbs, 9);
-#endif
-  mpz_t work, target, proof;
+  /* Compute sum += 2^256 / (target + 1). */
+  mpz_t sum, work;
 
-  mpz_init(work);
-  mpz_init(target);
-  mpz_init(proof);
+  mpz_inits(sum, work, NULL);
 
   if (prev != NULL)
-    mpz_import(work, prev->chainwork, 32, -1);
+    mpz_import(sum, prev->chainwork, 32, -1);
 
-  mpz_set_compact(target, entry->header.bits);
-
-  CHECK(mpz_sgn(target) >= 0);
-  CHECK(mpz_bitlen(target) <= 256);
-
-  mpz_add_ui(target, target, 1);
-  mpz_quo(proof, max, target);
-
-  mpz_add(work, work, proof);
-  mpz_export(chainwork, work, 32, -1);
-
-  mpz_clear(work);
-  mpz_clear(target);
-  mpz_clear(proof);
+  mpz_work(work, entry->header.bits);
+  mpz_add(sum, sum, work);
+  mpz_export(chainwork, sum, 32, -1);
+  mpz_clears(sum, work, NULL);
 }
 
 void

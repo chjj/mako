@@ -21,8 +21,7 @@ btc_compact_export(uint8_t *target, uint32_t bits) {
   int ret = 0;
   mpz_t z;
 
-  mpz_init(z);
-  mpz_set_compact(z, bits);
+  mpz_init_set_compact(z, bits);
 
   if (mpz_sgn(z) <= 0)
     goto fail;
@@ -42,8 +41,7 @@ btc_compact_import(const uint8_t *target) {
   uint32_t bits;
   mpz_t x;
 
-  mpz_init(x);
-  mpz_import(x, target, 32, -1);
+  mpz_init_import(x, target, 32, -1);
 
   bits = mpz_get_compact(x);
 

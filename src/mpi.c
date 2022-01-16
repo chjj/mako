@@ -5186,6 +5186,12 @@ mpz_init_set_str(mpz_ptr z, const char *str, int base) {
   return mpz_set_str(z, str, base);
 }
 
+void
+mpz_init_import(mpz_ptr z, const unsigned char *raw, size_t size, int endian) {
+  mpz_init(z);
+  mpz_import(z, raw, size, endian);
+}
+
 /*
  * Uninitialization
  */
