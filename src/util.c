@@ -83,11 +83,8 @@ btc_memcmp4(const void *x, size_t xn, const void *y, size_t yn) {
       return cmp;
   }
 
-  if (xn < yn)
-    return -1;
-
-  if (xn > yn)
-    return 1;
+  if (xn != yn)
+    return xn < yn ? -1 : 1;
 
   return 0;
 }
@@ -148,10 +145,8 @@ size_t
 btc_strnlen(const char *xp, size_t max) {
   size_t xn = 0;
 
-  while (*xp++) {
-    if (++xn == max)
-      break;
-  }
+  while (*xp && ++xn < max)
+    xp++;
 
   return xn;
 }
