@@ -452,12 +452,14 @@ http_client_write(http_client_t *client, void *data, size_t size) {
 
   if (rc == -1) {
     btc_socket_close(client->socket);
+    btc_loop_cleanup(client->loop);
     return 0;
   }
 
   if (rc == 0) {
     if (btc_socket_buffered(client->socket) > HTTP_MAX_BUFFER) {
       btc_socket_close(client->socket);
+      btc_loop_cleanup(client->loop);
       return 0;
     }
   }
@@ -561,8 +563,10 @@ http_client_write_head(http_client_t *client, const http_options_t *opt) {
     char tp[512], bp[685];
     int tn;
 
-    if (strlen(opt->user) > 255 || strlen(opt->pass) > 255)
+    if (strlen(opt->user) > 255 || strlen(opt->pass) > 255) {
+      free(head);
       return 0;
+    }
 
     tn = sprintf(tp, "%s:%s", opt->user, opt->pass);
 
@@ -610,8 +614,11 @@ http_client_request(http_client_t *client, const http_options_t *options) {
   start = btc_time_msec();
 
   while (!client->done) {
-    if (btc_time_msec() > start + 10 * 1000)
+    if (btc_time_msec() > start + 10 * 1000) {
+      btc_socket_timeout(client->socket);
+      btc_loop_cleanup(client->loop);
       goto fail;
+    }
 
     btc_loop_poll(client->loop, 1000);
   }

@@ -94,6 +94,9 @@ btc_socket_send(btc_socket_t *socket,
 BTC_EXTERN void
 btc_socket_close(btc_socket_t *socket);
 
+BTC_EXTERN void
+btc_socket_timeout(btc_socket_t *socket);
+
 /*
  * Loop
  */
@@ -130,6 +133,9 @@ btc_loop_start(btc_loop_t *loop);
 
 BTC_EXTERN void
 btc_loop_stop(btc_loop_t *loop);
+
+BTC_EXTERN void
+btc_loop_cleanup(btc_loop_t *loop);
 
 BTC_EXTERN void
 btc_loop_poll(btc_loop_t *loop, int timeout);

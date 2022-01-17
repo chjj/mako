@@ -60,6 +60,7 @@ typedef char btc_sockopt_t;
 #  define BTC_EMSGSIZE WSAEMSGSIZE
 #  define BTC_EAFNOSUPPORT WSAEAFNOSUPPORT
 #  define BTC_ENOBUFS WSAENOBUFS
+#  define BTC_ETIMEDOUT WSAETIMEDOUT
 #  define BTC_EINPROGRESS WSAEWOULDBLOCK
 #  define btc_closesocket closesocket
 #else
@@ -83,6 +84,7 @@ typedef int btc_sockopt_t;
 #  define BTC_EMSGSIZE EMSGSIZE
 #  define BTC_EAFNOSUPPORT EAFNOSUPPORT
 #  define BTC_ENOBUFS ENOBUFS
+#  define BTC_ETIMEDOUT ETIMEDOUT
 #  define BTC_EINPROGRESS EINPROGRESS
 #  define btc_closesocket close
 #endif
@@ -1250,6 +1252,12 @@ btc_socket_kill(btc_socket_t *socket) {
   socket->on_close(socket);
 }
 
+void
+btc_socket_timeout(btc_socket_t *socket) {
+  socket->loop->error = BTC_ETIMEDOUT;
+  btc_socket_close(socket);
+}
+
 /*
  * Loop
  */
@@ -1746,6 +1754,13 @@ btc_loop_start(btc_loop_t *loop) {
 void
 btc_loop_stop(btc_loop_t *loop) {
   loop->running = 0;
+}
+
+void
+btc_loop_cleanup(btc_loop_t *loop) {
+  CHECK(loop->running == 0);
+
+  handle_closed(loop);
 }
 
 void
