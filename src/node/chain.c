@@ -609,9 +609,6 @@ btc_chain_last_checkpoint(btc_chain_t *chain) {
   const btc_entry_t *entry;
   int i;
 
-  if (!(chain->flags & BTC_CHAIN_CHECKPOINTS))
-    return NULL;
-
   for (i = length - 1; i >= 0; i--) {
     chk = &network->checkpoints.items[i];
     entry = btc_chaindb_by_hash(chain->db, chk->hash);
@@ -1005,6 +1002,9 @@ btc_chain_check_target(btc_chain_t *chain, const btc_header_t *hdr) {
   const btc_entry_t *chk;
   int64_t delta;
   uint32_t max;
+
+  if (!(chain->flags & BTC_CHAIN_CHECKPOINTS))
+    return 1;
 
   if (btc_hash_equal(hdr->prev_block, chain->tip->hash))
     return 1;
@@ -1626,69 +1626,22 @@ btc_chain_disconnect(btc_chain_t *chain, btc_entry_t *entry) {
   return 1;
 }
 
-static void
-btc_chain_unreorganize(btc_chain_t *chain,
-                       const btc_entry_t *fork,
-                       btc_entry_t *last) {
-  btc_entry_t *tip = chain->tip;
-  btc_vector_t disconnect, connect;
-  btc_entry_t *entry;
-  size_t i;
+const btc_entry_t *
+btc_chain_find_fork(btc_chain_t *chain, const btc_entry_t *entry) {
+  if (entry->height > chain->height)
+    entry = btc_chain_get_ancestor(chain, entry, chain->height);
 
-  btc_vector_init(&disconnect);
-  btc_vector_init(&connect);
+  while (!btc_chaindb_is_main(chain->db, entry))
+    entry = entry->prev;
 
-  /* Blocks to disconnect. */
-  for (entry = tip; entry != fork; entry = entry->prev)
-    btc_vector_push(&disconnect, entry);
-
-  /* Blocks to connect. */
-  for (entry = last; entry != fork; entry = entry->prev)
-    btc_vector_push(&connect, entry);
-
-  /* Disconnect blocks and transactions. */
-  for (i = 0; i < disconnect.length; i++)
-    CHECK(btc_chain_disconnect(chain, disconnect.items[i]));
-
-  /* Connect blocks and transactions. */
-  for (i = connect.length - 1; i != (size_t)-1; i--)
-    CHECK(btc_chain_reconnect(chain, connect.items[i]));
-
-  btc_log_warn(chain, "Chain un-reorganization: old=%H(%d) new=%H(%d)",
-                      tip->hash, tip->height, last->hash, last->height);
-
-  if (chain->on_reorganize != NULL)
-    chain->on_reorganize(tip, last, chain->arg);
-
-  btc_vector_clear(&disconnect);
-  btc_vector_clear(&connect);
-}
-
-static const btc_entry_t *
-find_fork(const btc_entry_t *fork, const btc_entry_t *longer) {
-  while (fork != longer) {
-    while (longer->height > fork->height) {
-      longer = longer->prev;
-
-      CHECK(longer != NULL);
-    }
-
-    if (fork == longer)
-      return fork;
-
-    fork = fork->prev;
-
-    CHECK(fork != NULL);
-  }
-
-  return fork;
+  return entry;
 }
 
 static int
 btc_chain_reorganize(btc_chain_t *chain,
                      const btc_entry_t *fork,
-                     btc_entry_t *competitor) {
-  btc_entry_t *tip = chain->tip;
+                     btc_entry_t *new_tip) {
+  btc_entry_t *old_tip = chain->tip;
   btc_vector_t disconnect, connect;
   btc_entry_t *entry;
   int ret = 0;
@@ -1698,24 +1651,19 @@ btc_chain_reorganize(btc_chain_t *chain,
   btc_vector_init(&connect);
 
   /* Blocks to disconnect. */
-  for (entry = tip; entry != fork; entry = entry->prev)
+  for (entry = old_tip; entry != fork; entry = entry->prev)
     btc_vector_push(&disconnect, entry);
 
   /* Blocks to connect. */
-  for (entry = competitor; entry != fork; entry = entry->prev)
+  for (entry = new_tip; entry != fork; entry = entry->prev)
     btc_vector_push(&connect, entry);
 
   /* Disconnect blocks and transactions. */
   for (i = 0; i < disconnect.length; i++)
     CHECK(btc_chain_disconnect(chain, disconnect.items[i]));
 
-  /* Sanity check. */
-  CHECK(connect.length > 0);
-
-  /* Connect blocks and transactions. Note that
-     we don't want to connect the new tip here.
-     That will be done outside in set_best_chain. */
-  for (i = connect.length - 1; i != 0; i--) {
+  /* Connect blocks and transactions. */
+  for (i = connect.length - 1; i != (size_t)-1; i--) {
     if (!btc_chain_reconnect(chain, connect.items[i])) {
       if (!chain->error.malleated) {
         while (i--) {
@@ -1724,19 +1672,16 @@ btc_chain_reorganize(btc_chain_t *chain,
         }
       }
 
-      if (btc_hash_compare(chain->tip->chainwork, tip->chainwork) < 0)
-        btc_chain_unreorganize(chain, fork, tip);
-
       goto fail;
     }
   }
 
   btc_log_warn(chain, "Chain reorganization: old=%H(%d) new=%H(%d)",
-                      tip->hash, tip->height,
-                      competitor->hash, competitor->height);
+                      old_tip->hash, old_tip->height,
+                      new_tip->hash, new_tip->height);
 
   if (chain->on_reorganize != NULL)
-    chain->on_reorganize(tip, competitor, chain->arg);
+    chain->on_reorganize(old_tip, new_tip, chain->arg);
 
   ret = 1;
 fail:
@@ -1754,7 +1699,9 @@ btc_chain_save_alternate(btc_chain_t *chain,
 
   /* Do not accept forked chain older than the last checkpoint. */
   if (chain->flags & BTC_CHAIN_CHECKPOINTS) {
-    if (entry->height < chain->network->last_checkpoint) {
+    const btc_entry_t *chk = btc_chain_last_checkpoint(chain);
+
+    if (chk != NULL && entry->height < chk->height) {
       return btc_chain_throw(chain, hdr,
                              BTC_REJECT_CHECKPOINT,
                              "bad-fork-prior-to-checkpoint",
@@ -1804,10 +1751,14 @@ btc_chain_set_best_chain(btc_chain_t *chain,
   if (!btc_hash_equal(entry->header.prev_block, tip->hash)) {
     btc_log_warn(chain, "WARNING: Reorganizing chain.");
 
-    fork = find_fork(tip, entry);
+    fork = btc_chain_find_fork(chain, entry);
 
-    if (!btc_chain_reorganize(chain, fork, entry))
+    if (!btc_chain_reorganize(chain, fork, entry->prev)) {
+      if (btc_hash_compare(chain->tip->chainwork, tip->chainwork) < 0)
+        CHECK(btc_chain_reorganize(chain, fork, tip));
+
       return 0;
+    }
   }
 
   /* Otherwise, everything is in order. Do "contextual" verification
@@ -1824,7 +1775,7 @@ btc_chain_set_best_chain(btc_chain_t *chain,
 
     if (fork != NULL) {
       if (btc_hash_compare(chain->tip->chainwork, tip->chainwork) < 0)
-        btc_chain_unreorganize(chain, fork, tip);
+        CHECK(btc_chain_reorganize(chain, fork, tip));
     }
 
     return 0;
