@@ -1644,7 +1644,7 @@ btc_chain_reorganize(btc_chain_t *chain,
   btc_entry_t *old_tip = chain->tip;
   btc_vector_t disconnect, connect;
   btc_entry_t *entry;
-  int ret = 0;
+  int ret = 1;
   size_t i;
 
   btc_vector_init(&disconnect);
@@ -1671,22 +1671,14 @@ btc_chain_reorganize(btc_chain_t *chain,
           btc_chain_set_invalid(chain, entry->hash);
         }
       }
-
-      goto fail;
+      ret = 0;
+      break;
     }
   }
 
-  btc_log_warn(chain, "Chain reorganization: old=%H(%d) new=%H(%d)",
-                      old_tip->hash, old_tip->height,
-                      new_tip->hash, new_tip->height);
-
-  if (chain->on_reorganize != NULL)
-    chain->on_reorganize(old_tip, new_tip, chain->arg);
-
-  ret = 1;
-fail:
   btc_vector_clear(&disconnect);
   btc_vector_clear(&connect);
+
   return ret;
 }
 
@@ -1788,11 +1780,19 @@ btc_chain_set_best_chain(btc_chain_t *chain,
   chain->height = entry->height;
   chain->state = state;
 
-  if (chain->on_block != NULL)
-    chain->on_block(block, entry, chain->arg);
-
   if (chain->on_connect != NULL)
     chain->on_connect(entry, block, view, chain->arg);
+
+  if (fork != NULL) {
+    btc_log_warn(chain, "Chain reorganization: old=%H(%d) new=%H(%d)",
+                        tip->hash, tip->height, entry->hash, entry->height);
+
+    if (chain->on_reorganize != NULL)
+      chain->on_reorganize(tip, entry, chain->arg);
+  }
+
+  if (chain->on_block != NULL)
+    chain->on_block(block, entry, chain->arg);
 
   btc_view_destroy(view);
 
