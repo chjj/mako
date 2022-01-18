@@ -440,16 +440,18 @@ try_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
 
   fd = accept(sockfd, addr, addrlen);
 
+  if (fd == -1)
+    return -1;
+
 #ifdef SO_NOSIGPIPE
-  if (fd != -1) {
+  {
     btc_sockopt_t yes = 1;
 
     setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &yes, sizeof(yes));
   }
 #endif
 
-  if (fd != -1)
-    set_cloexec(fd);
+  set_cloexec(fd);
 
   return fd;
 }
@@ -493,16 +495,18 @@ safe_socket(int domain, int type, int protocol) {
 
   fd = socket(domain, type, protocol);
 
+  if (fd == -1)
+    return -1;
+
 #ifdef SO_NOSIGPIPE
-  if (fd != -1) {
+  {
     btc_sockopt_t yes = 1;
 
     setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &yes, sizeof(yes));
   }
 #endif
 
-  if (fd != -1)
-    set_cloexec(fd);
+  set_cloexec(fd);
 
   return fd;
 #endif
