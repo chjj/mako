@@ -6,10 +6,8 @@
 
 #include <stdlib.h>
 #include <stdint.h>
-#include <string.h>
-#include <mako/coins.h>
 #include <mako/mpi.h>
-#include "impl.h"
+#include <mako/util.h>
 #include "internal.h"
 
 /*

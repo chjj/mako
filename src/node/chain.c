@@ -1626,7 +1626,7 @@ btc_chain_disconnect(btc_chain_t *chain, btc_entry_t *entry) {
   return 1;
 }
 
-const btc_entry_t *
+static const btc_entry_t *
 btc_chain_find_fork(btc_chain_t *chain, const btc_entry_t *entry) {
   if (entry->height > chain->height)
     entry = btc_chain_get_ancestor(chain, entry, chain->height);

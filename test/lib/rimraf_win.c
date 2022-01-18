@@ -26,6 +26,7 @@ btc_remove(char *path, int plen) {
   if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
     HANDLE handle = INVALID_HANDLE_VALUE;
     WIN32_FIND_DATAA fdata;
+    int tries = 0;
 
     if (plen + 3 > 4096) {
       SetLastError(ERROR_BUFFER_OVERFLOW);
@@ -53,7 +54,6 @@ btc_remove(char *path, int plen) {
     do {
       char *name = fdata.cFileName;
       char *ptr = path + plen;
-      int tries = 0;
 
       if (strcmp(name, ".") == 0)
         continue;
@@ -108,7 +108,7 @@ btc_remove(char *path, int plen) {
   }
 
   if (attrs & FILE_ATTRIBUTE_READONLY)
-    SetFileAttributesA(name, attrs & ~FILE_ATTRIBUTE_READONLY);
+    SetFileAttributesA(path, attrs & ~FILE_ATTRIBUTE_READONLY);
 
   if (!DeleteFileA(path)) {
     if (GetLastError() == ERROR_FILE_NOT_FOUND)

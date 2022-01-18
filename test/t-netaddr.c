@@ -10,7 +10,7 @@
 #include <mako/netaddr.h>
 #include "lib/tests.h"
 
-const btc_netaddr_t *
+static const btc_netaddr_t *
 decode(const char *str, btc_netaddr_t *tmp) {
   ASSERT(btc_netaddr_set_str(tmp, str));
   return tmp;

@@ -5,26 +5,197 @@
 cmake_minimum_required(VERSION 3.4)
 project(mako LANGUAGES C)
 
+#
+# Toolchain/Platform Fixes
+#
+
+if(WASI)
+  # No idea why this isn't set.
+  set(CMAKE_EXECUTABLE_SUFFIX ".wasm")
+endif()
+
+if(EMSCRIPTEN)
+  # CMAKE_CROSSCOMPILING_EMULATOR is mistakenly quoted by emcmake.
+  string(REPLACE "\"" "" CMAKE_CROSSCOMPILING_EMULATOR
+         "${CMAKE_CROSSCOMPILING_EMULATOR}")
+endif()
+
+#
+# Includes
+#
+
+include(cmake/AppendCCompilerFlag.cmake)
+include(cmake/CheckCThreadLocalStorage.cmake)
+include(cmake/TargetLinkOptions.cmake)
+include(CheckCSourceCompiles)
+include(CheckIncludeFile)
+include(CheckLibraryExists)
+include(CheckSymbolExists)
 include(CTest)
+include(GNUInstallDirs)
 include(TestBigEndian)
 
-option(MAKO_USE_LEVELDB "Use leveldb" OFF)
+#
+# Options
+#
 
+option(MAKO_ASM "Use inline assembly if available" ON)
+option(MAKO_COVERAGE "Enable coverage" OFF)
+option(MAKO_INT128 "Use __int128 if available" ON)
+option(MAKO_LEVELDB "Use leveldb" OFF)
+option(MAKO_LIBONLY "Build only the core library" OFF)
+option(MAKO_PIC "Enable PIC" OFF)
+option(MAKO_SHARED "Build shared library" ON)
+option(MAKO_TESTS "Build tests" ON)
+option(MAKO_TLS "Use thread-local storage if available" ON)
+
+#
+# Variables
+#
+
+set(io_sources)
+set(node_sources)
+set(client_sources)
+set(test_sources)
 set(mako_sources)
 set(mako_defines)
 set(mako_cflags)
 set(mako_includes)
 set(mako_ldflags)
 set(mako_libs)
-set(io_sources)
-set(node_sources)
-set(client_sources)
-set(test_sources)
+set(node_libs)
+set(test_libs)
 
-set(CMAKE_C_STANDARD 90)
-set(CMAKE_C_EXTENSIONS OFF)
-set(CMAKE_C_STANDARD_REQUIRED OFF)
+#
+# Global Flags
+#
+
+if(NOT PROJECT_NAME STREQUAL CMAKE_PROJECT_NAME)
+  unset(CMAKE_C_STANDARD_REQUIRED)
+  unset(CMAKE_C_EXTENSIONS)
+  unset(CMAKE_C_STANDARD)
+  unset(CMAKE_C_VISIBILITY_PRESET)
+  unset(CMAKE_OSX_DEPLOYMENT_TARGET)
+endif()
+
+check_symbol_exists(__GLIBC__ "limits.h" MAKO_GLIBC)
+
+if(MAKO_GLIBC)
+  set(CMAKE_C_STANDARD 90)
+  set(CMAKE_C_EXTENSIONS OFF)
+  set(CMAKE_C_STANDARD_REQUIRED OFF)
+endif()
+
 set(CMAKE_C_VISIBILITY_PRESET hidden)
+
+if(APPLE)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.7)
+endif()
+
+#
+# Feature Testing
+#
+
+test_big_endian(MAKO_BIGENDIAN)
+
+if(MAKO_ASM)
+  check_c_source_compiles([=[
+    int main(void) {
+      unsigned long z = 953;
+      unsigned long x = 109;
+      unsigned long y = 577;
+      unsigned long c;
+      __asm__ __volatile__ (
+#   if defined(__amd64__) || defined(__amd64)
+        "movq $0, %q1\\n"
+#   elif defined(__x86_64__) || defined(__x86_64)
+        "movq $0, %q1\\n"
+#   elif defined(__i386__) || defined(__i386) || defined(i386)
+        "movl $0, %k1\\n"
+#   else
+        ""
+#   endif
+        : "+r" (z), "=&r" (c)
+#   if defined(__wasm__) || defined(__EMSCRIPTEN__)
+        :
+#   elif defined(__TINYC__)
+        : "rm" (x), "rm" (y)
+#   else
+        : "%rm" (x), "rm" (y)
+#   endif
+        : "cc", "memory"
+      );
+      return z & 0x7f;
+    }
+  ]=] MAKO_HAVE_ASM)
+else()
+  set(MAKO_HAVE_ASM)
+endif()
+
+check_c_source_compiles([=[
+# include <time.h>
+  int main(void) {
+    struct timespec ts;
+    (void)clock_gettime((clockid_t)CLOCK_REALTIME, &ts);
+    (void)clock_gettime((clockid_t)CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec & ts.tv_nsec & 0x7f;
+  }
+]=] MAKO_HAVE_CLOCK)
+
+if(MAKO_INT128)
+  check_c_source_compiles([=[
+    typedef signed __int128 xint128_t;
+    typedef unsigned __int128 xuint128_t;
+    typedef char check_voidptr_t[sizeof(void *) >= 8 ? 1 : -1];
+    typedef char check_int128_t[sizeof(xint128_t) == 16 ? 1 : -1];
+    typedef char check_uint128_t[sizeof(xuint128_t) == 16 ? 1 : -1];
+    int main(int argc, char **argv) {
+      xint128_t c = argv[0][0];
+      xuint128_t r = argc + c;
+      while (argc--) r *= r;
+      return r >> 121;
+    }
+  ]=] MAKO_HAVE_INT128)
+else()
+  set(MAKO_HAVE_INT128)
+endif()
+
+set(MAKO_HAVE_PTHREAD 0)
+
+if(NOT MINGW AND NOT WASI AND NOT EMSCRIPTEN)
+  set(THREADS_PREFER_PTHREAD_FLAG ON)
+
+  find_package(Threads)
+
+  if(CMAKE_USE_PTHREADS_INIT)
+    set(MAKO_HAVE_PTHREAD 1)
+  endif()
+endif()
+
+if(MAKO_TLS)
+  check_c_thread_local_storage(MAKO_TLS_KEYWORD
+                               MAKO_TLS_FLAG
+                               MAKO_TLS_EMULATED)
+else()
+  set(MAKO_TLS_KEYWORD)
+  set(MAKO_TLS_FLAG)
+  set(MAKO_TLS_EMULATED)
+endif()
+
+set(MAKO_HAVE_ZLIB 0)
+
+if(MAKO_TESTS)
+  check_include_file(zlib.h MAKO_HAVE_ZLIB_H)
+  check_library_exists(z compress2 "" MAKO_HAVE_ZLIB_A)
+
+  if(MAKO_HAVE_ZLIB_H AND MAKO_HAVE_ZLIB_A)
+    set(MAKO_HAVE_ZLIB 1)
+  endif()
+endif()
+
+#
+# Sources
+#
 
 list(APPEND mako_sources src/crypto/chacha20.c
                          src/crypto/drbg.c
@@ -157,192 +328,406 @@ else()
   list(APPEND test_sources test/lib/rimraf_unix.c)
 endif()
 
+#
+# Flags
+#
+
+if(MSVC)
+  append_c_compiler_flag(mako_cflags /wd4146  # negation of unsigned integer
+                                     /wd4244  # implicit integer demotion
+                                     /wd4267  # implicit size_t demotion
+                                     /wd4334) # implicit 32->64 bit shift
+elseif(BORLAND)
+# Todo.
+elseif(CMAKE_C_COMPILER_ID MATCHES "Watcom$")
+  append_c_compiler_flag(mako_cflags -wcd=201  # unreachable code
+                                     -wcd=202) # unused symbol
+else()
+  append_c_compiler_flag(mako_cflags -pedantic
+                                     -Wall
+                                     -Wextra
+                                     -Wcast-align
+                                     -Wcast-align=strict
+                                     -Wconditional-uninitialized
+                                     -Wmissing-prototypes
+                                     -Wno-implicit-fallthrough
+                                     -Wno-long-long
+                                     -Wno-overlength-strings
+                                     -Wshadow
+                                     -Wstrict-prototypes
+                                     -Wundef)
+endif()
+
+if(MAKO_COVERAGE)
+  list(APPEND mako_cflags -O0 --coverage)
+  list(APPEND mako_ldflags --coverage)
+endif()
+
+if(MAKO_TLS_FLAG)
+  list(APPEND mako_cflags ${MAKO_TLS_FLAG})
+endif()
+
+if(MINGW)
+  # Ensure we are redistributable on windows.
+  list(APPEND mako_ldflags -static-libgcc)
+endif()
+
+#
+# Defines
+#
+
+if(MAKO_BIGENDIAN)
+  list(APPEND mako_defines BTC_BIGENDIAN)
+endif()
+
+if(MAKO_HAVE_ASM)
+  list(APPEND mako_defines BTC_HAVE_ASM)
+endif()
+
+if(MAKO_HAVE_CLOCK)
+  list(APPEND mako_defines BTC_HAVE_CLOCK)
+endif()
+
+if(MAKO_COVERAGE)
+  list(APPEND mako_defines BTC_COVERAGE)
+endif()
+
+list(APPEND mako_defines $<$<CONFIG:Debug>:BTC_DEBUG>)
+
+if(MAKO_HAVE_INT128)
+  list(APPEND mako_defines BTC_HAVE_INT128)
+endif()
+
+if(MAKO_HAVE_PTHREAD)
+  list(APPEND mako_defines BTC_HAVE_PTHREAD)
+endif()
+
+if(MAKO_TLS_KEYWORD)
+  list(APPEND mako_defines BTC_TLS=${MAKO_TLS_KEYWORD})
+endif()
+
+if(MAKO_HAVE_ZLIB)
+  list(APPEND mako_defines BTC_HAVE_ZLIB)
+endif()
+
+#
+# Feature Test Macros
+#
+
 if(WIN32)
   list(APPEND mako_defines _WIN32_WINNT=0x501)
 endif()
 
-if(WIN32 AND NOT MINGW)
-  list(APPEND mako_defines "BTC_TLS=__declspec(thread)")
-else()
-  list(APPEND mako_defines BTC_HAVE_ASM)
-  list(APPEND mako_defines BTC_HAVE_INT128)
-  if(NOT MINGW)
-    list(APPEND mako_defines BTC_HAVE_CLOCK)
-    list(APPEND mako_defines BTC_HAVE_PTHREAD)
-    list(APPEND mako_defines BTC_TLS=__thread)
-    list(APPEND mako_defines _GNU_SOURCE)
-  endif()
+if(MAKO_GLIBC)
+  list(APPEND mako_defines _GNU_SOURCE)
 endif()
 
-test_big_endian(BTC_BIGENDIAN)
-
-if(BTC_BIGENDIAN)
-  list(APPEND mako_defines BTC_BIGENDIAN)
+if(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
+  list(APPEND mako_defines _TS_ERRNO)
 endif()
 
-if(NOT CMAKE_CROSSCOMPILING)
-  if(WIN32)
-    string(REPLACE "/" "\\" srcdir "${PROJECT_SOURCE_DIR}")
-    list(APPEND mako_defines BTC_PREFIX="${srcdir}\\tmp")
-  else()
-    list(APPEND mako_defines BTC_PREFIX="${PROJECT_SOURCE_DIR}/tmp")
-  endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "AIX")
+  list(APPEND mako_defines _THREAD_SAFE_ERRNO)
 endif()
 
-if(MSVC)
-  list(APPEND mako_cflags /wd4244
-                          /wd4267)
-else()
-  list(APPEND mako_cflags -pedantic
-                          -Wall
-                          -Wextra
-                          -Wcast-align
-                          -Wno-implicit-fallthrough
-                          -Wno-long-long
-                          -Wno-overlength-strings
-                          -Wshadow)
-endif()
+#
+# Includes
+#
 
 list(APPEND mako_includes ${PROJECT_SOURCE_DIR}/include)
+
+#
+# Libraries
+#
 
 if(WIN32)
   list(APPEND mako_libs shell32 userenv ws2_32)
 else()
   list(APPEND mako_libs m)
+
+  if(MAKO_HAVE_PTHREAD)
+    list(APPEND mako_libs Threads::Threads)
+  endif()
 endif()
 
-if(MAKO_USE_LEVELDB)
-  add_subdirectory(deps/lsm2)
+if(MAKO_LEVELDB)
+  list(APPEND node_libs lsm2)
 else()
-  add_subdirectory(deps/lsm1)
+  list(APPEND node_libs lsm1)
 endif()
 
-add_library(mako_lib STATIC ${mako_sources})
-target_compile_definitions(mako_lib PUBLIC ${mako_defines})
-target_compile_options(mako_lib PUBLIC ${mako_cflags})
-target_include_directories(mako_lib PUBLIC ${mako_includes})
-target_link_options(mako_lib INTERFACE ${mako_ldflags})
-target_link_libraries(mako_lib PRIVATE ${mako_libs})
-set_property(TARGET mako_lib PROPERTY OUTPUT_NAME mako)
+if(MAKO_HAVE_ZLIB)
+  list(APPEND test_libs z)
+endif()
 
-add_library(mako_io STATIC ${io_sources})
-target_compile_definitions(mako_io PUBLIC ${mako_defines})
-target_compile_options(mako_io PUBLIC ${mako_cflags})
-target_include_directories(mako_io PUBLIC ${mako_includes})
-target_link_options(mako_io INTERFACE ${mako_ldflags})
-target_link_libraries(mako_io PRIVATE pthread)
-set_property(TARGET mako_io PROPERTY OUTPUT_NAME io)
+#
+# Targets
+#
 
-add_library(mako_node STATIC ${node_sources})
-target_compile_definitions(mako_node PUBLIC ${mako_defines})
-target_compile_options(mako_node PUBLIC ${mako_cflags})
-target_include_directories(mako_node PUBLIC ${mako_includes})
-target_link_options(mako_node INTERFACE ${mako_ldflags})
+function(mako_build_full)
+  #
+  # Interface Library
+  #
 
-if(MAKO_USE_LEVELDB)
-  target_link_libraries(mako_node PRIVATE lsm2)
+  add_library(mako INTERFACE)
+  target_compile_definitions(mako INTERFACE ${mako_defines})
+  target_compile_options(mako INTERFACE ${mako_cflags})
+  target_include_directories(mako INTERFACE ${mako_includes})
+  target_link_options(mako INTERFACE ${mako_ldflags})
+  target_link_libraries(mako INTERFACE ${mako_libs})
+
+  #
+  # Static Library
+  #
+
+  add_library(mako_static STATIC ${mako_sources})
+  target_link_libraries(mako_static PRIVATE mako)
+  set_property(TARGET mako_static PROPERTY POSITION_INDEPENDENT_CODE
+                                           ${MAKO_PIC})
+
+  if(WIN32)
+    set_property(TARGET mako_static PROPERTY OUTPUT_NAME libmako)
+  else()
+    set_property(TARGET mako_static PROPERTY OUTPUT_NAME mako)
+  endif()
+
+  if(MINGW)
+    set_target_properties(mako_static PROPERTIES PREFIX "" SUFFIX ".lib")
+  endif()
+
+  #
+  # Test Library
+  #
+
+  add_library(mako_test STATIC ${test_sources})
+  target_link_libraries(mako_test PRIVATE mako ${test_libs})
+  set_property(TARGET mako_test PROPERTY OUTPUT_NAME test)
+
+  mako_tests_lib()
+
+  if(WASI OR EMSCRIPTEN)
+    return()
+  endif()
+
+  #
+  # Shared Library
+  #
+
+  if(MAKO_SHARED)
+    add_library(mako_shared SHARED ${mako_sources})
+    target_link_libraries(mako_shared PRIVATE mako)
+    target_compile_definitions(mako_shared PRIVATE BTC_EXPORT)
+    set_property(TARGET mako_shared PROPERTY OUTPUT_NAME mako)
+
+    if(MINGW)
+      set_target_properties(mako_shared PROPERTIES PREFIX ""
+                                                   SUFFIX ".dll"
+                                                   IMPORT_PREFIX ""
+                                                   IMPORT_SUFFIX ".lib")
+      target_link_options(mako_shared PRIVATE -Wl,--output-def,mako.def)
+    endif()
+  endif()
+
+  #
+  # Install Targets
+  #
+
+  if(UNIX)
+    configure_file(libmako.pc.in libmako.pc @ONLY)
+
+    install(DIRECTORY include/mako/
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mako)
+    install(FILES LICENSE
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/${PROJECT_NAME})
+    install(FILES README.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+    install(FILES ${PROJECT_BINARY_DIR}/libmako.pc
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+    install(TARGETS mako_static ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+    if(MAKO_SHARED)
+      install(TARGETS mako_shared
+              ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+              LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    endif()
+  endif()
+
+  if(WIN32)
+    install(DIRECTORY include/mako/ DESTINATION include/mako)
+    install(FILES LICENSE README.md DESTINATION .)
+    install(TARGETS mako_static ARCHIVE DESTINATION lib/$<CONFIG>)
+
+    if(MAKO_SHARED)
+      install(TARGETS mako_shared
+              ARCHIVE DESTINATION lib/$<CONFIG>
+              RUNTIME DESTINATION lib/$<CONFIG>)
+    endif()
+  endif()
+
+  if(MAKO_LIBONLY)
+    return()
+  endif()
+
+  #
+  # Node Targets
+  #
+
+  if(MAKO_LEVELDB)
+    add_subdirectory(deps/lsm2)
+  else()
+    add_subdirectory(deps/lsm1)
+  endif()
+
+  add_library(mako_io STATIC ${io_sources})
+  target_link_libraries(mako_io PRIVATE mako)
+  set_property(TARGET mako_io PROPERTY OUTPUT_NAME io)
+
+  add_library(mako_node STATIC ${node_sources})
+  target_link_libraries(mako_node PRIVATE mako mako_io mako_static ${node_libs})
+  set_property(TARGET mako_node PROPERTY OUTPUT_NAME node)
+
+  add_library(mako_client STATIC ${client_sources})
+  target_link_libraries(mako_client PRIVATE mako mako_io mako_static)
+  set_property(TARGET mako_client PROPERTY OUTPUT_NAME client)
+
+  add_executable(mako_daemon src/node/main.c)
+  target_link_libraries(mako_daemon PRIVATE mako mako_node)
+  set_property(TARGET mako_daemon PROPERTY OUTPUT_NAME makod)
+
+  add_executable(mako_cli src/client/main.c)
+  target_link_libraries(mako_cli PRIVATE mako mako_client)
+  set_property(TARGET mako_cli PROPERTY OUTPUT_NAME mako)
+
+  mako_tests_node()
+
+  if(UNIX)
+    install(TARGETS mako_daemon mako_cli
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
+
+  if(WIN32)
+    install(TARGETS mako_daemon mako_cli
+            RUNTIME DESTINATION bin/$<CONFIG>)
+  endif()
+endfunction()
+
+function(mako_build_sub)
+  # Bulding a subproject. Keep it simple.
+  if(COMMAND add_node_library)
+    add_node_library(mako STATIC ${mako_sources})
+  else()
+    add_library(mako STATIC ${mako_sources})
+    set_property(TARGET mako PROPERTY POSITION_INDEPENDENT_CODE ${MAKO_PIC})
+  endif()
+
+  target_compile_definitions(mako PRIVATE ${mako_defines})
+  target_compile_options(mako PRIVATE ${mako_cflags})
+  target_include_directories(mako PUBLIC ${mako_includes})
+  target_link_options(mako INTERFACE ${mako_ldflags})
+  target_link_libraries(mako INTERFACE ${mako_libs})
+endfunction()
+
+#
+# Tests
+#
+
+function(mako_tests_lib)
+  set(tests_lib # crypto
+                bip340
+                chacha20
+                drbg
+                ecdsa
+                hash160
+                hash256
+                hmac
+                merkle
+                pbkdf2
+                rand
+                ripemd160
+                sha1
+                sha256
+                sha512
+                siphash
+                # lib
+                address
+                array
+                base16
+                base58
+                bech32
+                bip32
+                bip37
+                bip39
+                bip152
+                block
+                bloom
+                coin
+                config
+                entry
+                header
+                heap
+                input
+                "list"
+                map
+                mpi
+                murmur3
+                netaddr
+                netmsg
+                outpoint
+                output
+                printf
+                script
+                sighash
+                tx
+                util
+                vector
+                view)
+
+  if(MAKO_TESTS)
+    foreach(name ${tests_lib})
+      add_executable(t-${name} test/t-${name}.c)
+      target_link_libraries(t-${name} PRIVATE mako mako_test mako_static)
+      add_test(NAME ${name} COMMAND t-${name})
+    endforeach()
+  endif()
+endfunction()
+
+function(mako_tests_node)
+  set(tests_io addrinfo
+               sockaddr
+               fs
+               loop
+               thread
+               http
+               workers)
+
+  set(tests_node addrman
+                 chaindb
+                 chain
+                 mempool
+                 miner
+                 rpc
+                 timedata)
+
+  if(MAKO_TESTS)
+    foreach(name ${tests_io})
+      add_executable(t-${name} test/t-${name}.c)
+      target_link_libraries(t-${name} PRIVATE mako mako_test mako_io)
+      add_test(NAME ${name} COMMAND t-${name})
+    endforeach()
+
+    foreach(name ${tests_node})
+      add_executable(t-${name} test/t-${name}.c)
+      target_link_libraries(t-${name} PRIVATE mako mako_test mako_node)
+      add_test(NAME ${name} COMMAND t-${name})
+    endforeach()
+  endif()
+endfunction()
+
+#
+# Build
+#
+
+if(NOT PROJECT_NAME STREQUAL CMAKE_PROJECT_NAME)
+  mako_build_sub()
 else()
-  target_link_libraries(mako_node PRIVATE lsm1)
+  mako_build_full()
 endif()
-
-set_property(TARGET mako_node PROPERTY OUTPUT_NAME node)
-
-add_library(mako_client STATIC ${client_sources})
-target_compile_definitions(mako_client PUBLIC ${mako_defines})
-target_compile_options(mako_client PUBLIC ${mako_cflags})
-target_include_directories(mako_client PUBLIC ${mako_includes})
-target_link_options(mako_client INTERFACE ${mako_ldflags})
-set_property(TARGET mako_client PROPERTY OUTPUT_NAME client)
-
-add_library(mako_tests STATIC ${test_sources})
-target_compile_definitions(mako_tests PUBLIC ${mako_defines})
-target_compile_options(mako_tests PUBLIC ${mako_cflags})
-target_include_directories(mako_tests PUBLIC ${mako_includes})
-target_link_options(mako_tests INTERFACE ${mako_ldflags})
-set_property(TARGET mako_tests PROPERTY OUTPUT_NAME tests)
-
-add_executable(makod src/node/main.c)
-target_link_libraries(makod PRIVATE mako_node
-                                    mako_io
-                                    mako_lib)
-
-add_executable(mako src/client/main.c)
-target_link_libraries(mako PRIVATE mako_client
-                                   mako_io
-                                   mako_lib)
-
-set(tests # crypto
-          bip340
-          chacha20
-          drbg
-          ecdsa
-          hash160
-          hash256
-          hmac
-          merkle
-          pbkdf2
-          rand
-          ripemd160
-          sha1
-          sha256
-          sha512
-          siphash
-          # lib
-          address
-          array
-          base16
-          base58
-          bech32
-          bip32
-          bip37
-          bip39
-          bip152
-          block
-          bloom
-          coin
-          config
-          entry
-          header
-          heap
-          input
-          "list"
-          map
-          mpi
-          murmur3
-          netaddr
-          netmsg
-          outpoint
-          output
-          printf
-          script
-          sighash
-          tx
-          util
-          vector
-          view
-          # io
-          addrinfo
-          sockaddr
-          fs
-          loop
-          thread
-          http
-          workers
-          # node
-          addrman
-          chaindb
-          chain
-          mempool
-          miner
-          rpc
-          timedata)
-
-foreach(name ${tests})
-  add_executable(t-${name} test/t-${name}.c)
-  target_link_libraries(t-${name} PRIVATE mako_tests
-                                          mako_node
-                                          mako_client
-                                          mako_io
-                                          mako_lib)
-  add_test(NAME ${name} COMMAND t-${name})
-endforeach()
