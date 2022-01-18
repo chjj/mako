@@ -70,6 +70,6 @@ void
 hex_decode(unsigned char *zp, size_t *zn, const char *xp);
 
 int
-btc_clean(const char *prefix);
+btc_rimraf(const char *path);
 
 #endif /* BTC_TESTS_H */

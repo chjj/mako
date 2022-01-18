@@ -21,7 +21,7 @@ test_chain(const btc_network_t *network, const char **vectors, size_t length) {
   btc_block_t block;
   size_t i;
 
-  btc_clean(BTC_PREFIX);
+  btc_rimraf(BTC_PREFIX);
 
   ASSERT(btc_chain_open(chain, BTC_PREFIX, 0));
 
@@ -41,7 +41,7 @@ test_chain(const btc_network_t *network, const char **vectors, size_t length) {
   btc_chain_close(chain);
   btc_chain_destroy(chain);
 
-  btc_clean(BTC_PREFIX);
+  btc_rimraf(BTC_PREFIX);
 }
 
 int

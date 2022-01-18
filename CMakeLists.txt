@@ -19,6 +19,7 @@ set(mako_libs)
 set(io_sources)
 set(node_sources)
 set(client_sources)
+set(test_sources)
 
 set(CMAKE_C_STANDARD 90)
 set(CMAKE_C_EXTENSIONS OFF)
@@ -148,6 +149,14 @@ list(APPEND node_sources src/node/addrman.c
 
 list(APPEND client_sources src/client/client.c)
 
+list(APPEND test_sources test/lib/tests.c)
+
+if(WIN32)
+  list(APPEND test_sources test/lib/rimraf_win.c)
+else()
+  list(APPEND test_sources test/lib/rimraf_unix.c)
+endif()
+
 if(WIN32)
   list(APPEND mako_defines _WIN32_WINNT=0x501)
 endif()
@@ -245,7 +254,7 @@ target_include_directories(mako_client PUBLIC ${mako_includes})
 target_link_options(mako_client INTERFACE ${mako_ldflags})
 set_property(TARGET mako_client PROPERTY OUTPUT_NAME client)
 
-add_library(mako_tests STATIC test/lib/tests.c test/lib/clean.c)
+add_library(mako_tests STATIC ${test_sources})
 target_compile_definitions(mako_tests PUBLIC ${mako_defines})
 target_compile_options(mako_tests PUBLIC ${mako_cflags})
 target_include_directories(mako_tests PUBLIC ${mako_includes})
