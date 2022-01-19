@@ -324,7 +324,7 @@ static int lsmPosixOsLock(lsm_file *pFile, int iLock, int eType){
   assert( aType[LSM_LOCK_UNLOCK]==F_UNLCK );
   assert( aType[LSM_LOCK_SHARED]==F_RDLCK );
   assert( aType[LSM_LOCK_EXCL]==F_WRLCK );
-  assert( eType>=0 && eType<array_size(aType) );
+  assert( eType>=0 && eType<(int)array_size(aType) );
   assert( iLock>0 && iLock<=32 );
 
   memset(&lock, 0, sizeof(lock));
@@ -354,7 +354,7 @@ static int lsmPosixOsTestLock(lsm_file *pFile, int iLock, int nLock, int eType){
   assert( eType==LSM_LOCK_SHARED || eType==LSM_LOCK_EXCL );
   assert( aType[LSM_LOCK_SHARED]==F_RDLCK );
   assert( aType[LSM_LOCK_EXCL]==F_WRLCK );
-  assert( eType>=0 && eType<array_size(aType) );
+  assert( eType>=0 && eType<(int)array_size(aType) );
   assert( iLock>0 && iLock<=32 );
 
   memset(&lock, 0, sizeof(lock));

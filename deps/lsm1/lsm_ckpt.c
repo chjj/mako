@@ -869,7 +869,7 @@ int lsmCheckpointLoad(lsm_db *pDb, int *piRead){
   int nRem = LSM_ATTEMPTS_BEFORE_PROTOCOL;
   ShmHeader *pShm = pDb->pShmhdr;
   while( (nRem--)>0 ){
-    int nInt;
+    u32 nInt;
 
     nInt = pShm->aSnap1[CKPT_HDR_NCKPT];
     if( nInt<=(LSM_META_RW_PAGE_SIZE / sizeof(u32)) ){
@@ -1117,7 +1117,7 @@ int lsmCheckpointSynced(lsm_db *pDb, i64 *piId, i64 *piLog, u32 *pnWrite){
   if( iMeta==1 || iMeta==2 ){
     rc = lsmFsMetaPageGet(pDb->pFS, 0, iMeta, &pPg);
     if( rc==LSM_OK ){
-      int nCkpt;
+      u32 nCkpt;
       int nData;
       u8 *aData; 
 

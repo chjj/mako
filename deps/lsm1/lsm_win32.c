@@ -877,7 +877,7 @@ static int lsmWin32OsMutexStatic(
 
   if( InterlockedCompareExchange(&initialized, 1, 0)==0 ){
     int i;
-    for(i=0; i<array_size(sMutex); i++){
+    for(i=0; i<(int)array_size(sMutex); i++){
       InitializeCriticalSection(&sMutex[i].mutex);
     }
   }

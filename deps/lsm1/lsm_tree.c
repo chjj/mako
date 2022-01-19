@@ -285,7 +285,7 @@ static int treeKeycmp(void *p1, int n1, void *p2, int n2){
 */
 static u32 getChildPtr(TreeNode *p, int iVersion, int iCell){
   assert( iVersion>=0 );
-  assert( iCell>=0 && iCell<=array_size(p->aiChildPtr) );
+  assert( iCell>=0 && iCell<=(int)array_size(p->aiChildPtr) );
   if( p->iV2 && p->iV2<=(u32)iVersion && iCell==p->iV2Child ) return p->iV2Ptr;
   return p->aiChildPtr[iCell];
 }
@@ -1149,7 +1149,7 @@ static void treeHeaderChecksum(
   u32 cksum1 = 0x12345678;
   u32 cksum2 = 0x9ABCDEF0;
   u32 *a = (u32 *)pHdr;
-  int i;
+  size_t i;
 
   assert( (offsetof(TreeHeader, aCksum) + sizeof(u32)*2)==sizeof(TreeHeader) );
   assert( (sizeof(TreeHeader) % (sizeof(u32)*2))==0 );
