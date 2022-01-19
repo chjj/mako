@@ -23,11 +23,10 @@ liblsm_la_SOURCES = lsm.h        \
                     lsm_varint.c \
                     $(os_src)
 
-# Note: Maybe always pass -DNDEBUG?
 if MINGW
-liblsm_la_CFLAGS = -DLSM_MUTEX_WIN32
+liblsm_la_CFLAGS = -DNDEBUG -DLSM_MUTEX_WIN32
 else
-liblsm_la_CFLAGS = -DLSM_MUTEX_PTHREADS
+liblsm_la_CFLAGS = -DNDEBUG -DLSM_MUTEX_PTHREADS
 endif
 
 liblsm_la_LDFLAGS = -static

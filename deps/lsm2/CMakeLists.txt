@@ -1,3 +1,7 @@
+# CMakeLists.txt - cmake build for leveldb wrapper
+# Copyright (c) 2021-2022, Christopher Jeffrey (MIT License).
+# https://github.com/chjj/mako
+
 cmake_minimum_required(VERSION 3.4)
 project(lsm2 LANGUAGES C)
 

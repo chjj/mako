@@ -197,6 +197,7 @@ AS_IF([test x"$WASI$EMSCRIPTEN" != x''], [
 # Feature Testing
 #
 
+has_64bit=no
 has_asm=no
 has_big=no
 has_clock=no
@@ -204,6 +205,17 @@ has_int128=no
 has_pthread=no
 has_tls=no
 has_zlib=no
+
+AC_MSG_CHECKING(for 64-bit support)
+AC_COMPILE_IFELSE([
+  AC_LANG_SOURCE([[
+    typedef char check_voidptr_t[sizeof(void *) >= 8 ? 1 : -1];
+    int main(void) {
+      return 0;
+    }
+  ]])
+], [has_64bit=yes])
+AC_MSG_RESULT([$has_64bit])
 
 AS_IF([test x"$enable_asm" = x'yes'], [
   AC_MSG_CHECKING(for inline asm support)
@@ -416,6 +428,11 @@ AS_CASE([$host_os], [aix*], [
   AC_DEFINE([_THREAD_SAFE_ERRNO])
 ])
 
+AS_IF([test x"$has_64bit" != x'yes'], [
+  # https://twitter.com/hyc_symas/status/678604015127683074
+  AC_DEFINE([MDB_VL32])
+])
+
 #
 # Libraries
 #
@@ -475,6 +492,7 @@ AC_OUTPUT
 
 AC_MSG_NOTICE([Build Options:
 
+  64-bit     = $has_64bit
   asm        = $has_asm
   big        = $has_big
   clock      = $has_clock

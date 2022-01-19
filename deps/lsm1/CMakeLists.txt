@@ -1,3 +1,7 @@
+# CMakeLists.txt - cmake build for sqlite/lsm1
+# Copyright (c) 2021-2022, Christopher Jeffrey (MIT License).
+# https://github.com/chjj/mako
+
 cmake_minimum_required(VERSION 3.4)
 project(lsm1 LANGUAGES C)
 
@@ -29,11 +33,10 @@ endif()
 
 add_library(lsm1 STATIC ${lsm_sources})
 
-# Note: Maybe always pass NDEBUG?
 if(WIN32)
-  target_compile_definitions(lsm1 PRIVATE LSM_MUTEX_WIN32)
+  target_compile_definitions(lsm1 PRIVATE NDEBUG LSM_MUTEX_WIN32)
 else()
-  target_compile_definitions(lsm1 PRIVATE LSM_MUTEX_PTHREADS)
+  target_compile_definitions(lsm1 PRIVATE NDEBUG LSM_MUTEX_PTHREADS)
 endif()
 
 target_include_directories(lsm1 INTERFACE ${PROJECT_SOURCE_DIR})
