@@ -253,30 +253,36 @@ endif
 
 libmako_la_SOURCES = $(mako_sources)
 if ENABLE_SHARED
-libmako_la_CFLAGS = -DBTC_EXPORT
+libmako_la_CFLAGS = $(WARN_FLAGS) -DBTC_EXPORT
 libmako_la_LDFLAGS = -no-undefined $(mako_ldflags)
+else
+libmako_la_CFLAGS = $(WARN_FLAGS)
 endif
 
 lib_LTLIBRARIES = libmako.la
 
 if ENABLE_NODE
 libio_la_SOURCES = $(io_sources)
+libio_la_CFLAGS = $(WARN_FLAGS)
 libio_la_LDFLAGS = -static
 
 libnode_la_SOURCES = $(node_sources)
-libnode_la_CFLAGS = -I$(top_srcdir)/$(mako_dbdir)
+libnode_la_CFLAGS = $(WARN_FLAGS) -I$(top_srcdir)/$(mako_dbdir)
 libnode_la_LDFLAGS = -static
 libnode_la_LIBADD = libmako.la libio.la $(mako_dbdir)/liblsm.la
 
 libclient_la_SOURCES = $(client_sources)
+libclient_la_CFLAGS = $(WARN_FLAGS)
 libclient_la_LDFLAGS = -static
 libclient_la_LIBADD = libmako.la libio.la
 
 makod_SOURCES = src/node/main.c
+makod_CFLAGS = $(WARN_FLAGS)
 makod_LDFLAGS = -static
 makod_LDADD = libnode.la
 
 mako_SOURCES = src/client/main.c
+mako_CFLAGS = $(WARN_FLAGS)
 mako_LDFLAGS = -static
 mako_LDADD = libclient.la
 

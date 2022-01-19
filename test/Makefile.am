@@ -2,7 +2,7 @@
 # Copyright (c) 2021-2022, Christopher Jeffrey (MIT License).
 # https://github.com/chjj/mako
 
-AM_CPPFLAGS = -I$(top_builddir)/include
+AM_CPPFLAGS = $(WARN_FLAGS) -I$(top_builddir)/include
 AM_LDFLAGS = -no-install
 LDADD = libtests.la
 
