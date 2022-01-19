@@ -1,13 +1,13 @@
-prefix=@CMAKE_INSTALL_PREFIX@
-exec_prefix=${prefix}
-libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
-includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
 
 Name: libmako
-Version: @PROJECT_VERSION@
+Version: @PACKAGE_VERSION@
 Description: Bitcoin library.
 URL: https://github.com/chjj/mako
 
-Libs: -L${libdir} -lmako
-Libs.private: @CMAKE_THREAD_LIBS_INIT@
 Cflags: -I${includedir}
+Libs: -L${libdir} -lmako
+Libs.private: -lm @PTHREAD_LIBS@

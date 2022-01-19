@@ -2,8 +2,15 @@
 # Copyright (c) 2020, Christopher Jeffrey (MIT License).
 # https://github.com/chjj/mako
 
+set(MAKO_PKG_VERSION 0.0.0)
+set(MAKO_ABI_VERSION 0:0:0)
+
+#
+# Initialization
+#
+
 cmake_minimum_required(VERSION 3.4)
-project(mako LANGUAGES C)
+project(mako VERSION ${MAKO_PKG_VERSION} LANGUAGES C)
 
 #
 # Toolchain/Platform Fixes
@@ -26,6 +33,7 @@ endif()
 
 include(cmake/AppendCCompilerFlag.cmake)
 include(cmake/CheckCThreadLocalStorage.cmake)
+include(cmake/LibtoolEmulator.cmake)
 include(cmake/TargetLinkOptions.cmake)
 include(CheckCSourceCompiles)
 include(CheckIncludeFile)
@@ -43,7 +51,7 @@ option(MAKO_ASM "Use inline assembly if available" ON)
 option(MAKO_COVERAGE "Enable coverage" OFF)
 option(MAKO_INT128 "Use __int128 if available" ON)
 option(MAKO_LEVELDB "Use leveldb" OFF)
-option(MAKO_LIBONLY "Build only the core library" OFF)
+option(MAKO_NODE "Build the fullnode" ON)
 option(MAKO_PIC "Enable PIC" OFF)
 option(MAKO_SHARED "Build shared library" ON)
 option(MAKO_TESTS "Build tests" ON)
@@ -93,10 +101,22 @@ if(APPLE)
 endif()
 
 #
-# Feature Testing
+# Compiler Fixes
 #
 
-test_big_endian(MAKO_BIGENDIAN)
+# Encourage the user to build with xlc_r.
+if(CMAKE_C_COMPILER_ID STREQUAL "XL" AND CMAKE_SYSTEM_NAME STREQUAL "AIX")
+  check_symbol_exists(_THREAD_SAFE "" MAKO_XLC_R)
+
+  if(NOT MAKO_XLC_R)
+    message(WARNING "Please use a thread-safe compiler invocation.\n"
+                    "For example, `cmake . -DCMAKE_C_COMPILER=xlc_r`.")
+  endif()
+endif()
+
+#
+# Feature Testing
+#
 
 if(MAKO_ASM)
   check_c_source_compiles([=[
@@ -131,6 +151,8 @@ if(MAKO_ASM)
 else()
   set(MAKO_HAVE_ASM)
 endif()
+
+test_big_endian(MAKO_BIGENDIAN)
 
 check_c_source_compiles([=[
 # include <time.h>
@@ -518,6 +540,7 @@ function(mako_build_full)
     target_link_libraries(mako_shared PRIVATE mako)
     target_compile_definitions(mako_shared PRIVATE BTC_EXPORT)
     set_property(TARGET mako_shared PROPERTY OUTPUT_NAME mako)
+    set_target_version_info(mako_shared ${MAKO_ABI_VERSION})
 
     if(MINGW)
       set_target_properties(mako_shared PROPERTIES PREFIX ""
@@ -533,7 +556,7 @@ function(mako_build_full)
   #
 
   if(UNIX)
-    configure_file(libmako.pc.in libmako.pc @ONLY)
+    configure_file(libmako-cmake.pc.in libmako.pc @ONLY)
 
     install(DIRECTORY include/mako/
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mako)
@@ -563,7 +586,7 @@ function(mako_build_full)
     endif()
   endif()
 
-  if(MAKO_LIBONLY)
+  if(NOT MAKO_NODE)
     return()
   endif()
 

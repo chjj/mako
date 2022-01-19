@@ -96,7 +96,9 @@ typedef int btc_sockopt_t;
 #if !defined(BTC_USE_SELECT) \
  && !defined(BTC_USE_POLL)   \
  && !defined(BTC_USE_EPOLL)
-#  if defined(__linux__)
+#  if defined(__LINUX__) && defined(__WATCOMC__)
+#    define BTC_USE_SELECT
+#  elif defined(__linux__) && defined(__GNUC__)
 #    define BTC_USE_EPOLL
 #  elif defined(_WIN32) || defined(_AIX)
 #    define BTC_USE_SELECT
@@ -1396,7 +1398,6 @@ btc_loop_register(btc_loop_t *loop, btc_socket_t *socket) {
   memset(&ev, 0, sizeof(ev));
 
   ev.events = EPOLLIN | EPOLLOUT;
-  ev.data.fd = socket->fd;
   ev.data.ptr = socket;
 
   if (epoll_ctl(loop->fd, EPOLL_CTL_ADD, socket->fd, &ev) != 0)

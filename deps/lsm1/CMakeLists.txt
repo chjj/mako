@@ -29,6 +29,7 @@ endif()
 
 add_library(lsm1 STATIC ${lsm_sources})
 
+# Note: Maybe always pass NDEBUG?
 if(WIN32)
   target_compile_definitions(lsm1 PRIVATE LSM_MUTEX_WIN32)
 else()

@@ -1,0 +1,32 @@
+#!/bin/sh
+
+# wasi-run - wasi runner for libtorsion
+# Copyright (c) 2020, Christopher Jeffrey (MIT License).
+# https://github.com/bcoin-org/libtorsion
+
+set -e
+
+DIR=`dirname "$0"`
+
+if test x"$NODEJS" = x; then
+  if nodejs --version > /dev/null 2>& 1; then
+    NODEJS=nodejs
+  elif node --version > /dev/null 2>& 1; then
+    NODEJS=node
+  else
+    echo 'Node.js not found!' >& 2
+    exit 1
+  fi
+fi
+
+FLAGS='--no-warnings'
+
+if "$NODEJS" --experimental-wasm-bigint -e 1 > /dev/null 2>& 1; then
+  FLAGS="$FLAGS --experimental-wasm-bigint"
+fi
+
+if "$NODEJS" --experimental-wasi-unstable-preview1 -e 1 > /dev/null 2>& 1; then
+  FLAGS="$FLAGS --experimental-wasi-unstable-preview1"
+fi
+
+exec "$NODEJS" $FLAGS "$DIR/wasi.js" "$@"

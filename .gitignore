@@ -55,11 +55,13 @@ m4/ltoptions.m4
 m4/ltsugar.m4
 m4/ltversion.m4
 sha256sums.txt
-mako_bench
-mako_ctgrind
-mako_bench.js
+mako
+mako.js
 makod
 makod.js
+test/t-*[!c]
+test/*.log
+test/*.trs
 tmp/
 vgcore.*
 wasm32-wasi/

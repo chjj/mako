@@ -500,6 +500,7 @@ lsm_set_user_version(lsm_db *db, unsigned int val) {
 int
 lsm_info(lsm_db *db, int param, ...) {
   va_list ap;
+  (void)db;
   va_start(ap, param);
   va_end(ap);
   return LSM_MISUSE;

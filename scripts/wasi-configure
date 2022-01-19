@@ -1,0 +1,67 @@
+#!/bin/sh
+
+# wasi-configure - wasi wrapper for configure scripts
+# Copyright (c) 2020, Christopher Jeffrey (MIT License).
+# https://github.com/bcoin-org/libtorsion
+#
+# Partially based on:
+#   https://github.com/jedisct1/libsodium/blob/master/dist-build/wasm32-wasi.sh
+
+set -e
+
+if test x"$WASI" != x; then
+  WASI=`cd "$WASI" && pwd`
+elif test -d /opt/wasi-sdk; then
+  WASI=/opt/wasi-sdk
+elif test -d /opt/local/wasi-sdk; then
+  WASI=/opt/local/wasi-sdk
+elif test -d /usr/lib/wasi-sdk; then
+  WASI=/usr/lib/wasi-sdk
+elif test -d /usr/local/lib/wasi-sdk; then
+  WASI=/usr/local/lib/wasi-sdk
+else
+  echo 'WASI SDK not found!' >& 2
+  exit 1
+fi
+
+export WASI="$WASI"
+export PREFIX="`pwd`/wasm32-wasi"
+export AR="$WASI/bin/llvm-ar"
+export AS="$WASI/bin/clang"
+export CC="$WASI/bin/clang"
+export CPP="$WASI/bin/clang-cpp"
+export CXX="$WASI/bin/clang++"
+export LD="$WASI/bin/wasm-ld"
+export NM="$WASI/bin/llvm-nm"
+export OBJCOPY="$WASI/bin/llvm-objcopy"
+export OBJDUMP="$WASI/bin/llvm-objdump"
+export RANLIB="$WASI/bin/llvm-ranlib"
+export STRINGS="$WASI/bin/llvm-strings"
+export STRIP="$WASI/bin/llvm-strip"
+export ARFLAGS='cr'
+
+CONFIGURE="$1"
+
+shift
+
+if ! test -d "$PREFIX"; then
+  mkdir "$PREFIX"
+fi
+
+BUILDDIR=.
+
+if test -d ./build-aux; then
+  BUILDDIR=./build-aux
+fi
+
+if test -f $BUILDDIR/config.sub; then
+  if ! grep 'wasi' $BUILDDIR/config.sub > /dev/null; then
+    cp "$WASI/share/misc/config.guess" $BUILDDIR/config.guess
+    cp "$WASI/share/misc/config.sub" $BUILDDIR/config.sub
+  fi
+fi
+
+exec "$CONFIGURE" --prefix="$PREFIX"                        \
+                  --with-sysroot="$WASI/share/wasi-sysroot" \
+                  --host=wasm32-wasi                        \
+                  "$@"
