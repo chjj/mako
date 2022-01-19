@@ -251,7 +251,7 @@ static int lsmPosixOsFullpath(
   int nReq;
 
   if( zName[0]!='/' ){
-    char *z;
+    char *z = NULL;
     char *zTmp;
     int nTmp = 512;
     zTmp = lsmMalloc(pEnv, nTmp);
