@@ -394,7 +394,7 @@ static void ckptExportAppendlist(
   for(i=0; i<LSM_APPLIST_SZ; i++){
     ckptAppend64(p, piOut, aiAppend[i], pRc);
   }
-};
+}
 
 static int ckptExportSnapshot( 
   lsm_db *pDb,                    /* Connection handle */
@@ -659,7 +659,7 @@ int lsmCheckpointLevels(
 ){
   Level *p;                       /* Used to iterate through levels */
   int nAll= 0;
-  int rc;
+  int rc = LSM_OK;
   int i;
   int iOut;
   CkptBuffer ckpt;

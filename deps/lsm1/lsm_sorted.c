@@ -866,7 +866,7 @@ static int btreeCursorRestore(
 
     /* Populate any other aPg[] array entries */
     if( rc==LSM_OK && nDepth>1 ){
-      LsmBlob blob = {0,0,0};
+      LsmBlob blob = {0,0,0,0};
       void *pSeek;
       int nSeek;
       int iTopicSeek;
@@ -1775,7 +1775,7 @@ static int seekInBtree(
   int rc;
   int iPg;
   Page *pPg = 0;
-  LsmBlob blob = {0, 0, 0};
+  LsmBlob blob = {0, 0, 0, 0};
 
   iPg = (int)pSeg->iRoot;
   do {
@@ -3957,7 +3957,7 @@ static int mergeWorkerWrite(
   Merge *pMerge;                  /* Persistent part of level merge state */
   int nHdr;                       /* Space required for this record header */
   Page *pPg;                      /* Page to write to */
-  u8 *aData;                      /* Data buffer for page pWriter->pPage */
+  u8 *aData = NULL;               /* Data buffer for page pWriter->pPage */
   int nData = 0;                  /* Size of buffer aData[] in bytes */
   int nRec = 0;                   /* Number of records on page pPg */
   int iFPtr = 0;                  /* Value of pointer in footer of pPg */
@@ -5531,7 +5531,7 @@ static int fileToString(
 }
 
 void sortedDumpPage(lsm_db *pDb, Segment *pRun, Page *pPg, int bVals){
-  LsmBlob blob = {0, 0, 0};       /* LsmBlob used for keys */
+  LsmBlob blob = {0, 0, 0, 0};       /* LsmBlob used for keys */
   LsmString s;
   int i;
 

@@ -625,8 +625,8 @@ static int treeCursorRestore(TreeCursor *pCsr, int *pRes){
 static u32 treeShmalloc(lsm_db *pDb, int bAlign, int nByte, int *pRc){
   u32 iRet = 0;
   if( *pRc==LSM_OK ){
-    const static int CHUNK_SIZE = LSM_SHM_CHUNK_SIZE;
-    const static int CHUNK_HDR = LSM_SHM_CHUNK_HDR;
+    static const int CHUNK_SIZE = LSM_SHM_CHUNK_SIZE;
+    static const int CHUNK_HDR = LSM_SHM_CHUNK_HDR;
     u32 iWrite;                   /* Current write offset */
     u32 iEof;                     /* End of current chunk */
     int iChunk;                   /* Current chunk */

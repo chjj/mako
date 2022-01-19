@@ -1944,7 +1944,7 @@ void print_db_locks(lsm_db *db){
 void print_all_db_locks(lsm_db *db){
   lsm_db *p;
   for(p=db->pDatabase->pConn; p; p=p->pNext){
-    printf("%s connection %p ", ((p==db)?"*":""), p);
+    printf("%s connection %p ", ((p==db)?"*":""), (void *)p);
     print_db_locks(p);
   }
 }
