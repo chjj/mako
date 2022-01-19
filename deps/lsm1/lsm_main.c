@@ -431,7 +431,7 @@ int lsm_config(lsm_db *pDb, int eParam, ...){
   return rc;
 }
 
-void lsmAppendSegmentList(LsmString *pStr, char *zPre, Segment *pSeg){
+static void lsmAppendSegmentList(LsmString *pStr, char *zPre, Segment *pSeg){
   lsmStringAppendf(pStr, "%s{%d %d %d %d}", zPre, 
         pSeg->iFirst, pSeg->iLastPg, pSeg->iRoot, pSeg->nSize
   );
@@ -457,7 +457,7 @@ static void infoFreeWorker(lsm_db *pDb, int bUnlock){
   }
 }
 
-int lsmStructList(
+static int lsmStructList(
   lsm_db *pDb,                    /* Database handle */
   char **pzOut                    /* OUT: Nul-terminated string (tcl list) */
 ){

@@ -97,7 +97,7 @@ static void assertNotInFreelist(Freelist *p, int iBlk){
 /*
 ** Append an entry to the free-list. If (iId==-1), this is a delete.
 */
-int freelistAppend(lsm_db *db, u32 iBlk, i64 iId){
+static int freelistAppend(lsm_db *db, u32 iBlk, i64 iId){
   lsm_env *pEnv = db->pEnv;
   Freelist *p;
   int i; 
@@ -1046,7 +1046,7 @@ static int dbSetReadLock(lsm_db *db, i64 iLsm, u32 iShm){
 /*
 ** Release the read-lock currently held by connection db.
 */
-int dbReleaseReadlock(lsm_db *db){
+static int dbReleaseReadlock(lsm_db *db){
   int rc = LSM_OK;
   if( db->iReader>=0 ){
     rc = lsmShmLock(db, LSM_LOCK_READER(db->iReader), LSM_LOCK_UNLOCK, 0);
@@ -1860,7 +1860,7 @@ int lsmShmLock(
 
 #ifdef LSM_DEBUG
 
-int shmLockType(lsm_db *db, int iLock){
+static int shmLockType(lsm_db *db, int iLock){
   const u64 me = ((u64)1 << (iLock-1));
   const u64 ms = ((u64)1 << (iLock+32-1));
 

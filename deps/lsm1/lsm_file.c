@@ -1269,7 +1269,7 @@ static int fsBlockNext(
 /*
 ** Return the page number of the last page on the same block as page iPg.
 */
-LsmPgno fsLastPageOnPagesBlock(FileSystem *pFS, LsmPgno iPg){
+static LsmPgno fsLastPageOnPagesBlock(FileSystem *pFS, LsmPgno iPg){
   return fsLastPageOnBlock(pFS, fsPageToBlock(pFS, iPg));
 }
 

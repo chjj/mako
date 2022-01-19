@@ -482,7 +482,7 @@ static void strAppendFlags(LsmString *pStr, u8 flags){
   lsmStringAppend(pStr, zFlags, 5);
 }
 
-void dump_node_contents(
+static void dump_node_contents(
   lsm_db *pDb,
   u32 iNode,                      /* Print out the contents of this node */
   char *zPath,                    /* Path from root to this node */
@@ -541,7 +541,7 @@ void dump_node_contents(
   tblobFree(pDb, &b);
 }
 
-void dump_tree_contents(lsm_db *pDb, const char *zCaption){
+static void dump_tree_contents(lsm_db *pDb, const char *zCaption){
   char zPath[64];
   TreeRoot *p = &pDb->treehdr.root;
   printf("\n%s\n", zCaption);

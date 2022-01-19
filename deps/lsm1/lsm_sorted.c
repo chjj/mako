@@ -326,7 +326,7 @@ static u8 *fsPageData(Page *pPg, int *pnData){
 /*
 ** Write nVal as a 16-bit unsigned big-endian integer into buffer aOut.
 */
-void lsmPutU16(u8 *aOut, u16 nVal){
+static void lsmPutU16(u8 *aOut, u16 nVal){
   aOut[0] = (u8)((nVal>>8) & 0xFF);
   aOut[1] = (u8)(nVal & 0xFF);
 }
@@ -338,7 +338,7 @@ void lsmPutU32(u8 *aOut, u32 nVal){
   aOut[3] = (u8)((nVal    ) & 0xFF);
 }
 
-int lsmGetU16(u8 *aOut){
+static int lsmGetU16(u8 *aOut){
   return (aOut[0] << 8) + aOut[1];
 }
 
@@ -360,7 +360,7 @@ u64 lsmGetU64(u8 *aOut){
        + ((u32)aOut[7]);
 }
 
-void lsmPutU64(u8 *aOut, u64 nVal){
+static void lsmPutU64(u8 *aOut, u64 nVal){
   aOut[0] = (u8)((nVal>>56) & 0xFF);
   aOut[1] = (u8)((nVal>>48) & 0xFF);
   aOut[2] = (u8)((nVal>>40) & 0xFF);
@@ -2933,7 +2933,7 @@ static int multiCursorEnd(MultiCursor *pCsr, int bLast){
 }
 
 
-int mcursorSave(MultiCursor *pCsr){
+static int mcursorSave(MultiCursor *pCsr){
   int rc = LSM_OK;
   if( pCsr->aTree ){
     int iTree = pCsr->aTree[1];
@@ -2945,7 +2945,7 @@ int mcursorSave(MultiCursor *pCsr){
   return rc;
 }
 
-int mcursorRestore(lsm_db *pDb, MultiCursor *pCsr){
+static int mcursorRestore(lsm_db *pDb, MultiCursor *pCsr){
   int rc;
   rc = multiCursorInit(pCsr, pDb->pClient);
   if( rc==LSM_OK && pCsr->key.pData ){
@@ -2988,7 +2988,7 @@ lsm_db *lsmMCursorDb(MultiCursor *pCsr){
   return pCsr->pDb;
 }
 
-void lsmMCursorReset(MultiCursor *pCsr){
+static void lsmMCursorReset(MultiCursor *pCsr){
   int i;
   lsmTreeCursorReset(pCsr->apTreeCsr[0]);
   lsmTreeCursorReset(pCsr->apTreeCsr[1]);
@@ -5530,7 +5530,8 @@ static int fileToString(
   return i;
 }
 
-void sortedDumpPage(lsm_db *pDb, Segment *pRun, Page *pPg, int bVals){
+#if 0
+static void sortedDumpPage(lsm_db *pDb, Segment *pRun, Page *pPg, int bVals){
   LsmBlob blob = {0, 0, 0, 0};       /* LsmBlob used for keys */
   LsmString s;
   int i;
@@ -5600,6 +5601,7 @@ void sortedDumpPage(lsm_db *pDb, Segment *pRun, Page *pPg, int bVals){
 
   sortedBlobFree(&blob);
 }
+#endif
 
 static void infoCellDump(
   lsm_db *pDb,                    /* Database handle */
@@ -5826,7 +5828,7 @@ int lsmInfoPageDump(
   return infoPageDump(pDb, iPg, flags, pzOut);
 }
 
-void sortedDumpSegment(lsm_db *pDb, Segment *pRun, int bVals){
+static void sortedDumpSegment(lsm_db *pDb, Segment *pRun, int bVals){
   assert( pDb->xLog );
   if( pRun && pRun->iFirst ){
     int flags = (bVals ? INFO_PAGE_DUMP_VALUES : 0);
