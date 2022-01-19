@@ -1694,6 +1694,7 @@ static int treeDeleteEntry(lsm_db *db, TreeCursor *pCsr, u32 iNewptr){
         pNew2 = (TreeNode *)newTreeNode(db, &iNew2, &rc);
       }
       pNewP = copyTreeNode(db, pParent, &iNewP, &rc);
+      if( pNewP == NULL ) abort();
 
       if( iDir==-1 ){
         pNew1->aiKeyPtr[1] = pPeer->aiKeyPtr[0];
@@ -1835,7 +1836,7 @@ int lsmTreeDelete(
     ** break out of the loop.  */
     bDone = 1;
     if( lsmTreeCursorValid(&csr) ){
-      lsmTreeCursorKey(&csr, 0, &pDel, &nDel);
+      if( lsmTreeCursorKey(&csr, 0, &pDel, &nDel) != LSM_OK ) abort();
       if( treeKeycmp(pDel, nDel, pKey2, nKey2)<0 ) bDone = 0;
     }
 

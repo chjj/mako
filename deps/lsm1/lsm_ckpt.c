@@ -1223,7 +1223,7 @@ void lsmCheckpointZeroLogoffset(lsm_db *pDb){
 */
 int lsmCheckpointSize(lsm_db *db, int *pnKB){
   int rc = LSM_OK;
-  u32 nSynced;
+  u32 nSynced = 0;
 
   /* Set nSynced to the number of pages that had been written when the 
   ** database was last checkpointed. */

@@ -4006,7 +4006,7 @@ static int mergeWorkerWrite(
     if( iOff<0 || pPg==0 || iOff+nHdr > SEGMENT_EOF(nData, nRec+1) ){
       if( iOff>=0 && pPg ){
         /* Zero any free space on the page */
-        assert( aData );
+        if( aData == NULL ) abort();
         memset(&aData[iOff], 0, SEGMENT_EOF(nData, nRec)-iOff);
       }
       iFPtr = (int)*pMW->pCsr->pPrevMergePtr;
