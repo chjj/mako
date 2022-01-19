@@ -3148,6 +3148,7 @@ int lsmInfoArrayPages(lsm_db *pDb, LsmPgno iFirst, char **pzOut){
 /*
 ** Helper function for lsmFsIntegrityCheck()
 */
+#ifdef LSM_DEBUG
 static void checkBlocks(
   FileSystem *pFS, 
   Segment *pSeg,
@@ -3295,7 +3296,6 @@ int lsmFsIntegrityCheck(lsm_db *pDb){
   return 1;
 }
 
-#ifndef NDEBUG
 /*
 ** Return true if pPg happens to be the last page in segment pSeg. Or false
 ** otherwise. This function is only invoked as part of assert() conditions.

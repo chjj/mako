@@ -1924,6 +1924,9 @@ int lsmShmAssertWorker(lsm_db *db){
 **     (gdb) call print_db_locks(pDb)
 **     (shared on dms2) (exclusive on writer) 
 */
+void print_db_locks(lsm_db *db);
+void print_all_db_locks(lsm_db *db);
+
 void print_db_locks(lsm_db *db){
   int iLock;
   for(iLock=0; iLock<16; iLock++){

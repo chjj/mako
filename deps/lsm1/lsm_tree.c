@@ -124,8 +124,13 @@ static int lsmAssertFlagsOk(u8 keyflags){
   return 1;
 }
 #endif
+#ifndef NDEBUG
 static int assert_delete_ranges_match(lsm_db *);
 static int treeCountEntries(lsm_db *db);
+#else
+#define assert_delete_ranges_match(x) 1
+#define treeCountEntries(x) 0
+#endif
 
 /*
 ** Container for a key-value pair. Within the *-shm file, each key/value
@@ -439,6 +444,7 @@ void lsmFlagsToString(int flags, char *zFlags){
 
 #ifdef LSM_DEBUG
 
+#if 0
 /*
 ** Pointer pBlob points to a buffer containing a blob of binary data
 ** nBlob bytes long. Append the contents of this blob to *pStr, with
@@ -461,6 +467,7 @@ static void lsmAppendStrBlob(LsmString *pStr, void *pBlob, int nBlob){
   }
   pStr->z[pStr->n] = 0;
 }
+#endif
 
 #if 0  /* NOT USED */
 /*
@@ -473,6 +480,7 @@ static void lsmAppendIndent(LsmString *pStr, int nIndent){
 }
 #endif
 
+#if 0
 static void strAppendFlags(LsmString *pStr, u8 flags){
   char zFlags[8];
 
@@ -551,6 +559,7 @@ static void dump_tree_contents(lsm_db *pDb, const char *zCaption){
   }
   fflush(stdout);
 }
+#endif
 
 #endif
 
@@ -1404,9 +1413,7 @@ static int treeNextIsEndDelete(lsm_db *db, TreeCursor *pCsr){
   while( iNode>=0 ){
     TreeNode *pNode = pCsr->apTreeNode[iNode];
     if( iCell<3 && pNode->aiKeyPtr[iCell] ){
-      int rc = LSM_OK;
       TreeKey *pKey = treeShmptr(db, pNode->aiKeyPtr[iCell]);
-      assert( rc==LSM_OK );
       return ((pKey->flags & LSM_END_DELETE) ? 1 : 0);
     }
     iNode--;
@@ -1426,9 +1433,7 @@ static int treePrevIsStartDelete(lsm_db *db, TreeCursor *pCsr){
     TreeNode *pNode = pCsr->apTreeNode[iNode];
     int iCell = pCsr->aiCell[iNode]-1;
     if( iCell>=0 && pNode->aiKeyPtr[iCell] ){
-      int rc = LSM_OK;
       TreeKey *pKey = treeShmptr(db, pNode->aiKeyPtr[iCell]);
-      assert( rc==LSM_OK );
       return ((pKey->flags & LSM_START_DELETE) ? 1 : 0);
     }
     iNode--;
@@ -1867,7 +1872,7 @@ int lsmTreeDelete(
           rc = lsmTreeCursorSeek(&csr, TKV_KEY(pKey), pKey->nKey, &res);
         }
         if( rc==LSM_OK ){
-          assert( res==0 && csr.iNode==iNode );
+          assert( res==0 && csr.iNode==iNode ); (void)iNode;
           rc = lsmTreeCursorNext(&csr);
           if( rc==LSM_OK ){
             rc = treeDeleteEntry(db, &csr, 0);
@@ -2240,11 +2245,9 @@ int lsmTreeCursorEnd(TreeCursor *pCsr, int bLast){
 int lsmTreeCursorFlags(TreeCursor *pCsr){
   int flags = 0;
   if( pCsr && pCsr->iNode>=0 ){
-    int rc = LSM_OK;
     TreeKey *pKey = (TreeKey *)treeShmptrUnsafe(pCsr->pDb,
         pCsr->apTreeNode[pCsr->iNode]->aiKeyPtr[pCsr->aiCell[pCsr->iNode]]
     );
-    assert( rc==LSM_OK );
     flags = (pKey->flags & ~LSM_CONTIGUOUS);
   }
   return flags;

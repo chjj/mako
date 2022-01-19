@@ -837,10 +837,10 @@ int lsm_csr_value(lsm_cursor *pCsr, const void **ppVal, int *pnVal){
 
 void lsm_config_log(
   lsm_db *pDb, 
-  void (*xLog)(void *, int, const char *), 
+  void (*xLogFn)(void *, int, const char *), 
   void *pCtx
 ){
-  pDb->xLog = xLog;
+  pDb->xLog = xLogFn;
   pDb->pLogCtx = pCtx;
 }
 
