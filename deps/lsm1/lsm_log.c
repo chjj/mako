@@ -790,6 +790,7 @@ void lsmLogSeek(
 /*
 ** This function does the work for an lsm_info(LOG_STRUCTURE) request.
 */
+#ifdef LSM_DEBUG_STRING
 int lsmInfoLogStructure(lsm_db *pDb, char **pzVal){
   int rc = LSM_OK;
   char *zVal = 0;
@@ -819,6 +820,7 @@ int lsmInfoLogStructure(lsm_db *pDb, char **pzVal){
   *pzVal = zVal;
   return rc;
 }
+#endif /* LSM_DEBUG_STRING */
 
 /*************************************************************************
 ** Begin code for log recovery.

@@ -522,11 +522,15 @@ int lsmFsCloseAndDeleteLog(FileSystem *pFS){
     pFS->fdLog = 0;
   }
 
-  zDel = lsmMallocPrintf(pFS->pEnv, "%s-log", pFS->zDb);
-  if( zDel ){
-    lsmEnvUnlink(pFS->pEnv, zDel);
-    lsmFree(pFS->pEnv, zDel);
-  }
+  zDel = lsmMalloc(pFS->pEnv, strlen(pFS->zDb) + 5);
+
+  if( !zDel ) return LSM_NOMEM;
+
+  sprintf(zDel, "%s-log", pFS->zDb);
+
+  lsmEnvUnlink(pFS->pEnv, zDel);
+  lsmFree(pFS->pEnv, zDel);
+
   return LSM_OK;
 }
 
@@ -2945,6 +2949,7 @@ int lsmFsSectorSize(FileSystem *pFS){
   return pFS->szSector;
 }
 
+#ifdef LSM_DEBUG_STRING
 /*
 ** Helper function for lsmInfoArrayStructure().
 */
@@ -3044,6 +3049,7 @@ int lsmInfoArrayStructure(
   }
   return rc;
 }
+#endif /* LSM_DEBUG_STRING */
 
 int lsmFsSegmentContainsPg(
   FileSystem *pFS, 
@@ -3079,6 +3085,7 @@ int lsmFsSegmentContainsPg(
 **
 ** If an error occurs, *pzOut is set to NULL and an LSM error code returned.
 */
+#ifdef LSM_DEBUG_STRING
 int lsmInfoArrayPages(lsm_db *pDb, LsmPgno iFirst, char **pzOut){
   int rc = LSM_OK;
   Snapshot *pWorker;              /* Worker snapshot */
@@ -3131,6 +3138,7 @@ int lsmInfoArrayPages(lsm_db *pDb, LsmPgno iFirst, char **pzOut){
   }
   return rc;
 }
+#endif /* LSM_DEBUG_STRING */
 
 /*
 ** The following macros are used by the integrity-check code. Associated with

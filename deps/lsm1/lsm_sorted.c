@@ -5468,6 +5468,7 @@ int lsmFlushTreeToDisk(lsm_db *pDb){
   return rc;
 }
 
+#ifdef LSM_DEBUG_STRING
 /*
 ** Return a string representation of the segment passed as the only argument.
 ** Space for the returned string is allocated using lsmMalloc(), and should
@@ -5966,6 +5967,7 @@ void lsmSortedDumpStructure(
 
   assert( lsmFsIntegrityCheck(pDb) );
 }
+#endif /* LSM_DEBUG_STRING */
 
 void lsmSortedFreeLevel(lsm_env *pEnv, Level *pLevel){
   Level *pNext;

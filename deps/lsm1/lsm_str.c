@@ -85,6 +85,7 @@ int lsmStringBinAppend(LsmString *pStr, const u8 *a, int n){
 /*
 ** Append printf-formatted content to an LsmString.
 */
+#ifdef LSM_DEBUG_STRING
 void lsmStringVAppendf(
   LsmString *pStr, 
   const char *zFormat, 
@@ -124,6 +125,7 @@ void lsmStringAppendf(LsmString *pStr, const char *zFormat, ...){
   va_end(ap);
   va_end(ap2);
 }
+#endif /* LSM_DEBUG_STRING */
 
 int lsmStrlen(const char *zName){
   int nRet = 0;
@@ -134,6 +136,7 @@ int lsmStrlen(const char *zName){
 /*
 ** Write into memory obtained from lsm_malloc().
 */
+#ifdef LSM_DEBUG_STRING
 char *lsmMallocPrintf(lsm_env *pEnv, const char *zFormat, ...){
   LsmString s;
   va_list ap, ap2;
@@ -146,3 +149,4 @@ char *lsmMallocPrintf(lsm_env *pEnv, const char *zFormat, ...){
   if( s.n<0 ) return 0;
   return (char *)lsmReallocOrFree(pEnv, s.z, s.n+1);
 }
+#endif /* LSM_DEBUG_STRING */

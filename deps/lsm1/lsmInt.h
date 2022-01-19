@@ -38,9 +38,15 @@
 # ifdef LSM_DEBUG
 #  undef LSM_DEBUG
 # endif
+# ifdef LSM_DEBUG_STRING
+#  undef LSM_DEBUG_STRING
+# endif
 #else
 # ifndef LSM_DEBUG
 #  define LSM_DEBUG
+# endif
+# ifndef LSM_DEBUG_STRING
+#  define LSM_DEBUG_STRING
 # endif
 #endif
 
@@ -768,8 +774,10 @@ int lsmFsSyncDb(FileSystem *, int);
 void lsmFsFlushWaiting(FileSystem *, int *);
 
 /* Used by lsm_info(ARRAY_STRUCTURE) and lsm_config(MMAP) */
+#ifdef LSM_DEBUG_STRING
 int lsmInfoArrayStructure(lsm_db *pDb, int bBlock, LsmPgno iFirst, char **pz);
 int lsmInfoArrayPages(lsm_db *pDb, LsmPgno iFirst, char **pzOut);
+#endif
 int lsmConfigMmap(lsm_db *pDb, int *piParam);
 
 int lsmEnvOpen(lsm_env *, const char *, int, lsm_file **);
@@ -796,7 +804,9 @@ void lsmFsPurgeCache(FileSystem *);
 /* 
 ** Functions from file "lsm_sorted.c".
 */
+#ifdef LSM_DEBUG_STRING
 int lsmInfoPageDump(lsm_db *, LsmPgno, int, char **);
+#endif
 void lsmSortedCleanup(lsm_db *);
 int lsmSortedAutoWork(lsm_db *, int nUnit);
 
@@ -836,7 +846,9 @@ void lsmMCursorFreeCache(lsm_db *);
 int lsmSaveCursors(lsm_db *pDb);
 int lsmRestoreCursors(lsm_db *pDb);
 
+#ifdef LSM_DEBUG_STRING
 void lsmSortedDumpStructure(lsm_db *pDb, Snapshot *, int, int, const char *);
+#endif
 void lsmFsDumpBlocklists(lsm_db *);
 
 void lsmSortedExpandBtreePage(Page *pPg, int nOrig);
@@ -859,8 +871,10 @@ int lsmVarintSize(u8 c);
 /* 
 ** Functions from file "main.c".
 */
+#ifdef LSM_DEBUG_STRING
 void lsmLogMessage(lsm_db *, int, const char *, ...);
 int lsmInfoFreelist(lsm_db *pDb, char **pzOut);
+#endif
 
 /*
 ** Functions from file "lsm_log.c".
@@ -874,7 +888,9 @@ void lsmLogSeek(lsm_db *, LogMark *);
 void lsmLogClose(lsm_db *);
 
 int lsmLogRecover(lsm_db *);
+#ifdef LSM_DEBUG_STRING
 int lsmInfoLogStructure(lsm_db *pDb, char **pzVal);
+#endif
 
 /* Valid values for the second argument to lsmLogWrite(). */
 #define LSM_WRITE        0x06
@@ -971,10 +987,14 @@ int lsmCheckCompressionId(lsm_db *, u32);
 void lsmStringInit(LsmString*, lsm_env *pEnv);
 int lsmStringExtend(LsmString*, int);
 int lsmStringAppend(LsmString*, const char *, int);
+#ifdef LSM_DEBUG_STRING
 void lsmStringVAppendf(LsmString*, const char *zFormat, va_list, va_list);
 void lsmStringAppendf(LsmString*, const char *zFormat, ...);
+#endif
 void lsmStringClear(LsmString*);
+#ifdef LSM_DEBUG_STRING
 char *lsmMallocPrintf(lsm_env*, const char*, ...);
+#endif
 int lsmStringBinAppend(LsmString *pStr, const u8 *a, int n);
 
 int lsmStrlen(const char *zName);

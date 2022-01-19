@@ -433,6 +433,7 @@ int lsm_config(lsm_db *pDb, int eParam, ...){
   return rc;
 }
 
+#ifdef LSM_DEBUG_STRING
 static void lsmAppendSegmentList(LsmString *pStr, char *zPre, Segment *pSeg){
   lsmStringAppendf(pStr, "%s{%d %d %d %d}", zPre, 
         pSeg->iFirst, pSeg->iLastPg, pSeg->iRoot, pSeg->nSize
@@ -522,6 +523,7 @@ int lsmInfoFreelist(lsm_db *pDb, char **pzOut){
   infoFreeWorker(pDb, bUnlock);
   return rc;
 }
+#endif /* LSM_DEBUG_STRING */
 
 static int infoTreeSize(lsm_db *db, int *pnOldKB, int *pnNewKB){
   ShmHeader *pShm = db->pShmhdr;
@@ -578,6 +580,7 @@ int lsm_info(lsm_db *pDb, int eParam, ...){
       break;
     }
 
+#ifdef LSM_DEBUG_STRING
     case LSM_INFO_DB_STRUCTURE: {
       char **pzVal = va_arg(ap, char **);
       rc = lsmStructList(pDb, pzVal);
@@ -623,6 +626,7 @@ int lsm_info(lsm_db *pDb, int eParam, ...){
       rc = lsmInfoFreelist(pDb, pzVal);
       break;
     }
+#endif /* LSM_DEBUG_STRING */
 
     case LSM_INFO_CHECKPOINT_SIZE: {
       int *pnKB = va_arg(ap, int *);
@@ -855,6 +859,7 @@ void lsm_config_work_hook(
   pDb->pWorkCtx = pCtx;
 }
 
+#ifdef LSM_DEBUG_STRING
 void lsmLogMessage(lsm_db *pDb, int rc, const char *zFormat, ...){
   if( pDb->xLog ){
     LsmString s;
@@ -869,6 +874,7 @@ void lsmLogMessage(lsm_db *pDb, int rc, const char *zFormat, ...){
     lsmStringClear(&s);
   }
 }
+#endif
 
 int lsm_begin(lsm_db *pDb, int iLevel){
   int rc;

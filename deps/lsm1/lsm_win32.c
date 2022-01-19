@@ -500,7 +500,7 @@ static int lsmWin32OsFullpath(
     int nOut = *pnOut;
     int nLen = strlen(zTempUtf8) + 1;
     if( nLen<=nOut ){
-      snprintf(zOut, nOut, "%s", zTempUtf8);
+      memcpy(zOut, zTempUtf8, nLen);
     }
     lsmFree(pEnv, zTempUtf8);
     *pnOut = nLen;
