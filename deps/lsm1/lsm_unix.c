@@ -191,6 +191,7 @@ static int lsmPosixOsSync(lsm_file *pFile){
 }
 
 static int lsmPosixOsSectorSize(lsm_file *pFile){
+  (void)pFile;
   return 512;
 }
 
@@ -310,6 +311,7 @@ static int lsmPosixOsFileid(
 
 static int lsmPosixOsUnlink(lsm_env *pEnv, const char *zFile){
   int prc = unlink(zFile);
+  (void)pEnv;
   return prc ? LSM_IOERR_BKPT : LSM_OK;
 }
 
@@ -374,7 +376,7 @@ static int lsmPosixOsShmMap(lsm_file *pFile, int iChunk, int sz, void **ppShm){
   PosixFile *p = (PosixFile *)pFile;
 
   *ppShm = 0;
-  assert( sz==LSM_SHM_CHUNK_SIZE );
+  assert( sz==LSM_SHM_CHUNK_SIZE ); (void)sz;
   if( iChunk>=p->nShm ){
     int i;
     void **apNew;
@@ -463,6 +465,7 @@ static int lsmPosixOsClose(lsm_file *pFile){
 }
 
 static int lsmPosixOsSleep(lsm_env *pEnv, int us){
+  (void)pEnv;
 #if 0
   /* Apparently on Android usleep() returns void */
   if( usleep(us) ) return LSM_IOERR;
@@ -478,13 +481,16 @@ static int lsmPosixOsSleep(lsm_env *pEnv, int us){
 
 static void *lsmPosixOsMalloc(lsm_env *pEnv, size_t N){
   unsigned char * m;
+  (void)pEnv;
   N += BLOCK_HDR_SIZE;
   m = (unsigned char *)malloc(N);
+  if( m == NULL ) return NULL;
   *((size_t*)m) = N;
   return m + BLOCK_HDR_SIZE;
 }
 
 static void lsmPosixOsFree(lsm_env *pEnv, void *p){
+  (void)pEnv;
   if(p){
     free( ((unsigned char *)p) - BLOCK_HDR_SIZE );
   }
@@ -519,6 +525,7 @@ static void *lsmPosixOsRealloc(lsm_env *pEnv, void *p, size_t N){
 
 static size_t lsmPosixOsMSize(lsm_env *pEnv, void *p){
   unsigned char * m = (unsigned char *)p;
+  (void)pEnv;
   return *((size_t*)(m-BLOCK_HDR_SIZE));
 }
 #undef BLOCK_HDR_SIZE
@@ -556,6 +563,8 @@ static int lsmPosixOsMutexStatic(
     LSM_PTHREAD_STATIC_MUTEX,
     LSM_PTHREAD_STATIC_MUTEX
   };
+
+  (void)pEnv;
 
   assert( iMutex==LSM_MUTEX_GLOBAL || iMutex==LSM_MUTEX_HEAP );
   assert( LSM_MUTEX_GLOBAL==1 && LSM_MUTEX_HEAP==2 );
@@ -655,6 +664,7 @@ static int lsmPosixOsMutexStatic(
   int iMutex,
   lsm_mutex **ppStatic
 ){
+  (void)pEnv;
   assert( iMutex>=1 && iMutex<=(int)array_size(aStaticNoopMutex) );
   *ppStatic = (lsm_mutex *)&aStaticNoopMutex[iMutex-1];
   return LSM_OK;

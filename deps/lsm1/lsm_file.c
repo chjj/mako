@@ -351,6 +351,8 @@ static void assert_lists_are_ok(FileSystem *pFS){
     assert( p->flags & PAGE_FREE );
     assert( p==fsPageFindInHash(pFS, p->iPg, 0) );
   }
+#else
+  (void)pFS;
 #endif
 }
 #endif
@@ -1165,6 +1167,7 @@ int lsmFsUnmap(FileSystem *pFS){
 ** fsync() the database file.
 */
 int lsmFsSyncDb(FileSystem *pFS, int nBlock){
+  (void)nBlock;
   return lsmEnvSync(pFS->pEnv, pFS->fdDb);
 }
 
@@ -2108,6 +2111,8 @@ int lsmFsSortedAppend(
   Segment *p = &pLvl->lhs;
   LsmPgno iPrev = p->iLastPg;
 
+  (void)pSnapshot;
+
   *ppOut = 0;
   assert( p->pRedirect==0 );
 
@@ -2808,6 +2813,9 @@ int lsmFsSortedPadding(
   Segment *pSeg
 ){
   int rc = LSM_OK;
+
+  (void)pSnapshot;
+
   if( pFS->pCompress && pSeg->iFirst ){
     LsmPgno iLast2;
     LsmPgno iLast = pSeg->iLastPg;  /* Current last page of segment */
@@ -3049,6 +3057,8 @@ int lsmFsSegmentContainsPg(
   int iLastBlk;
   int iPgBlock;                   /* Block containing page iPg */
 
+  (void)iPg;
+
   iPgBlock = fsPageToBlock(pFS, pSeg->iFirst);
   iBlk = fsRedirectBlock(pRedir, fsPageToBlock(pFS, pSeg->iFirst));
   iLastBlk = fsRedirectBlock(pRedir, fsPageToBlock(pFS, pSeg->iLastPg));
@@ -3156,6 +3166,8 @@ static void checkBlocks(
   int nUsed,
   u8 *aUsed
 ){
+  (void)nUsed;
+
   if( pSeg ){
     if( pSeg && pSeg->nSize>0 ){
       int rc;
@@ -3226,6 +3238,8 @@ struct CheckFreelistCtx {
 };
 static int checkFreelistCb(void *pCtx, int iBlk, i64 iSnapshot){
   CheckFreelistCtx *p = (CheckFreelistCtx *)pCtx;
+
+  (void)iSnapshot;
 
   assert( iBlk>=1 );
   assert( iBlk<=p->nBlock );

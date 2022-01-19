@@ -159,6 +159,8 @@ static void assertRwclientLockValue(lsm_db *db){
   msk -= (((u64)1 << (LSM_LOCK_RWCLIENT(0)-1)) - 1);
 
   assert( (db->mLock & msk)==rwclient );
+#else
+  (void)db;
 #endif
 }
 

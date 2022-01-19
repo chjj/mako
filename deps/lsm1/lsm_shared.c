@@ -200,6 +200,9 @@ static int dbTruncate(lsm_db *pDb, i64 iInUse){
 #endif
     pDb->pWorker->nBlock = ctx.nBlock;
   }
+#else
+  (void)pDb;
+  (void)iInUse;
 #endif
   return rc;
 }
@@ -1786,6 +1789,8 @@ int lsmShmLock(
   const u64 ms = ((u64)1 << (iLock+32-1));
   int rc = LSM_OK;
   Database *p = db->pDatabase;
+
+  (void)bBlock;
 
   assert( eOp!=LSM_LOCK_EXCL || p->bReadonly==0 );
   assert( iLock>=1 && iLock<=LSM_LOCK_RWCLIENT(LSM_LOCK_NRWCLIENT-1) );

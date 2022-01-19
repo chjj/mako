@@ -3401,6 +3401,8 @@ static int mergeWorkerMoveHierarchy(
   Page **apHier = pMW->hier.apHier;
   int nHier = pMW->hier.nHier;
 
+  (void)bSep;
+
   for(i=0; rc==LSM_OK && i<nHier; i++){
     Page *pNew = 0;
     rc = lsmFsSortedAppend(pDb->pFS, pDb->pWorker, pMW->pLevel, 1, &pNew);
@@ -3878,6 +3880,8 @@ static int mergeWorkerData(
 ){
   int rc = LSM_OK;                /* Return code */
   int nRem = nWrite;              /* Number of bytes still to write */
+
+  (void)bSep;
 
   while( rc==LSM_OK && nRem>0 ){
     Merge *pMerge = pMW->pLevel->pMerge;
@@ -4769,6 +4773,7 @@ struct MoveBlockCtx {
 
 static int moveBlockCb(void *pCtx, int iBlk, i64 iSnapshot){
   MoveBlockCtx *p = (MoveBlockCtx *)pCtx;
+  (void)iSnapshot;
   assert( p->iFrom==0 );
   if( iBlk==(p->iSeen-1) ){
     p->iSeen = iBlk;

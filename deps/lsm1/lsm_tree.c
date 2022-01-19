@@ -243,6 +243,7 @@ static int intArrayAppend(lsm_env *pEnv, IntArray *p, u32 iVal){
 ** Zero the IntArray object.
 */
 static void intArrayFree(lsm_env *pEnv, IntArray *p){
+  (void)pEnv;
   p->nArray = 0;
 }
 
@@ -2414,6 +2415,8 @@ int lsmTreeLoadHeaderOk(lsm_db *pDb, int iRead){
 */
 int lsmTreeEndTransaction(lsm_db *pDb, int bCommit){
   ShmHeader *pShm = pDb->pShmhdr;
+
+  (void)bCommit;
 
   treeHeaderChecksum(&pDb->treehdr, pDb->treehdr.aCksum);
   memcpy(&pShm->hdr2, &pDb->treehdr, sizeof(TreeHeader));
