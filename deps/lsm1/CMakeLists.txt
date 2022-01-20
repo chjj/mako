@@ -7,7 +7,7 @@ project(lsm1 LANGUAGES C)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 
-find_package(Threads REQUIRED)
+find_package(Threads)
 
 set(lsm_sources lsm_ckpt.c
                 lsm_file.c
