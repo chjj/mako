@@ -4,6 +4,7 @@
  * https://github.com/chjj/mako
  */
 
+#include <limits.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -115,7 +116,10 @@ btc_script_decompress(btc_script_t *z, const uint8_t **xp, size_t *xn) {
   if (!btc_varint_read(&zn, xp, xn))
     return 0;
 
-  switch (zn) {
+  if (zn > INT_MAX)
+    return 0;
+
+  switch ((int)zn) {
     case 0x00: {
       if (!btc_zraw_read(&zp, 20, xp, xn))
         return 0;
