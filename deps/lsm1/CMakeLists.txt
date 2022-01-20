@@ -5,10 +5,6 @@
 cmake_minimum_required(VERSION 3.4)
 project(lsm1 LANGUAGES C)
 
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-
-find_package(Threads)
-
 set(lsm_sources lsm_ckpt.c
                 lsm_file.c
                 lsm_log.c
@@ -31,11 +27,16 @@ add_library(lsm1 STATIC ${lsm_sources})
 
 target_compile_definitions(lsm1 PRIVATE NDEBUG)
 
-if(WIN32)
-  target_compile_definitions(lsm1 PRIVATE LSM_MUTEX_WIN32)
-elseif(CMAKE_USE_PTHREADS_INIT AND NOT EMSCRIPTEN)
-  target_compile_definitions(lsm1 PRIVATE LSM_MUTEX_PTHREADS)
-  target_link_libraries(lsm1 PRIVATE Threads::Threads)
-endif()
+# Note: we don't require locks as of yet.
+# if(WIN32)
+#   target_compile_definitions(lsm1 PRIVATE LSM_MUTEX_WIN32)
+# elseif(NOT WASI AND NOT EMSCRIPTEN)
+#   set(THREADS_PREFER_PTHREAD_FLAG ON)
+#   find_package(Threads)
+#   if(CMAKE_USE_PTHREADS_INIT)
+#     target_compile_definitions(lsm1 PRIVATE LSM_MUTEX_PTHREADS)
+#     target_link_libraries(lsm1 PRIVATE Threads::Threads)
+#   endif()
+# endif()
 
 target_include_directories(lsm1 INTERFACE ${PROJECT_SOURCE_DIR})

@@ -23,16 +23,18 @@ liblsm_la_SOURCES = lsm.h        \
                     lsm_varint.c \
                     $(os_src)
 
-if MINGW
-liblsm_la_CFLAGS = -DNDEBUG -DLSM_MUTEX_WIN32
-else
-if HAVE_PTHREAD
-liblsm_la_CFLAGS = -DNDEBUG -DLSM_MUTEX_PTHREADS
-else
-liblsm_la_CFLAGS = -DNDEBUG
-endif
-endif
+# Note: we don't require locks as of yet.
+# if MINGW
+# liblsm_la_CFLAGS = -DNDEBUG -DLSM_MUTEX_WIN32
+# else
+# if HAVE_PTHREAD
+# liblsm_la_CFLAGS = -DNDEBUG -DLSM_MUTEX_PTHREADS
+# else
+# liblsm_la_CFLAGS = -DNDEBUG
+# endif
+# endif
 
+liblsm_la_CFLAGS = -DNDEBUG
 liblsm_la_LDFLAGS = -static
 
 noinst_LTLIBRARIES = liblsm.la
