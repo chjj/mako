@@ -26,7 +26,11 @@ liblsm_la_SOURCES = lsm.h        \
 if MINGW
 liblsm_la_CFLAGS = -DNDEBUG -DLSM_MUTEX_WIN32
 else
+if HAVE_PTHREAD
 liblsm_la_CFLAGS = -DNDEBUG -DLSM_MUTEX_PTHREADS
+else
+liblsm_la_CFLAGS = -DNDEBUG
+endif
 endif
 
 liblsm_la_LDFLAGS = -static

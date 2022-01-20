@@ -9,10 +9,6 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 
 find_package(Threads REQUIRED)
 
-if(NOT WIN32 AND NOT CMAKE_USE_PTHREADS_INIT)
-  message(FATAL_ERROR "pthread not found")
-endif()
-
 set(lsm_sources lsm_ckpt.c
                 lsm_file.c
                 lsm_log.c
@@ -33,11 +29,13 @@ endif()
 
 add_library(lsm1 STATIC ${lsm_sources})
 
+target_compile_definitions(lsm1 PRIVATE NDEBUG)
+
 if(WIN32)
-  target_compile_definitions(lsm1 PRIVATE NDEBUG LSM_MUTEX_WIN32)
-else()
-  target_compile_definitions(lsm1 PRIVATE NDEBUG LSM_MUTEX_PTHREADS)
+  target_compile_definitions(lsm1 PRIVATE LSM_MUTEX_WIN32)
+elseif(CMAKE_USE_PTHREADS_INIT AND NOT EMSCRIPTEN)
+  target_compile_definitions(lsm1 PRIVATE LSM_MUTEX_PTHREADS)
+  target_link_libraries(lsm1 PRIVATE Threads::Threads)
 endif()
 
 target_include_directories(lsm1 INTERFACE ${PROJECT_SOURCE_DIR})
-target_link_libraries(lsm1 PRIVATE Threads::Threads)

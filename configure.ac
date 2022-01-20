@@ -475,6 +475,7 @@ AM_CONDITIONAL([ENABLE_LEVELDB], [test x"$enable_leveldb" = x'yes'])
 AM_CONDITIONAL([ENABLE_NODE], [test x"$enable_node" = x'yes'])
 AM_CONDITIONAL([ENABLE_SHARED], [test x"$enable_shared" = x'yes'])
 AM_CONDITIONAL([ENABLE_TESTS], [test x"$enable_tests" = x'yes'])
+AM_CONDITIONAL([HAVE_PTHREAD], [test x"$has_pthread" = x'yes'])
 AM_CONDITIONAL([MINGW], [test x"$MINGW" != x''])
 
 AC_CONFIG_FILES([deps/lmdb/Makefile
