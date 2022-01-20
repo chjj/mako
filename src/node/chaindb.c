@@ -1140,18 +1140,19 @@ btc_chaindb_read(btc_chaindb_t *db,
   if (size > (64 << 20))
     goto fail;
 
-  data = (uint8_t *)malloc(24 + size);
+  size += 24;
+  data = (uint8_t *)malloc(size);
 
   if (data == NULL)
     goto fail;
 
   memcpy(data, hdr, 24);
 
-  if (!btc_fs_read(fd, data + 24, size))
+  if (!btc_fs_read(fd, data + 24, size - 24))
     goto fail;
 
   *raw = data;
-  *len = size + 24;
+  *len = size;
 
   data = NULL;
   ret = 1;
