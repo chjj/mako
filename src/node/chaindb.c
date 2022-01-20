@@ -48,9 +48,11 @@
  * Constants
  */
 
-#define WRITE_FLAGS (BTC_O_RDWR | BTC_O_CREAT | BTC_O_APPEND)
+#define WRITE_FLAGS (BTC_O_WRONLY | BTC_O_CREAT | BTC_O_APPEND)
 #define READ_FLAGS (BTC_O_RDONLY | BTC_O_RANDOM)
 #define MAX_FILE_SIZE (128 << 20)
+#define BLOCK_FILE 0
+#define UNDO_FILE 1
 
 /*
  * LSM Helpers
@@ -495,7 +497,7 @@ DEFINE_SERIALIZABLE_OBJECT(btc_chainfile, SCOPE_STATIC)
 static void
 btc_chainfile_init(btc_chainfile_t *z) {
   z->fd = -1;
-  z->type = 0;
+  z->type = BLOCK_FILE;
   z->id = 0;
   z->pos = 0;
   z->items = 0;
@@ -623,7 +625,7 @@ struct btc_chaindb_s {
 
 static void
 btc_chaindb_path(btc_chaindb_t *db, char *path, int type, int id) {
-  const char *tag = (type == 0 ? "blk" : "rev");
+  const char *tag = (type == BLOCK_FILE ? "blk" : "rev");
 
 #if defined(_WIN32)
   sprintf(path, "%s\\blocks\\%s%.5d.dat", db->prefix, tag, id);
@@ -779,10 +781,10 @@ btc_chaindb_load_files(btc_chaindb_t *db) {
   if (lsm_csr_valid(cur)) {
     CHECK(lsm_csr_value(cur, &vp, &vn) == 0);
     CHECK(btc_chainfile_import(&db->block, vp, vn));
-    CHECK(db->block.type == 0);
+    CHECK(db->block.type == BLOCK_FILE);
   } else {
     btc_chainfile_init(&db->block);
-    db->block.type = 0;
+    db->block.type = BLOCK_FILE;
   }
 
   /* Read best undo file. */
@@ -791,10 +793,10 @@ btc_chaindb_load_files(btc_chaindb_t *db) {
   if (lsm_csr_valid(cur)) {
     CHECK(lsm_csr_value(cur, &vp, &vn) == 0);
     CHECK(btc_chainfile_import(&db->undo, vp, vn));
-    CHECK(db->undo.type == 1);
+    CHECK(db->undo.type == UNDO_FILE);
   } else {
     btc_chainfile_init(&db->undo);
-    db->undo.type = 1;
+    db->undo.type = UNDO_FILE;
   }
 
   /* Read file index and build vector. */
@@ -1110,45 +1112,46 @@ static int
 btc_chaindb_read(btc_chaindb_t *db,
                  uint8_t **raw,
                  size_t *len,
-                 const btc_chainfile_t *file,
+                 int type,
                  int id,
                  int pos) {
   char path[BTC_PATH_MAX];
   uint8_t *data = NULL;
-  uint8_t tmp[4];
+  uint8_t hdr[24];
   size_t size;
   int ret = 0;
   int fd;
 
-  if (id == file->id) {
-    fd = file->fd;
-  } else {
-    btc_chaindb_path(db, path, file->type, id);
+  btc_chaindb_path(db, path, type, id);
 
-    fd = btc_fs_open(path, READ_FLAGS, 0);
+  fd = btc_fs_open(path, READ_FLAGS, 0);
 
-    if (fd == -1)
-      return 0;
-  }
+  if (fd == -1)
+    return 0;
 
-  if (!btc_fs_pread(fd, tmp, 4, pos + 16))
+  if (btc_fs_seek(fd, pos, BTC_SEEK_SET) != pos)
     goto fail;
 
-  size = 24 + btc_read32le(tmp);
-
-  if (size < 24 || size > (64 << 20))
+  if (!btc_fs_read(fd, hdr, 24))
     goto fail;
 
-  data = (uint8_t *)malloc(size);
+  size = btc_read32le(hdr + 16);
+
+  if (size > (64 << 20))
+    goto fail;
+
+  data = (uint8_t *)malloc(24 + size);
 
   if (data == NULL)
     goto fail;
 
-  if (!btc_fs_pread(fd, data, size, pos))
+  memcpy(data, hdr, 24);
+
+  if (!btc_fs_read(fd, data + 24, size))
     goto fail;
 
   *raw = data;
-  *len = size;
+  *len = size + 24;
 
   data = NULL;
   ret = 1;
@@ -1156,8 +1159,7 @@ fail:
   if (data != NULL)
     free(data);
 
-  if (fd != file->fd)
-    btc_fs_close(fd);
+  btc_fs_close(fd);
 
   return ret;
 }
@@ -1171,7 +1173,7 @@ btc_chaindb_read_block(btc_chaindb_t *db, const btc_entry_t *entry) {
   if (entry->block_pos == -1)
     return NULL;
 
-  if (!btc_chaindb_read(db, &buf, &len, &db->block, entry->block_file,
+  if (!btc_chaindb_read(db, &buf, &len, BLOCK_FILE, entry->block_file,
                                                     entry->block_pos)) {
     return NULL;
   }
@@ -1192,7 +1194,7 @@ btc_chaindb_read_undo(btc_chaindb_t *db, const btc_entry_t *entry) {
   if (entry->undo_pos == -1)
     return btc_undo_create();
 
-  if (!btc_chaindb_read(db, &buf, &len, &db->undo, entry->undo_file,
+  if (!btc_chaindb_read(db, &buf, &len, UNDO_FILE, entry->undo_file,
                                                    entry->undo_pos)) {
     return NULL;
   }
@@ -1760,7 +1762,7 @@ btc_chaindb_get_raw_block(btc_chaindb_t *db,
   if (entry->block_pos == -1)
     return 0;
 
-  return btc_chaindb_read(db, data, length, &db->block, entry->block_file,
+  return btc_chaindb_read(db, data, length, BLOCK_FILE, entry->block_file,
                                                         entry->block_pos);
 
 }
