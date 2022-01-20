@@ -1,0 +1,36 @@
+#!/bin/sh
+
+# wasi-cmake - wasi wrapper for cmake
+# Copyright (c) 2020, Christopher Jeffrey (MIT License).
+# https://github.com/bcoin-org/libtorsion
+
+set -e
+
+DIR=`dirname "$0"`
+DIR=`cd "$DIR" && pwd`
+
+if test x"$WASI" != x; then
+  WASI=`cd "$WASI" && pwd`
+elif test -d /opt/wasi-sdk; then
+  WASI=/opt/wasi-sdk
+elif test -d /opt/local/wasi-sdk; then
+  WASI=/opt/local/wasi-sdk
+elif test -d /usr/lib/wasi-sdk; then
+  WASI=/usr/lib/wasi-sdk
+elif test -d /usr/local/lib/wasi-sdk; then
+  WASI=/usr/local/lib/wasi-sdk
+else
+  echo 'WASI SDK not found!' >& 2
+  exit 1
+fi
+
+CMAKE="$1"
+
+shift
+
+exec "$CMAKE" -G 'Unix Makefiles'                                       \
+              -DCMAKE_MODULE_PATH="$DIR/cmake"                          \
+              -DCMAKE_TOOLCHAIN_FILE="$WASI/share/cmake/wasi-sdk.cmake" \
+              -DCMAKE_CROSSCOMPILING_EMULATOR="$DIR/wasi-run"           \
+              -DWASI_SDK_PREFIX="$WASI"                                 \
+              "$@"
