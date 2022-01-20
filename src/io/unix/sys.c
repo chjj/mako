@@ -94,39 +94,28 @@ btc_sys_numcpu(void) {
 int
 btc_sys_homedir(char *buf, size_t size) {
   char *home = getenv("HOME");
-  struct passwd *result;
-  struct passwd pwd;
-  char slab[8192];
+  struct passwd *pwd;
   size_t len;
-  uid_t uid;
-  int rc;
 
-  if (home != NULL) {
-    len = strlen(home);
+  if (home == NULL) {
+    uid_t uid = geteuid();
 
-    if (len + 1 > size)
+    do {
+      pwd = getpwuid(uid);
+    } while (pwd == NULL && errno == EINTR);
+
+    if (pwd == NULL)
       return 0;
 
-    memcpy(buf, home, len + 1);
-
-    return 1;
+    home = pwd->pw_dir;
   }
 
-  uid = geteuid();
-
-  do {
-    rc = getpwuid_r(uid, &pwd, slab, sizeof(slab), &result);
-  } while (rc == EINTR);
-
-  if (rc != 0 || result == NULL)
-    return 0;
-
-  len = strlen(pwd.pw_dir);
+  len = strlen(home);
 
   if (len + 1 > size)
     return 0;
 
-  memcpy(buf, pwd.pw_dir, len + 1);
+  memcpy(buf, home, len + 1);
 
   return 1;
 }
