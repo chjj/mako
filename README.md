@@ -54,7 +54,7 @@ $ make
 #### Building with LevelDB
 
 ``` sh
-$ cmake . -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-g -DMAKO_USE_LEVELDB=ON
+$ cmake . -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-g -DMAKO_LEVELDB=ON
 $ make
 ```
 
