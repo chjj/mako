@@ -271,7 +271,11 @@ thread_stack_size(void) {
   if (lim.rlim_cur != RLIM_INFINITY) {
     lim.rlim_cur -= (lim.rlim_cur % (rlim_t)getpagesize());
 
+#if defined(PTHREAD_STACK_MIN)
     if (lim.rlim_cur >= PTHREAD_STACK_MIN)
+#else
+    if (lim.rlim_cur >= (16 << 10))
+#endif
       return lim.rlim_cur;
   }
 
