@@ -721,7 +721,7 @@ btc_fs_read(int fd, void *dst, size_t len) {
 
     do {
       nread = read(fd, buf, max);
-    } while (nread < 0 && (errno == EINTR || errno == EAGAIN));
+    } while (nread < 0 && errno == EINTR);
 
     if (nread <= 0)
       break;
@@ -748,7 +748,7 @@ btc_fs_write(int fd, const void *src, size_t len) {
 
     do {
       nwrite = write(fd, buf, max);
-    } while (nwrite < 0 && (errno == EINTR || errno == EAGAIN));
+    } while (nwrite < 0 && errno == EINTR);
 
     if (nwrite <= 0)
       break;
@@ -775,7 +775,7 @@ btc_fs_pread(int fd, void *dst, size_t len, int64_t pos) {
 
     do {
       nread = pread(fd, buf, max, pos);
-    } while (nread < 0 && (errno == EINTR || errno == EAGAIN));
+    } while (nread < 0 && errno == EINTR);
 
     if (nread <= 0)
       break;
@@ -810,7 +810,7 @@ btc_fs_pwrite(int fd, const void *src, size_t len, int64_t pos) {
 
     do {
       nwrite = pwrite(fd, buf, max, pos);
-    } while (nwrite < 0 && (errno == EINTR || errno == EAGAIN));
+    } while (nwrite < 0 && errno == EINTR);
 
     if (nwrite <= 0)
       break;
