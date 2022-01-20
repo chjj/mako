@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# watcom-cmake - watcom wrapper for cmake
+# Copyright (c) 2020, Christopher Jeffrey (MIT License).
+# https://github.com/bcoin-org/libtorsion
+
+export WATCOM=${WATCOM:-/opt/watcom}
+export PATH="$WATCOM/binl:$PATH"
+export INCLUDE="$WATCOM/lh"
+
+CMAKE="$1"
+
+shift
+
+exec "$CMAKE" -G 'Unix Makefiles'       \
+              -DCMAKE_C_COMPILER=wcl386 \
+              "$@"

@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# watcom-configure - watcom wrapper for configure scripts
+# Copyright (c) 2020, Christopher Jeffrey (MIT License).
+# https://github.com/bcoin-org/libtorsion
+
+export WATCOM=${WATCOM:-/opt/watcom}
+export PATH="$WATCOM/binl:$PATH"
+export INCLUDE="$WATCOM/lh"
+export CC=owcc
+export CXX=owcc
+
+CONFIGURE="$1"
+
+shift
+
+exec "$CONFIGURE" --disable-shared "$@"
