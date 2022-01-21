@@ -52,15 +52,10 @@ btc_sys_datadir(char *buf, size_t size, const char *name) {
 
   memset(path, 0, sizeof(path));
 
-#if defined(CSIDL_APPDATA)
   if (!SHGetSpecialFolderPathA(NULL, path, CSIDL_APPDATA, FALSE)) {
     if (!btc_sys_homedir(path, sizeof(path)))
       return 0;
   }
-#else
-  if (!btc_sys_homedir(path, sizeof(path)))
-    return 0;
-#endif
 
   if (strlen(path) + strlen(name) + 2 > size)
     return 0;
