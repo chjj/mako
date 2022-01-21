@@ -438,7 +438,7 @@ AS_IF([test x"$has_64bit" != x'yes'], [
 #
 
 AS_IF([test x"$MINGW" != x''], [
-  LIBS="$LIBS -lkernel32 -ladvapi32 -lshell32 -luserenv -lws2_32"
+  LIBS="$LIBS -lkernel32 -ladvapi32 -lshell32 -lws2_32"
 ], [
   LIBS="$LIBS -lm"
 

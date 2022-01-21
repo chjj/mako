@@ -8,12 +8,10 @@
 #include <stdlib.h>
 #include <windows.h>
 #include <shlobj.h>
-#include <userenv.h>
 #include <io/core.h>
 
 #ifndef __MINGW32__
 #  pragma comment(lib, "shell32.lib")
-#  pragma comment(lib, "userenv.lib")
 #endif
 
 /*
@@ -30,20 +28,7 @@ btc_sys_numcpu(void) {
 int
 btc_sys_homedir(char *buf, size_t size) {
   DWORD len = GetEnvironmentVariableA("USERPROFILE", buf, size);
-  HANDLE token;
-
-  if (len >= size)
-    return 0;
-
-  if (len != 0)
-    return 1;
-
-  if (OpenProcessToken(GetCurrentProcess(), TOKEN_READ, &token) == 0)
-    return 0;
-
-  len = size;
-
-  return GetUserProfileDirectoryA(token, buf, &len) == TRUE;
+  return len > 0 && len < size;
 }
 
 int

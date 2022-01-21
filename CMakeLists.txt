@@ -114,6 +114,30 @@ if(CMAKE_C_COMPILER_ID STREQUAL "XL" AND CMAKE_SYSTEM_NAME STREQUAL "AIX")
   endif()
 endif()
 
+# chibicc doesn't support .so versioning.
+# Furthermore, CMake doesn't know about chibicc's -fPIC.
+check_symbol_exists(__chibicc__ "" MAKO_CHIBICC)
+
+if(MAKO_CHIBICC)
+  set(CMAKE_C_COMPILE_OPTIONS_PIC "-fPIC")
+  set(CMAKE_SHARED_LIBRARY_C_FLAGS "-fPIC")
+  set(MAKO_SHARED OFF)
+endif()
+
+# OpenWatcom-Linux can't create shared libraries.
+if(CMAKE_C_COMPILER_ID STREQUAL "OpenWatcom")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(MAKO_SHARED OFF)
+  endif()
+endif()
+
+# dietlibc is for static linking only.
+check_symbol_exists(__dietlibc__ "" MAKO_DIETLIBC)
+
+if(MAKO_DIETLIBC)
+  set(MAKO_SHARED OFF)
+endif()
+
 #
 # Feature Testing
 #
@@ -184,7 +208,7 @@ endif()
 
 set(MAKO_HAVE_PTHREAD 0)
 
-if(NOT MINGW AND NOT WASI AND NOT EMSCRIPTEN)
+if(NOT WIN32 AND NOT WASI AND NOT EMSCRIPTEN)
   set(THREADS_PREFER_PTHREAD_FLAG ON)
 
   find_package(Threads)
@@ -463,7 +487,7 @@ list(APPEND mako_includes ${PROJECT_SOURCE_DIR}/include)
 #
 
 if(WIN32)
-  list(APPEND mako_libs shell32 userenv ws2_32)
+  list(APPEND mako_libs kernel32 advapi32 shell32 ws2_32)
 else()
   list(APPEND mako_libs m)
 
