@@ -249,7 +249,7 @@ AS_IF([test "x$ax_pthread_clang" = "xyes"],
 # correctly enabled
 
 case $host_os in
-        darwin* | hpux* | linux* | osf* | solaris*)
+        darwin* | hpux* | osf* | solaris*)
         ax_pthread_check_macro="_REENTRANT"
         ;;
 
