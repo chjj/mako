@@ -53,7 +53,7 @@ option(MAKO_INT128 "Use __int128 if available" ON)
 option(MAKO_LEVELDB "Use leveldb" OFF)
 option(MAKO_NODE "Build the fullnode" ON)
 option(MAKO_PIC "Enable PIC" OFF)
-option(MAKO_SHARED "Build shared library" ON)
+option(MAKO_SHARED "Build shared library" OFF)
 option(MAKO_TESTS "Build tests" ON)
 option(MAKO_TLS "Use thread-local storage if available" ON)
 
@@ -114,28 +114,12 @@ if(CMAKE_C_COMPILER_ID STREQUAL "XL" AND CMAKE_SYSTEM_NAME STREQUAL "AIX")
   endif()
 endif()
 
-# chibicc doesn't support .so versioning.
-# Furthermore, CMake doesn't know about chibicc's -fPIC.
+# CMake doesn't know about chibicc's -fPIC.
 check_symbol_exists(__chibicc__ "" MAKO_CHIBICC)
 
 if(MAKO_CHIBICC)
   set(CMAKE_C_COMPILE_OPTIONS_PIC "-fPIC")
   set(CMAKE_SHARED_LIBRARY_C_FLAGS "-fPIC")
-  set(MAKO_SHARED OFF)
-endif()
-
-# OpenWatcom-Linux can't create shared libraries.
-if(CMAKE_C_COMPILER_ID STREQUAL "OpenWatcom")
-  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(MAKO_SHARED OFF)
-  endif()
-endif()
-
-# dietlibc is for static linking only.
-check_symbol_exists(__dietlibc__ "" MAKO_DIETLIBC)
-
-if(MAKO_DIETLIBC)
-  set(MAKO_SHARED OFF)
 endif()
 
 #
@@ -564,7 +548,10 @@ function(mako_build_full)
     target_link_libraries(mako_shared PRIVATE mako)
     target_compile_definitions(mako_shared PRIVATE BTC_EXPORT)
     set_property(TARGET mako_shared PROPERTY OUTPUT_NAME mako)
-    set_target_version_info(mako_shared ${MAKO_ABI_VERSION})
+
+    if (NOT MAKO_CHIBICC) # chibicc doesn't support .so versioning.
+      set_target_version_info(mako_shared ${MAKO_ABI_VERSION})
+    endif()
 
     if(MINGW)
       set_target_properties(mako_shared PROPERTIES PREFIX ""

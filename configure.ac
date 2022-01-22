@@ -25,7 +25,7 @@ m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 AM_SILENT_RULES([yes])
 
 LT_PREREQ([2.2.8])
-LT_INIT([shared static])
+LT_INIT([static disable-shared])
 
 #
 # Sanity Checks
@@ -165,32 +165,10 @@ AC_COMPILE_IFELSE([
   AC_MSG_WARN([For example, './configure CC=xlc_r'.])
 ])
 
-# chibicc doesn't support .so versioning.
-AC_CHECK_DEFINE([__chibicc__], [
-  enable_shared=no
-])
-
 # Hack to get OpenWatcom's owcc working.
 AC_CHECK_DEFINE([__WATCOMC__], [
   grep -v '#define PACKAGE_STRING' confdefs.h > confdefs.h.tmp
   mv -f confdefs.h.tmp confdefs.h
-])
-
-# OpenWatcom-Linux can't create shared libraries.
-AC_CHECK_DEFINE([__WATCOMC__], [
-  AC_CHECK_DEFINE([__LINUX__], [
-    enable_shared=no
-  ])
-])
-
-# dietlibc is for static linking only.
-AC_CHECK_DEFINE([__dietlibc__], [
-  enable_shared=no
-])
-
-AS_IF([test x"$WASI$EMSCRIPTEN" != x''], [
-  enable_shared=no
-  enable_node=no
 ])
 
 #
@@ -469,6 +447,10 @@ AS_IF([test x"$EMSCRIPTEN" != x''], [
 
 AS_IF([test x"$has_zlib" = x'yes'], [
   AC_SUBST([ZLIB], ['-lz'])
+])
+
+AS_IF([test x"$WASI$EMSCRIPTEN" != x''], [
+  enable_node=no
 ])
 
 AM_CONDITIONAL([ENABLE_LEVELDB], [test x"$enable_leveldb" = x'yes'])
