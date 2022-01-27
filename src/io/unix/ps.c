@@ -5,6 +5,7 @@
  */
 
 #include <signal.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
@@ -15,6 +16,10 @@
 #include <sys/resource.h> /* getrlimit */
 #include <fcntl.h> /* open */
 #include <unistd.h>
+
+#ifdef __APPLE__
+#include <mach/mach.h>
+#endif
 
 #include <io/core.h>
 
@@ -180,4 +185,42 @@ btc_ps_onterm(void (*handler)(void *), void *arg) {
     btc_signal(SIGTERM, real_handler);
     btc_signal(SIGINT, real_handler);
   }
+}
+
+size_t
+btc_ps_rss(void) {
+#if defined(__linux__)
+  FILE *fp = fopen("/proc/self/statm", "r");
+  long size, rss, shm;
+
+  if (fp == NULL)
+    return 0;
+
+  if (fscanf(fp, "%ld %ld %ld", &size, &rss, &shm) != 3) {
+    fclose(fp);
+    return 0;
+  }
+
+  fclose(fp);
+
+  return rss * getpagesize();
+#elif defined(__APPLE__)
+  mach_msg_type_number_t count;
+  task_basic_info_data_t info;
+  kern_return_t rc;
+
+  count = TASK_BASIC_INFO_COUNT;
+
+  rc = task_info(mach_task_self(),
+                 TASK_BASIC_INFO,
+                 (task_info_t)&info,
+                 &count);
+
+  if (rc != KERN_SUCCESS)
+    return 0;
+
+  return info.resident_size;
+#else
+  return 0;
+#endif
 }

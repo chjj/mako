@@ -3865,6 +3865,7 @@ btc_pool_add_block(btc_pool_t *pool,
   }
 
   peer->block_time = btc_time_msec();
+  peer->last_ping = peer->block_time;
 
   if (!btc_chain_add(pool->chain, block, flags, peer->id)) {
     btc_peer_reject(peer, "block", btc_chain_error(pool->chain));

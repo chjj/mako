@@ -1835,6 +1835,8 @@ btc_chain_connect(btc_chain_t *chain,
     btc_log_info(chain, "Block %H (%d) added to chain (txs=%zu time=%.2f).",
                         entry->hash, entry->height, block->txs.length,
                         (double)(btc_time_usec() - now) / 1000.0);
+
+    btc_log_debug(chain, "Memory: rss=%zumb\n", btc_ps_rss() / (1 << 20));
   }
 
   btc_chain_maybe_sync(chain);

@@ -31,10 +31,20 @@ EXTRA_DIST = cmake/              \
 if ENABLE_NODE
 if ENABLE_LEVELDB
 mako_dbdir = deps/lsm2
+mako_dblib = $(mako_dbdir)/liblsm.la
+chaindb = chaindb
 else
+if ENABLE_LSM
 mako_dbdir = deps/lsm1
-endif
-endif
+mako_dblib = $(mako_dbdir)/liblsm.la
+chaindb = chaindb
+else
+mako_dbdir = deps/rdb
+mako_dblib = $(mako_dbdir)/librdb.la
+chaindb = chainrdb
+endif ENABLE_LSM
+endif ENABLE_LEVELDB
+endif ENABLE_NODE
 
 SUBDIRS = $(mako_dbdir) . test
 
@@ -228,15 +238,15 @@ io_sources = src/io/http/http_client.c \
              src/io/workers.c          \
              $(os_sources)
 
-node_sources = src/node/addrman.c  \
-               src/node/chain.c    \
-               src/node/chaindb.c  \
-               src/node/logger.c   \
-               src/node/mempool.c  \
-               src/node/miner.c    \
-               src/node/node.c     \
-               src/node/pool.c     \
-               src/node/rpc.c      \
+node_sources = src/node/addrman.c    \
+               src/node/chain.c      \
+               src/node/$(chaindb).c \
+               src/node/logger.c     \
+               src/node/mempool.c    \
+               src/node/miner.c      \
+               src/node/node.c       \
+               src/node/pool.c       \
+               src/node/rpc.c        \
                src/node/timedata.c
 
 client_sources = src/client/client.c
@@ -269,7 +279,7 @@ libio_la_LDFLAGS = -static
 libnode_la_SOURCES = $(node_sources)
 libnode_la_CFLAGS = $(WARN_FLAGS) -I$(top_srcdir)/$(mako_dbdir)
 libnode_la_LDFLAGS = -static
-libnode_la_LIBADD = libmako.la libio.la $(mako_dbdir)/liblsm.la
+libnode_la_LIBADD = libmako.la libio.la $(mako_dblib)
 
 libclient_la_SOURCES = $(client_sources)
 libclient_la_CFLAGS = $(WARN_FLAGS)

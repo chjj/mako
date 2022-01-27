@@ -50,7 +50,8 @@ include(TestBigEndian)
 option(MAKO_ASM "Use inline assembly if available" ON)
 option(MAKO_COVERAGE "Enable coverage" OFF)
 option(MAKO_INT128 "Use __int128 if available" ON)
-option(MAKO_LEVELDB "Use leveldb" OFF)
+option(MAKO_LEVELDB "Use LevelDB" OFF)
+option(MAKO_LSM "Use SQLite4 LSM" OFF)
 option(MAKO_NODE "Build the fullnode" ON)
 option(MAKO_PIC "Enable PIC" OFF)
 option(MAKO_SHARED "Build shared library" OFF)
@@ -337,9 +338,15 @@ else()
                          src/io/unix/time.c)
 endif()
 
+if(MAKO_LEVELDB OR MAKO_LSM)
+  set(chaindb chaindb)
+else()
+  set(chaindb chainrdb)
+endif()
+
 list(APPEND node_sources src/node/addrman.c
                          src/node/chain.c
-                         src/node/chaindb.c
+                         src/node/${chaindb}.c
                          src/node/logger.c
                          src/node/mempool.c
                          src/node/miner.c
@@ -482,8 +489,10 @@ endif()
 
 if(MAKO_LEVELDB)
   list(APPEND node_libs lsm2)
-else()
+elseif(MAKO_LSM)
   list(APPEND node_libs lsm1)
+else()
+  list(APPEND node_libs rdb)
 endif()
 
 if(MAKO_HAVE_ZLIB)
@@ -607,8 +616,10 @@ function(mako_build_full)
 
   if(MAKO_LEVELDB)
     add_subdirectory(deps/lsm2)
-  else()
+  elseif(MAKO_LSM)
     add_subdirectory(deps/lsm1)
+  else()
+    add_subdirectory(deps/rdb)
   endif()
 
   add_library(mako_io STATIC ${io_sources})

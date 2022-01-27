@@ -100,6 +100,14 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_ENABLE(
+  lsm,
+  AS_HELP_STRING([--enable-lsm],
+                 [use sqlite4 lsm [default=no]]),
+  [enable_lsm=$enableval],
+  [enable_lsm=no]
+)
+
+AC_ARG_ENABLE(
   node,
   AS_HELP_STRING([--enable-node],
                  [build the fullnode [default=yes]]),
@@ -380,6 +388,7 @@ AS_IF([test x"$has_pthread" = x'yes'], [
 
 AS_IF([test x"$has_tls" = x'yes'], [
   AC_DEFINE_UNQUOTED([BTC_TLS], [$ax_cv_tls_keyword])
+  AC_DEFINE_UNQUOTED([RDB_TLS], [$ax_cv_tls_keyword])
 ])
 
 AS_IF([test x"$has_zlib" = x'yes'], [
@@ -454,6 +463,7 @@ AS_IF([test x"$WASI$EMSCRIPTEN" != x''], [
 ])
 
 AM_CONDITIONAL([ENABLE_LEVELDB], [test x"$enable_leveldb" = x'yes'])
+AM_CONDITIONAL([ENABLE_LSM], [test x"$enable_lsm" = x'yes'])
 AM_CONDITIONAL([ENABLE_NODE], [test x"$enable_node" = x'yes'])
 AM_CONDITIONAL([ENABLE_SHARED], [test x"$enable_shared" = x'yes'])
 AM_CONDITIONAL([ENABLE_TESTS], [test x"$enable_tests" = x'yes'])
@@ -463,6 +473,7 @@ AM_CONDITIONAL([MINGW], [test x"$MINGW" != x''])
 AC_CONFIG_FILES([deps/lmdb/Makefile
                  deps/lsm1/Makefile
                  deps/lsm2/Makefile
+                 deps/rdb/Makefile
                  Makefile
                  test/Makefile
                  libmako.pc])
@@ -484,6 +495,7 @@ AC_MSG_NOTICE([Build Options:
   emscripten = $EMSCRIPTEN
   int128     = $has_int128
   leveldb    = $enable_leveldb
+  lsm        = $enable_lsm
   node       = $enable_node
   pthread    = $has_pthread
   tests      = $enable_tests
