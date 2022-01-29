@@ -3896,12 +3896,12 @@ btc_pool_add_block(btc_pool_t *pool,
   if (height % 20 == 0) {
     btc_pool_debug(pool, "Status:"
                          " time=%D height=%d progress=%.2f%%"
-                         " orphans=%d active=%zu"
+                         " orphans=%zu active=%zu"
                          " target=%#.8x peers=%zu",
       block->header.time,
       height,
       btc_chain_progress(pool->chain) * 100.0,
-      0,
+      btc_chain_orphans(pool->chain),
       btc_hashset_size(pool->block_map),
       block->header.bits,
       pool->peers.length);

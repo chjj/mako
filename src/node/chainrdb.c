@@ -272,6 +272,7 @@ struct btc_chaindb_s {
   const btc_network_t *network;
   char prefix[BTC_PATH_MAX - 26];
   unsigned int flags;
+  int64_t last_block;
   rdb_t *tree;
   rdb_txn_t *txn;
   btc_hashmap_t *hashes;
@@ -308,6 +309,7 @@ btc_chaindb_init(btc_chaindb_t *db, const btc_network_t *network) {
   db->tree = rdb_create();
   db->hashes = btc_hashmap_create();
   db->flags = BTC_CHAIN_DEFAULT_FLAGS;
+  db->last_block = btc_time_msec();
 
   btc_vector_init(&db->heights);
 
@@ -810,8 +812,13 @@ btc_chaindb_read_undo(btc_chaindb_t *db, const btc_entry_t *entry) {
 }
 
 static int
+entry_synced(const btc_entry_t *entry) {
+  return entry->header.time >= btc_now() - 2 * 60 * 60;
+}
+
+static int
 should_sync(const btc_entry_t *entry) {
-  if (entry->header.time >= btc_now() - 24 * 60 * 60)
+  if (entry_synced(entry))
     return 1;
 
   if ((entry->height % 20000) == 0)
@@ -1153,6 +1160,22 @@ btc_chaindb_save(btc_chaindb_t *db,
   if (entry->height == 0 || rdb_memusage() >= FLUSH_THRESHOLD) {
     if (rdb_txn_commit(db->txn) != 0)
       goto fail;
+  }
+
+  /* Keep some heat off the database. */
+  if (view != NULL && !entry_synced(entry)) {
+    int64_t now = btc_time_msec();
+
+    if (rdb_busy(db->tree)) {
+      int64_t delta = 500 - (now - db->last_block);
+
+      if (delta > 0) {
+        btc_time_sleep(delta);
+        now += delta;
+      }
+    }
+
+    db->last_block = now;
   }
 
   /* Update hashes. */

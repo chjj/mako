@@ -65,7 +65,7 @@
 #define RDB_SLAB_SIZE (RDB_READ_BUFFER - (RDB_READ_BUFFER % RDB_META_SIZE))
 
 #define RDB_COMPACT_THRESH (UINT64_C(3) << 30)
-#define RDB_COMPACT_MAXMEM (sizeof(void *) >= 8 ? (1024 << 20) : (512 << 20))
+#define RDB_COMPACT_MAXMEM (sizeof(void *) >= 8 ? (2048 << 20) : (1024 << 20))
 
 /*
  * Macros
@@ -2201,6 +2201,21 @@ rdb_sync(rdb_t *db) {
     return RDB_EBADWRITE;
 
   return RDB_OK;
+}
+
+int
+rdb_busy(rdb_t *db) {
+  int compacting = 0;
+
+#ifdef RDB_BACKGROUND_COMPACTION
+  CHECK(pthread_mutex_lock(&db->mutex) == 0);
+
+  compacting = db->compacting;
+
+  CHECK(pthread_mutex_unlock(&db->mutex) == 0);
+#endif
+
+  return compacting;
 }
 
 /*

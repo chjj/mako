@@ -161,6 +161,9 @@ btc_chain_error(btc_chain_t *chain);
 BTC_EXTERN double
 btc_chain_progress(btc_chain_t *chain);
 
+BTC_EXTERN size_t
+btc_chain_orphans(btc_chain_t *chain);
+
 BTC_EXTERN int
 btc_chain_synced(btc_chain_t *chain);
 

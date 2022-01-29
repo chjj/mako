@@ -68,6 +68,9 @@ rdb_fd(rdb_t *db);
 int
 rdb_sync(rdb_t *db);
 
+int
+rdb_busy(rdb_t *db);
+
 /*
  * Transaction
  */
