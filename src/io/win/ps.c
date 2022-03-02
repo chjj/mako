@@ -69,3 +69,13 @@ btc_ps_onterm(void (*handler)(void *), void *arg) {
     SetConsoleCtrlHandler(real_handler, TRUE);
   }
 }
+
+size_t
+btc_ps_rss(void) {
+  PROCESS_MEMORY_COUNTERS pmc;
+
+  if (!GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+    return 0;
+
+  return pmc.WorkingSetSize;
+}

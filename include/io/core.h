@@ -343,6 +343,9 @@ btc_ps_fdlimit(int minfd);
 BTC_EXTERN void
 btc_ps_onterm(void (*handler)(void *), void *arg);
 
+BTC_EXTERN size_t
+btc_ps_rss(void);
+
 /*
  * Mutex
  */

@@ -7,6 +7,7 @@
 #ifndef BTC_INTERNAL_H
 #define BTC_INTERNAL_H
 
+#include <stddef.h>
 #include <mako/common.h>
 
 /*

@@ -12,6 +12,7 @@ extern "C" {
 #endif
 
 #include <stddef.h>
+#include <stdint.h>
 #include "common.h"
 #include "impl.h"
 #include "types.h"

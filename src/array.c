@@ -4,6 +4,7 @@
  * https://github.com/chjj/mako
  */
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <mako/array.h>

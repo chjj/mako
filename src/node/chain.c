@@ -1807,6 +1807,7 @@ btc_chain_connect(btc_chain_t *chain,
   const btc_header_t *hdr = &block->header;
   btc_entry_t *entry = btc_entry_create();
   int64_t now = btc_time_usec();
+  size_t rss;
 
   /* Sanity check. */
   CHECK(btc_hash_equal(hdr->prev_block, prev->hash));
@@ -1835,6 +1836,9 @@ btc_chain_connect(btc_chain_t *chain,
     btc_log_info(chain, "Block %H (%d) added to chain (txs=%zu time=%.2f).",
                         entry->hash, entry->height, block->txs.length,
                         (double)(btc_time_usec() - now) / 1000.0);
+
+    if ((rss = btc_ps_rss()))
+      btc_log_debug(chain, "Memory: rss=%zumb", rss / (1 << 20));
   }
 
   btc_chain_maybe_sync(chain);
@@ -2016,6 +2020,11 @@ btc_chain_progress(btc_chain_t *chain) {
     progress = 1.0;
 
   return progress;
+}
+
+size_t
+btc_chain_orphans(btc_chain_t *chain) {
+  return btc_hashmap_size(chain->orphan_map);
 }
 
 int
