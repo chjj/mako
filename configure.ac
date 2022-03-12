@@ -406,11 +406,6 @@ AS_CASE([$host_os], [aix*], [
   AC_DEFINE([_THREAD_SAFE_ERRNO])
 ])
 
-AS_IF([test x"$has_64bit" != x'yes'], [
-  # https://twitter.com/hyc_symas/status/678604015127683074
-  AC_DEFINE([MDB_VL32])
-])
-
 #
 # Libraries
 #
