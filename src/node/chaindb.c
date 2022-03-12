@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <lsm.h>
+#include <lcdb.h>
 
 #include <io/core.h>
 #include <mako/block.h>
@@ -30,21 +30,6 @@
 #include "../internal.h"
 
 /*
- * Options
- */
-
-#undef USE_WORKER
-#undef USE_CKPTR
-
-#if defined(USE_CKPTR) && !defined(USE_WORKER)
-#  error "invalid options"
-#endif
-
-#if defined(USE_WORKER) && defined(LSM_LEVELDB)
-#  error "invalid options"
-#endif
-
-/*
  * Constants
  */
 
@@ -55,333 +40,21 @@
 #define UNDO_FILE 1
 
 /*
- * LSM Helpers
- */
-
-static const char *
-lsm_strerror(int code) {
-  switch (code) {
-#define X(c) case (c): return #c
-    X(LSM_OK);
-    X(LSM_ERROR);
-    X(LSM_BUSY);
-    X(LSM_NOMEM);
-    X(LSM_READONLY);
-    X(LSM_IOERR);
-    X(LSM_CORRUPT);
-    X(LSM_FULL);
-    X(LSM_CANTOPEN);
-    X(LSM_PROTOCOL);
-    X(LSM_MISUSE);
-    X(LSM_MISMATCH);
-    X(LSM_IOERR_NOENT);
-#undef X
-  }
-  return "LSM_UNKNOWN";
-}
-
-static int
-lsm_csr_le(lsm_cursor *cur, const void *kp, int kn) {
-  int cmp;
-
-  if (!lsm_csr_valid(cur))
-    return 0;
-
-  CHECK(lsm_csr_cmp(cur, kp, kn, &cmp) == 0);
-
-  return cmp <= 0;
-}
-
-static int
-lsm_connect(lsm_db **lsm, const char *path) {
-  lsm_db *db = NULL;
-  int rc, op;
-
-  rc = lsm_new(lsm_default_env(), &db);
-
-  if (rc != LSM_OK)
-    return rc;
-
-#ifdef LSM_LEVELDB
-  op = 64 * 1024; /* default = 8mb */
-  rc = lsm_config(db, LSM_CONFIG_CACHE_SIZE, &op);
-
-  if (rc != LSM_OK)
-    goto done;
-
-  op = 32 * 1024; /* default = 4mb */
-  rc = lsm_config(db, LSM_CONFIG_BUFFER_SIZE, &op);
-
-  if (rc != LSM_OK)
-    goto done;
-#endif
-
-#ifdef USE_WORKER
-  op = 4 * 1024; /* default = 1mb */
-  rc = lsm_config(db, LSM_CONFIG_AUTOFLUSH, &op);
-
-  if (rc != LSM_OK)
-    goto done;
-
-  op = 8 * 1024; /* default = 2mb */
-  rc = lsm_config(db, LSM_CONFIG_AUTOCHECKPOINT, &op);
-
-  if (rc != LSM_OK)
-    goto done;
-
-  op = 2; /* default = 4 */
-  rc = lsm_config(db, LSM_CONFIG_AUTOMERGE, &op);
-
-  if (rc != LSM_OK)
-    goto done;
-#endif
-
-  op = 0; /* default = 1 */
-  rc = lsm_config(db, LSM_CONFIG_MMAP, &op);
-
-  if (rc != LSM_OK)
-    goto done;
-
-  op = 0; /* default = 1 */
-  rc = lsm_config(db, LSM_CONFIG_MULTIPLE_PROCESSES, &op);
-
-  if (rc != LSM_OK)
-    goto done;
-
-#ifdef USE_WORKER
-  op = 0; /* default = 1 */
-  rc = lsm_config(db, LSM_CONFIG_AUTOWORK, &op);
-
-  if (rc != LSM_OK)
-    goto done;
-#endif
-
-  rc = lsm_open(db, path);
-
-  if (rc != LSM_OK)
-    goto done;
-
-  *lsm = db;
-
-done:
-  if (rc != LSM_OK)
-    CHECK(lsm_close(db) == 0);
-
-  return rc;
-}
-
-/*
- * LSM Worker
- */
-
-#ifdef USE_WORKER
-typedef struct lsm_worker_s {
-  lsm_db *conn;
-  btc_thread_t *thread;
-  btc_cond_t *cond;
-  btc_mutex_t *lock;
-  int autockpt;
-  int work;
-  int stop;
-  struct lsm_worker_s *ckptr;
-} lsm_worker;
-
-static void
-lsm_worker_init(lsm_worker *w) {
-  w->conn = NULL;
-  w->thread = btc_thread_alloc();
-  w->cond = btc_cond_create();
-  w->lock = btc_mutex_create();
-  w->autockpt = -1;
-  w->work = 0;
-  w->stop = 0;
-  w->ckptr = NULL;
-}
-
-static void
-lsm_worker_clear(lsm_worker *w) {
-  btc_thread_free(w->thread);
-  btc_cond_destroy(w->cond);
-  btc_mutex_destroy(w->lock);
-}
-
-static int
-lsm_worker_start(lsm_worker *w, const char *path, void (*start)(void *)) {
-  int rc = lsm_connect(&w->conn, path);
-
-  if (rc == LSM_OK) {
-    w->autockpt = -1;
-
-    CHECK(lsm_config(w->conn, LSM_CONFIG_AUTOCHECKPOINT, &w->autockpt) == 0);
-
-    btc_thread_create(w->thread, start, w);
-  }
-
-  return rc;
-}
-
-static void
-lsm_worker_stop(lsm_worker *w) {
-  btc_mutex_lock(w->lock);
-
-  w->stop = 1;
-
-  btc_cond_signal(w->cond);
-  btc_mutex_unlock(w->lock);
-
-  btc_thread_join(w->thread);
-
-  CHECK(lsm_close(w->conn) == 0);
-}
-
-static void
-lsm_worker_signal(lsm_worker *w) {
-  btc_mutex_lock(w->lock);
-
-  w->work = 1;
-
-  btc_cond_signal(w->cond);
-  btc_mutex_unlock(w->lock);
-}
-
-static void
-lsm_worker_ckpt(void *arg) {
-  lsm_worker *w = (lsm_worker *)arg;
-  int kb, rc;
-
-  btc_mutex_lock(w->lock);
-
-  while (!w->stop) {
-    btc_mutex_unlock(w->lock);
-
-    kb = 0;
-    rc = lsm_info(w->conn, LSM_INFO_CHECKPOINT_SIZE, &kb);
-
-    if (rc == LSM_OK && kb >= (w->autockpt / 4))
-      rc = lsm_checkpoint(w->conn, 0);
-
-    if (rc != LSM_OK && rc != LSM_BUSY)
-      btc_abort(); /* LCOV_EXCL_LINE */
-
-    btc_mutex_lock(w->lock);
-
-    if (!w->stop && !w->work)
-      btc_cond_wait(w->cond, w->lock);
-
-    w->work = 0;
-  }
-
-  btc_mutex_unlock(w->lock);
-}
-
-static int
-lsm_worker_barrier(lsm_worker *w, lsm_db *db) {
-  int kb, rc;
-
-  for (;;) {
-    kb = 0;
-    rc = lsm_info(db, LSM_INFO_CHECKPOINT_SIZE, &kb);
-
-    if (rc != LSM_OK || kb < w->autockpt)
-      break;
-
-    lsm_worker_signal(w);
-
-    btc_time_sleep(5);
-  }
-
-  return rc;
-}
-
-static void
-lsm_worker_work(void *arg) {
-  lsm_worker *w = (lsm_worker *)arg;
-  int ckpt = (w->ckptr != NULL);
-  int nwrite, rc;
-  int val = 0;
-
-  btc_mutex_lock(w->lock);
-
-  if (ckpt)
-    CHECK(lsm_config(w->conn, LSM_CONFIG_AUTOCHECKPOINT, &val) == 0);
-
-  while (!w->stop) {
-    btc_mutex_unlock(w->lock);
-
-    do {
-      if (ckpt)
-        lsm_worker_barrier(w->ckptr, w->conn);
-
-      nwrite = 0;
-      rc = lsm_work(w->conn, 0, 256, &nwrite);
-
-      if (rc != LSM_OK && rc != LSM_BUSY)
-        btc_abort(); /* LCOV_EXCL_LINE */
-
-      if (ckpt && nwrite > 0)
-        lsm_worker_signal(w->ckptr);
-    } while (nwrite > 0);
-
-    btc_mutex_lock(w->lock);
-
-    if (!w->stop && !w->work)
-      btc_cond_wait(w->cond, w->lock);
-
-    w->work = 0;
-  }
-
-  btc_mutex_unlock(w->lock);
-}
-
-static int
-lsm_worker_wait(lsm_worker *w, lsm_db *db) {
-  int rc, old, new;
-  int limit = -1;
-
-  rc = lsm_config(db, LSM_CONFIG_AUTOFLUSH, &limit);
-
-  if (rc != LSM_OK)
-    return rc;
-
-  for (;;) {
-    rc = lsm_info(db, LSM_INFO_TREE_SIZE, &old, &new);
-
-    if (rc != LSM_OK)
-      break;
-
-    if (old == 0 || new < (limit / 2))
-      break;
-
-    lsm_worker_signal(w);
-
-    btc_time_sleep(5);
-  }
-
-  return rc;
-}
-
-static void
-lsm_worker_hook(lsm_db *db, void *arg) {
-  lsm_worker *w = (lsm_worker *)arg;
-
-  (void)db;
-
-  lsm_worker_signal(w);
-}
-#endif /* USE_WORKER */
-
-/*
  * Database Keys
  */
 
-static const uint8_t meta_key[1] = {'R'};
-static const uint8_t blockfile_key[1] = {'B'};
-static const uint8_t undofile_key[1] = {'U'};
+static uint8_t meta_key_[1] = {'R'};
+static uint8_t blockfile_key_[1] = {'B'};
+static uint8_t undofile_key_[1] = {'U'};
+
+static const ldb_slice_t meta_key = {meta_key_, 1, 0};
+static const ldb_slice_t blockfile_key = {blockfile_key_, 1, 0};
+static const ldb_slice_t undofile_key = {undofile_key_, 1, 0};
 
 #define ENTRY_PREFIX 'e'
 #define ENTRY_KEYLEN 33
 
-static const uint8_t entry_min[ENTRY_KEYLEN] = {
+static uint8_t entry_min_[ENTRY_KEYLEN] = {
   ENTRY_PREFIX,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -389,7 +62,7 @@ static const uint8_t entry_min[ENTRY_KEYLEN] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-static const uint8_t entry_max[ENTRY_KEYLEN] = {
+static uint8_t entry_max_[ENTRY_KEYLEN] = {
   ENTRY_PREFIX,
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -397,16 +70,20 @@ static const uint8_t entry_max[ENTRY_KEYLEN] = {
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 };
 
-static void
+static const ldb_slice_t entry_min = {entry_min_, ENTRY_KEYLEN, 0};
+static const ldb_slice_t entry_max = {entry_max_, ENTRY_KEYLEN, 0};
+
+static size_t
 entry_key(uint8_t *key, const uint8_t *hash) {
   key[0] = ENTRY_PREFIX;
   memcpy(key + 1, hash, 32);
+  return ENTRY_KEYLEN;
 }
 
 #define TIP_PREFIX 'p'
 #define TIP_KEYLEN 33
 
-BTC_UNUSED static const uint8_t tip_min[TIP_KEYLEN] = {
+static uint8_t tip_min_[TIP_KEYLEN] = {
   TIP_PREFIX,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -414,7 +91,7 @@ BTC_UNUSED static const uint8_t tip_min[TIP_KEYLEN] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-BTC_UNUSED static const uint8_t tip_max[TIP_KEYLEN] = {
+static uint8_t tip_max_[TIP_KEYLEN] = {
   TIP_PREFIX,
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -422,32 +99,40 @@ BTC_UNUSED static const uint8_t tip_max[TIP_KEYLEN] = {
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 };
 
-static void
+BTC_UNUSED static const ldb_slice_t tip_min = {tip_min_, TIP_KEYLEN, 0};
+BTC_UNUSED static const ldb_slice_t tip_max = {tip_max_, TIP_KEYLEN, 0};
+
+static size_t
 tip_key(uint8_t *key, const uint8_t *hash) {
   key[0] = TIP_PREFIX;
   memcpy(key + 1, hash, 32);
+  return TIP_KEYLEN;
 }
 
 #define FILE_PREFIX 'f'
 #define FILE_KEYLEN 6
 
-static const uint8_t file_min[FILE_KEYLEN] =
+static uint8_t file_min_[FILE_KEYLEN] =
   {FILE_PREFIX, 0x00, 0x00, 0x00, 0x00, 0x00};
 
-static const uint8_t file_max[FILE_KEYLEN] =
+static uint8_t file_max_[FILE_KEYLEN] =
   {FILE_PREFIX, 0xff, 0xff, 0xff, 0xff, 0xff};
 
-static void
+static const ldb_slice_t file_min = {file_min_, FILE_KEYLEN, 0};
+static const ldb_slice_t file_max = {file_max_, FILE_KEYLEN, 0};
+
+static size_t
 file_key(uint8_t *key, uint8_t type, uint32_t id) {
   key[0] = FILE_PREFIX;
   key[1] = type;
   btc_write32be(key + 2, id);
+  return FILE_KEYLEN;
 }
 
 #define COIN_PREFIX 'c'
 #define COIN_KEYLEN 37
 
-BTC_UNUSED static const uint8_t coin_min[COIN_KEYLEN] = {
+static uint8_t coin_min_[COIN_KEYLEN] = {
   COIN_PREFIX,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -456,7 +141,7 @@ BTC_UNUSED static const uint8_t coin_min[COIN_KEYLEN] = {
   0x00, 0x00, 0x00, 0x00
 };
 
-BTC_UNUSED static const uint8_t coin_max[COIN_KEYLEN] = {
+static uint8_t coin_max_[COIN_KEYLEN] = {
   COIN_PREFIX,
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -465,11 +150,15 @@ BTC_UNUSED static const uint8_t coin_max[COIN_KEYLEN] = {
   0xff, 0xff, 0xff, 0xff
 };
 
-static void
+BTC_UNUSED static const ldb_slice_t coin_min = {coin_min_, COIN_KEYLEN, 0};
+BTC_UNUSED static const ldb_slice_t coin_max = {coin_max_, COIN_KEYLEN, 0};
+
+static size_t
 coin_key(uint8_t *key, const uint8_t *hash, uint32_t index) {
   key[0] = COIN_PREFIX;
   memcpy(key + 1, hash, 32);
   btc_write32be(key + 33, index);
+  return COIN_KEYLEN;
 }
 
 /*
@@ -595,6 +284,22 @@ btc_chainfile_update(btc_chainfile_t *z, const btc_entry_t *entry) {
 }
 
 /*
+ * Database Helpers
+ */
+
+static int
+ldb_iter_le(ldb_iter_t *iter, const ldb_slice_t *key) {
+  ldb_slice_t k;
+
+  if (!ldb_iter_valid(iter))
+    return 0;
+
+  k = ldb_iter_key(iter);
+
+  return ldb_compare(&k, key) <= 0;
+}
+
+/*
  * Chain Database
  */
 
@@ -602,13 +307,8 @@ struct btc_chaindb_s {
   const btc_network_t *network;
   char prefix[BTC_PATH_MAX - 26];
   unsigned int flags;
-  lsm_db *lsm;
-#ifdef USE_WORKER
-  lsm_worker worker;
-#endif
-#ifdef USE_CKPTR
-  lsm_worker ckptr;
-#endif
+  ldb_t *lsm;
+  ldb_lru_t *block_cache;
   btc_hashmap_t *hashes;
   btc_vector_t heights;
   btc_entry_t *head;
@@ -642,16 +342,7 @@ btc_chaindb_init(btc_chaindb_t *db, const btc_network_t *network) {
   db->prefix[0] = '/';
   db->hashes = btc_hashmap_create();
   db->flags = BTC_CHAIN_DEFAULT_FLAGS;
-
-#ifdef USE_WORKER
-  lsm_worker_init(&db->worker);
-#endif
-
-#ifdef USE_CKPTR
-  lsm_worker_init(&db->ckptr);
-
-  db->worker.ckptr = &db->ckptr;
-#endif
+  db->block_cache = ldb_lru_create(64 << 20);
 
   btc_vector_init(&db->heights);
 
@@ -660,15 +351,12 @@ btc_chaindb_init(btc_chaindb_t *db, const btc_network_t *network) {
 
 static void
 btc_chaindb_clear(btc_chaindb_t *db) {
+  ldb_lru_destroy(db->block_cache);
+
   btc_hashmap_destroy(db->hashes);
   btc_vector_clear(&db->heights);
-#ifdef USE_WORKER
-  lsm_worker_clear(&db->worker);
-#endif
-#ifdef USE_CKPTR
-  lsm_worker_clear(&db->ckptr);
-#endif
   btc_free(db->slab);
+
   memset(db, 0, sizeof(*db));
 }
 
@@ -706,62 +394,40 @@ btc_chaindb_load_prefix(btc_chaindb_t *db, const char *prefix) {
 
 static int
 btc_chaindb_load_database(btc_chaindb_t *db) {
+  ldb_dbopt_t options = *ldb_dbopt_default;
   char path[BTC_PATH_MAX];
   int rc;
 
-  if (!btc_path_join(path, sizeof(path), db->prefix, "chain.dat", NULL)) {
-    fprintf(stderr, "lsm_open: path too long\n");
+  if (!btc_path_join(path, sizeof(path), db->prefix, "chain", NULL)) {
+    fprintf(stderr, "ldb_open: path too long\n");
     return 0;
   }
 
-  rc = lsm_connect(&db->lsm, path);
+  options.create_if_missing = 1;
+  options.block_cache = db->block_cache;
+  options.write_buffer_size = 32 << 20;
+#ifndef _WIN32
+  options.max_open_files = sizeof(void *) < 8 ? 64 : 1000;
+#endif
+  options.compression = LDB_NO_COMPRESSION;
+#if 0
+  opt.filter_policy = ldb_bloom_default;
+#endif
+  options.use_mmap = 0;
+
+  rc = ldb_open(path, &options, &db->lsm);
 
   if (rc != 0) {
-    fprintf(stderr, "lsm_connect: %s\n", lsm_strerror(rc));
+    fprintf(stderr, "ldb_open: %s\n", ldb_strerror(rc));
     return 0;
   }
 
-#ifdef USE_CKPTR
-  rc = lsm_worker_start(&db->ckptr, path, lsm_worker_ckpt);
-
-  if (rc != 0)
-    goto fail;
-#endif
-
-#ifdef USE_WORKER
-  rc = lsm_worker_start(&db->worker, path, lsm_worker_work);
-
-  if (rc != 0)
-    goto fail;
-
-  lsm_config_work_hook(db->lsm, lsm_worker_hook, &db->worker);
-#endif
-
   return 1;
-#ifdef USE_WORKER
-fail:
-  fprintf(stderr, "lsm_worker_start: %s\n", lsm_strerror(rc));
-
-  CHECK(lsm_close(db->lsm) == 0);
-
-  db->lsm = NULL;
-
-  return 0;
-#endif
 }
 
 static void
 btc_chaindb_unload_database(btc_chaindb_t *db) {
-#ifdef USE_WORKER
-  lsm_worker_stop(&db->worker);
-#endif
-
-#ifdef USE_CKPTR
-  lsm_worker_stop(&db->ckptr);
-#endif
-
-  CHECK(lsm_close(db->lsm) == 0);
-
+  ldb_close(db->lsm);
   db->lsm = NULL;
 }
 
@@ -769,62 +435,71 @@ static int
 btc_chaindb_load_files(btc_chaindb_t *db) {
   char path[BTC_PATH_MAX];
   btc_chainfile_t *file;
-  lsm_cursor *cur;
-  const void *vp;
-  int vn;
-
-  CHECK(lsm_csr_open(db->lsm, &cur) == 0);
+  ldb_slice_t val;
+  ldb_iter_t *it;
+  int rc;
 
   /* Read best block file. */
-  CHECK(lsm_csr_seek(cur, blockfile_key, 1, LSM_SEEK_EQ) == 0);
+  rc = ldb_get(db->lsm, &blockfile_key, &val, 0);
 
-  if (lsm_csr_valid(cur)) {
-    CHECK(lsm_csr_value(cur, &vp, &vn) == 0);
-    CHECK(btc_chainfile_import(&db->block, vp, vn));
+  if (rc == LDB_OK) {
+    CHECK(btc_chainfile_import(&db->block, val.data, val.size));
     CHECK(db->block.type == BLOCK_FILE);
+
+    ldb_free(val.data);
   } else {
+    CHECK(rc == LDB_NOTFOUND);
+
     btc_chainfile_init(&db->block);
+
     db->block.type = BLOCK_FILE;
   }
 
   /* Read best undo file. */
-  CHECK(lsm_csr_seek(cur, undofile_key, 1, LSM_SEEK_EQ) == 0);
+  rc = ldb_get(db->lsm, &undofile_key, &val, 0);
 
-  if (lsm_csr_valid(cur)) {
-    CHECK(lsm_csr_value(cur, &vp, &vn) == 0);
-    CHECK(btc_chainfile_import(&db->undo, vp, vn));
+  if (rc == LDB_OK) {
+    CHECK(btc_chainfile_import(&db->undo, val.data, val.size));
     CHECK(db->undo.type == UNDO_FILE);
+
+    ldb_free(val.data);
   } else {
+    CHECK(rc == LDB_NOTFOUND);
+
     btc_chainfile_init(&db->undo);
+
     db->undo.type = UNDO_FILE;
   }
 
   /* Read file index and build vector. */
-  CHECK(lsm_csr_seek(cur, file_min, sizeof(file_min), LSM_SEEK_GE) == 0);
+  it = ldb_iterator(db->lsm, 0);
 
-  while (lsm_csr_le(cur, file_max, sizeof(file_max))) {
+  ldb_iter_seek(it, &file_min);
+
+  while (ldb_iter_le(it, &file_max)) {
     file = btc_chainfile_create();
+    val = ldb_iter_value(it);
 
-    CHECK(lsm_csr_value(cur, &vp, &vn) == 0);
-
-    CHECK(btc_chainfile_import(file, vp, vn));
+    CHECK(btc_chainfile_import(file, val.data, val.size));
 
     btc_list_push(&db->files, file, btc_chainfile_t);
 
-    CHECK(lsm_csr_next(cur) == 0);
+    ldb_iter_next(it);
   }
 
-  CHECK(lsm_csr_close(cur) == 0);
+  CHECK(ldb_iter_status(it) == 0);
+
+  ldb_iter_destroy(it);
 
   /* Open block file for writing. */
-  btc_chaindb_path(db, path, 0, db->block.id);
+  btc_chaindb_path(db, path, BLOCK_FILE, db->block.id);
 
   db->block.fd = btc_fs_open(path, WRITE_FLAGS, 0644);
 
   CHECK(db->block.fd != -1);
 
   /* Open undo file for writing. */
-  btc_chaindb_path(db, path, 1, db->undo.id);
+  btc_chaindb_path(db, path, UNDO_FILE, db->undo.id);
 
   db->undo.fd = btc_fs_open(path, WRITE_FLAGS, 0644);
 
@@ -877,42 +552,43 @@ btc_chaindb_load_index(btc_chaindb_t *db) {
   btc_entry_t *gen = NULL;
   btc_hashmapiter_t iter;
   uint8_t tip_hash[32];
-  lsm_cursor *cur;
-  const void *vp;
-  int vn;
-
-  CHECK(lsm_csr_open(db->lsm, &cur) == 0);
+  ldb_slice_t val;
+  ldb_iter_t *it;
+  int rc;
 
   /* Read tip hash. */
   {
-    CHECK(lsm_csr_seek(cur, meta_key, 1, LSM_SEEK_EQ) == 0);
+    rc = ldb_get(db->lsm, &meta_key, &val, 0);
 
-    if (!lsm_csr_valid(cur)) {
-      CHECK(lsm_csr_close(cur) == 0);
+    if (rc == LDB_NOTFOUND)
       return btc_chaindb_init_index(db);
-    }
 
-    CHECK(lsm_csr_value(cur, &vp, &vn) == 0);
-    CHECK(vn == 32);
+    CHECK(rc == LDB_OK);
+    CHECK(val.size == 32);
 
-    memcpy(tip_hash, vp, 32);
+    memcpy(tip_hash, val.data, 32);
+
+    ldb_free(val.data);
   }
 
   /* Read block index and create hash->entry map. */
-  CHECK(lsm_csr_seek(cur, entry_min, sizeof(entry_min), LSM_SEEK_GE) == 0);
+  it = ldb_iterator(db->lsm, 0);
 
-  while (lsm_csr_le(cur, entry_max, sizeof(entry_max))) {
+  ldb_iter_seek(it, &entry_min);
+
+  while (ldb_iter_le(it, &entry_max)) {
     entry = btc_entry_create();
+    val = ldb_iter_value(it);
 
-    CHECK(lsm_csr_value(cur, &vp, &vn) == 0);
-
-    CHECK(btc_entry_import(entry, vp, vn));
+    CHECK(btc_entry_import(entry, val.data, val.size));
     CHECK(btc_hashmap_put(db->hashes, entry->hash, entry));
 
-    CHECK(lsm_csr_next(cur) == 0);
+    ldb_iter_next(it);
   }
 
-  CHECK(lsm_csr_close(cur) == 0);
+  CHECK(ldb_iter_status(it) == 0);
+
+  ldb_iter_destroy(it);
 
   /* Create `prev` links and retrieve genesis block. */
   btc_hashmap_iterate(&iter, db->hashes);
@@ -1008,30 +684,31 @@ btc_chaindb_close(btc_chaindb_t *db) {
 static btc_coin_t *
 read_coin(const btc_outpoint_t *prevout, void *arg1, void *arg2) {
   btc_chaindb_t *db = (btc_chaindb_t *)arg1;
-  lsm_cursor *cur = (lsm_cursor *)arg2;
-  uint8_t key[COIN_KEYLEN];
+  uint8_t kbuf[COIN_KEYLEN];
+  ldb_slice_t key, val;
   btc_coin_t *coin;
-  const void *vp;
-  int rc, vn;
+  int rc;
 
-  (void)db;
+  (void)arg2;
 
-  coin_key(key, prevout->hash, prevout->index);
+  key.data = kbuf;
+  key.size = coin_key(kbuf, prevout->hash, prevout->index);
 
-  rc = lsm_csr_seek(cur, key, sizeof(key), LSM_SEEK_EQ);
+  rc = ldb_get(db->lsm, &key, &val, 0);
 
-  if (rc != 0) {
-    fprintf(stderr, "lsm_csr_seek: %s\n", lsm_strerror(rc));
+  if (rc == LDB_NOTFOUND)
+    return NULL;
+
+  if (rc != LDB_OK) {
+    fprintf(stderr, "ldb_get: %s\n", ldb_strerror(rc));
     return NULL;
   }
 
-  if (!lsm_csr_valid(cur))
-    return NULL;
-
   coin = btc_coin_create();
 
-  CHECK(lsm_csr_value(cur, &vp, &vn) == 0);
-  CHECK(btc_coin_import(coin, vp, vn));
+  CHECK(btc_coin_import(coin, val.data, val.size));
+
+  ldb_free(val.data);
 
   return coin;
 }
@@ -1040,72 +717,45 @@ int
 btc_chaindb_spend(btc_chaindb_t *db,
                   btc_view_t *view,
                   const btc_tx_t *tx) {
-  lsm_cursor *cur;
-  int rc;
-
-  rc = lsm_csr_open(db->lsm, &cur);
-
-  if (rc != 0) {
-    fprintf(stderr, "lsm_csr_open: %s\n", lsm_strerror(rc));
-    return 0;
-  }
-
-  rc = btc_view_spend(view, tx, read_coin, db, cur);
-
-  CHECK(lsm_csr_close(cur) == 0);
-
-  return rc;
+  return btc_view_spend(view, tx, read_coin, db, NULL);
 }
 
 int
 btc_chaindb_fill(btc_chaindb_t *db,
                  btc_view_t *view,
                  const btc_tx_t *tx) {
-  lsm_cursor *cur;
-  int rc;
-
-  rc = lsm_csr_open(db->lsm, &cur);
-
-  if (rc != 0) {
-    fprintf(stderr, "lsm_csr_open: %s\n", lsm_strerror(rc));
-    return 0;
-  }
-
-  rc = btc_view_fill(view, tx, read_coin, db, cur);
-
-  CHECK(lsm_csr_close(cur) == 0);
-
-  return rc;
+  return btc_view_fill(view, tx, read_coin, db, NULL);
 }
 
-static int
-btc_chaindb_save_view(btc_chaindb_t *db, const btc_view_t *view) {
-  uint8_t key[COIN_KEYLEN];
-  uint8_t *val = db->slab;
+static void
+btc_chaindb_save_view(btc_chaindb_t *db,
+                      ldb_batch_t *batch,
+                      const btc_view_t *view) {
+  uint8_t kbuf[COIN_KEYLEN];
+  uint8_t *vbuf = db->slab;
   const btc_coin_t *coin;
+  ldb_slice_t key, val;
   btc_viewiter_t iter;
-  size_t len;
-  int rc;
+
+  key.data = kbuf;
+  key.size = sizeof(kbuf);
+
+  val.data = vbuf;
+  val.size = 0;
 
   btc_view_iterate(&iter, view);
 
   while (btc_view_next(&coin, &iter)) {
-    coin_key(key, iter.hash, iter.index);
+    coin_key(kbuf, iter.hash, iter.index);
 
     if (coin->spent) {
-      rc = lsm_delete(db->lsm, key, sizeof(key));
+      ldb_batch_del(batch, &key);
     } else {
-      len = btc_coin_export(val, coin);
-      rc = lsm_insert(db->lsm, key, sizeof(key), val, len);
-    }
+      val.size = btc_coin_export(vbuf, coin);
 
-    if (rc != 0) {
-      fprintf(stderr, "lsm_insert: %s\n", lsm_strerror(rc));
-      return 0;
+      ldb_batch_put(batch, &key, &val);
     }
   }
-
-  return 1;
 }
 
 static int
@@ -1219,21 +869,26 @@ should_sync(const btc_entry_t *entry) {
 }
 
 static int
-btc_chaindb_alloc(btc_chaindb_t *db, btc_chainfile_t *file, size_t len) {
-  uint8_t raw[BTC_CHAINFILE_SIZE];
-  uint8_t key[FILE_KEYLEN];
+btc_chaindb_alloc(btc_chaindb_t *db,
+                  ldb_batch_t *batch,
+                  btc_chainfile_t *file,
+                  size_t len) {
+  uint8_t vbuf[BTC_CHAINFILE_SIZE];
+  uint8_t kbuf[FILE_KEYLEN];
   char path[BTC_PATH_MAX];
+  ldb_slice_t key, val;
   int fd;
 
   if (file->pos + len <= MAX_FILE_SIZE)
     return 1;
 
-  file_key(key, file->type, file->id);
+  key.data = kbuf;
+  key.size = file_key(kbuf, file->type, file->id);
 
-  btc_chainfile_export(raw, file);
+  val.data = vbuf;
+  val.size = btc_chainfile_export(vbuf, file);
 
-  if (lsm_insert(db->lsm, key, sizeof(key), raw, sizeof(raw)) != 0)
-    return 0;
+  ldb_batch_put(batch, &key, &val);
 
   btc_chaindb_path(db, path, file->type, file->id + 1);
 
@@ -1262,10 +917,12 @@ btc_chaindb_alloc(btc_chaindb_t *db, btc_chainfile_t *file, size_t len) {
 
 static int
 btc_chaindb_write_block(btc_chaindb_t *db,
+                        ldb_batch_t *batch,
                         btc_entry_t *entry,
                         const btc_block_t *block) {
-  uint8_t raw[BTC_CHAINFILE_SIZE];
+  uint8_t vbuf[BTC_CHAINFILE_SIZE];
   uint8_t hash[32];
+  ldb_slice_t val;
   size_t len;
 
   len = btc_block_export(db->slab + 24, block);
@@ -1283,7 +940,7 @@ btc_chaindb_write_block(btc_chaindb_t *db,
 
   len += 24;
 
-  if (!btc_chaindb_alloc(db, &db->block, len))
+  if (!btc_chaindb_alloc(db, batch, &db->block, len))
     return 0;
 
   if (!btc_fs_write(db->block.fd, db->slab, len))
@@ -1299,22 +956,24 @@ btc_chaindb_write_block(btc_chaindb_t *db,
 
   btc_chainfile_update(&db->block, entry);
 
-  btc_chainfile_export(raw, &db->block);
+  val.data = vbuf;
+  val.size = btc_chainfile_export(vbuf, &db->block);
 
-  if (lsm_insert(db->lsm, blockfile_key, 1, raw, sizeof(raw)) != 0)
-    return 0;
+  ldb_batch_put(batch, &blockfile_key, &val);
 
   return 1;
 }
 
 static int
 btc_chaindb_write_undo(btc_chaindb_t *db,
+                       ldb_batch_t *batch,
                        btc_entry_t *entry,
                        const btc_undo_t *undo) {
   size_t len = btc_undo_size(undo);
-  uint8_t raw[BTC_CHAINFILE_SIZE];
+  uint8_t vbuf[BTC_CHAINFILE_SIZE];
   uint8_t *buf = db->slab;
   uint8_t hash[32];
+  ldb_slice_t val;
   int ret = 0;
 
   if (len > BTC_MAX_RAW_BLOCK_SIZE)
@@ -1334,7 +993,7 @@ btc_chaindb_write_undo(btc_chaindb_t *db,
 
   len += 24;
 
-  if (!btc_chaindb_alloc(db, &db->undo, len))
+  if (!btc_chaindb_alloc(db, batch, &db->undo, len))
     goto fail;
 
   if (!btc_fs_write(db->undo.fd, buf, len))
@@ -1350,10 +1009,10 @@ btc_chaindb_write_undo(btc_chaindb_t *db,
 
   btc_chainfile_update(&db->undo, entry);
 
-  btc_chainfile_export(raw, &db->undo);
+  val.data = vbuf;
+  val.size = btc_chainfile_export(vbuf, &db->undo);
 
-  if (lsm_insert(db->lsm, undofile_key, 1, raw, sizeof(raw)) != 0)
-    goto fail;
+  ldb_batch_put(batch, &undofile_key, &val);
 
   ret = 1;
 fail:
@@ -1364,10 +1023,13 @@ fail:
 }
 
 static int
-btc_chaindb_prune_files(btc_chaindb_t *db, const btc_entry_t *entry) {
+btc_chaindb_prune_files(btc_chaindb_t *db,
+                        ldb_batch_t *batch,
+                        const btc_entry_t *entry) {
   btc_chainfile_t *file, *next;
-  uint8_t key[FILE_KEYLEN];
+  uint8_t kbuf[FILE_KEYLEN];
   char path[BTC_PATH_MAX];
+  ldb_slice_t key;
   int32_t target;
 
   if (!(db->flags & BTC_CHAIN_PRUNE))
@@ -1381,21 +1043,18 @@ btc_chaindb_prune_files(btc_chaindb_t *db, const btc_entry_t *entry) {
   if (target <= db->network->block.prune_after_height)
     return 1;
 
-  for (file = db->files.head; file != NULL; file = file->next) {
-    if (file->max_height >= target)
-      continue;
-
-    file_key(key, file->type, file->id);
-
-    if (lsm_delete(db->lsm, key, sizeof(key)) != 0)
-      return 0;
-  }
+  key.data = kbuf;
+  key.size = sizeof(kbuf);
 
   for (file = db->files.head; file != NULL; file = next) {
     next = file->next;
 
     if (file->max_height >= target)
       continue;
+
+    file_key(kbuf, file->type, file->id);
+
+    ldb_batch_del(batch, &key);
 
     btc_chaindb_path(db, path, file->type, file->id);
 
@@ -1411,6 +1070,7 @@ btc_chaindb_prune_files(btc_chaindb_t *db, const btc_entry_t *entry) {
 
 static int
 btc_chaindb_connect_block(btc_chaindb_t *db,
+                          ldb_batch_t *batch,
                           btc_entry_t *entry,
                           const btc_block_t *block,
                           const btc_view_t *view) {
@@ -1423,23 +1083,23 @@ btc_chaindb_connect_block(btc_chaindb_t *db,
     return 1;
 
   /* Commit new coin state. */
-  if (!btc_chaindb_save_view(db, view))
-    return 0;
+  btc_chaindb_save_view(db, batch, view);
 
   /* Write undo coins (if there are any). */
   undo = btc_view_undo(view);
 
   if (undo->length != 0 && entry->undo_pos == -1) {
-    if (!btc_chaindb_write_undo(db, entry, undo))
+    if (!btc_chaindb_write_undo(db, batch, entry, undo))
       return 0;
   }
 
   /* Prune height-288 if pruning is enabled. */
-  return btc_chaindb_prune_files(db, entry);
+  return btc_chaindb_prune_files(db, batch, entry);
 }
 
 static btc_view_t *
 btc_chaindb_disconnect_block(btc_chaindb_t *db,
+                             ldb_batch_t *batch,
                              const btc_entry_t *entry,
                              const btc_block_t *block) {
   btc_undo_t *undo = btc_chaindb_read_undo(db, entry);
@@ -1477,29 +1137,27 @@ btc_chaindb_disconnect_block(btc_chaindb_t *db,
   btc_undo_destroy(undo);
 
   /* Commit new coin state. */
-  if (!btc_chaindb_save_view(db, view)) {
-    btc_view_destroy(view);
-    return NULL;
-  }
+  btc_chaindb_save_view(db, batch, view);
 
   return view;
 }
 
 static int
 btc_chaindb_save_block(btc_chaindb_t *db,
+                       ldb_batch_t *batch,
                        btc_entry_t *entry,
                        const btc_block_t *block,
                        const btc_view_t *view) {
   /* Write actual block data. */
   if (entry->block_pos == -1) {
-    if (!btc_chaindb_write_block(db, entry, block))
+    if (!btc_chaindb_write_block(db, batch, entry, block))
       return 0;
   }
 
   if (view == NULL)
     return 1;
 
-  return btc_chaindb_connect_block(db, entry, block, view);
+  return btc_chaindb_connect_block(db, batch, entry, block, view);
 }
 
 int
@@ -1507,58 +1165,58 @@ btc_chaindb_save(btc_chaindb_t *db,
                  btc_entry_t *entry,
                  const btc_block_t *block,
                  const btc_view_t *view) {
-  uint8_t raw[BTC_ENTRY_SIZE];
-  uint8_t key[ENTRY_KEYLEN];
+  uint8_t vbuf[BTC_ENTRY_SIZE];
+  uint8_t kbuf[ENTRY_KEYLEN];
+  ldb_slice_t key, val;
+  ldb_batch_t batch;
+  int ret = 0;
 
   /* Sanity checks. */
   CHECK(entry->prev != NULL || entry->height == 0);
   CHECK(entry->next == NULL);
 
-#ifdef USE_WORKER
-  /* Wait for worker. */
-  if (lsm_worker_wait(&db->worker, db->lsm) != 0)
-    return 0;
-#endif
-
   /* Begin transaction. */
-  if (lsm_begin(db->lsm, 1) != 0)
-    return 0;
+  ldb_batch_init(&batch);
 
   /* Connect block and save data. */
-  if (!btc_chaindb_save_block(db, entry, block, view))
+  if (!btc_chaindb_save_block(db, &batch, entry, block, view))
     goto fail;
 
   /* Write entry data. */
-  entry_key(key, entry->hash);
+  key.data = kbuf;
+  key.size = entry_key(kbuf, entry->hash);
 
-  btc_entry_export(raw, entry);
+  val.data = vbuf;
+  val.size = btc_entry_export(vbuf, entry);
 
-  if (lsm_insert(db->lsm, key, sizeof(key), raw, sizeof(raw)) != 0)
-    goto fail;
+  ldb_batch_put(&batch, &key, &val);
 
   /* Clear old tip. */
   if (entry->height != 0) {
-    tip_key(key, entry->header.prev_block);
+    key.data = kbuf;
+    key.size = tip_key(kbuf, entry->header.prev_block);
 
-    if (lsm_delete(db->lsm, key, sizeof(key)) != 0)
-      goto fail;
+    ldb_batch_del(&batch, &key);
   }
 
   /* Write new tip. */
-  tip_key(key, entry->hash);
+  key.data = kbuf;
+  key.size = tip_key(kbuf, entry->hash);
+  val.size = 1;
 
-  if (lsm_insert(db->lsm, key, sizeof(key), raw, 1) != 0)
-    goto fail;
+  ldb_batch_put(&batch, &key, &val);
 
   /* Write state (main chain only). */
   if (view != NULL) {
     /* Commit new chain state. */
-    if (lsm_insert(db->lsm, meta_key, 1, entry->hash, 32) != 0)
-      goto fail;
+    val.data = entry->hash;
+    val.size = 32;
+
+    ldb_batch_put(&batch, &meta_key, &val);
   }
 
   /* Commit transaction. */
-  if (lsm_commit(db->lsm, 0) != 0)
+  if (ldb_write(db->lsm, &batch, 0) != 0)
     goto fail;
 
   /* Update hashes. */
@@ -1581,10 +1239,10 @@ btc_chaindb_save(btc_chaindb_t *db,
     db->tail = entry;
   }
 
-  return 1;
+  ret = 1;
 fail:
-  CHECK(lsm_rollback(db->lsm, 0) == 0);
-  return 0;
+  ldb_batch_clear(&batch);
+  return ret;
 }
 
 int
@@ -1592,37 +1250,36 @@ btc_chaindb_reconnect(btc_chaindb_t *db,
                       btc_entry_t *entry,
                       const btc_block_t *block,
                       const btc_view_t *view) {
-  uint8_t raw[BTC_ENTRY_SIZE];
-  uint8_t key[ENTRY_KEYLEN];
-
-#ifdef USE_WORKER
-  /* Wait for worker. */
-  if (lsm_worker_wait(&db->worker, db->lsm) != 0)
-    return 0;
-#endif
+  uint8_t vbuf[BTC_ENTRY_SIZE];
+  uint8_t kbuf[ENTRY_KEYLEN];
+  ldb_slice_t key, val;
+  ldb_batch_t batch;
+  int ret = 0;
 
   /* Begin transaction. */
-  if (lsm_begin(db->lsm, 1) != 0)
-    return 0;
+  ldb_batch_init(&batch);
 
   /* Connect inputs. */
-  if (!btc_chaindb_connect_block(db, entry, block, view))
+  if (!btc_chaindb_connect_block(db, &batch, entry, block, view))
     goto fail;
 
   /* Re-write entry data (we may have updated the undo pos). */
-  entry_key(key, entry->hash);
+  key.data = kbuf;
+  key.size = entry_key(kbuf, entry->hash);
 
-  btc_entry_export(raw, entry);
+  val.data = vbuf;
+  val.size = btc_entry_export(vbuf, entry);
 
-  if (lsm_insert(db->lsm, key, sizeof(key), raw, sizeof(raw)) != 0)
-    goto fail;
+  ldb_batch_put(&batch, &key, &val);
 
   /* Commit new chain state. */
-  if (lsm_insert(db->lsm, meta_key, 1, entry->hash, 32) != 0)
-    goto fail;
+  val.data = entry->hash;
+  val.size = 32;
+
+  ldb_batch_put(&batch, &meta_key, &val);
 
   /* Commit transaction. */
-  if (lsm_commit(db->lsm, 0) != 0)
+  if (ldb_write(db->lsm, &batch, 0) != 0)
     goto fail;
 
   /* Set next pointer. */
@@ -1637,40 +1294,37 @@ btc_chaindb_reconnect(btc_chaindb_t *db,
   /* Update tip. */
   db->tail = entry;
 
-  return 1;
+  ret = 1;
 fail:
-  CHECK(lsm_rollback(db->lsm, 0) == 0);
-  return 0;
+  ldb_batch_clear(&batch);
+  return ret;
 }
 
 btc_view_t *
 btc_chaindb_disconnect(btc_chaindb_t *db,
                        btc_entry_t *entry,
                        const btc_block_t *block) {
+  ldb_batch_t batch;
   btc_view_t *view;
-
-#ifdef USE_WORKER
-  /* Wait for worker. */
-  if (lsm_worker_wait(&db->worker, db->lsm) != 0)
-    return NULL;
-#endif
+  ldb_slice_t val;
 
   /* Begin transaction. */
-  if (lsm_begin(db->lsm, 1) != 0)
-    return NULL;
+  ldb_batch_init(&batch);
 
   /* Disconnect inputs. */
-  view = btc_chaindb_disconnect_block(db, entry, block);
+  view = btc_chaindb_disconnect_block(db, &batch, entry, block);
 
   if (view == NULL)
     goto fail;
 
   /* Revert chain state to previous tip. */
-  if (lsm_insert(db->lsm, meta_key, 1, entry->header.prev_block, 32) != 0)
-    goto fail;
+  val.data = entry->header.prev_block;
+  val.size = 32;
+
+  ldb_batch_put(&batch, &meta_key, &val);
 
   /* Commit transaction. */
-  if (lsm_commit(db->lsm, 0) != 0)
+  if (ldb_write(db->lsm, &batch, 0) != 0)
     goto fail;
 
   /* Set next pointer. */
@@ -1684,12 +1338,14 @@ btc_chaindb_disconnect(btc_chaindb_t *db,
   /* Revert tip. */
   db->tail = entry->prev;
 
+  ldb_batch_clear(&batch);
+
   return view;
 fail:
   if (view != NULL)
     btc_view_destroy(view);
 
-  CHECK(lsm_rollback(db->lsm, 0) == 0);
+  ldb_batch_clear(&batch);
 
   return NULL;
 }
@@ -1732,22 +1388,26 @@ btc_chaindb_is_main(btc_chaindb_t *db, const btc_entry_t *entry) {
 
 int
 btc_chaindb_has_coins(btc_chaindb_t *db, const btc_tx_t *tx) {
-  uint8_t min[COIN_KEYLEN];
-  uint8_t max[COIN_KEYLEN];
-  lsm_cursor *cur;
-  int ret;
+  uint8_t kbuf[COIN_KEYLEN];
+  ldb_slice_t key;
+  size_t i;
+  int rc;
 
-  coin_key(min, tx->hash, 0);
-  coin_key(max, tx->hash, UINT32_MAX);
+  key.data = kbuf;
+  key.size = sizeof(kbuf);
 
-  CHECK(lsm_csr_open(db->lsm, &cur) == 0);
-  CHECK(lsm_csr_seek(cur, min, sizeof(min), LSM_SEEK_GE) == 0);
+  for (i = 0; i < tx->outputs.length; i++) {
+    coin_key(kbuf, tx->hash, i);
 
-  ret = lsm_csr_le(cur, max, sizeof(max));
+    rc = ldb_has(db->lsm, &key, 0);
 
-  CHECK(lsm_csr_close(cur) == 0);
+    if (rc == LDB_OK)
+      return 1;
 
-  return ret;
+    CHECK(rc == LDB_NOTFOUND);
+  }
+
+  return 0;
 }
 
 btc_block_t *

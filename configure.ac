@@ -460,9 +460,8 @@ AM_CONDITIONAL([ENABLE_TESTS], [test x"$enable_tests" = x'yes'])
 AM_CONDITIONAL([HAVE_PTHREAD], [test x"$has_pthread" = x'yes'])
 AM_CONDITIONAL([MINGW], [test x"$MINGW" != x''])
 
-AC_CONFIG_FILES([deps/lmdb/Makefile
-                 deps/lsm1/Makefile
-                 deps/lsm2/Makefile
+AC_CONFIG_FILES([deps/lcdb/Makefile
+                 deps/lcdb/contrib/lwdb/Makefile
                  Makefile
                  test/Makefile
                  libmako.pc])

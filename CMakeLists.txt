@@ -192,7 +192,9 @@ endif()
 
 set(MAKO_HAVE_PTHREAD 0)
 
-if(NOT WIN32 AND NOT WASI AND NOT EMSCRIPTEN)
+if(CMAKE_C_COMPILER_ID MATCHES "Watcom$")
+  set(MAKO_HAVE_PTHREAD 1)
+elseif(NOT WIN32 AND NOT WASI AND NOT EMSCRIPTEN)
   set(THREADS_PREFER_PTHREAD_FLAG ON)
 
   find_package(Threads)
@@ -475,16 +477,12 @@ if(WIN32)
 else()
   list(APPEND mako_libs m)
 
-  if(MAKO_HAVE_PTHREAD)
+  if(MAKO_HAVE_PTHREAD AND NOT CMAKE_C_COMPILER_ID MATCHES "Watcom$")
     list(APPEND mako_libs Threads::Threads)
   endif()
 endif()
 
-if(MAKO_LEVELDB)
-  list(APPEND node_libs lsm2)
-else()
-  list(APPEND node_libs lsm1)
-endif()
+list(APPEND node_libs lcdb)
 
 if(MAKO_HAVE_ZLIB)
   list(APPEND test_libs z)
@@ -606,9 +604,9 @@ function(mako_build_full)
   #
 
   if(MAKO_LEVELDB)
-    add_subdirectory(deps/lsm2)
+    add_subdirectory(deps/lcdb/contrib/lwdb)
   else()
-    add_subdirectory(deps/lsm1)
+    add_subdirectory(deps/lcdb)
   endif()
 
   add_library(mako_io STATIC ${io_sources})

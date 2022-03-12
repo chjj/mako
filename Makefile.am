@@ -30,9 +30,9 @@ EXTRA_DIST = cmake/              \
 
 if ENABLE_NODE
 if ENABLE_LEVELDB
-mako_dbdir = deps/lsm2
+mako_dbdir = deps/lcdb/contrib/lwdb
 else
-mako_dbdir = deps/lsm1
+mako_dbdir = deps/lcdb
 endif
 endif
 
@@ -269,7 +269,7 @@ libio_la_LDFLAGS = -static
 libnode_la_SOURCES = $(node_sources)
 libnode_la_CFLAGS = $(WARN_FLAGS) -I$(top_srcdir)/$(mako_dbdir)
 libnode_la_LDFLAGS = -static
-libnode_la_LIBADD = libmako.la libio.la $(mako_dbdir)/liblsm.la
+libnode_la_LIBADD = libmako.la libio.la $(mako_dbdir)/liblcdb.la
 
 libclient_la_SOURCES = $(client_sources)
 libclient_la_CFLAGS = $(WARN_FLAGS)
