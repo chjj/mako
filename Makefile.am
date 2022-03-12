@@ -267,7 +267,7 @@ libio_la_CFLAGS = $(WARN_FLAGS)
 libio_la_LDFLAGS = -static
 
 libnode_la_SOURCES = $(node_sources)
-libnode_la_CFLAGS = $(WARN_FLAGS) -I$(top_srcdir)/$(mako_dbdir)
+libnode_la_CFLAGS = $(WARN_FLAGS) -I$(top_srcdir)/deps/lcdb/include
 libnode_la_LDFLAGS = -static
 libnode_la_LIBADD = libmako.la libio.la $(mako_dbdir)/liblcdb.la
 

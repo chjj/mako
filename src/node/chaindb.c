@@ -406,18 +406,18 @@ btc_chaindb_load_database(btc_chaindb_t *db) {
   options.create_if_missing = 1;
   options.block_cache = db->block_cache;
   options.write_buffer_size = 32 << 20;
-#ifndef _WIN32
+#ifdef _WIN32
+  options.max_open_files = 1000;
+#else
   options.max_open_files = sizeof(void *) < 8 ? 64 : 1000;
 #endif
   options.compression = LDB_NO_COMPRESSION;
-#if 0
-  opt.filter_policy = ldb_bloom_default;
-#endif
+  options.filter_policy = NULL; /* ldb_bloom_default */
   options.use_mmap = 0;
 
   rc = ldb_open(path, &options, &db->lsm);
 
-  if (rc != 0) {
+  if (rc != LDB_OK) {
     fprintf(stderr, "ldb_open: %s\n", ldb_strerror(rc));
     return 0;
   }
@@ -487,7 +487,7 @@ btc_chaindb_load_files(btc_chaindb_t *db) {
     ldb_iter_next(it);
   }
 
-  CHECK(ldb_iter_status(it) == 0);
+  CHECK(ldb_iter_status(it) == LDB_OK);
 
   ldb_iter_destroy(it);
 
@@ -586,7 +586,7 @@ btc_chaindb_load_index(btc_chaindb_t *db) {
     ldb_iter_next(it);
   }
 
-  CHECK(ldb_iter_status(it) == 0);
+  CHECK(ldb_iter_status(it) == LDB_OK);
 
   ldb_iter_destroy(it);
 
@@ -1216,7 +1216,7 @@ btc_chaindb_save(btc_chaindb_t *db,
   }
 
   /* Commit transaction. */
-  if (ldb_write(db->lsm, &batch, 0) != 0)
+  if (ldb_write(db->lsm, &batch, 0) != LDB_OK)
     goto fail;
 
   /* Update hashes. */
@@ -1279,7 +1279,7 @@ btc_chaindb_reconnect(btc_chaindb_t *db,
   ldb_batch_put(&batch, &meta_key, &val);
 
   /* Commit transaction. */
-  if (ldb_write(db->lsm, &batch, 0) != 0)
+  if (ldb_write(db->lsm, &batch, 0) != LDB_OK)
     goto fail;
 
   /* Set next pointer. */
@@ -1324,7 +1324,7 @@ btc_chaindb_disconnect(btc_chaindb_t *db,
   ldb_batch_put(&batch, &meta_key, &val);
 
   /* Commit transaction. */
-  if (ldb_write(db->lsm, &batch, 0) != 0)
+  if (ldb_write(db->lsm, &batch, 0) != LDB_OK)
     goto fail;
 
   /* Set next pointer. */
