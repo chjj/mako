@@ -1,15 +1,14 @@
 /*!
  * core.c - core io functions for mako
- * Copyright (c) 2020, Christopher Jeffrey (MIT License).
+ * Copyright (c) 2021-2022, Christopher Jeffrey (MIT License).
  * https://github.com/chjj/mako
  */
 
-#include <stdarg.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <io/core.h>
+#ifdef _WIN32
+#  include "core_win_impl.h"
+#else
+#  include "core_unix_impl.h"
+#endif
 
 /*
  * Filesystem
@@ -17,11 +16,10 @@
 
 int
 btc_fs_read_file(const char *name, void *dst, size_t len) {
-  int flags = BTC_O_RDONLY | BTC_O_SEQUENTIAL;
-  int fd = btc_fs_open(name, flags, 0);
+  btc_fd_t fd = btc_fs_open(name);
   int ret = 0;
 
-  if (fd == -1)
+  if (fd == BTC_INVALID_FD)
     return 0;
 
   if (!btc_fs_read(fd, dst, len))
@@ -34,15 +32,11 @@ fail:
 }
 
 int
-btc_fs_write_file(const char *name,
-                  uint32_t mode,
-                  const void *src,
-                  size_t len) {
-  int flags = BTC_O_WRONLY | BTC_O_CREAT | BTC_O_TRUNC;
-  int fd = btc_fs_open(name, flags, mode);
+btc_fs_write_file(const char *name, const void *src, size_t len) {
+  btc_fd_t fd = btc_fs_create(name);
   int ret = 0;
 
-  if (fd == -1)
+  if (fd == BTC_INVALID_FD)
     return 0;
 
   if (!btc_fs_write(fd, src, len))
@@ -55,24 +49,23 @@ fail:
 }
 
 int
-btc_fs_alloc_file(unsigned char **dst, size_t *len, const char *name) {
-  int flags = BTC_O_RDONLY | BTC_O_SEQUENTIAL;
-  int fd = btc_fs_open(name, flags, 0);
+btc_fs_alloc_file(const char *name, unsigned char **dst, size_t *len) {
+  btc_fd_t fd = btc_fs_open(name);
   uint8_t *xp = NULL;
-  btc_stat_t stat;
+  uint64_t size;
   int ret = 0;
   size_t xn;
 
-  if (fd == -1)
+  if (fd == BTC_INVALID_FD)
     return 0;
 
-  if (!btc_fs_fstat(fd, &stat))
+  if (!btc_fs_fsize(fd, &size))
     goto fail;
 
-  if ((uint64_t)stat.st_size > (SIZE_MAX >> 1))
+  if (size > (SIZE_MAX >> 1))
     goto fail;
 
-  xn = stat.st_size;
+  xn = size;
 
   if (xn == 0)
     goto fail;
@@ -99,61 +92,90 @@ fail:
   return ret;
 }
 
-int
-btc_fs_open_lock(const char *name, uint32_t mode) {
-  int flags = BTC_O_RDWR | BTC_O_CREAT | BTC_O_TRUNC;
-  int fd = btc_fs_open(name, flags, mode);
-
-  if (fd == -1)
-    return -1;
-
-  if (!btc_fs_flock(fd, BTC_LOCK_EX)) {
-    btc_fs_close(fd);
-    return -1;
-  }
-
-  return fd;
-}
-
-void
-btc_fs_close_lock(int fd) {
-  btc_fs_flock(fd, BTC_LOCK_UN);
-  btc_fs_close(fd);
-}
-
 /*
  * Path
  */
 
+static int
+btc_path_is_absolute(const char *path) {
+#ifdef _WIN32
+  if (path[0] == '\0')
+    return 0;
+
+  if (path[0] == '/' || path[0] == '\\')
+    return 1;
+
+  if (path[0] >= 'A' && path[0] <= 'Z' && path[1] == ':')
+    return path[2] == '/' || path[2] == '\\';
+
+  if (path[0] >= 'a' && path[0] <= 'z' && path[1] == ':')
+    return path[2] == '/' || path[2] == '\\';
+
+  return 0;
+#else
+  return path[0] == '/';
+#endif
+}
+
 int
-btc_path_join(char *buf, size_t size, ...) {
-  char *zp = buf;
-  size_t zn = 0;
-  const char *xp;
-  va_list ap;
+btc_path_absolutify(char *buf, size_t size) {
+  char tp[BTC_PATH_MAX];
+  size_t tn;
 
-  va_start(ap, size);
+  if (btc_path_is_absolute(buf))
+    return 1;
 
-  while ((xp = va_arg(ap, const char *))) {
-    zn += strlen(xp) + 1;
+  if (!btc_path_absolute(tp, sizeof(tp), buf))
+    return 0;
 
-    if (zn > size) {
-      va_end(ap);
-      return 0;
-    }
+  tn = strlen(tp);
 
+  if (tn + 1 > size)
+    return 0;
+
+  memcpy(buf, tp, tn + 1);
+
+  return 1;
+}
+
+int
+btc_path_join(char *zp, size_t zn, const char *xp, const char *yp) {
+  size_t xn = strlen(xp);
+  size_t yn = strlen(yp);
+
+  if (xn + yn + 2 > zn)
+    return 0;
+
+  if (zp != xp) {
     while (*xp)
       *zp++ = *xp++;
-
-    *zp++ = BTC_PATH_SEP;
+  } else {
+    zp += xn;
   }
 
-  if (zn > 0)
-    zp--;
+#ifdef _WIN32
+  *zp++ = '\\';
+#else
+  *zp++ = '/';
+#endif
+
+  while (*yp)
+    *zp++ = *yp++;
 
   *zp = '\0';
 
-  va_end(ap);
-
   return 1;
+}
+
+int
+btc_path_resolve(char *zp, size_t zn, const char *xp, const char *yp) {
+  char tp[BTC_PATH_MAX];
+
+  if (btc_path_is_absolute(xp))
+    return btc_path_join(zp, zn, xp, yp);
+
+  if (!btc_path_absolute(tp, sizeof(tp), xp))
+    return 0;
+
+  return btc_path_join(zp, zn, tp, yp);
 }

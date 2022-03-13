@@ -176,12 +176,14 @@ send_requests(void *lock) {
 }
 
 int main(void) {
-  btc_thread_t *thread = btc_thread_alloc();
-  btc_mutex_t *lock = btc_mutex_create();
   http_server_t *server;
   btc_sockaddr_t addr;
+  btc_thread_t thread;
+  btc_mutex_t lock;
   btc_loop_t *loop;
   int64_t start;
+
+  btc_mutex_init(&lock);
 
   btc_net_startup();
 
@@ -193,19 +195,18 @@ int main(void) {
 
   ASSERT(http_server_listen(server, &addr));
 
-  btc_thread_create(thread, send_requests, lock);
+  btc_thread_create(&thread, send_requests, &lock);
 
   start = btc_time_msec();
 
-  while (get_recv(lock) < 2) {
+  while (get_recv(&lock) < 2) {
     ASSERT(btc_time_msec() < start + 10 * 1000);
 
     btc_loop_poll(loop, 1000);
   }
 
-  btc_thread_join(thread);
-  btc_thread_free(thread);
-  btc_mutex_destroy(lock);
+  btc_thread_join(&thread);
+  btc_mutex_destroy(&lock);
 
   http_server_close(server);
 

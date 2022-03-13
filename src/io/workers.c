@@ -152,9 +152,9 @@ btc_workq_slice(btc_workq_t *z, btc_workq_t *x, int length) {
  */
 
 struct btc_workers_s {
-  btc_mutex_t *mutex;
-  btc_cond_t *master;
-  btc_cond_t *worker;
+  btc_mutex_t mutex;
+  btc_cond_t master;
+  btc_cond_t worker;
   btc_workq_t queue;
   int threads;
   int max_batch;
@@ -169,7 +169,7 @@ worker_thread(void *arg);
 btc_workers_t *
 btc_workers_create(int threads, int max_batch) {
   btc_workers_t *pool = safe_malloc(sizeof(btc_workers_t));
-  btc_thread_t *thread = btc_thread_alloc();
+  btc_thread_t thread;
   int i;
 
   if (threads < 2)
@@ -178,9 +178,9 @@ btc_workers_create(int threads, int max_batch) {
   if (max_batch < 1)
     max_batch = 1;
 
-  pool->mutex = btc_mutex_create();
-  pool->master = btc_cond_create();
-  pool->worker = btc_cond_create();
+  btc_mutex_init(&pool->mutex);
+  btc_cond_init(&pool->master);
+  btc_cond_init(&pool->worker);
 
   btc_workq_init(&pool->queue);
 
@@ -191,47 +191,45 @@ btc_workers_create(int threads, int max_batch) {
   pool->stop = 0;
 
   for (i = 0; i < threads; i++) {
-    btc_thread_create(thread, worker_thread, pool);
-    btc_thread_detach(thread);
+    btc_thread_create(&thread, worker_thread, pool);
+    btc_thread_detach(&thread);
   }
-
-  btc_thread_free(thread);
 
   return pool;
 }
 
 void
 btc_workers_destroy(btc_workers_t *pool) {
-  btc_mutex_lock(pool->mutex);
+  btc_mutex_lock(&pool->mutex);
 
   btc_workq_clear(&pool->queue);
 
   pool->stop = 1;
 
-  btc_cond_broadcast(pool->worker);
-  btc_mutex_unlock(pool->mutex);
+  btc_cond_broadcast(&pool->worker);
+  btc_mutex_unlock(&pool->mutex);
 
-  btc_mutex_lock(pool->mutex);
+  btc_mutex_lock(&pool->mutex);
 
   while (pool->threads > 0)
-    btc_cond_wait(pool->master, pool->mutex);
+    btc_cond_wait(&pool->master, &pool->mutex);
 
-  btc_mutex_unlock(pool->mutex);
+  btc_mutex_unlock(&pool->mutex);
 
-  btc_mutex_destroy(pool->mutex);
-  btc_cond_destroy(pool->worker);
-  btc_cond_destroy(pool->master);
+  btc_mutex_destroy(&pool->mutex);
+  btc_cond_destroy(&pool->worker);
+  btc_cond_destroy(&pool->master);
 
   free(pool);
 }
 
 void
 btc_workers_add(btc_workers_t *pool, btc_work_f *func, void *arg) {
-  btc_mutex_lock(pool->mutex);
+  btc_mutex_lock(&pool->mutex);
   btc_workq_push(&pool->queue, func, arg);
   pool->left++;
-  btc_cond_signal(pool->worker);
-  btc_mutex_unlock(pool->mutex);
+  btc_cond_signal(&pool->worker);
+  btc_mutex_unlock(&pool->mutex);
 }
 
 void
@@ -241,28 +239,28 @@ btc_workers_batch(btc_workers_t *pool, btc_workq_t *batch) {
   if (length == 0)
     return;
 
-  btc_mutex_lock(pool->mutex);
+  btc_mutex_lock(&pool->mutex);
 
   btc_workq_concat(&pool->queue, batch);
 
   pool->left += length;
 
   if (length == 1)
-    btc_cond_signal(pool->worker);
+    btc_cond_signal(&pool->worker);
   else
-    btc_cond_broadcast(pool->worker);
+    btc_cond_broadcast(&pool->worker);
 
-  btc_mutex_unlock(pool->mutex);
+  btc_mutex_unlock(&pool->mutex);
 }
 
 void
 btc_workers_wait(btc_workers_t *pool) {
-  btc_mutex_lock(pool->mutex);
+  btc_mutex_lock(&pool->mutex);
 
   while (pool->left > 0)
-    btc_cond_wait(pool->master, pool->mutex);
+    btc_cond_wait(&pool->master, &pool->mutex);
 
-  btc_mutex_unlock(pool->mutex);
+  btc_mutex_unlock(&pool->mutex);
 }
 
 static int
@@ -289,18 +287,18 @@ worker_thread(void *arg) {
   int length = 0;
 
   for (;;) {
-    btc_mutex_lock(pool->mutex);
+    btc_mutex_lock(&pool->mutex);
 
     if (length > 0) {
       pool->left -= length;
 
       if (!pool->stop && pool->left == 0)
-        btc_cond_signal(pool->master);
+        btc_cond_signal(&pool->master);
     }
 
     while (!pool->stop && pool->queue.length == 0) {
       pool->idle++;
-      btc_cond_wait(pool->worker, pool->mutex);
+      btc_cond_wait(&pool->worker, &pool->mutex);
       pool->idle--;
     }
 
@@ -310,7 +308,7 @@ worker_thread(void *arg) {
     if (pool->max_batch > 1) {
       length = btc_workers_slice(pool, &jobs);
 
-      btc_mutex_unlock(pool->mutex);
+      btc_mutex_unlock(&pool->mutex);
 
       for (work = jobs.head; work != NULL; work = next)
         next = btc_work_execute(work);
@@ -318,14 +316,14 @@ worker_thread(void *arg) {
       work = btc_workq_shift(&pool->queue);
       length = 1;
 
-      btc_mutex_unlock(pool->mutex);
+      btc_mutex_unlock(&pool->mutex);
 
       btc_work_execute(work);
     }
   }
 
   if (--pool->threads == 0)
-    btc_cond_signal(pool->master);
+    btc_cond_signal(&pool->master);
 
-  btc_mutex_unlock(pool->mutex);
+  btc_mutex_unlock(&pool->mutex);
 }

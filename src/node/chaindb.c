@@ -168,7 +168,7 @@ coin_key(uint8_t *key, const uint8_t *hash, uint32_t index) {
 #define BTC_CHAINFILE_SIZE 37
 
 typedef struct btc_chainfile_s {
-  int fd;
+  btc_fd_t fd;
   uint8_t type;
   int32_t id;
   int32_t pos;
@@ -185,7 +185,7 @@ DEFINE_SERIALIZABLE_OBJECT(btc_chainfile, SCOPE_STATIC)
 
 static void
 btc_chainfile_init(btc_chainfile_t *z) {
-  z->fd = -1;
+  z->fd = BTC_INVALID_FD;
   z->type = BLOCK_FILE;
   z->id = 0;
   z->pos = 0;
@@ -205,7 +205,7 @@ btc_chainfile_clear(btc_chainfile_t *z) {
 
 static void
 btc_chainfile_copy(btc_chainfile_t *z, const btc_chainfile_t *x) {
-  z->fd = -1;
+  z->fd = BTC_INVALID_FD;
   z->type = x->type;
   z->id = x->id;
   z->pos = x->pos;
@@ -377,16 +377,16 @@ static int
 btc_chaindb_load_prefix(btc_chaindb_t *db, const char *prefix) {
   char path[BTC_PATH_MAX];
 
-  if (!btc_path_resolve(db->prefix, sizeof(db->prefix), prefix, NULL))
+  if (!btc_path_absolute(db->prefix, sizeof(db->prefix), prefix))
     return 0;
 
-  if (!btc_fs_mkdirp(db->prefix, 0755))
+  if (!btc_fs_mkdirp(db->prefix))
     return 0;
 
-  if (!btc_path_join(path, sizeof(path), db->prefix, "blocks", NULL))
+  if (!btc_path_join(path, sizeof(path), db->prefix, "blocks"))
     return 0;
 
-  if (!btc_fs_exists(path) && !btc_fs_mkdir(path, 0755))
+  if (!btc_fs_exists(path) && !btc_fs_mkdir(path))
     return 0;
 
   return 1;
@@ -398,7 +398,7 @@ btc_chaindb_load_database(btc_chaindb_t *db) {
   char path[BTC_PATH_MAX];
   int rc;
 
-  if (!btc_path_join(path, sizeof(path), db->prefix, "chain", NULL)) {
+  if (!btc_path_join(path, sizeof(path), db->prefix, "chain")) {
     fprintf(stderr, "ldb_open: path too long\n");
     return 0;
   }
@@ -494,16 +494,16 @@ btc_chaindb_load_files(btc_chaindb_t *db) {
   /* Open block file for writing. */
   btc_chaindb_path(db, path, BLOCK_FILE, db->block.id);
 
-  db->block.fd = btc_fs_open(path, WRITE_FLAGS, 0644);
+  db->block.fd = btc_fs_append(path);
 
-  CHECK(db->block.fd != -1);
+  CHECK(db->block.fd != BTC_INVALID_FD);
 
   /* Open undo file for writing. */
   btc_chaindb_path(db, path, UNDO_FILE, db->undo.id);
 
-  db->undo.fd = btc_fs_open(path, WRITE_FLAGS, 0644);
+  db->undo.fd = btc_fs_append(path);
 
-  CHECK(db->undo.fd != -1);
+  CHECK(db->undo.fd != BTC_INVALID_FD);
 
   return 1;
 }
@@ -770,16 +770,16 @@ btc_chaindb_read(btc_chaindb_t *db,
   uint8_t hdr[24];
   size_t size;
   int ret = 0;
-  int fd;
+  btc_fd_t fd;
 
   btc_chaindb_path(db, path, type, id);
 
-  fd = btc_fs_open(path, READ_FLAGS, 0);
+  fd = btc_fs_open(path);
 
-  if (fd == -1)
+  if (fd == BTC_INVALID_FD)
     return 0;
 
-  if (btc_fs_seek(fd, pos, BTC_SEEK_SET) != pos)
+  if (btc_fs_seek(fd, pos) != pos)
     goto fail;
 
   if (!btc_fs_read(fd, hdr, 24))
@@ -877,7 +877,7 @@ btc_chaindb_alloc(btc_chaindb_t *db,
   uint8_t kbuf[FILE_KEYLEN];
   char path[BTC_PATH_MAX];
   ldb_slice_t key, val;
-  int fd;
+  btc_fd_t fd;
 
   if (file->pos + len <= MAX_FILE_SIZE)
     return 1;
@@ -892,9 +892,9 @@ btc_chaindb_alloc(btc_chaindb_t *db,
 
   btc_chaindb_path(db, path, file->type, file->id + 1);
 
-  fd = btc_fs_open(path, WRITE_FLAGS, 0644);
+  fd = btc_fs_append(path);
 
-  if (fd == -1)
+  if (fd == BTC_INVALID_FD)
     return 0;
 
   btc_fs_fsync(file->fd);

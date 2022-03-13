@@ -201,22 +201,6 @@ mako_sources = src/crypto/chacha20.c   \
                src/vector.c            \
                src/view.c
 
-if MINGW
-os_sources = src/io/win/fs.c     \
-             src/io/win/net.c    \
-             src/io/win/ps.c     \
-             src/io/win/sys.c    \
-             src/io/win/thread.c \
-             src/io/win/time.c
-else
-os_sources = src/io/unix/fs.c     \
-             src/io/unix/net.c    \
-             src/io/unix/ps.c     \
-             src/io/unix/sys.c    \
-             src/io/unix/thread.c \
-             src/io/unix/time.c
-endif
-
 io_sources = src/io/http/http_client.c \
              src/io/http/http_common.c \
              src/io/http/http_parser.c \
@@ -224,9 +208,9 @@ io_sources = src/io/http/http_client.c \
              src/io/addrinfo.c         \
              src/io/core.c             \
              src/io/loop.c             \
+             src/io/net.c              \
              src/io/sockaddr.c         \
-             src/io/workers.c          \
-             $(os_sources)
+             src/io/workers.c
 
 node_sources = src/node/addrman.c  \
                src/node/chain.c    \

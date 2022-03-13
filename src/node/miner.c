@@ -71,9 +71,9 @@ typedef struct btc_cpuminer_s {
   btc_miner_t *miner;
   int mining;
   int64_t last_check;
-  btc_mutex_t *lock;
-  btc_cond_t *master;
-  btc_cond_t *worker;
+  btc_mutex_t lock;
+  btc_cond_t master;
+  btc_cond_t worker;
   btc_cputhread_t *threads;
   int length;
   uint8_t last_tip[32];
@@ -640,9 +640,11 @@ btc_cpuminer_init(btc_cpuminer_t *cpu, btc_miner_t *miner, int length) {
   cpu->miner = miner;
   cpu->mining = 0;
   cpu->last_check = 0;
-  cpu->lock = btc_mutex_create();
-  cpu->master = btc_cond_create();
-  cpu->worker = btc_cond_create();
+
+  btc_mutex_init(&cpu->lock);
+  btc_cond_init(&cpu->master);
+  btc_cond_init(&cpu->worker);
+
   cpu->threads = btc_malloc(length * sizeof(btc_cputhread_t));
   cpu->length = length;
   btc_hash_init(cpu->last_tip);
@@ -663,9 +665,9 @@ btc_cpuminer_init(btc_cpuminer_t *cpu, btc_miner_t *miner, int length) {
 
 static void
 btc_cpuminer_clear(btc_cpuminer_t *cpu) {
-  btc_mutex_destroy(cpu->lock);
-  btc_cond_destroy(cpu->master);
-  btc_cond_destroy(cpu->worker);
+  btc_mutex_destroy(&cpu->lock);
+  btc_cond_destroy(&cpu->master);
+  btc_cond_destroy(&cpu->worker);
   btc_free(cpu->threads);
 }
 
@@ -731,8 +733,8 @@ mining_thread(void *arg);
 
 static void
 btc_cpuminer_start(btc_cpuminer_t *cpu, int active) {
-  btc_thread_t *thread = btc_thread_alloc();
   btc_miner_t *miner = cpu->miner;
+  btc_thread_t thread;
   int i;
 
   btc_log_info(miner, "Starting miner.");
@@ -751,13 +753,11 @@ btc_cpuminer_start(btc_cpuminer_t *cpu, int active) {
   btc_loop_on_tick(miner->loop, on_tick, cpu);
 
   for (i = 0; i < active; i++) {
-    btc_thread_create(thread, mining_thread, &cpu->threads[i]);
-    btc_thread_detach(thread);
+    btc_thread_create(&thread, mining_thread, &cpu->threads[i]);
+    btc_thread_detach(&thread);
   }
 
   cpu->active = active;
-
-  btc_thread_free(thread);
 }
 
 static void
@@ -768,24 +768,24 @@ btc_cpuminer_stop(btc_cpuminer_t *cpu) {
 
   CHECK(cpu->mining == 1);
 
-  btc_mutex_lock(cpu->lock);
+  btc_mutex_lock(&cpu->lock);
 
   cpu->stop = 1;
 
   btc_cpuminer_stop_job(cpu);
   btc_hash_init(cpu->last_tip);
 
-  btc_cond_signal(cpu->worker);
-  btc_mutex_unlock(cpu->lock);
+  btc_cond_signal(&cpu->worker);
+  btc_mutex_unlock(&cpu->lock);
 
-  btc_mutex_lock(cpu->lock);
+  btc_mutex_lock(&cpu->lock);
 
   while (cpu->active > 0)
-    btc_cond_wait(cpu->master, cpu->lock);
+    btc_cond_wait(&cpu->master, &cpu->lock);
 
   cpu->stop = 0;
 
-  btc_mutex_unlock(cpu->lock);
+  btc_mutex_unlock(&cpu->lock);
 
   cpu->mining = 0;
 
@@ -825,7 +825,7 @@ on_tick(void *arg) {
 
   cpu->last_check = now;
 
-  btc_mutex_lock(cpu->lock);
+  btc_mutex_lock(&cpu->lock);
 
   /* Get tip for below checks. */
   tip = btc_chain_tip(miner->chain);
@@ -836,7 +836,7 @@ on_tick(void *arg) {
     if (!btc_hash_equal(cpu->last_tip, tip->hash)) {
       /* Start a new job. */
       btc_cpuminer_start_job(cpu);
-      btc_cond_broadcast(cpu->worker);
+      btc_cond_broadcast(&cpu->worker);
     }
     goto done;
   }
@@ -858,13 +858,13 @@ on_tick(void *arg) {
       if (!btc_hash_equal(cpu->job->prev_block, tip->hash)) {
         /* Job is stale. Start new job immediately. */
         btc_cpuminer_start_job(cpu);
-        btc_cond_broadcast(cpu->worker);
+        btc_cond_broadcast(&cpu->worker);
       } else {
         /* Wait for new job. */
         btc_cpuminer_stop_job(cpu);
       }
 
-      btc_mutex_unlock(cpu->lock);
+      btc_mutex_unlock(&cpu->lock);
 
       CHECK(btc_chain_add(miner->chain, block, BTC_BLOCK_DEFAULT_FLAGS, 0));
 
@@ -877,14 +877,14 @@ on_tick(void *arg) {
   /* Is our job stale? */
   if (!btc_hash_equal(cpu->job->prev_block, tip->hash)) {
     btc_cpuminer_start_job(cpu);
-    btc_cond_broadcast(cpu->worker);
+    btc_cond_broadcast(&cpu->worker);
     goto done;
   }
 
   /* Do we need to check the mempool again? */
   if (now >= cpu->last_job + 60 * 1000) {
     btc_cpuminer_start_job(cpu);
-    btc_cond_broadcast(cpu->worker);
+    btc_cond_broadcast(&cpu->worker);
     goto done;
   }
 
@@ -923,10 +923,10 @@ on_tick(void *arg) {
     thread->result = -1;
   }
 
-  btc_cond_broadcast(cpu->worker);
+  btc_cond_broadcast(&cpu->worker);
 
 done:
-  btc_mutex_unlock(cpu->lock);
+  btc_mutex_unlock(&cpu->lock);
 }
 
 static void
@@ -937,7 +937,7 @@ mining_thread(void *arg) {
   int result = -1;
 
   for (;;) {
-    btc_mutex_lock(cpu->lock);
+    btc_mutex_lock(&cpu->lock);
 
     CHECK(thread->result == -1);
 
@@ -950,7 +950,7 @@ mining_thread(void *arg) {
       if (cpu->job != NULL && thread->result == -1)
         break;
 
-      btc_cond_wait(cpu->worker, cpu->lock);
+      btc_cond_wait(&cpu->worker, &cpu->lock);
     }
 
     if (cpu->stop)
@@ -961,15 +961,15 @@ mining_thread(void *arg) {
                           thread->time,
                           thread->nonce);
 
-    btc_mutex_unlock(cpu->lock);
+    btc_mutex_unlock(&cpu->lock);
 
     result = btc_header_mine(&hdr, 3 << 20);
   }
 
   if (--cpu->active == 0)
-    btc_cond_signal(cpu->master);
+    btc_cond_signal(&cpu->master);
 
-  btc_mutex_unlock(cpu->lock);
+  btc_mutex_unlock(&cpu->lock);
 }
 
 /*

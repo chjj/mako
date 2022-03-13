@@ -37,7 +37,7 @@ get_config(int argc, char **argv) {
   conf = btc_conf_create(argc, argv, prefix, 0);
 
   /* Absolute-ify path before we daemonize and call chdir("/"). */
-  if (!btc_path_absolute(conf->prefix, sizeof(conf->prefix))) {
+  if (!btc_path_absolutify(conf->prefix, sizeof(conf->prefix))) {
     fprintf(stderr, "Path for datadir is too long!\n");
     btc_conf_destroy(conf);
     return NULL;

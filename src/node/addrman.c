@@ -422,7 +422,7 @@ btc_addrman_read_file(btc_addrman_t *man, const char *file) {
   uint8_t *xp;
   size_t xn;
 
-  if (!btc_fs_alloc_file(&xp, &xn, file))
+  if (!btc_fs_alloc_file(file, &xp, &xn))
     return 0;
 
   if (!btc_addrman_import(man, xp, xn)) {
@@ -496,7 +496,7 @@ btc_addrman_open(btc_addrman_t *man, const char *file, unsigned int flags) {
   man->flags = flags;
 
   if (file != NULL) {
-    if (!btc_path_resolve(man->file, sizeof(man->file), file, NULL))
+    if (!btc_path_absolute(man->file, sizeof(man->file), file))
       return 0;
 
     if (btc_addrman_read_file(man, man->file))
@@ -523,7 +523,7 @@ btc_addrman_write_file(btc_addrman_t *man, const char *file) {
 
   CHECK(btc_addrman_export(zp, man) == zn);
 
-  ret = btc_fs_write_file(file, 0644, zp, zn);
+  ret = btc_fs_write_file(file, zp, zn);
 
   btc_free(zp);
 
