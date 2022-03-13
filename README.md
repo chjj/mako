@@ -1,12 +1,11 @@
 # mako - full bitcoin implementation in C
 
-__Mako__ is a from-scratch bitcoin reimplementation, written in "almost-C89"
+__mako__ is a from-scratch bitcoin reimplementation, written in "almost-C89"
 (i.e. it can be compiled by a C89 compiler if `<stdint.h>` is available -- no
 other C99 features are used).
 
-Mako is more-or-less dependency-less. It only vendors lmdb, which has a
-remarkably small codebase. Mako aims to support any POSIX.1-2001 operating
-system as well as Windows XP and up.
+Mako is more-or-less dependency-less. It only vendors [lcdb]. Mako aims to
+support any POSIX.1-2001 operating system as well as Windows XP and up.
 
 Mako has a re-usable architecture. The core library (libmako) does no IO, and
 has almost every tool needed for working with bitcoin. The fullnode (libnode)
@@ -37,29 +36,6 @@ has only been tested on Linux and Win32 (cross-compiled with mingw).
 `cmake . && make` will produce two binaries: `mako and makod`. The arguments
 mimic `bitcoin-cli` and `bitcoind` respectively.
 
-### Database Backends
-
-There are currently two database backends to choose from: the SQLite LSM tree
-(vendored), or LevelDB (dynamically linked). LevelDB will use less disk space
-and is probably faster, but requires a third party library to be installed on
-the system (LevelDB will never be vendored as it requires a C++ compiler).
-
-#### Building with the SQLite LSM tree
-
-``` sh
-$ cmake . -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-g
-$ make
-```
-
-#### Building with LevelDB
-
-``` sh
-$ cmake . -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-g -DMAKO_LEVELDB=ON
-$ make
-```
-
-Note: LevelDB must be installed system-wide.
-
 ## Why?
 
 There are a few reasons mako needed to exist:
@@ -87,9 +63,10 @@ all code is your original work. `</legalese>`
 
 ## License
 
-- Copyright (c) 2021, Christopher Jeffrey (MIT License).
+- Copyright (c) 2021-2022, Christopher Jeffrey (MIT License).
 
 See LICENSE for more info.
 
+[lcdb]: https://github.com/chjj/lcdb
 [cxx]: http://harmful.cat-v.org/software/c++/linus
 [hns]: https://handshake.org/
