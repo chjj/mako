@@ -337,13 +337,7 @@ list(APPEND node_sources src/node/addrman.c
 
 list(APPEND client_sources src/client/client.c)
 
-list(APPEND test_sources test/lib/tests.c)
-
-if(WIN32)
-  list(APPEND test_sources test/lib/rimraf_win.c)
-else()
-  list(APPEND test_sources test/lib/rimraf_unix.c)
-endif()
+list(APPEND test_sources test/lib/tests.c test/lib/rimraf.c)
 
 #
 # Flags

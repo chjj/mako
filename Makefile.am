@@ -236,11 +236,10 @@ mako_ldflags = -version-info @ABI_VERSION@
 endif
 
 libmako_la_SOURCES = $(mako_sources)
-if ENABLE_SHARED
-libmako_la_CFLAGS = $(WARN_FLAGS) -DBTC_EXPORT
-libmako_la_LDFLAGS = -no-undefined $(mako_ldflags)
-else
 libmako_la_CFLAGS = $(WARN_FLAGS)
+if ENABLE_SHARED
+libmako_la_CFLAGS += -DBTC_EXPORT
+libmako_la_LDFLAGS = -no-undefined $(mako_ldflags)
 endif
 
 lib_LTLIBRARIES = libmako.la

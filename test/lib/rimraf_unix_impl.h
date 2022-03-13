@@ -1,5 +1,5 @@
 /*!
- * rimraf.c - rm -rf for c
+ * rimraf_unix_impl.h - rm -rf for c
  * Copyright (c) 2022, Christopher Jeffrey (MIT License).
  * https://github.com/chjj
  */

@@ -6,11 +6,7 @@ AM_CPPFLAGS = $(WARN_FLAGS) -I$(top_builddir)/include
 AM_LDFLAGS = -no-install
 LDADD = libtests.la
 
-if MINGW
-libtests_la_SOURCES = lib/tests.h lib/tests.c lib/rimraf_win.c
-else
-libtests_la_SOURCES = lib/tests.h lib/tests.c lib/rimraf_unix.c
-endif
+libtests_la_SOURCES = lib/tests.h lib/tests.c lib/rimraf.c
 
 if ENABLE_NODE
 libtests_la_LIBADD = $(top_builddir)/libnode.la @ZLIB@
@@ -85,11 +81,10 @@ tests_node = t-addrman  \
              t-timedata
 
 check_LTLIBRARIES = libtests.la
+check_PROGRAMS = $(tests_crypto) $(tests_lib)
 
 if ENABLE_NODE
-check_PROGRAMS = $(tests_crypto) $(tests_lib) $(tests_io) $(tests_node)
-else
-check_PROGRAMS = $(tests_crypto) $(tests_lib)
+check_PROGRAMS += $(tests_io) $(tests_node)
 endif
 
 TESTS = $(check_PROGRAMS)
