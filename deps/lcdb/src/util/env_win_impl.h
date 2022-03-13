@@ -362,7 +362,7 @@ ldb_get_file_size(const char *filename, uint64_t *size) {
                        0,
                        NULL,
                        OPEN_EXISTING,
-                       FILE_FLAG_BACKUP_SEMANTICS,
+                       FILE_ATTRIBUTE_NORMAL,
                        NULL);
 
   if (handle == INVALID_HANDLE_VALUE)
@@ -823,7 +823,7 @@ ldb_appendfile_create(const char *filename, ldb_wfile_t **file) {
     return LDB_INVALID;
 
   handle = CreateFileA(filename,
-                       FILE_APPEND_DATA,
+                       GENERIC_WRITE,
                        0,
                        NULL,
                        OPEN_ALWAYS,
@@ -832,6 +832,14 @@ ldb_appendfile_create(const char *filename, ldb_wfile_t **file) {
 
   if (handle == INVALID_HANDLE_VALUE)
     return LDB_WIN32_ERROR(GetLastError());
+
+  if (SetFilePointer(handle, 0, NULL, FILE_END) == (DWORD)-1) {
+    DWORD code = GetLastError();
+    if (code != NO_ERROR) {
+      CloseHandle(handle);
+      return LDB_WIN32_ERROR(code);
+    }
+  }
 
   *file = ldb_malloc(sizeof(ldb_wfile_t));
 
@@ -857,7 +865,7 @@ ldb_logger_create(FILE *stream);
 
 int
 ldb_logger_open(const char *filename, ldb_logger_t **result) {
-  FILE *stream = fopen(filename, "wN");
+  FILE *stream = fopen(filename, "w"); /* "wN" */
 
   if (stream == NULL)
     return LDB_WIN32_ERROR(GetLastError());
@@ -878,7 +886,7 @@ ldb_now_usec(void) {
 
   GetSystemTimeAsFileTime(&ft);
 
-  ticks = ((uint64_t)ft.dwHighDateTime << 32) + ft.dwLowDateTime;
+  ticks = ((uint64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
 
   return ticks / 10;
 }

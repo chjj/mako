@@ -117,12 +117,9 @@ int main(void) {
   assert(ldb_compare(&ret, &val) == 0);
 
   ldb_free(ret.data);
+  ldb_close(db);
 
-  rc = ldb_close(db);
-
-  assert(rc == LDB_OK);
-
-  return rc;
+  return 0;
 }
 ```
 

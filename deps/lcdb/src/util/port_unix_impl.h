@@ -128,7 +128,7 @@ static void *
 ldb_thread_run(void *ptr) {
   ldb_args_t args = *((ldb_args_t *)ptr);
 
-  free(ptr);
+  ldb_free(ptr);
 
   args.start(args.arg);
 

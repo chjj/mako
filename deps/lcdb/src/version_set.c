@@ -2387,17 +2387,18 @@ ldb_compaction_is_base_level_for_key(ldb_compaction_t *c,
 int
 ldb_compaction_should_stop_before(ldb_compaction_t *c,
                                   const ldb_slice_t *ikey) {
-  const ldb_filemeta_t **items = (const ldb_filemeta_t **)c->grandparents.items;
   const ldb_vset_t *vset = c->input_version->vset;
   const ldb_comparator_t *icmp = &vset->icmp;
 
   /* Scan to find earliest grandparent file that contains key. */
   while (c->grandparent_index < c->grandparents.length) {
-    if (ldb_compare(icmp, ikey, &items[c->grandparent_index]->largest) <= 0)
+    ldb_filemeta_t *f = c->grandparents.items[c->grandparent_index];
+
+    if (ldb_compare(icmp, ikey, &f->largest) <= 0)
       break;
 
     if (c->seen_key)
-      c->overlapped_bytes += items[c->grandparent_index]->file_size;
+      c->overlapped_bytes += f->file_size;
 
     c->grandparent_index++;
   }
@@ -2408,9 +2409,9 @@ ldb_compaction_should_stop_before(ldb_compaction_t *c,
     /* Too much overlap for current output; start new output. */
     c->overlapped_bytes = 0;
     return 1;
-  } else {
-    return 0;
   }
+
+  return 0;
 }
 
 void

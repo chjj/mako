@@ -183,7 +183,7 @@ ldb_thread_create(ldb_thread_t *thread, void (*start)(void *), void *arg) {
 
 void
 ldb_thread_detach(ldb_thread_t *thread) {
-  if (CloseHandle(thread->handle) == FALSE)
+  if (!CloseHandle(thread->handle))
     abort(); /* LCOV_EXCL_LINE */
 }
 
@@ -191,6 +191,6 @@ void
 ldb_thread_join(ldb_thread_t *thread) {
   WaitForSingleObject(thread->handle, INFINITE);
 
-  if (CloseHandle(thread->handle) == FALSE)
+  if (!CloseHandle(thread->handle))
     abort(); /* LCOV_EXCL_LINE */
 }

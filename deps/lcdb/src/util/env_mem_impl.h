@@ -721,7 +721,7 @@ ldb_now_usec(void) {
 
   GetSystemTimeAsFileTime(&ft);
 
-  ticks = ((uint64_t)ft.dwHighDateTime << 32) + ft.dwLowDateTime;
+  ticks = ((uint64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
 
   return ticks / 10;
 #else /* !_WIN32 */
