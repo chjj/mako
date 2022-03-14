@@ -34,9 +34,17 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+
+#if defined(_WIN32)
+#  include <windows.h>
+#elif defined(BTC_HAVE_PTHREAD)
+#  include <pthread.h>
+#endif
+
 #include <mako/crypto/rand.h>
 #include <mako/crypto/stream.h>
 #include <mako/util.h>
+
 #include "rand.h"
 #include "../internal.h"
 
@@ -157,19 +165,7 @@ rng_uniform(rng_t *rng, uint32_t max) {
  * Global Lock
  */
 
-#if defined(__MINGW32__) && defined(_WIN32)
-/* MinGW autolinks to libwinpthread when TLS
- * is used. This means our library will not be
- * redistributable on Windows unless we ship
- * libwinpthread.dll as well.
- *
- * To avoid this, we utilize the win32 API
- * directly and use a global lock instead.
- */
-
-#undef BTC_TLS
-
-#include <windows.h>
+#ifdef _WIN32
 
 static CRITICAL_SECTION rng_lock;
 
@@ -199,20 +195,15 @@ rng_global_unlock(void) {
   LeaveCriticalSection(&rng_lock);
 }
 
-#else /* !__MINGW32__ */
+#else /* !_WIN32 */
 
-#if !defined(BTC_TLS) && defined(BTC_HAVE_PTHREAD)
-#  define BTC_USE_PTHREAD
-#endif
-
-#ifdef BTC_USE_PTHREAD
-#  include <pthread.h>
+#ifdef BTC_HAVE_PTHREAD
 static pthread_mutex_t rng_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
 static void
 rng_global_lock(void) {
-#ifdef BTC_USE_PTHREAD
+#ifdef BTC_HAVE_PTHREAD
   if (pthread_mutex_lock(&rng_lock) != 0)
     btc_abort(); /* LCOV_EXCL_LINE */
 #endif
@@ -220,23 +211,19 @@ rng_global_lock(void) {
 
 static void
 rng_global_unlock(void) {
-#ifdef BTC_USE_PTHREAD
+#ifdef BTC_HAVE_PTHREAD
   if (pthread_mutex_unlock(&rng_lock) != 0)
     btc_abort(); /* LCOV_EXCL_LINE */
 #endif
 }
 
-#endif /* !__MINGW32__ */
+#endif /* !_WIN32 */
 
 /*
  * Global Context
  */
 
-#if defined(BTC_TLS)
-static BTC_TLS rng_t rng_state;
-#else
 static rng_t rng_state;
-#endif
 
 static void
 rng_global_init(void) {

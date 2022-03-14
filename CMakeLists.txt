@@ -32,7 +32,6 @@ endif()
 #
 
 include(cmake/AppendCCompilerFlag.cmake)
-include(cmake/CheckCThreadLocalStorage.cmake)
 include(cmake/LibtoolEmulator.cmake)
 include(cmake/TargetLinkOptions.cmake)
 include(CheckCSourceCompiles)
@@ -55,7 +54,6 @@ option(MAKO_NODE "Build the fullnode" ON)
 option(MAKO_PIC "Enable PIC" OFF)
 option(MAKO_SHARED "Build shared library" OFF)
 option(MAKO_TESTS "Build tests" ON)
-option(MAKO_TLS "Use thread-local storage if available" ON)
 
 #
 # Variables
@@ -202,16 +200,6 @@ elseif(NOT WIN32 AND NOT WASI AND NOT EMSCRIPTEN)
   if(CMAKE_USE_PTHREADS_INIT)
     set(MAKO_HAVE_PTHREAD 1)
   endif()
-endif()
-
-if(MAKO_TLS)
-  check_c_thread_local_storage(MAKO_TLS_KEYWORD
-                               MAKO_TLS_FLAG
-                               MAKO_TLS_EMULATED)
-else()
-  set(MAKO_TLS_KEYWORD)
-  set(MAKO_TLS_FLAG)
-  set(MAKO_TLS_EMULATED)
 endif()
 
 set(MAKO_HAVE_ZLIB 0)
@@ -375,10 +363,6 @@ if(MAKO_COVERAGE)
   list(APPEND mako_ldflags --coverage)
 endif()
 
-if(MAKO_TLS_FLAG)
-  list(APPEND mako_cflags ${MAKO_TLS_FLAG})
-endif()
-
 if(MINGW)
   # Ensure we are redistributable on windows.
   list(APPEND mako_ldflags -static-libgcc)
@@ -412,10 +396,6 @@ endif()
 
 if(MAKO_HAVE_PTHREAD)
   list(APPEND mako_defines BTC_HAVE_PTHREAD)
-endif()
-
-if(MAKO_TLS_KEYWORD)
-  list(APPEND mako_defines BTC_TLS=${MAKO_TLS_KEYWORD})
 endif()
 
 if(MAKO_HAVE_ZLIB)

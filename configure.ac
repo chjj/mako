@@ -115,14 +115,6 @@ AC_ARG_ENABLE(
   [enable_tests=yes]
 )
 
-AC_ARG_ENABLE(
-  tls,
-  AS_HELP_STRING([--enable-tls],
-                 [use thread-local storage if available [default=yes]]),
-  [enable_tls=$enableval],
-  [enable_tls=yes]
-)
-
 #
 # Global Flags
 #
@@ -181,7 +173,6 @@ has_big=no
 has_clock=no
 has_int128=no
 has_pthread=no
-has_tls=no
 has_zlib=no
 
 AC_MSG_CHECKING(for 64-bit support)
@@ -281,10 +272,6 @@ AS_IF([test x"$MINGW$WASI$EMSCRIPTEN" = x''], [
   AX_PTHREAD([has_pthread=yes])
 ])
 
-AS_IF([test x"$enable_tls" = x'yes'], [
-  AX_TLS([has_tls=yes])
-])
-
 AS_IF([test x"$enable_tests" = x'yes'], [
   AC_CHECK_HEADER([zlib.h], [
     AC_CHECK_LIB([z], [compress2], [has_zlib=yes])
@@ -337,10 +324,6 @@ AS_IF([test x"$enable_debug" = x'yes'], [
   AX_CHECK_COMPILE_FLAG([-g], [CFLAGS="$CFLAGS -g"])
 ])
 
-AS_IF([test x"$has_tls" = x'yes'], [
-  CFLAGS="$CFLAGS $ax_cv_tls_cflags"
-])
-
 AS_IF([test x"$MINGW" != x''], [
   # Ensure we are redistributable on windows.
   LDFLAGS="$LDFLAGS -static-libgcc"
@@ -376,10 +359,6 @@ AS_IF([test x"$has_int128" = x'yes'], [
 
 AS_IF([test x"$has_pthread" = x'yes'], [
   AC_DEFINE([BTC_HAVE_PTHREAD])
-])
-
-AS_IF([test x"$has_tls" = x'yes'], [
-  AC_DEFINE_UNQUOTED([BTC_TLS], [$ax_cv_tls_keyword])
 ])
 
 AS_IF([test x"$has_zlib" = x'yes'], [
@@ -481,7 +460,6 @@ AC_MSG_NOTICE([Build Options:
   node       = $enable_node
   pthread    = $has_pthread
   tests      = $enable_tests
-  tls        = $has_tls
   wasi       = $WASI
   zlib       = $has_zlib
 
