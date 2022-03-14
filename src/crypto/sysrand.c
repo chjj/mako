@@ -478,7 +478,7 @@
 #    include <bcrypt.h> /* BCryptGenRandom */
 #    pragma comment(lib, "bcrypt.lib")
 #    define HAVE_BCRYPTGENRANDOM
-#  else /* Windows XP (2001) */
+#  elif defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0501 /* Windows XP (2001) */
 #    define RtlGenRandom SystemFunction036
 #    ifdef __cplusplus
 extern "C"

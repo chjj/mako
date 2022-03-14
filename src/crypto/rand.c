@@ -168,31 +168,20 @@ static CRITICAL_SECTION rng_lock;
 
 static void
 rng_global_lock(void) {
-  static int initialized = 0;
-  static HANDLE event = NULL;
-  HANDLE created, existing;
+  /* Logic from libsodium/core.c */
+  static volatile long state = 0;
+  long value;
 
-  if (initialized == 0) {
-    created = CreateEvent(NULL, 1, 0, NULL);
+  while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
+    Sleep(0);
 
-    if (created == NULL)
+  if (value == 0) {
+    InitializeCriticalSection(&rng_lock);
+
+    if (InterlockedExchange(&state, 2) != 1)
       btc_abort(); /* LCOV_EXCL_LINE */
-
-    existing = InterlockedCompareExchangePointer(&event, created, NULL);
-
-    if (existing == NULL) {
-      InitializeCriticalSection(&rng_lock);
-
-      if (!SetEvent(created))
-        btc_abort(); /* LCOV_EXCL_LINE */
-
-      initialized = 1;
-    } else {
-      CloseHandle(created);
-
-      if (WaitForSingleObject(existing, INFINITE) != WAIT_OBJECT_0)
-        btc_abort(); /* LCOV_EXCL_LINE */
-    }
+  } else {
+    ASSERT(value == 2);
   }
 
   EnterCriticalSection(&rng_lock);
