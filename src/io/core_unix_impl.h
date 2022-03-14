@@ -616,6 +616,14 @@ btc_sys_numcpu(void) {
 
 int
 btc_sys_datadir(char *buf, size_t size, const char *name) {
+#if defined(__wasi__)
+  if (strlen(name) + 3 > size)
+    return 0;
+
+  sprintf(buf, "/.%s", name);
+
+  return 1;
+#else /* !__wasi__ */
   char *home = getenv("HOME");
 
   if (home == NULL || home[0] == '\0')
@@ -635,6 +643,7 @@ btc_sys_datadir(char *buf, size_t size, const char *name) {
 #endif
 
   return 1;
+#endif /* !__wasi__ */
 }
 
 /*
