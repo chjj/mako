@@ -9,9 +9,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <lcdb.h>
-
-#include <io/core.h>
 #include <mako/block.h>
 #include <mako/coins.h>
 #include <mako/consensus.h>
@@ -23,7 +20,13 @@
 #include <mako/tx.h>
 #include <mako/util.h>
 #include <mako/vector.h>
+
+#include <io/core.h>
+#include <io/loop.h>
+
 #include <node/chaindb.h>
+
+#include <lcdb.h>
 
 #include "../bio.h"
 #include "../impl.h"
@@ -342,7 +345,6 @@ btc_chaindb_init(btc_chaindb_t *db, const btc_network_t *network) {
   db->prefix[0] = '/';
   db->hashes = btc_hashmap_create();
   db->flags = BTC_CHAIN_DEFAULT_FLAGS;
-  db->block_cache = ldb_lru_create(64 << 20);
 
   btc_vector_init(&db->heights);
 
@@ -351,8 +353,6 @@ btc_chaindb_init(btc_chaindb_t *db, const btc_network_t *network) {
 
 static void
 btc_chaindb_clear(btc_chaindb_t *db) {
-  ldb_lru_destroy(db->block_cache);
-
   btc_hashmap_destroy(db->hashes);
   btc_vector_clear(&db->heights);
   btc_free(db->slab);
@@ -394,6 +394,7 @@ btc_chaindb_load_prefix(btc_chaindb_t *db, const char *prefix) {
 
 static int
 btc_chaindb_load_database(btc_chaindb_t *db) {
+  static const size_t cache_size = 128 << 20;
   ldb_dbopt_t options = *ldb_dbopt_default;
   char path[BTC_PATH_MAX];
   int rc;
@@ -403,22 +404,41 @@ btc_chaindb_load_database(btc_chaindb_t *db) {
     return 0;
   }
 
+  db->block_cache = ldb_lru_create(cache_size / 2);
+
   options.create_if_missing = 1;
   options.block_cache = db->block_cache;
-  options.write_buffer_size = 32 << 20;
-#ifdef _WIN32
-  options.max_open_files = 1000;
-#else
-  options.max_open_files = sizeof(void *) < 8 ? 64 : 1000;
-#endif
+  options.write_buffer_size = cache_size / 4;
   options.compression = LDB_NO_COMPRESSION;
   options.filter_policy = NULL; /* ldb_bloom_default */
   options.use_mmap = 0;
+
+  if (options.use_mmap == 0 || sizeof(void *) < 8) {
+    static const int sockets = 256;
+    int fdset = btc_loop_fd_setsize();
+
+    if (fdset < 0) {
+      /* select(2) backend not in use. */
+    } else if (fdset >= options.max_open_files + sockets) {
+      /* Use default max_open_files. */
+    } else if (fdset >= 64 + sockets) {
+      options.max_open_files = fdset - sockets;
+    } else {
+      if (sizeof(void *) < 8)
+        options.max_open_files = 64;
+      else
+        options.use_mmap = 1;
+    }
+  }
 
   rc = ldb_open(path, &options, &db->lsm);
 
   if (rc != LDB_OK) {
     fprintf(stderr, "ldb_open: %s\n", ldb_strerror(rc));
+
+    ldb_lru_destroy(db->block_cache);
+    db->block_cache = NULL;
+
     return 0;
   }
 
@@ -428,7 +448,10 @@ btc_chaindb_load_database(btc_chaindb_t *db) {
 static void
 btc_chaindb_unload_database(btc_chaindb_t *db) {
   ldb_close(db->lsm);
+  ldb_lru_destroy(db->block_cache);
+
   db->lsm = NULL;
+  db->block_cache = NULL;
 }
 
 static int
@@ -682,14 +705,12 @@ btc_chaindb_close(btc_chaindb_t *db) {
 }
 
 static btc_coin_t *
-read_coin(const btc_outpoint_t *prevout, void *arg1, void *arg2) {
-  btc_chaindb_t *db = (btc_chaindb_t *)arg1;
+read_coin(const btc_outpoint_t *prevout, void *arg) {
+  btc_chaindb_t *db = (btc_chaindb_t *)arg;
   uint8_t kbuf[COIN_KEYLEN];
   ldb_slice_t key, val;
   btc_coin_t *coin;
   int rc;
-
-  (void)arg2;
 
   key.data = kbuf;
   key.size = coin_key(kbuf, prevout->hash, prevout->index);
@@ -717,14 +738,14 @@ int
 btc_chaindb_spend(btc_chaindb_t *db,
                   btc_view_t *view,
                   const btc_tx_t *tx) {
-  return btc_view_spend(view, tx, read_coin, db, NULL);
+  return btc_view_spend(view, tx, read_coin, db);
 }
 
 int
 btc_chaindb_fill(btc_chaindb_t *db,
                  btc_view_t *view,
                  const btc_tx_t *tx) {
-  return btc_view_fill(view, tx, read_coin, db, NULL);
+  return btc_view_fill(view, tx, read_coin, db);
 }
 
 static void

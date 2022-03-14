@@ -1944,6 +1944,15 @@ btc_loop_close(btc_loop_t *loop) {
 #endif /* !BTC_USE_POLL */
 }
 
+int
+btc_loop_fd_setsize(void) {
+#if !defined(_WIN32) && defined(BTC_USE_SELECT)
+  return FD_SETSIZE;
+#else
+  return -1;
+#endif
+}
+
 /*
  * Server
  */

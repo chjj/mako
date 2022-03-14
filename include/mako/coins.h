@@ -21,9 +21,7 @@ extern "C" {
  * Types
  */
 
-typedef btc_coin_t *btc_coin_read_cb(const btc_outpoint_t *prevout,
-                                     void *arg1,
-                                     void *arg2);
+typedef btc_coin_t *btc_coin_read_cb(const btc_outpoint_t *prevout, void *arg);
 
 struct btc_coins_s;
 
@@ -94,15 +92,13 @@ BTC_EXTERN int
 btc_view_spend(btc_view_t *view,
                const btc_tx_t *tx,
                btc_coin_read_cb *read_coin,
-               void *arg1,
-               void *arg2);
+               void *arg);
 
 BTC_EXTERN int
 btc_view_fill(btc_view_t *view,
               const btc_tx_t *tx,
               btc_coin_read_cb *read_coin,
-              void *arg1,
-              void *arg2);
+              void *arg);
 
 BTC_EXTERN void
 btc_view_add(btc_view_t *view, const btc_tx_t *tx, int32_t height, int spent);

@@ -21,7 +21,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #ifdef BTC_HAVE_PTHREAD
-/* #include <pthread.h> */
+#include <pthread.h>
 #endif
 #include <unistd.h>
 
@@ -394,16 +394,6 @@ btc_path_absolute(char *buf, size_t size, const char *name) {
 }
 
 /*
- * Net
- */
-
-void
-btc_net_startup(void);
-
-void
-btc_net_cleanup(void);
-
-/*
  * Process
  */
 
@@ -628,7 +618,7 @@ int
 btc_sys_datadir(char *buf, size_t size, const char *name) {
   char *home = getenv("HOME");
 
-  if (home == NULL)
+  if (home == NULL || home[0] == '\0')
     return 0;
 
 #if defined(__APPLE__)

@@ -177,8 +177,7 @@ int
 btc_view_spend(btc_view_t *view,
                const btc_tx_t *tx,
                btc_coin_read_cb *read_coin,
-               void *arg1,
-               void *arg2) {
+               void *arg) {
   const btc_outpoint_t *prevout;
   btc_coins_t *coins;
   btc_coin_t *coin;
@@ -190,7 +189,7 @@ btc_view_spend(btc_view_t *view,
     coin = btc_coins_get(coins, prevout->index);
 
     if (coin == NULL) {
-      coin = read_coin(prevout, arg1, arg2);
+      coin = read_coin(prevout, arg);
 
       if (coin == NULL)
         return 0;
@@ -213,8 +212,7 @@ int
 btc_view_fill(btc_view_t *view,
               const btc_tx_t *tx,
               btc_coin_read_cb *read_coin,
-              void *arg1,
-              void *arg2) {
+              void *arg) {
   const btc_outpoint_t *prevout;
   btc_coins_t *coins;
   btc_coin_t *coin;
@@ -227,7 +225,7 @@ btc_view_fill(btc_view_t *view,
     coin = btc_coins_get(coins, prevout->index);
 
     if (coin == NULL) {
-      coin = read_coin(prevout, arg1, arg2);
+      coin = read_coin(prevout, arg);
 
       if (coin == NULL) {
         ret = 0;

@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-/* #include <windows.h> */
+#include <windows.h>
 #include <shlobj.h>
 #include <io/core.h>
 
@@ -327,16 +327,6 @@ btc_path_absolute(char *buf, size_t size, const char *name) {
 }
 
 /*
- * Net
- */
-
-void
-btc_net_startup(void);
-
-void
-btc_net_cleanup(void);
-
-/*
  * Process
  */
 
@@ -622,7 +612,7 @@ typedef struct btc_args_s {
   void *arg;
 } btc_args_t;
 
-static DWORD WINAPI /* __stdcall */
+static DWORD WINAPI
 btc_thread_run(void *ptr) {
   btc_args_t args = *((btc_args_t *)ptr);
 

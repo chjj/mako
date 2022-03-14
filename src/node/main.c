@@ -159,7 +159,14 @@ btc_main(const btc_conf_t *conf) {
     }
   }
 
-  btc_ps_fdlimit(conf->max_inbound + conf->max_outbound + 200);
+  {
+    int needed = conf->max_inbound + conf->max_outbound + 1000 + 200;
+
+    if (needed < 8192)
+      needed = 8192;
+
+    btc_ps_fdlimit(needed);
+  }
 
   btc_net_startup();
 
