@@ -242,13 +242,10 @@ BTC_EXTERN int
 btc_path_absolute(char *buf, size_t size, const char *name);
 
 BTC_EXTERN int
-btc_path_absolutify(char *buf, size_t size);
+btc_path_absolutify(char *name, size_t size);
 
 BTC_EXTERN int
 btc_path_join(char *zp, size_t zn, const char *xp, const char *yp);
-
-BTC_EXTERN int
-btc_path_resolve(char *zp, size_t zn, const char *xp, const char *yp);
 
 /*
  * Process

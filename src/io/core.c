@@ -96,44 +96,20 @@ fail:
  * Path
  */
 
-static int
-btc_path_is_absolute(const char *path) {
-#ifdef _WIN32
-  if (path[0] == '\0')
-    return 0;
-
-  if (path[0] == '/' || path[0] == '\\')
-    return 1;
-
-  if (path[0] >= 'A' && path[0] <= 'Z' && path[1] == ':')
-    return path[2] == '/' || path[2] == '\\';
-
-  if (path[0] >= 'a' && path[0] <= 'z' && path[1] == ':')
-    return path[2] == '/' || path[2] == '\\';
-
-  return 0;
-#else
-  return path[0] == '/';
-#endif
-}
-
 int
-btc_path_absolutify(char *buf, size_t size) {
-  char tp[BTC_PATH_MAX];
-  size_t tn;
+btc_path_absolutify(char *name, size_t size) {
+  char path[BTC_PATH_MAX];
+  size_t len;
 
-  if (btc_path_is_absolute(buf))
-    return 1;
-
-  if (!btc_path_absolute(tp, sizeof(tp), buf))
+  if (!btc_path_absolute(path, sizeof(path), name))
     return 0;
 
-  tn = strlen(tp);
+  len = strlen(path);
 
-  if (tn + 1 > size)
+  if (len + 1 > size)
     return 0;
 
-  memcpy(buf, tp, tn + 1);
+  memcpy(name, path, len + 1);
 
   return 1;
 }
@@ -165,17 +141,4 @@ btc_path_join(char *zp, size_t zn, const char *xp, const char *yp) {
   *zp = '\0';
 
   return 1;
-}
-
-int
-btc_path_resolve(char *zp, size_t zn, const char *xp, const char *yp) {
-  char tp[BTC_PATH_MAX];
-
-  if (btc_path_is_absolute(xp))
-    return btc_path_join(zp, zn, xp, yp);
-
-  if (!btc_path_absolute(tp, sizeof(tp), xp))
-    return 0;
-
-  return btc_path_join(zp, zn, tp, yp);
 }

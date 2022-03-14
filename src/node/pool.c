@@ -2411,7 +2411,7 @@ btc_pool_open(btc_pool_t *pool, const char *prefix, unsigned int flags) {
 
   btc_pool_info(pool, "Opening pool.");
 
-  if (!btc_path_resolve(file, sizeof(file), prefix, "peers.dat"))
+  if (!btc_path_join(file, sizeof(file), prefix, "peers.dat"))
     return 0;
 
   if (!btc_addrman_open(pool->addrman, file, flags))

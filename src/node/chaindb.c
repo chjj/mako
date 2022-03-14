@@ -377,7 +377,7 @@ static int
 btc_chaindb_load_prefix(btc_chaindb_t *db, const char *prefix) {
   char path[BTC_PATH_MAX];
 
-  if (!btc_path_absolute(db->prefix, sizeof(db->prefix), prefix))
+  if (!btc_strcpy(db->prefix, sizeof(db->prefix), prefix))
     return 0;
 
   if (!btc_fs_mkdirp(db->prefix))

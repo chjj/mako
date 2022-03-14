@@ -112,6 +112,9 @@ btc_memdup(const void *xp, size_t xn);
  * String
  */
 
+BTC_EXTERN int
+btc_strcpy(char *zp, size_t zn, const char *xp);
+
 BTC_EXTERN size_t
 btc_strnlen(const char *xp, size_t max);
 

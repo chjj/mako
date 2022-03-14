@@ -141,6 +141,23 @@ btc_memdup(const void *xp, size_t xn) {
  * String
  */
 
+int
+btc_strcpy(char *zp, size_t zn, const char *xp) {
+  size_t xn;
+
+  if (zp == xp)
+    return 1;
+
+  xn = strlen(xp);
+
+  if (xn + 1 > zn)
+    return 0;
+
+  memcpy(zp, xp, xn + 1);
+
+  return 1;
+}
+
 size_t
 btc_strnlen(const char *xp, size_t max) {
   size_t xn = 0;

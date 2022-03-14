@@ -130,16 +130,12 @@ btc_node_destroy(btc_node_t *node) {
 
 int
 btc_node_open(btc_node_t *node, const char *prefix, unsigned int flags) {
-  char path[BTC_PATH_MAX];
   char file[BTC_PATH_MAX];
 
-  if (!btc_path_absolute(path, sizeof(path), prefix))
+  if (!btc_fs_mkdirp(prefix))
     return 0;
 
-  if (!btc_fs_mkdirp(path))
-    return 0;
-
-  if (!btc_path_join(file, sizeof(file), path, "debug.log"))
+  if (!btc_path_join(file, sizeof(file), prefix, "debug.log"))
     return 0;
 
   if (!btc_logger_open(node->logger, file))
@@ -147,16 +143,16 @@ btc_node_open(btc_node_t *node, const char *prefix, unsigned int flags) {
 
   btc_log_info(node, "Opening node.");
 
-  if (!btc_chain_open(node->chain, path, flags))
+  if (!btc_chain_open(node->chain, prefix, flags))
     goto fail1;
 
-  if (!btc_mempool_open(node->mempool, path, flags))
+  if (!btc_mempool_open(node->mempool, prefix, flags))
     goto fail2;
 
   if (!btc_miner_open(node->miner, flags))
     goto fail3;
 
-  if (!btc_pool_open(node->pool, path, flags))
+  if (!btc_pool_open(node->pool, prefix, flags))
     goto fail4;
 
   if (!btc_rpc_open(node->rpc, flags))

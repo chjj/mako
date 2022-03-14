@@ -496,7 +496,7 @@ btc_addrman_open(btc_addrman_t *man, const char *file, unsigned int flags) {
   man->flags = flags;
 
   if (file != NULL) {
-    if (!btc_path_absolute(man->file, sizeof(man->file), file))
+    if (!btc_strcpy(man->file, sizeof(man->file), file))
       return 0;
 
     if (btc_addrman_read_file(man, man->file))

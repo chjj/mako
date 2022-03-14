@@ -315,7 +315,7 @@ btc_mempool_open(btc_mempool_t *mp, const char *prefix, unsigned int flags) {
   mp->flags = flags;
 
   if (prefix != NULL) {
-    if (!btc_path_resolve(mp->file, sizeof(mp->file), prefix, "mempool.dat"))
+    if (!btc_path_join(mp->file, sizeof(mp->file), prefix, "mempool.dat"))
       return 0;
   }
 
