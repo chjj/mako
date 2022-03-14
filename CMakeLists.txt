@@ -240,6 +240,7 @@ list(APPEND mako_sources src/crypto/chacha20.c
                          src/crypto/pbkdf256.c
                          src/crypto/pbkdf512.c
                          src/crypto/rand.c
+                         src/crypto/rand_env.c
                          src/crypto/rand_sys.c
                          src/crypto/ripemd160.c
                          src/crypto/sha1.c

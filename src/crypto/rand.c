@@ -56,7 +56,14 @@ typedef struct rng_s {
 static int
 rng_init(rng_t *rng) {
   memset(rng, 0, sizeof(*rng));
-  return btc_sysrand(rng->key, 32);
+
+  if (btc_sysrand(rng->key, 32))
+    return 1;
+
+  if (btc_envrand(rng->key, 32))
+    return 1;
+
+  return 0;
 }
 
 static void

@@ -16,6 +16,7 @@
 
 #define btc_getpid btc__getpid
 #define btc_sysrand btc__sysrand
+#define btc_envrand btc__envrand
 
 /*
  * Entropy
@@ -26,5 +27,8 @@ btc_getpid(void);
 
 int
 btc_sysrand(void *dst, size_t size);
+
+int
+btc_envrand(void *dst, size_t size);
 
 #endif /* BTC_SYS_H */
