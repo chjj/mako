@@ -1,5 +1,5 @@
 /*!
- * sysrand.h - system entropy source for mako
+ * rand.h - entropy sources for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
  * https://github.com/chjj/mako
  */

@@ -37,7 +37,7 @@
 #include <mako/crypto/rand.h>
 #include <mako/crypto/stream.h>
 #include <mako/util.h>
-#include "sysrand.h"
+#include "rand.h"
 #include "../internal.h"
 
 /*

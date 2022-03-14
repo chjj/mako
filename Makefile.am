@@ -91,8 +91,8 @@ noinst_HEADERS = src/bio.h                         \
                  src/crypto/asn1.h                 \
                  src/crypto/fields/secp256k1_32.h  \
                  src/crypto/fields/secp256k1_64.h  \
+                 src/crypto/rand.h                 \
                  src/crypto/secp256k1.h            \
-                 src/crypto/sysrand.h              \
                  src/impl.h                        \
                  src/internal.h                    \
                  src/io/http/http_common.h         \
@@ -128,12 +128,12 @@ mako_sources = src/crypto/chacha20.c   \
                src/crypto/pbkdf256.c   \
                src/crypto/pbkdf512.c   \
                src/crypto/rand.c       \
+               src/crypto/rand_sys.c   \
                src/crypto/ripemd160.c  \
                src/crypto/sha1.c       \
                src/crypto/sha256.c     \
                src/crypto/sha512.c     \
                src/crypto/siphash.c    \
-               src/crypto/sysrand.c    \
                src/json/json_builder.c \
                src/json/json_extra.c   \
                src/json/json_parser.c  \

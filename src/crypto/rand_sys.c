@@ -1,5 +1,5 @@
 /*!
- * sysrand.c - os/system entropy for mako
+ * rand_sys.c - os/system entropy for mako
  * Copyright (c) 2020, Christopher Jeffrey (MIT License).
  * https://github.com/chjj/mako
  *
@@ -423,7 +423,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
-#include "sysrand.h"
+#include "rand.h"
 
 /*
  * Options
