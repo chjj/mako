@@ -477,7 +477,7 @@ if(MAKO_LEGACY)
 endif()
 
 if(MAKO_HAVE_PTHREAD)
-  list(APPEND mako_defines BTC_HAVE_PTHREAD)
+  list(APPEND mako_defines BTC_PTHREAD)
 endif()
 
 if(MAKO_HAVE_RTLGENRANDOM)

@@ -20,7 +20,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
-#ifdef BTC_HAVE_PTHREAD
+#ifdef BTC_PTHREAD
 #include <pthread.h>
 #endif
 #include <unistd.h>
@@ -774,7 +774,7 @@ btc_time_sleep(int64_t msec) {
  * Threads
  */
 
-#ifdef BTC_HAVE_PTHREAD
+#ifdef BTC_PTHREAD
 
 /*
  * Mutex
@@ -930,7 +930,7 @@ btc_thread_join(btc_thread_t *thread) {
     abort(); /* LCOV_EXCL_LINE */
 }
 
-#else /* !BTC_HAVE_PTHREAD */
+#else /* !BTC_PTHREAD */
 
 /*
  * Mutex
@@ -1009,4 +1009,4 @@ btc_thread_join(btc_thread_t *thread) {
   (void)thread;
 }
 
-#endif /* !BTC_HAVE_PTHREAD */
+#endif /* !BTC_PTHREAD */

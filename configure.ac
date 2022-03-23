@@ -520,7 +520,7 @@ AS_IF([test x"$has_pread" = x'yes'], [
 ])
 
 AS_IF([test x"$has_pthread" = x'yes'], [
-  AC_DEFINE([BTC_HAVE_PTHREAD])
+  AC_DEFINE([BTC_PTHREAD])
   AC_DEFINE([LDB_PTHREAD])
 ])
 

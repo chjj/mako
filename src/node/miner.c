@@ -796,7 +796,7 @@ btc_cpuminer_stop(btc_cpuminer_t *cpu) {
 
 static void
 btc_cpuminer_setgenerate(btc_cpuminer_t *cpu, int value, int active) {
-#if defined(_WIN32) || defined(BTC_HAVE_PTHREAD)
+#if defined(_WIN32) || defined(BTC_PTHREAD)
   int mining = (value != 0);
 
   if (cpu->mining == mining)

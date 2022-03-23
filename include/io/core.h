@@ -41,7 +41,7 @@ typedef struct BTC_RTL_CRITICAL_SECTION {
 #endif
 } BTC_CRITICAL_SECTION;
 #  pragma pack(pop)
-#elif defined(BTC_HAVE_PTHREAD)
+#elif defined(BTC_PTHREAD)
 #  include <pthread.h>
 #endif
 
@@ -90,7 +90,7 @@ typedef struct btc_thread_s {
 
 #define BTC_MUTEX_INITIALIZER {0, {0, 0, 0, 0, 0, 0}}
 
-#elif defined(BTC_HAVE_PTHREAD)
+#elif defined(BTC_PTHREAD)
 
 typedef struct btc_mutex_s {
   pthread_mutex_t handle;
@@ -106,7 +106,7 @@ typedef struct btc_thread_s {
 
 #define BTC_MUTEX_INITIALIZER { PTHREAD_MUTEX_INITIALIZER }
 
-#else /* !BTC_HAVE_PTHREAD */
+#else /* !BTC_PTHREAD */
 
 typedef struct btc_mutex_s {
   void *handle;
@@ -122,7 +122,7 @@ typedef struct btc_thread_s {
 
 #define BTC_MUTEX_INITIALIZER {0}
 
-#endif /* !BTC_HAVE_PTHREAD */
+#endif /* !BTC_PTHREAD */
 
 typedef struct btc_sockaddr_s {
   int family;

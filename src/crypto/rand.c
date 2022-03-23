@@ -37,7 +37,7 @@
 
 #if defined(_WIN32)
 #  include <windows.h>
-#elif defined(BTC_HAVE_PTHREAD)
+#elif defined(BTC_PTHREAD)
 #  include <pthread.h>
 #endif
 
@@ -197,13 +197,13 @@ rng_global_unlock(void) {
 
 #else /* !_WIN32 */
 
-#ifdef BTC_HAVE_PTHREAD
+#ifdef BTC_PTHREAD
 static pthread_mutex_t rng_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
 static void
 rng_global_lock(void) {
-#ifdef BTC_HAVE_PTHREAD
+#ifdef BTC_PTHREAD
   if (pthread_mutex_lock(&rng_lock) != 0)
     btc_abort(); /* LCOV_EXCL_LINE */
 #endif
@@ -211,7 +211,7 @@ rng_global_lock(void) {
 
 static void
 rng_global_unlock(void) {
-#ifdef BTC_HAVE_PTHREAD
+#ifdef BTC_PTHREAD
   if (pthread_mutex_unlock(&rng_lock) != 0)
     btc_abort(); /* LCOV_EXCL_LINE */
 #endif
