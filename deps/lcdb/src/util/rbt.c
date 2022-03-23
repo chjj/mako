@@ -527,56 +527,27 @@ rb_iter_seek_last(rb_iter_t *iter) {
 }
 
 void
-rb_iter_seek_min(rb_iter_t *iter, rb_val_t key) {
-  const rb_node_t *root = iter->root;
-  const rb_node_t *current = NIL;
+rb_iter_seek(rb_iter_t *iter, rb_val_t key) {
+  const rb_node_t *current = iter->root;
+  const rb_node_t *result = NIL;
 
-  while (root != NIL) {
-    int cmp = iter->tree->compare(root->key, key, iter->tree->arg);
-
-    if (cmp == 0) {
-      current = root;
-      break;
-    }
-
-    if (cmp > 0) {
-      current = root;
-      root = root->left;
-    } else {
-      root = root->right;
-    }
-  }
-
-  iter->node = current;
-}
-
-void
-rb_iter_seek_max(rb_iter_t *iter, rb_val_t key) {
-  const rb_node_t *root = iter->root;
-  const rb_node_t *current = NIL;
-
-  while (root != NIL) {
-    int cmp = iter->tree->compare(root->key, key, iter->tree->arg);
+  while (current != NIL) {
+    int cmp = iter->tree->compare(key, current->key, iter->tree->arg);
 
     if (cmp == 0) {
-      current = root;
+      result = current;
       break;
     }
 
     if (cmp < 0) {
-      current = root;
-      root = root->right;
+      result = current;
+      current = current->left;
     } else {
-      root = root->left;
+      current = current->right;
     }
   }
 
-  iter->node = current;
-}
-
-void
-rb_iter_seek(rb_iter_t *iter, rb_val_t key) {
-  rb_iter_seek_min(iter, key);
+  iter->node = result;
 }
 
 int

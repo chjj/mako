@@ -17,7 +17,6 @@
 
 #include "util/arena.h"
 #include "util/atomic.h"
-#include "util/coding.h" /* don't need */
 #include "util/comparator.h"
 #include "util/internal.h"
 #include "util/random.h"
@@ -105,8 +104,6 @@ ldb_skipnode_create(ldb_skiplist_t *list, const uint8_t *key, int height) {
                + sizeof(ldb_atomic_ptr(ldb_skipnode_t)) * (height - 1));
 
   ldb_skipnode_t *node = ldb_arena_alloc_aligned(list->arena, size);
-
-  memset(node, 0, size);
 
   ldb_skipnode_init(node, key);
 

@@ -82,8 +82,6 @@ typedef rb_tree_t rb_set64_t;
 #define rb_iter_reset ldb_rb_iter_reset
 #define rb_iter_seek_first ldb_rb_iter_seek_first
 #define rb_iter_seek_last ldb_rb_iter_seek_last
-#define rb_iter_seek_min ldb_rb_iter_seek_min
-#define rb_iter_seek_max ldb_rb_iter_seek_max
 #define rb_iter_seek ldb_rb_iter_seek
 #define rb_iter_prev ldb_rb_iter_prev
 #define rb_iter_next ldb_rb_iter_next
@@ -175,12 +173,6 @@ rb_iter_seek_first(rb_iter_t *iter);
 
 void
 rb_iter_seek_last(rb_iter_t *iter);
-
-void
-rb_iter_seek_min(rb_iter_t *iter, rb_val_t key);
-
-void
-rb_iter_seek_max(rb_iter_t *iter, rb_val_t key);
 
 void
 rb_iter_seek(rb_iter_t *iter, rb_val_t key);

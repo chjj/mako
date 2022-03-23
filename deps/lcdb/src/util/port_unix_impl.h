@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h> /* getpagesize */
-/* #include <pthread.h> */
+#include <pthread.h>
 #include "internal.h"
 #include "port.h"
 
@@ -94,8 +94,6 @@ ldb_cond_wait(ldb_cond_t *cond, ldb_mutex_t *mtx) {
 
 /* Set a sane stack size for thread (from libuv). */
 #if defined(__APPLE__) || defined(__linux__)
-int getpagesize(void);
-
 static size_t
 thread_stack_size(void) {
   struct rlimit lim;

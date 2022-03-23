@@ -13,7 +13,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-/* #include <windows.h> */
+#include <windows.h>
 #include "internal.h"
 #include "port.h"
 
@@ -157,7 +157,7 @@ ldb_cond_wait(ldb_cond_t *cond, ldb_mutex_t *mtx) {
  * Thread
  */
 
-static DWORD WINAPI /* __stdcall */
+static DWORD WINAPI
 ldb_thread_run(void *ptr) {
   ldb_args_t args = *((ldb_args_t *)ptr);
 
