@@ -666,20 +666,21 @@ RtlGenRandom(PVOID RandomBuffer, ULONG RandomBufferLength);
 #    include <uuid/uuid.h> /* uuid_generate */
 #    define HAVE_UUID_GENERATE
 #  endif
-#else
-#  error "unknown platform"
 #endif
 
 #if defined(DEV_RANDOM_NAME) || defined(HAVE_EGD)
 #  include <sys/types.h> /* ssize_t, pid_t */
+#  include <sys/time.h> /* select */
 #  include <sys/stat.h> /* stat, fstat, S_* */
 #  include <fcntl.h> /* open, fcntl, O_*, FD_* */
 #  include <unistd.h> /* read, write, close, getpid */
+#  ifdef DEV_RANDOM_SELECT
+#    if !defined(FD_SETSIZE) && !defined(FD_SET)
+#      include <sys/select.h> /* select */
+#    endif
+#  endif
 #  ifdef DEV_RANDOM_POLL
 #    include <poll.h> /* poll */
-#  endif
-#  ifdef DEV_RANDOM_SELECT
-#    include <sys/time.h> /* select */
 #  endif
 #  ifdef HAVE_EGD
 #    include <sys/socket.h> /* connect, shutdown, sockaddr */
@@ -702,7 +703,7 @@ RtlGenRandom(PVOID RandomBuffer, ULONG RandomBufferLength);
 #ifdef DEV_RANDOM_NAME
 static int
 btc_retry_open(int fd) {
-  if (fd == -1) {
+  if (fd < 0) {
 #ifdef EINTR
     if (errno == EINTR)
       return 1;
@@ -766,14 +767,14 @@ btc_open(const char *name, int flags) {
 #ifdef O_CLOEXEC
   fd = open(name, flags | O_CLOEXEC);
 
-  if (fd != -1 || errno != EINVAL)
+  if (fd >= 0 || errno != EINVAL)
     return fd;
 #endif
 
   fd = open(name, flags);
 
 #ifdef FD_CLOEXEC
-  if (fd != -1) {
+  if (fd >= 0) {
     int r = fcntl(fd, F_GETFD);
 
     if (r != -1)
@@ -793,14 +794,14 @@ btc_socket(int domain, int type, int protocol) {
 #ifdef SOCK_CLOEXEC
   fd = socket(domain, type | SOCK_CLOEXEC, protocol);
 
-  if (fd != -1 || errno != EINVAL)
+  if (fd >= 0 || errno != EINVAL)
     return fd;
 #endif
 
   fd = socket(domain, type, protocol);
 
 #ifdef FD_CLOEXEC
-  if (fd != -1) {
+  if (fd >= 0) {
     int r = fcntl(fd, F_GETFD);
 
     if (r != -1)
@@ -1293,7 +1294,7 @@ btc_egdrand(void *dst, size_t size) {
   }
 #endif
 
-  fd = btc_socket(AF_UNIX, SOCK_STREAM, 0);
+  fd = btc_socket(PF_UNIX, SOCK_STREAM, 0);
 
   if (fd < 0)
     return 0;

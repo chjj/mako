@@ -244,11 +244,22 @@ btc_envrand(void *dst, size_t size) {
   {
     DWORD spc, bps, nfc, tnc;
 
-    if (GetDiskFreeSpace(NULL, &spc, &bps, &nfc, &tnc)) {
+    if (GetDiskFreeSpaceA(NULL, &spc, &bps, &nfc, &tnc)) {
       sha256_write_int(&hash, spc);
       sha256_write_int(&hash, bps);
       sha256_write_int(&hash, nfc);
       sha256_write_int(&hash, tnc);
+    }
+  }
+
+  /* Disk usage (requires Windows 95 OSR2 or later). */
+  {
+    ULARGE_INTEGER caller, total, avail;
+
+    if (GetDiskFreeSpaceExA(NULL, &caller, &total, &avail)) {
+      sha256_write_int(&hash, caller.QuadPart);
+      sha256_write_int(&hash, total.QuadPart);
+      sha256_write_int(&hash, avail.QuadPart);
     }
   }
 
