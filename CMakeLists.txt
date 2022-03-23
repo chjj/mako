@@ -433,7 +433,7 @@ list(APPEND mako_includes ${PROJECT_SOURCE_DIR}/include)
 #
 
 if(WIN32)
-  list(APPEND mako_libs kernel32 advapi32 shell32 ws2_32)
+  list(APPEND mako_libs kernel32 advapi32 ws2_32)
 else()
   list(APPEND mako_libs m)
 

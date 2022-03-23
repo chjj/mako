@@ -13,6 +13,7 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "../mako/common.h"
 
@@ -48,11 +49,7 @@ typedef struct BTC_RTL_CRITICAL_SECTION {
  * Constants
  */
 
-#if defined(_WIN32)
-#  define BTC_PATH_MAX 260
-#else
-#  define BTC_PATH_MAX 1024
-#endif
+#define BTC_PATH_MAX 1024
 
 #define BTC_INET_ADDRSTRLEN 22
 #define BTC_INET6_ADDRSTRLEN 65
@@ -166,6 +163,9 @@ btc_fs_create(const char *name);
 
 BTC_EXTERN btc_fd_t
 btc_fs_append(const char *name);
+
+BTC_EXTERN FILE *
+btc_fs_fopen(const char *name, const char *mode);
 
 BTC_EXTERN int
 btc_fs_close(btc_fd_t fd);

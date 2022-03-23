@@ -10,6 +10,7 @@
 #ifndef _WIN32
 #include <unistd.h>
 #endif
+#include <io/core.h>
 #include <node/logger.h>
 #include <mako/printf.h>
 #include <mako/util.h>
@@ -92,7 +93,7 @@ btc_logger_set_silent(btc_logger_t *logger, int silent) {
 
 int
 btc_logger_open(btc_logger_t *logger, const char *file) {
-  FILE *stream = fopen(file, "a");
+  FILE *stream = btc_fs_fopen(file, "a");
 
   if (stream == NULL)
     return 0;

@@ -10,11 +10,199 @@
 #include "tests.h"
 
 /*
- * Removal
+ * Removal (Wide)
  */
 
+static WCHAR *
+btc_basename_wide(const WCHAR *name) {
+  size_t len = lstrlenW(name);
+
+  while (len > 0) {
+    if (name[len - 1] == L'/' || name[len - 1] == L'\\')
+      break;
+
+    len--;
+  }
+
+  return (WCHAR *)name + len;
+}
+
 static int
-btc_remove(char *path, int plen) {
+btc_remove_wide(WCHAR *path, int plen) {
+  DWORD attrs = GetFileAttributesW(path);
+
+  if (attrs == INVALID_FILE_ATTRIBUTES) {
+    if (GetLastError() == ERROR_FILE_NOT_FOUND)
+      return 0;
+    return -1;
+  }
+
+  if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
+    HANDLE handle = INVALID_HANDLE_VALUE;
+    WIN32_FIND_DATAW fdata;
+    int tries = 0;
+
+    if (plen + 3 > 4096) {
+      SetLastError(ERROR_BUFFER_OVERFLOW);
+      return -1;
+    }
+
+    if (path[plen - 1] == L'\\' || path[plen - 1] == L'/') {
+      path[plen + 0] = L'*';
+      path[plen + 1] = L'\0';
+    } else {
+      path[plen + 0] = L'\\';
+      path[plen + 1] = L'*';
+      path[plen + 2] = L'\0';
+    }
+
+    handle = FindFirstFileW(path, &fdata);
+    path[plen] = L'\0';
+
+    if (handle == INVALID_HANDLE_VALUE) {
+      if (GetLastError() == ERROR_FILE_NOT_FOUND)
+        return 0;
+      return -1;
+    }
+
+    do {
+      WCHAR *name = btc_basename_wide(fdata.cFileName);
+      WCHAR *ptr = path + plen;
+
+      if (lstrcmpW(name, L".") == 0)
+        continue;
+
+      if (lstrcmpW(name, L"..") == 0)
+        continue;
+
+      if (plen + lstrlenW(name) + 2 > 4096) {
+        SetLastError(ERROR_BUFFER_OVERFLOW);
+        FindClose(handle);
+        return -1;
+      }
+
+      *ptr++ = L'/';
+
+      while (*name)
+        *ptr++ = *name++;
+
+      *ptr = L'\0';
+
+      if (btc_remove_wide(path, ptr - path) < 0) {
+        FindClose(handle);
+        path[plen] = L'\0';
+        return -1;
+      }
+
+      path[plen] = L'\0';
+    } while (FindNextFileW(handle, &fdata));
+
+    if (GetLastError() != ERROR_NO_MORE_FILES) {
+      FindClose(handle);
+      return -1;
+    }
+
+    FindClose(handle);
+
+    while (!RemoveDirectoryW(path)) {
+      if (GetLastError() == ERROR_FILE_NOT_FOUND)
+        return 0;
+
+      if (GetLastError() == ERROR_DIR_NOT_EMPTY) {
+        if (tries++ < 4) {
+          Sleep(1);
+          continue;
+        }
+      }
+
+      return -1;
+    }
+
+    return 0;
+  }
+
+  if (attrs & FILE_ATTRIBUTE_READONLY)
+    SetFileAttributesW(path, attrs & ~FILE_ATTRIBUTE_READONLY);
+
+  if (!DeleteFileW(path)) {
+    if (GetLastError() == ERROR_FILE_NOT_FOUND)
+      return 0;
+    return -1;
+  }
+
+  return 0;
+}
+
+static int
+btc_rimraf_wide(const char *path) {
+  WCHAR *tmp = malloc(4096 * sizeof(WCHAR));
+  int tries = 0;
+  int len;
+
+  if (tmp == NULL) {
+    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+    return -1;
+  }
+
+  len = MultiByteToWideChar(CP_UTF8, 0, path, -1, tmp, 4096);
+
+  if (len <= 0) {
+    free(tmp);
+    return -1;
+  }
+
+  len--;
+
+  if (len == 0) {
+    tmp[0] = L'.';
+    tmp[1] = L'\0';
+    len = 1;
+  }
+
+  while (btc_remove_wide(tmp, len) < 0) {
+    switch (GetLastError()) {
+      case ERROR_PATH_BUSY:
+      case ERROR_BUSY:
+      case ERROR_DIR_NOT_EMPTY:
+      case ERROR_ACCESS_DENIED:
+      case ERROR_TOO_MANY_OPEN_FILES:
+        if (tries++ < 3) {
+          Sleep(tries * 100);
+          continue;
+        }
+        break;
+    }
+
+    free(tmp);
+
+    return -1;
+  }
+
+  free(tmp);
+
+  return 0;
+}
+
+/*
+ * Removal (ANSI)
+ */
+
+static char *
+btc_basename_ansi(const char *name) {
+  size_t len = strlen(name);
+
+  while (len > 0) {
+    if (name[len - 1] == '/' || name[len - 1] == '\\')
+      break;
+
+    len--;
+  }
+
+  return (char *)name + len;
+}
+
+static int
+btc_remove_ansi(char *path, int plen) {
   DWORD attrs = GetFileAttributesA(path);
 
   if (attrs == INVALID_FILE_ATTRIBUTES) {
@@ -52,7 +240,7 @@ btc_remove(char *path, int plen) {
     }
 
     do {
-      char *name = fdata.cFileName;
+      char *name = btc_basename_ansi(fdata.cFileName);
       char *ptr = path + plen;
 
       if (strcmp(name, ".") == 0)
@@ -74,7 +262,7 @@ btc_remove(char *path, int plen) {
 
       *ptr = '\0';
 
-      if (btc_remove(path, ptr - path) < 0) {
+      if (btc_remove_ansi(path, ptr - path) < 0) {
         FindClose(handle);
         path[plen] = '\0';
         return -1;
@@ -119,8 +307,8 @@ btc_remove(char *path, int plen) {
   return 0;
 }
 
-int
-btc_rimraf(const char *path) {
+static int
+btc_rimraf_ansi(const char *path) {
   size_t len = strlen(path);
   char tmp[4096];
   int tries = 0;
@@ -133,11 +321,12 @@ btc_rimraf(const char *path) {
   memcpy(tmp, path, len + 1);
 
   if (len == 0) {
-    tmp[len++] = '.';
-    tmp[len] = '\0';
+    tmp[0] = '.';
+    tmp[1] = '\0';
+    len = 1;
   }
 
-  while (btc_remove(tmp, len) < 0) {
+  while (btc_remove_ansi(tmp, len) < 0) {
     switch (GetLastError()) {
       case ERROR_PATH_BUSY:
       case ERROR_BUSY:
@@ -154,4 +343,12 @@ btc_rimraf(const char *path) {
   }
 
   return 0;
+}
+
+int
+btc_rimraf(const char *path) {
+  if (GetVersion() < 0x80000000)
+    return btc_rimraf_wide(path);
+
+  return btc_rimraf_ansi(path);
 }

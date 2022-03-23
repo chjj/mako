@@ -17,13 +17,103 @@
 #include <shlobj.h>
 #include <io/core.h>
 
-#ifndef __MINGW32__
-#  pragma comment(lib, "shell32.lib") /* SHGetSpecialFolderPathA */
-#endif
+/*
+ * Types
+ */
+
+typedef struct btc_wide_s {
+  WCHAR scratch[256];
+  WCHAR *data;
+} btc_wide_t;
+
+/*
+ * Encoding Helpers
+ */
+
+static int
+btc_utf8_write(char *zp, size_t zn, const WCHAR *xp) {
+  return WideCharToMultiByte(CP_UTF8, 0, xp, -1, zp, zn, NULL, NULL) != 0;
+}
+
+static size_t
+btc_utf16_size(const char *xp) {
+  return MultiByteToWideChar(CP_UTF8, 0, xp, -1, NULL, 0);
+}
+
+static int
+btc_utf16_write(WCHAR *zp, size_t zn, const char *xp) {
+  return MultiByteToWideChar(CP_UTF8, 0, xp, -1, zp, zn) != 0;
+}
+
+/*
+ * Wide String
+ */
+
+static void
+btc_wide_init(btc_wide_t *z, size_t zn) {
+  if (zn > sizeof(z->scratch) / sizeof(WCHAR)) {
+    z->data = malloc(zn * sizeof(WCHAR));
+
+    if (z->data == NULL)
+      abort(); /* LCOV_EXCL_LINE */
+  } else {
+    z->data = z->scratch;
+  }
+}
+
+static void
+btc_wide_clear(btc_wide_t *z) {
+  if (z->data != z->scratch)
+    free(z->data);
+}
+
+static int
+btc_wide_import(btc_wide_t *z, const char *xp) {
+  size_t zn = btc_utf16_size(xp);
+
+  if (zn == 0)
+    return 0;
+
+  btc_wide_init(z, zn);
+
+  if (!btc_utf16_write(z->data, zn, xp)) {
+    btc_wide_clear(z);
+    return 0;
+  }
+
+  return 1;
+}
+
+static int
+btc_wide_export(char *zp, size_t zn, const btc_wide_t *x) {
+  return btc_utf8_write(zp, zn, x->data);
+}
 
 /*
  * Compat
  */
+
+static int
+BTCIsWindowsNT(void) {
+  /* Logic from libsodium/core.c */
+  static volatile long state = 0;
+  static DWORD version = 0;
+  long value;
+
+  while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
+    Sleep(0);
+
+  if (value == 0) {
+    version = GetVersion();
+
+    if (InterlockedExchange(&state, 2) != 1)
+      abort(); /* LCOV_EXCL_LINE */
+  } else {
+    assert(value == 2);
+  }
+
+  return version < 0x80000000;
+}
 
 static BOOL
 BTCSetFilePointerEx(HANDLE file,
@@ -58,41 +148,78 @@ BTCGetFileSizeEx(HANDLE file, LARGE_INTEGER *size) {
   return TRUE;
 }
 
+static HANDLE
+BTCCreateFile(LPCSTR filename,
+              DWORD access,
+              DWORD share,
+              LPSECURITY_ATTRIBUTES attrs,
+              DWORD disposition,
+              DWORD flags,
+              HANDLE temp) {
+  if (BTCIsWindowsNT()) {
+    btc_wide_t path;
+    HANDLE handle;
+
+    if (!btc_wide_import(&path, filename))
+      return INVALID_HANDLE_VALUE;
+
+    handle = CreateFileW(path.data,
+                         access,
+                         share,
+                         attrs,
+                         disposition,
+                         flags,
+                         temp);
+
+    btc_wide_clear(&path);
+
+    return handle;
+  }
+
+  return CreateFileA(filename,
+                     access,
+                     share,
+                     attrs,
+                     disposition,
+                     flags,
+                     temp);
+}
+
 /*
  * Filesystem
  */
 
 btc_fd_t
 btc_fs_open(const char *name) {
-  return CreateFileA(name,
-                     GENERIC_READ,
-                     FILE_SHARE_READ,
-                     NULL,
-                     OPEN_EXISTING,
-                     FILE_ATTRIBUTE_NORMAL,
-                     NULL);
+  return BTCCreateFile(name,
+                       GENERIC_READ,
+                       FILE_SHARE_READ,
+                       NULL,
+                       OPEN_EXISTING,
+                       FILE_ATTRIBUTE_NORMAL,
+                       NULL);
 }
 
 btc_fd_t
 btc_fs_create(const char *name) {
-  return CreateFileA(name,
-                     GENERIC_WRITE,
-                     0,
-                     NULL,
-                     CREATE_ALWAYS,
-                     FILE_ATTRIBUTE_NORMAL,
-                     NULL);
+  return BTCCreateFile(name,
+                       GENERIC_WRITE,
+                       0,
+                       NULL,
+                       CREATE_ALWAYS,
+                       FILE_ATTRIBUTE_NORMAL,
+                       NULL);
 }
 
 btc_fd_t
 btc_fs_append(const char *name) {
-  HANDLE handle = CreateFileA(name,
-                              GENERIC_WRITE,
-                              0,
-                              NULL,
-                              OPEN_ALWAYS,
-                              FILE_ATTRIBUTE_NORMAL,
-                              NULL);
+  HANDLE handle = BTCCreateFile(name,
+                                GENERIC_WRITE,
+                                0,
+                                NULL,
+                                OPEN_ALWAYS,
+                                FILE_ATTRIBUTE_NORMAL,
+                                NULL);
 
   if (handle == INVALID_HANDLE_VALUE)
     return INVALID_HANDLE_VALUE;
@@ -107,6 +234,31 @@ btc_fs_append(const char *name) {
   return handle;
 }
 
+FILE *
+btc_fs_fopen(const char *name, const char *mode) {
+  if (BTCIsWindowsNT()) {
+    btc_wide_t path, flags;
+    FILE *stream;
+
+    if (!btc_wide_import(&path, name))
+      return 0;
+
+    if (!btc_wide_import(&flags, mode)) {
+      btc_wide_clear(&path);
+      return 0;
+    }
+
+    stream = _wfopen(path.data, flags.data);
+
+    btc_wide_clear(&path);
+    btc_wide_clear(&flags);
+
+    return stream;
+  }
+
+  return fopen(name, mode);
+}
+
 int
 btc_fs_close(btc_fd_t fd) {
   return CloseHandle(fd) != 0;
@@ -114,14 +266,16 @@ btc_fs_close(btc_fd_t fd) {
 
 int
 btc_fs_size(const char *name, uint64_t *size) {
-  HANDLE handle = CreateFileA(name,
-                              0,
-                              0,
-                              NULL,
-                              OPEN_EXISTING,
-                              FILE_ATTRIBUTE_NORMAL,
-                              NULL);
   LARGE_INTEGER result;
+  HANDLE handle;
+
+  handle = BTCCreateFile(name,
+                         0,
+                         0,
+                         NULL,
+                         OPEN_EXISTING,
+                         FILE_ATTRIBUTE_NORMAL,
+                         NULL);
 
   if (handle == INVALID_HANDLE_VALUE)
     return 0;
@@ -140,12 +294,51 @@ btc_fs_size(const char *name, uint64_t *size) {
 
 int
 btc_fs_exists(const char *name) {
+  if (BTCIsWindowsNT()) {
+    btc_wide_t path;
+    DWORD attrs;
+
+    if (!btc_wide_import(&path, name))
+      return 0;
+
+    attrs = GetFileAttributesW(path.data);
+
+    btc_wide_clear(&path);
+
+    return attrs != INVALID_FILE_ATTRIBUTES;
+  }
+
   return GetFileAttributesA(name) != INVALID_FILE_ATTRIBUTES;
 }
 
 int
 btc_fs_rename(const char *from, const char *to) {
+  if (BTCIsWindowsNT()) {
+    btc_wide_t src, dst;
+    BOOL result;
+
+    if (!btc_wide_import(&src, from))
+      return 0;
+
+    if (!btc_wide_import(&dst, to)) {
+      btc_wide_clear(&src);
+      return 0;
+    }
+
+    /* Windows NT only. */
+    result = MoveFileExW(src.data, dst.data, MOVEFILE_REPLACE_EXISTING);
+
+    btc_wide_clear(&src);
+    btc_wide_clear(&dst);
+
+    return result != 0;
+  }
+
+  /* Windows 9x fallback (non-atomic). */
   if (!MoveFileA(from, to)) {
+    if (GetLastError() != ERROR_ALREADY_EXISTS)
+      return 0;
+
     if (!DeleteFileA(to))
       return 0;
 
@@ -158,16 +351,108 @@ btc_fs_rename(const char *from, const char *to) {
 
 int
 btc_fs_unlink(const char *name) {
+  if (BTCIsWindowsNT()) {
+    btc_wide_t path;
+    BOOL result;
+
+    if (!btc_wide_import(&path, name))
+      return 0;
+
+    result = DeleteFileW(path.data);
+
+    btc_wide_clear(&path);
+
+    return result != 0;
+  }
+
   return DeleteFileA(name) != 0;
 }
 
 int
 btc_fs_mkdir(const char *name) {
+  if (BTCIsWindowsNT()) {
+    btc_wide_t path;
+    BOOL result;
+
+    if (!btc_wide_import(&path, name))
+      return 0;
+
+    result = CreateDirectoryW(path.data, NULL);
+
+    btc_wide_clear(&path);
+
+    return result != 0;
+  }
+
   return CreateDirectoryA(name, NULL) != 0;
 }
 
-int
-btc_fs_mkdirp(const char *name) {
+static int
+btc_fs_mkdirp_wide(const char *name) {
+  size_t len = btc_utf16_size(name);
+  btc_wide_t tmp;
+  WCHAR *path;
+  size_t i;
+
+  if (len == 0)
+    return 0;
+
+  btc_wide_init(&tmp, len);
+
+  if (!btc_utf16_write(tmp.data, len, name))
+    return 0;
+
+  path = tmp.data;
+
+  for (i = 0; i < len; i++) {
+    if (name[i] == L'/')
+      path[i] = L'\\';
+    else
+      path[i] = name[i];
+  }
+
+  i = 0;
+
+  if ((path[0] >= L'A' && path[0] <= L'Z')
+      || (path[0] >= L'a' && path[0] <= L'z')) {
+    if (path[1] == L':' && path[2] == L'\0') {
+      btc_wide_clear(&tmp);
+      return 1;
+    }
+
+    if (path[1] == L':' && path[2] == L'\\')
+      i += 3;
+  }
+
+  while (path[i] == L'\\')
+    i += 1;
+
+  for (; i < len; i++) {
+    if (path[i] != L'\\' && path[i] != L'\0')
+      continue;
+
+    if (i > 0 && path[i - 1] == L'\\')
+      continue;
+
+    path[i] = L'\0';
+
+    if (!CreateDirectoryW(path, NULL)) {
+      if (GetLastError() != ERROR_ALREADY_EXISTS) {
+        btc_wide_clear(&tmp);
+        return 0;
+      }
+    }
+
+    path[i] = L'\\';
+  }
+
+  btc_wide_clear(&tmp);
+
+  return 1;
+}
+
+static int
+btc_fs_mkdirp_ansi(const char *name) {
   size_t len = strlen(name);
   char path[MAX_PATH];
   size_t i;
@@ -217,7 +502,29 @@ btc_fs_mkdirp(const char *name) {
 }
 
 int
+btc_fs_mkdirp(const char *name) {
+  if (BTCIsWindowsNT())
+    return btc_fs_mkdirp_wide(name);
+
+  return btc_fs_mkdirp_ansi(name);
+}
+
+int
 btc_fs_rmdir(const char *name) {
+  if (BTCIsWindowsNT()) {
+    btc_wide_t path;
+    BOOL result;
+
+    if (!btc_wide_import(&path, name))
+      return 0;
+
+    result = RemoveDirectoryW(path.data);
+
+    btc_wide_clear(&path);
+
+    return result != 0;
+  }
+
   return RemoveDirectoryA(name) != 0;
 }
 
@@ -278,13 +585,13 @@ btc_fs_fsync(btc_fd_t fd) {
 
 btc_fd_t
 btc_fs_lock(const char *name) {
-  HANDLE handle = CreateFileA(name,
-                              GENERIC_READ | GENERIC_WRITE,
-                              FILE_SHARE_READ,
-                              NULL,
-                              OPEN_ALWAYS,
-                              FILE_ATTRIBUTE_NORMAL,
-                              NULL);
+  HANDLE handle = BTCCreateFile(name,
+                                GENERIC_READ | GENERIC_WRITE,
+                                FILE_SHARE_READ,
+                                NULL,
+                                OPEN_ALWAYS,
+                                FILE_ATTRIBUTE_NORMAL,
+                                NULL);
 
   if (handle == INVALID_HANDLE_VALUE)
     return INVALID_HANDLE_VALUE;
@@ -312,18 +619,31 @@ btc_fs_unlock(btc_fd_t fd) {
 
 int
 btc_path_absolute(char *buf, size_t size, const char *name) {
-  DWORD len = GetFullPathNameA(name, size, buf, NULL);
-  DWORD i;
+  DWORD len;
 
-  if (len < 1 || len >= size)
-    return 0;
+  if (BTCIsWindowsNT()) {
+    btc_wide_t path, tmp;
+    int ret = 0;
 
-  for (i = 0; i < len; i++) {
-    if (buf[i] == '/')
-      buf[i] = '\\';
+    if (!btc_wide_import(&path, name))
+      return 0;
+
+    btc_wide_init(&tmp, size * 4);
+
+    len = GetFullPathNameW(path.data, size * 4, tmp.data, NULL);
+
+    if (len > 0 && len < size * 4)
+      ret = btc_wide_export(buf, size, &tmp);
+
+    btc_wide_clear(&path);
+    btc_wide_clear(&tmp);
+
+    return ret;
   }
 
-  return 1;
+  len = GetFullPathNameA(name, size, buf, NULL);
+
+  return len > 0 && len < size;
 }
 
 /*
@@ -374,6 +694,7 @@ btc_ps_onterm(void (*handler)(void *), void *arg) {
 
 size_t
 btc_ps_rss(void) {
+  /* GetProcessMemoryInfo is NT-only. */
   return 0;
 }
 
@@ -390,12 +711,59 @@ btc_sys_numcpu(void) {
 
 int
 btc_sys_datadir(char *buf, size_t size, const char *name) {
-  char path[MAX_PATH];
+  static BOOL (WINAPI *GetSpecialFolderPathW)(HWND, LPWSTR, int, BOOL) = NULL;
+  static BOOL (WINAPI *GetSpecialFolderPathA)(HWND, LPSTR, int, BOOL) = NULL;
+  static volatile long state = 0;
+  char path[MAX_PATH * 4];
+  long value;
 
-  memset(path, 0, sizeof(path));
+  /* Logic from libsodium/core.c */
+  while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
+    Sleep(0);
 
-  if (!SHGetSpecialFolderPathA(NULL, path, CSIDL_APPDATA, FALSE))
-    return 0;
+  if (value == 0) {
+    HINSTANCE handle = LoadLibraryA("shell32.dll");
+
+    if (handle != NULL) {
+      *((FARPROC *)&GetSpecialFolderPathW) =
+        GetProcAddress(handle, "SHGetSpecialFolderPathW");
+
+      *((FARPROC *)&GetSpecialFolderPathA) =
+        GetProcAddress(handle, "SHGetSpecialFolderPathA");
+    }
+
+    if (InterlockedExchange(&state, 2) != 1)
+      abort(); /* LCOV_EXCL_LINE */
+  } else {
+    assert(value == 2);
+  }
+
+  if (BTCIsWindowsNT()) {
+    WCHAR wpath[MAX_PATH];
+
+    wpath[0] = 0;
+
+    if (GetSpecialFolderPathW == NULL
+        || !GetSpecialFolderPathW(NULL, wpath, CSIDL_APPDATA, FALSE)) {
+      DWORD len = GetEnvironmentVariableW(L"USERPROFILE", wpath, MAX_PATH);
+
+      if (len == 0 || len >= MAX_PATH)
+        return 0;
+    }
+
+    if (!btc_utf8_write(path, sizeof(path), wpath))
+      return 0;
+  } else {
+    path[0] = 0;
+
+    if (GetSpecialFolderPathA == NULL
+        || !GetSpecialFolderPathA(NULL, path, CSIDL_APPDATA, FALSE)) {
+      DWORD len = GetEnvironmentVariableA("USERPROFILE", path, MAX_PATH);
+
+      if (len == 0 || len >= MAX_PATH)
+        return 0;
+    }
+  }
 
   if (strlen(path) + strlen(name) + 2 > size)
     return 0;
@@ -413,7 +781,7 @@ static double
 btc_time_qpf(void) {
   /* Logic from libsodium/core.c */
   static volatile long state = 0;
-  static double freq_inv = 1.0;
+  static double freq_inv = 0.0;
   LARGE_INTEGER freq;
   long value;
 
@@ -421,13 +789,8 @@ btc_time_qpf(void) {
     Sleep(0);
 
   if (value == 0) {
-    if (!QueryPerformanceFrequency(&freq))
-      abort(); /* LCOV_EXCL_LINE */
-
-    if (freq.QuadPart == 0)
-      abort(); /* LCOV_EXCL_LINE */
-
-    freq_inv = 1.0 / (double)freq.QuadPart;
+    if (QueryPerformanceFrequency(&freq) && freq.QuadPart > 0)
+      freq_inv = 1.0 / (double)freq.QuadPart;
 
     if (InterlockedExchange(&state, 2) != 1)
       abort(); /* LCOV_EXCL_LINE */
@@ -442,6 +805,31 @@ static int64_t
 btc_time_qpc(double scale) {
   double freq_inv = btc_time_qpf();
   LARGE_INTEGER ctr;
+
+  if (freq_inv == 0.0) {
+    static const uint64_t epoch = UINT64_C(116444736000000000);
+    ULARGE_INTEGER ul;
+    uint64_t units;
+    FILETIME ft;
+
+    GetSystemTimeAsFileTime(&ft);
+
+    ul.LowPart = ft.dwLowDateTime;
+    ul.HighPart = ft.dwHighDateTime;
+
+    units = ul.QuadPart - epoch;
+
+    if (scale == 1.0)
+      return units / 10000000;
+
+    if (scale == 1000.0)
+      return units / 10000;
+
+    if (scale == 1000000.0)
+      return units / 10;
+
+    return units * 100;
+  }
 
   if (!QueryPerformanceCounter(&ctr))
     abort(); /* LCOV_EXCL_LINE */

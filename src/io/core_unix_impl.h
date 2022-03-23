@@ -149,6 +149,29 @@ btc_fs_append(const char *name) {
   return btc_open(name, O_WRONLY | O_CREAT | O_APPEND, 0644);
 }
 
+FILE *
+btc_fs_fopen(const char *name, const char *mode) {
+  FILE *stream;
+  int fd = -1;
+
+  if (strcmp(mode, "r") == 0)
+    fd = btc_fs_open(name);
+  else if (strcmp(mode, "w") == 0)
+    fd = btc_fs_create(name);
+  else if (strcmp(mode, "a") == 0)
+    fd = btc_fs_append(name);
+
+  if (fd < 0)
+    return NULL;
+
+  stream = fdopen(fd, mode);
+
+  if (stream == NULL)
+    close(fd);
+
+  return stream;
+}
+
 int
 btc_fs_close(btc_fd_t fd) {
   return close(fd) == 0;

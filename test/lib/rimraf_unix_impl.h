@@ -8,8 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
 #include "tests.h"
@@ -212,8 +212,9 @@ btc_rimraf(const char *path) {
   memcpy(tmp, path, len + 1);
 
   if (len == 0) {
-    tmp[len++] = '.';
-    tmp[len] = '\0';
+    tmp[0] = '.';
+    tmp[1] = '\0';
+    len = 1;
   }
 
   while (btc_remove(tmp, len) < 0) {
