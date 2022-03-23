@@ -272,20 +272,13 @@ prefix ## _barrier(type x) {      \
  */
 
 #define lengthof(x) (sizeof(x) / sizeof((x)[0]))
+#define BTC_MIN(x, y) ((x) < (y) ? (x) : (y))
+#define BTC_MAX(x, y) ((x) > (y) ? (x) : (y))
+#define BTC_ABS(x) ((x) < 0 ? -(x) : (x))
 
 /*
  * Helpers
  */
-
-#define btc_assert_fail btc__assert_fail
-#define btc_abort btc__abort
-#define btc_malloc btc__malloc
-#define btc_realloc btc__realloc
-#define btc_free btc__free
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 BTC_EXTERN BTC_NORETURN void
 btc_assert_fail(const char *file, int line, const char *expr);
@@ -301,9 +294,5 @@ btc_realloc(void *ptr, size_t size);
 
 BTC_EXTERN void
 btc_free(void *ptr);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* BTC_INTERNAL_H */
