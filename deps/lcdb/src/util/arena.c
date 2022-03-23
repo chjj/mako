@@ -119,14 +119,15 @@ ldb_arena_alloc_aligned(ldb_arena_t *arena, size_t size) {
 
   if (needed <= arena->left) {
     result = arena->data + slop;
+
     arena->data += needed;
     arena->left -= needed;
+
+    assert(((uintptr_t)result & (align - 1)) == 0);
   } else {
     /* ldb_arena_alloc_fallback always returns aligned memory. */
     result = ldb_arena_alloc_fallback(arena, size);
   }
-
-  assert(((uintptr_t)result & (align - 1)) == 0);
 
   return result;
 }

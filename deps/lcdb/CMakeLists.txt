@@ -116,7 +116,7 @@ check_symbol_exists(pread unistd.h LDB_HAVE_PREAD)
 set(LDB_HAVE_PTHREAD 0)
 
 if(CMAKE_C_COMPILER_ID MATCHES "Watcom$")
-  set(LDB_HAVE_PTHREAD 1)
+  # Nothing.
 elseif(NOT WIN32 AND NOT WASI AND NOT EMSCRIPTEN)
   set(THREADS_PREFER_PTHREAD_FLAG ON)
 
@@ -302,7 +302,7 @@ list(APPEND ldb_includes ${PROJECT_SOURCE_DIR}/include)
 
 if(WIN32)
   list(APPEND ldb_libs kernel32)
-elseif(LDB_HAVE_PTHREAD AND NOT CMAKE_C_COMPILER_ID MATCHES "Watcom$")
+elseif(LDB_HAVE_PTHREAD)
   list(APPEND ldb_libs Threads::Threads)
 endif()
 

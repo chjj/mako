@@ -79,11 +79,15 @@
 #endif
 
 #if defined(__linux__) || defined(__sun) || defined(__NetBSD__)
-#  define HAVE_FDATASYNC
+#  ifdef LDB_HAVE_FDATASYNC
+#    define HAVE_FDATASYNC
+#  endif
 #endif
 
 #if !defined(__WATCOMC__) && !defined(__DJGPP__)
-#  define HAVE_PREAD
+#  ifdef LDB_HAVE_PREAD
+#    define HAVE_PREAD
+#  endif
 #endif
 
 /*
