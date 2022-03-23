@@ -172,8 +172,12 @@ btc_workers_create(int threads, int max_batch) {
   btc_thread_t thread;
   int i;
 
+#if defined(_WIN32) || defined(BTC_HAVE_PTHREAD)
   if (threads < 2)
     threads = 2;
+#else
+  threads = 0;
+#endif
 
   if (max_batch < 1)
     max_batch = 1;
@@ -225,15 +229,22 @@ btc_workers_destroy(btc_workers_t *pool) {
 
 void
 btc_workers_add(btc_workers_t *pool, btc_work_f *func, void *arg) {
+#if defined(_WIN32) || defined(BTC_HAVE_PTHREAD)
   btc_mutex_lock(&pool->mutex);
   btc_workq_push(&pool->queue, func, arg);
   pool->left++;
   btc_cond_signal(&pool->worker);
   btc_mutex_unlock(&pool->mutex);
+#else
+  (void)pool;
+
+  func(arg);
+#endif
 }
 
 void
 btc_workers_batch(btc_workers_t *pool, btc_workq_t *batch) {
+#if defined(_WIN32) || defined(BTC_HAVE_PTHREAD)
   int length = batch->length;
 
   if (length == 0)
@@ -251,6 +262,17 @@ btc_workers_batch(btc_workers_t *pool, btc_workq_t *batch) {
     btc_cond_broadcast(&pool->worker);
 
   btc_mutex_unlock(&pool->mutex);
+#else
+  btc_work_t *work, *next;
+
+  (void)btc_workq_concat;
+  (void)pool;
+
+  for (work = batch->head; work != NULL; work = next)
+    next = btc_work_execute(work);
+
+  btc_workq_init(batch);
+#endif
 }
 
 void
