@@ -187,11 +187,13 @@ has_64bit=no
 has_asm=no
 has_big=no
 has_clock=no
+has_fdatasync=no
 has_getaddrinfo=no
 has_gethostname=no
 has_getifaddrs=no
 has_inet6=no
 has_int128=no
+has_pread=no
 has_pthread=no
 has_rtlgenrandom=no
 has_zlib=no
@@ -266,6 +268,19 @@ AC_LINK_IFELSE([
   has_clock=yes
 ])
 AC_MSG_RESULT([$has_clock])
+
+AC_MSG_CHECKING(for fdatasync support)
+AC_LINK_IFELSE([
+  AC_LANG_SOURCE([[
+#   include <unistd.h>
+    int main(void) {
+      return fdatasync(1);
+    }
+  ]])
+], [
+  has_fdatasync=yes
+])
+AC_MSG_RESULT([$has_fdatasync])
 
 AS_IF([test x"$MINGW" = x''], [
   AC_MSG_CHECKING(for getaddrinfo support)
@@ -371,6 +386,20 @@ AS_IF([test x"$enable_int128" = x'yes'], [
   AC_MSG_RESULT([$has_int128])
 ])
 
+AC_MSG_CHECKING(for pread support)
+AC_LINK_IFELSE([
+  AC_LANG_SOURCE([[
+#   include <unistd.h>
+    int main(void) {
+      char buf[32];
+      return pread(0, buf, sizeof(buf), 0);
+    }
+  ]])
+], [
+  has_pread=yes
+])
+AC_MSG_RESULT([$has_pread])
+
 AS_IF([test x"$MINGW$WASI$EMSCRIPTEN" = x''], [
   AC_CHECK_DEFINE([__WATCOMC__], [], [
     AX_PTHREAD([has_pthread=yes])
@@ -458,6 +487,10 @@ AS_IF([test x"$enable_debug" = x'yes'], [
   AC_DEFINE([BTC_DEBUG])
 ])
 
+AS_IF([test x"$has_fdatasync" = x'yes'], [
+  AC_DEFINE([LDB_HAVE_FDATASYNC])
+])
+
 AS_IF([test x"$has_getaddrinfo" = x'yes'], [
   AC_DEFINE([BTC_HAVE_GETADDRINFO])
 ])
@@ -482,8 +515,13 @@ AS_IF([test x"$enable_legacy" = x'yes'], [
   AC_DEFINE([BTC_WSOCK32])
 ])
 
+AS_IF([test x"$has_pread" = x'yes'], [
+  AC_DEFINE([LDB_HAVE_PREAD])
+])
+
 AS_IF([test x"$has_pthread" = x'yes'], [
   AC_DEFINE([BTC_HAVE_PTHREAD])
+  AC_DEFINE([LDB_PTHREAD])
 ])
 
 AS_IF([test x"$has_rtlgenrandom" = x'yes'], [
@@ -592,6 +630,7 @@ AC_MSG_NOTICE([Build Options:
   coverage     = $enable_coverage
   debug        = $enable_debug
   emscripten   = $EMSCRIPTEN
+  fdatasync    = $has_fdatasync
   getaddrinfo  = $has_getaddrinfo
   gethostname  = $has_gethostname
   getifaddrs   = $has_getifaddrs
@@ -601,6 +640,7 @@ AC_MSG_NOTICE([Build Options:
   leveldb      = $enable_leveldb
   node         = $enable_node
   portable     = $enable_portable
+  pread        = $has_pread
   pthread      = $has_pthread
   rtlgenrandom = $has_rtlgenrandom
   tests        = $enable_tests
