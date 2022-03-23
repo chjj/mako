@@ -193,6 +193,7 @@ has_getifaddrs=no
 has_inet6=no
 has_int128=no
 has_pthread=no
+has_rtlgenrandom=no
 has_zlib=no
 
 AC_MSG_CHECKING(for 64-bit support)
@@ -332,15 +333,19 @@ AS_IF([test x"$MINGW" = x''], [
   AC_MSG_RESULT([$has_inet6])
 ], [
   AS_IF([test x"$enable_legacy" = x'yes' -o x"$enable_portable" = x'yes'], [
+    # NT 4.0 features.
     has_getaddrinfo=no
     has_gethostname=yes
     has_getifaddrs=no
     has_inet6=no
+    has_rtlgenrandom=no
   ], [
+    # XP features.
     has_getaddrinfo=yes
     has_gethostname=yes
     has_getifaddrs=no
     has_inet6=yes
+    has_rtlgenrandom=yes
   ])
 ])
 
@@ -481,6 +486,10 @@ AS_IF([test x"$has_pthread" = x'yes'], [
   AC_DEFINE([BTC_HAVE_PTHREAD])
 ])
 
+AS_IF([test x"$has_rtlgenrandom" = x'yes'], [
+  AC_DEFINE([BTC_HAVE_RTLGENRANDOM])
+])
+
 AS_IF([test x"$has_zlib" = x'yes'], [
   AC_DEFINE([BTC_HAVE_ZLIB])
 ])
@@ -576,35 +585,36 @@ AC_OUTPUT
 
 AC_MSG_NOTICE([Build Options:
 
-  64-bit      = $has_64bit
-  asm         = $has_asm
-  big         = $has_big
-  clock       = $has_clock
-  coverage    = $enable_coverage
-  debug       = $enable_debug
-  emscripten  = $EMSCRIPTEN
-  getaddrinfo = $has_getaddrinfo
-  gethostname = $has_gethostname
-  getifaddrs  = $has_getifaddrs
-  inet6       = $has_inet6
-  int128      = $has_int128
-  legacy      = $enable_legacy
-  leveldb     = $enable_leveldb
-  node        = $enable_node
-  portable    = $enable_portable
-  pthread     = $has_pthread
-  tests       = $enable_tests
-  tls         = $has_tls
-  wasi        = $WASI
-  zlib        = $has_zlib
+  64-bit       = $has_64bit
+  asm          = $has_asm
+  big          = $has_big
+  clock        = $has_clock
+  coverage     = $enable_coverage
+  debug        = $enable_debug
+  emscripten   = $EMSCRIPTEN
+  getaddrinfo  = $has_getaddrinfo
+  gethostname  = $has_gethostname
+  getifaddrs   = $has_getifaddrs
+  inet6        = $has_inet6
+  int128       = $has_int128
+  legacy       = $enable_legacy
+  leveldb      = $enable_leveldb
+  node         = $enable_node
+  portable     = $enable_portable
+  pthread      = $has_pthread
+  rtlgenrandom = $has_rtlgenrandom
+  tests        = $enable_tests
+  tls          = $has_tls
+  wasi         = $WASI
+  zlib         = $has_zlib
 
-  PREFIX      = $prefix
-  HOST        = $host
-  CC          = $CC
-  CPPFLAGS    = $CPPFLAGS
-  CFLAGS      = $CFLAGS
-  WARN_FLAGS  = $WARN_FLAGS
-  LDFLAGS     = $LDFLAGS
-  DEFS        = $DEFS
-  LIBS        = $LIBS
+  PREFIX       = $prefix
+  HOST         = $host
+  CC           = $CC
+  CPPFLAGS     = $CPPFLAGS
+  CFLAGS       = $CFLAGS
+  WARN_FLAGS   = $WARN_FLAGS
+  LDFLAGS      = $LDFLAGS
+  DEFS         = $DEFS
+  LIBS         = $LIBS
 ])

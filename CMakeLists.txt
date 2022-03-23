@@ -212,17 +212,23 @@ if(NOT WIN32)
       return 0;
     }
   ]=] MAKO_HAVE_INET6)
+
+  set(MAKO_HAVE_RTLGENRANDOM 0)
 else()
   if(MAKO_LEGACY OR MAKO_PORTABLE)
+    # NT 4.0 features.
     set(MAKO_HAVE_GETADDRINFO 0)
     set(MAKO_HAVE_GETHOSTNAME 1)
     set(MAKO_HAVE_GETIFADDRS 0)
     set(MAKO_HAVE_INET6 0)
+    set(MAKO_HAVE_RTLGENRANDOM 0)
   else()
+    # XP features.
     set(MAKO_HAVE_GETADDRINFO 1)
     set(MAKO_HAVE_GETHOSTNAME 1)
     set(MAKO_HAVE_GETIFADDRS 0)
     set(MAKO_HAVE_INET6 1)
+    set(MAKO_HAVE_RTLGENRANDOM 1)
   endif()
 endif()
 
@@ -472,6 +478,10 @@ endif()
 
 if(MAKO_HAVE_PTHREAD)
   list(APPEND mako_defines BTC_HAVE_PTHREAD)
+endif()
+
+if(MAKO_HAVE_RTLGENRANDOM)
+  list(APPEND mako_defines BTC_HAVE_RTLGENRANDOM)
 endif()
 
 if(MAKO_HAVE_ZLIB)
