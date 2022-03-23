@@ -305,7 +305,7 @@ dns_resolve(char **addrs, const char *name) {
   if (!dns_name_verify(name))
     return 0;
 
-  fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
   if (fd < 0)
     return 0;
