@@ -103,7 +103,7 @@
 
 #define CHECK_ALWAYS(expr) do { \
   if (UNLIKELY(!(expr)))        \
-    btc__abort();               \
+    btc_abort();                \
 } while (0)
 
 #define CHECK_NEVER(expr) do { \
@@ -124,9 +124,9 @@
 #undef ASSERT_NEVER
 #undef ASSERT
 
-#define ASSERT_ALWAYS(expr) do {                 \
-  if (UNLIKELY(!(expr)))                         \
-    btc__assert_fail(__FILE__, __LINE__, #expr); \
+#define ASSERT_ALWAYS(expr) do {                \
+  if (UNLIKELY(!(expr)))                        \
+    btc_assert_fail(__FILE__, __LINE__, #expr); \
 } while (0)
 
 #define ASSERT_NEVER(expr) do { \
