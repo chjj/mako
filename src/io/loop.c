@@ -13,14 +13,23 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(_WIN32)
+#ifdef _WIN32
 #  include <stdio.h>
-#  include <winsock2.h>
-#  include <ws2tcpip.h>
-#  include <windows.h>
-#  ifndef __MINGW32__
-#    pragma comment(lib, "ws2_32.lib")
+#  ifdef BTC_WSOCK32 /* Windows 95 & NT 3.51 (1995) */
+#    include <winsock.h>
+#    ifndef __MINGW32__
+#      pragma comment(lib, "wsock32.lib")
+#    endif
+#  else /* NT 4.0 (1996) */
+#    include <winsock2.h>
+#    ifdef BTC_HAVE_INET6 /* Windows XP (2001) */
+#      include <ws2tcpip.h>
+#    endif
+#    ifndef __MINGW32__
+#      pragma comment(lib, "ws2_32.lib")
+#    endif
 #  endif
+#  include <windows.h>
 #else
 #  include <sys/types.h>
 #  include <sys/time.h>
@@ -31,7 +40,6 @@
 #  include <netinet/in.h>
 #  include <netinet/tcp.h>
 #  include <arpa/inet.h>
-#  include <sys/un.h>
 #  include <fcntl.h>
 #  include <unistd.h>
 #endif
@@ -87,6 +95,10 @@ typedef int btc_sockopt_t;
 #  define BTC_ETIMEDOUT ETIMEDOUT
 #  define BTC_EINPROGRESS EINPROGRESS
 #  define btc_closesocket close
+#endif
+
+#ifndef BTC_HAVE_INET6
+#  define sockaddr_storage sockaddr_in
 #endif
 
 /*
@@ -355,11 +367,9 @@ sa_domain(const struct sockaddr *addr) {
   switch (addr->sa_family) {
     case AF_INET:
       return PF_INET;
+#ifdef BTC_HAVE_INET6
     case AF_INET6:
       return PF_INET6;
-#ifndef _WIN32
-    case AF_UNIX:
-      return PF_UNIX;
 #endif
     default:
       return PF_UNSPEC;
@@ -369,26 +379,14 @@ sa_domain(const struct sockaddr *addr) {
 static btc_socklen_t
 sa_addrlen(const struct sockaddr *addr) {
   switch (addr->sa_family) {
-    case AF_INET: {
+    case AF_INET:
       return sizeof(struct sockaddr_in);
-    }
-
-    case AF_INET6: {
+#ifdef BTC_HAVE_INET6
+    case AF_INET6:
       return sizeof(struct sockaddr_in6);
-    }
-
-#ifndef _WIN32
-    case AF_UNIX: {
-      const struct sockaddr_un *un = (const struct sockaddr_un *)addr;
-      size_t len = offsetof(struct sockaddr_un, sun_path);
-
-      return len + strlen(un->sun_path);
-    }
 #endif
-
-    default: {
+    default:
       return 0;
-    }
   }
 }
 
@@ -799,6 +797,7 @@ static int
 btc_socket_listen(btc_socket_t *server, const btc_sockaddr_t *addr) {
   btc_socklen_t addrlen;
   btc_sockfd_t fd;
+  int backlog;
 
   if (!btc_socket_setaddr(server, addr))
     return 0;
@@ -818,7 +817,12 @@ btc_socket_listen(btc_socket_t *server, const btc_sockaddr_t *addr) {
     return 0;
   }
 
-  if (listen(fd, 511) == BTC_SOCKET_ERROR) { /* Could use SOMAXCONN. */
+  backlog = SOMAXCONN;
+
+  if (backlog > 511)
+    backlog = 511;
+
+  if (listen(fd, backlog) == BTC_SOCKET_ERROR) {
     server->loop->error = btc_errno;
     btc_closesocket(fd);
     return 0;
@@ -951,12 +955,9 @@ btc_socket_talk(btc_socket_t *socket, int family) {
     case BTC_AF_INET:
       domain = PF_INET;
       break;
+#ifdef BTC_HAVE_INET6
     case BTC_AF_INET6:
       domain = PF_INET6;
-      break;
-#ifndef _WIN32
-    case BTC_AF_UNIX:
-      domain = PF_UNIX;
       break;
 #endif
     default:
@@ -1371,6 +1372,8 @@ btc_loop_strerror(btc_loop_t *loop) {
         | FORMAT_MESSAGE_IGNORE_INSERTS
         | FORMAT_MESSAGE_MAX_WIDTH_MASK;
 
+  /* Winsock error messages only available on Windows 2000 and up. */
+  /* See: https://tangentsoft.net/wskfaq/articles/history.html */
   length = FormatMessageA(flags,
                           NULL,
                           loop->error,

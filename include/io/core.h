@@ -57,7 +57,6 @@ typedef struct BTC_RTL_CRITICAL_SECTION {
 #define BTC_AF_UNSPEC 0
 #define BTC_AF_INET 4
 #define BTC_AF_INET6 6
-#define BTC_AF_UNIX 10
 
 /*
  * Types
@@ -128,7 +127,6 @@ typedef struct btc_thread_s {
 typedef struct btc_sockaddr_s {
   int family;
   uint8_t raw[32];
-  char path[108];
   int port;
   struct btc_sockaddr_s *next;
 } btc_sockaddr_t;

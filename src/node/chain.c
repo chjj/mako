@@ -401,8 +401,10 @@ btc_chain_open(btc_chain_t *chain, const char *prefix, unsigned int flags) {
   if (!btc_chaindb_open(chain->db, prefix, flags))
     return 0;
 
+#if defined(_WIN32) || defined(BTC_HAVE_PTHREAD)
   if (chain->threads > 0)
     chain->workers = btc_workers_create(chain->threads, 128);
+#endif
 
   chain->tip = (btc_entry_t *)btc_chaindb_tail(chain->db);
   chain->height = chain->tip->height;

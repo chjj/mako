@@ -92,6 +92,14 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_ENABLE(
+  legacy,
+  AS_HELP_STRING([--enable-legacy],
+                 [use legacy winsock [default=no]]),
+  [enable_legacy=$enableval],
+  [enable_legacy=no]
+)
+
+AC_ARG_ENABLE(
   leveldb,
   AS_HELP_STRING([--enable-leveldb],
                  [use leveldb [default=no]]),
@@ -105,6 +113,14 @@ AC_ARG_ENABLE(
                  [build the fullnode [default=yes]]),
   [enable_node=$enableval],
   [enable_node=yes]
+)
+
+AC_ARG_ENABLE(
+  portable,
+  AS_HELP_STRING([--enable-portable],
+                 [be as portable as possible [default=no]]),
+  [enable_portable=$enableval],
+  [enable_portable=no]
 )
 
 AC_ARG_ENABLE(
@@ -171,6 +187,10 @@ has_64bit=no
 has_asm=no
 has_big=no
 has_clock=no
+has_getaddrinfo=no
+has_gethostname=no
+has_getifaddrs=no
+has_inet6=no
 has_int128=no
 has_pthread=no
 has_zlib=no
@@ -246,6 +266,84 @@ AC_LINK_IFELSE([
 ])
 AC_MSG_RESULT([$has_clock])
 
+AS_IF([test x"$MINGW" = x''], [
+  AC_MSG_CHECKING(for getaddrinfo support)
+  AC_LINK_IFELSE([
+    AC_LANG_SOURCE([[
+#     include <stddef.h>
+#     include <sys/types.h>
+#     include <sys/socket.h>
+#     include <netdb.h>
+      int main(void) {
+        struct addrinfo *info;
+        return getaddrinfo("localhost", NULL, NULL, &info);
+      }
+    ]])
+  ], [
+    has_getaddrinfo=yes
+  ])
+  AC_MSG_RESULT([$has_getaddrinfo])
+
+  AC_MSG_CHECKING(for gethostname support)
+  AC_LINK_IFELSE([
+    AC_LANG_SOURCE([[
+#     include <unistd.h>
+      int main(void) {
+        char name[256];
+        return gethostname(name, sizeof(name));
+      }
+    ]])
+  ], [
+    has_gethostname=yes
+  ])
+  AC_MSG_RESULT([$has_gethostname])
+
+  AC_MSG_CHECKING(for getifaddrs support)
+  AC_LINK_IFELSE([
+    AC_LANG_SOURCE([[
+#     include <sys/types.h>
+#     include <ifaddrs.h>
+#     include <net/if.h>
+      int main(void) {
+        struct ifaddrs *addrs;
+        return getifaddrs(&addrs);
+      }
+    ]])
+  ], [
+    has_getifaddrs=yes
+  ])
+  AC_MSG_RESULT([$has_getifaddrs])
+
+  AC_MSG_CHECKING(for inet6 support)
+  AC_LINK_IFELSE([
+    AC_LANG_SOURCE([[
+#     include <sys/types.h>
+#     include <sys/socket.h>
+#     include <netinet/in.h>
+      int main(void) {
+        struct sockaddr_storage storage;
+        struct sockaddr_in6 sai6;
+        return 0;
+      }
+   ]])
+  ], [
+    has_inet6=yes
+  ])
+  AC_MSG_RESULT([$has_inet6])
+], [
+  AS_IF([test x"$enable_legacy" = x'yes' -o x"$enable_portable" = x'yes'], [
+    has_getaddrinfo=no
+    has_gethostname=yes
+    has_getifaddrs=no
+    has_inet6=no
+  ], [
+    has_getaddrinfo=yes
+    has_gethostname=yes
+    has_getifaddrs=no
+    has_inet6=yes
+  ])
+])
+
 AS_IF([test x"$enable_int128" = x'yes'], [
   AC_MSG_CHECKING(for int128 support)
   AC_LINK_IFELSE([
@@ -269,7 +367,9 @@ AS_IF([test x"$enable_int128" = x'yes'], [
 ])
 
 AS_IF([test x"$MINGW$WASI$EMSCRIPTEN" = x''], [
-  AX_PTHREAD([has_pthread=yes])
+  AC_CHECK_DEFINE([__WATCOMC__], [], [
+    AX_PTHREAD([has_pthread=yes])
+  ])
 ])
 
 AS_IF([test x"$enable_tests" = x'yes'], [
@@ -353,8 +453,28 @@ AS_IF([test x"$enable_debug" = x'yes'], [
   AC_DEFINE([BTC_DEBUG])
 ])
 
+AS_IF([test x"$has_getaddrinfo" = x'yes'], [
+  AC_DEFINE([BTC_HAVE_GETADDRINFO])
+])
+
+AS_IF([test x"$has_gethostname" = x'yes'], [
+  AC_DEFINE([BTC_HAVE_GETHOSTNAME])
+])
+
+AS_IF([test x"$has_getifaddrs" = x'yes'], [
+  AC_DEFINE([BTC_HAVE_GETIFADDRS])
+])
+
+AS_IF([test x"$has_inet6" = x'yes'], [
+  AC_DEFINE([BTC_HAVE_INET6])
+])
+
 AS_IF([test x"$has_int128" = x'yes'], [
   AC_DEFINE([BTC_HAVE_INT128])
+])
+
+AS_IF([test x"$enable_legacy" = x'yes'], [
+  AC_DEFINE([BTC_WSOCK32])
 ])
 
 AS_IF([test x"$has_pthread" = x'yes'], [
@@ -390,9 +510,17 @@ AS_CASE([$host_os], [aix*], [
 #
 
 AS_IF([test x"$MINGW" != x''], [
-  LIBS="$LIBS -lkernel32 -ladvapi32 -lshell32 -lws2_32"
+  LIBS="$LIBS -lkernel32 -ladvapi32"
+
+  AS_IF([test x"$enable_legacy" = x'yes'], [
+    LIBS="$LIBS -lwsock32"
+  ], [
+    LIBS="$LIBS -lws2_32"
+  ])
 ], [
-  LIBS="$LIBS -lm"
+  AC_CHECK_DEFINE([__WATCOMC__], [], [
+    LIBS="$LIBS -lm"
+  ])
 
   AS_IF([test x"$has_pthread" = x'yes'], [
     CC="$PTHREAD_CC"
@@ -448,28 +576,35 @@ AC_OUTPUT
 
 AC_MSG_NOTICE([Build Options:
 
-  64-bit     = $has_64bit
-  asm        = $has_asm
-  big        = $has_big
-  clock      = $has_clock
-  coverage   = $enable_coverage
-  debug      = $enable_debug
-  emscripten = $EMSCRIPTEN
-  int128     = $has_int128
-  leveldb    = $enable_leveldb
-  node       = $enable_node
-  pthread    = $has_pthread
-  tests      = $enable_tests
-  wasi       = $WASI
-  zlib       = $has_zlib
+  64-bit      = $has_64bit
+  asm         = $has_asm
+  big         = $has_big
+  clock       = $has_clock
+  coverage    = $enable_coverage
+  debug       = $enable_debug
+  emscripten  = $EMSCRIPTEN
+  getaddrinfo = $has_getaddrinfo
+  gethostname = $has_gethostname
+  getifaddrs  = $has_getifaddrs
+  inet6       = $has_inet6
+  int128      = $has_int128
+  legacy      = $enable_legacy
+  leveldb     = $enable_leveldb
+  node        = $enable_node
+  portable    = $enable_portable
+  pthread     = $has_pthread
+  tests       = $enable_tests
+  tls         = $has_tls
+  wasi        = $WASI
+  zlib        = $has_zlib
 
-  PREFIX     = $prefix
-  HOST       = $host
-  CC         = $CC
-  CPPFLAGS   = $CPPFLAGS
-  CFLAGS     = $CFLAGS
-  WARN_FLAGS = $WARN_FLAGS
-  LDFLAGS    = $LDFLAGS
-  DEFS       = $DEFS
-  LIBS       = $LIBS
+  PREFIX      = $prefix
+  HOST        = $host
+  CC          = $CC
+  CPPFLAGS    = $CPPFLAGS
+  CFLAGS      = $CFLAGS
+  WARN_FLAGS  = $WARN_FLAGS
+  LDFLAGS     = $LDFLAGS
+  DEFS        = $DEFS
+  LIBS        = $LIBS
 ])

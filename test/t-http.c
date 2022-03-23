@@ -13,6 +13,8 @@
 #include <io/http.h>
 #include "lib/tests.h"
 
+#if defined(_WIN32) || defined(BTC_HAVE_PTHREAD)
+
 static int g_sent = 0;
 static int g_recv = 0;
 
@@ -223,3 +225,11 @@ int main(void) {
 
   return 0;
 }
+
+#else /* !_WIN32 && !BTC_HAVE_PTHREAD */
+
+int main(void) {
+  return 0;
+}
+
+#endif /* !_WIN32 && !BTC_HAVE_PTHREAD */

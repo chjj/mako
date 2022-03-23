@@ -9,11 +9,20 @@
 #include <string.h>
 #include <io/core.h>
 
-#if defined(_WIN32)
-#  include <winsock2.h>
-#  include <ws2tcpip.h>
-#  ifndef __MINGW32__
-#    pragma comment(lib, "ws2_32.lib")
+#ifdef _WIN32
+#  ifdef BTC_WSOCK32 /* Windows 95 & NT 3.51 (1995) */
+#    include <winsock.h>
+#    ifndef __MINGW32__
+#      pragma comment(lib, "wsock32.lib")
+#    endif
+#  else /* NT 4.0 (1996) */
+#    include <winsock2.h>
+#    ifdef BTC_HAVE_INET6 /* Windows XP (2001) */
+#      include <ws2tcpip.h>
+#    endif
+#    ifndef __MINGW32__
+#      pragma comment(lib, "ws2_32.lib")
+#    endif
 #  endif
 #else
 #  include <sys/types.h>
@@ -21,22 +30,13 @@
 #  include <netdb.h>
 #  include <arpa/inet.h>
 #  include <netinet/in.h>
-#endif
-
-#undef HAVE_GETIFADDRS
-
-#if defined(__linux__)     \
- || defined(__APPLE__)     \
- || defined(__OpenBSD__)   \
- || defined(__FreeBSD__)   \
- || defined(__NetBSD__)    \
- || defined(__DragonFly__) \
- || defined(__HAIKU__)     \
- || defined(__CYGWIN__)    \
- || defined(__MSYS__)
-#  include <ifaddrs.h>
-#  include <net/if.h>
-#  define HAVE_GETIFADDRS
+#  ifdef BTC_HAVE_GETIFADDRS
+#    include <ifaddrs.h>
+#    include <net/if.h>
+#  endif
+#  ifdef __WATCOMC__
+#    include "watcom_dns.h"
+#  endif
 #endif
 
 /*
@@ -45,6 +45,7 @@
 
 int
 btc_getaddrinfo(btc_sockaddr_t **res, const char *name, int port) {
+#if defined(BTC_HAVE_GETADDRINFO)
   struct addrinfo hints, *info, *it;
   btc_sockaddr_t *addr = NULL;
   btc_sockaddr_t *prev = NULL;
@@ -94,6 +95,50 @@ btc_getaddrinfo(btc_sockaddr_t **res, const char *name, int port) {
   freeaddrinfo(info);
 
   return 1;
+#else /* !BTC_HAVE_GETADDRINFO */
+  struct hostent *info = gethostbyname(name);
+  btc_sockaddr_t *addr = NULL;
+  btc_sockaddr_t *prev = NULL;
+  struct sockaddr_in sai;
+  size_t i;
+
+  *res = NULL;
+
+  if (info == NULL)
+    return 0;
+
+  if (info->h_addrtype != AF_INET)
+    return 0;
+
+  memset(&sai, 0, sizeof(sai));
+
+  sai.sin_family = AF_INET;
+  sai.sin_port = htons(port);
+
+  for (i = 0; info->h_addr_list[i] != NULL; i++) {
+    const char *item = info->h_addr_list[i];
+
+    addr = (btc_sockaddr_t *)malloc(sizeof(btc_sockaddr_t));
+
+    if (addr == NULL)
+      abort(); /* LCOV_EXCL_LINE */
+
+    memcpy(&sai.sin_addr, item, sizeof(struct in_addr));
+
+    if (!btc_sockaddr_set(addr, (struct sockaddr *)&sai))
+      abort(); /* LCOV_EXCL_LINE */
+
+    if (*res == NULL)
+      *res = addr;
+
+    if (prev != NULL)
+      prev->next = addr;
+
+    prev = addr;
+  }
+
+  return 1;
+#endif
 }
 
 void
@@ -109,16 +154,7 @@ btc_freeaddrinfo(btc_sockaddr_t *res) {
 
 int
 btc_getifaddrs(btc_sockaddr_t **res, int port) {
-#if defined(_WIN32)
-  char name[256];
-
-  *res = NULL;
-
-  if (gethostname(name, sizeof(name)) == SOCKET_ERROR)
-    return 0;
-
-  return btc_getaddrinfo(res, name, port);
-#elif defined(HAVE_GETIFADDRS)
+#if defined(BTC_HAVE_GETIFADDRS)
   btc_sockaddr_t *addr = NULL;
   btc_sockaddr_t *prev = NULL;
   struct ifaddrs *addrs, *it;
@@ -168,10 +204,19 @@ btc_getifaddrs(btc_sockaddr_t **res, int port) {
   freeifaddrs(addrs);
 
   return 1;
-#else /* !HAVE_GETIFADDRS */
+#elif defined(BTC_HAVE_GETHOSTNAME)
+  char name[256];
+
+  *res = NULL;
+
+  if (gethostname(name, sizeof(name)) == -1)
+    return 0;
+
+  return btc_getaddrinfo(res, name, port);
+#else
   *res = NULL;
   return 0;
-#endif /* !HAVE_GETIFADDRS */
+#endif
 }
 
 void

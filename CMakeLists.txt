@@ -49,9 +49,11 @@ include(TestBigEndian)
 option(MAKO_ASM "Use inline assembly if available" ON)
 option(MAKO_COVERAGE "Enable coverage" OFF)
 option(MAKO_INT128 "Use __int128 if available" ON)
+option(MAKO_LEGACY "Use legacy winsock" OFF)
 option(MAKO_LEVELDB "Use leveldb" OFF)
 option(MAKO_NODE "Build the fullnode" ON)
 option(MAKO_PIC "Enable PIC" OFF)
+option(MAKO_PORTABLE "Be as portable as possible" OFF)
 option(MAKO_SHARED "Build shared library" OFF)
 option(MAKO_TESTS "Build tests" ON)
 
@@ -170,6 +172,60 @@ check_c_source_compiles([=[
   }
 ]=] MAKO_HAVE_CLOCK)
 
+if(NOT WIN32)
+  check_c_source_compiles([=[
+#   include <stddef.h>
+#   include <sys/types.h>
+#   include <sys/socket.h>
+#   include <netdb.h>
+    int main(void) {
+      struct addrinfo *info;
+      return getaddrinfo("localhost", NULL, NULL, &info);
+    }
+  ]=] MAKO_HAVE_GETADDRINFO)
+
+  check_c_source_compiles([=[
+#   include <unistd.h>
+    int main(void) {
+      char name[256];
+      return gethostname(name, sizeof(name));
+    }
+  ]=] MAKO_HAVE_GETHOSTNAME)
+
+  check_c_source_compiles([=[
+#   include <sys/types.h>
+#   include <ifaddrs.h>
+#   include <net/if.h>
+    int main(void) {
+      struct ifaddrs *addrs;
+      return getifaddrs(&addrs);
+    }
+  ]=] MAKO_HAVE_GETIFADDRS)
+
+  check_c_source_compiles([=[
+#   include <sys/types.h>
+#   include <sys/socket.h>
+#   include <netinet/in.h>
+    int main(void) {
+      struct sockaddr_storage storage;
+      struct sockaddr_in6 sai6;
+      return 0;
+    }
+  ]=] MAKO_HAVE_INET6)
+else()
+  if(MAKO_LEGACY OR MAKO_PORTABLE)
+    set(MAKO_HAVE_GETADDRINFO 0)
+    set(MAKO_HAVE_GETHOSTNAME 1)
+    set(MAKO_HAVE_GETIFADDRS 0)
+    set(MAKO_HAVE_INET6 0)
+  else()
+    set(MAKO_HAVE_GETADDRINFO 1)
+    set(MAKO_HAVE_GETHOSTNAME 1)
+    set(MAKO_HAVE_GETIFADDRS 0)
+    set(MAKO_HAVE_INET6 1)
+  endif()
+endif()
+
 if(MAKO_INT128)
   check_c_source_compiles([=[
     typedef signed __int128 xint128_t;
@@ -191,7 +247,7 @@ endif()
 set(MAKO_HAVE_PTHREAD 0)
 
 if(CMAKE_C_COMPILER_ID MATCHES "Watcom$")
-  set(MAKO_HAVE_PTHREAD 1)
+  # Nothing.
 elseif(NOT WIN32 AND NOT WASI AND NOT EMSCRIPTEN)
   set(THREADS_PREFER_PTHREAD_FLAG ON)
 
@@ -390,8 +446,28 @@ endif()
 
 list(APPEND mako_defines $<$<CONFIG:Debug>:BTC_DEBUG>)
 
+if(MAKO_HAVE_GETADDRINFO)
+  list(APPEND mako_defines BTC_HAVE_GETADDRINFO)
+endif()
+
+if(MAKO_HAVE_GETHOSTNAME)
+  list(APPEND mako_defines BTC_HAVE_GETHOSTNAME)
+endif()
+
+if(MAKO_HAVE_GETIFADDRS)
+  list(APPEND mako_defines BTC_HAVE_GETIFADDRS)
+endif()
+
+if(MAKO_HAVE_INET6)
+  list(APPEND mako_defines BTC_HAVE_INET6)
+endif()
+
 if(MAKO_HAVE_INT128)
   list(APPEND mako_defines BTC_HAVE_INT128)
+endif()
+
+if(MAKO_LEGACY)
+  list(APPEND mako_defines BTC_WSOCK32)
 endif()
 
 if(MAKO_HAVE_PTHREAD)
@@ -433,11 +509,19 @@ list(APPEND mako_includes ${PROJECT_SOURCE_DIR}/include)
 #
 
 if(WIN32)
-  list(APPEND mako_libs kernel32 advapi32 ws2_32)
-else()
-  list(APPEND mako_libs m)
+  list(APPEND mako_libs kernel32 advapi32)
 
-  if(MAKO_HAVE_PTHREAD AND NOT CMAKE_C_COMPILER_ID MATCHES "Watcom$")
+  if(MAKO_LEGACY)
+    list(APPEND mako_libs wsock32)
+  else()
+    list(APPEND mako_libs ws2_32)
+  endif()
+else()
+  if(NOT CMAKE_C_COMPILER_ID MATCHES "Watcom$")
+    list(APPEND mako_libs m)
+  endif()
+
+  if(MAKO_HAVE_PTHREAD)
     list(APPEND mako_libs Threads::Threads)
   endif()
 endif()

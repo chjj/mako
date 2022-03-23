@@ -435,7 +435,6 @@
  * Backend
  */
 
-#undef HAVE_BCRYPTGENRANDOM
 #undef HAVE_RTLGENRANDOM
 #undef HAVE_GETRANDOM
 #undef HAVE_SYSCTL_UUID
@@ -472,13 +471,7 @@
 #  define HAVE_GETRANDOM
 #elif defined(_WIN32)
 #  include <windows.h> /* _WIN32_WINNT */
-#  if (defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0601) /* Windows 7 (2009) */ \
-   && (defined(_MSC_VER) && _MSC_VER >= 1600) /* VS 2010 */                    \
-   && !defined(__MINGW32__)
-#    include <bcrypt.h> /* BCryptGenRandom */
-#    pragma comment(lib, "bcrypt.lib")
-#    define HAVE_BCRYPTGENRANDOM
-#  elif defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0501 /* Windows XP (2001) */
+#  ifdef BTC_HAVE_RTLGENRANDOM /* Windows XP (2001) */
 #    define RtlGenRandom SystemFunction036
 #    ifdef __cplusplus
 extern "C"
@@ -872,24 +865,7 @@ EM_JS(unsigned short, js_random_get, (unsigned char *dst, unsigned long len), {
 
 static int
 btc_callrand(void *dst, size_t size) {
-#if defined(HAVE_BCRYPTGENRANDOM)
-  unsigned long flags = BCRYPT_USE_SYSTEM_PREFERRED_RNG;
-  unsigned char *data = (unsigned char *)dst;
-  size_t max = ULONG_MAX;
-
-  while (size > 0) {
-    if (max > size)
-      max = size;
-
-    if (BCryptGenRandom(NULL, data, max, flags) != 0)
-      return 0;
-
-    data += max;
-    size -= max;
-  }
-
-  return 1;
-#elif defined(HAVE_RTLGENRANDOM)
+#if defined(HAVE_RTLGENRANDOM)
   unsigned char *data = (unsigned char *)dst;
   size_t max = ULONG_MAX;
 
