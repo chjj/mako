@@ -22,7 +22,7 @@ btc_fs_read_file(const char *name, void *dst, size_t len) {
   if (fd == BTC_INVALID_FD)
     return 0;
 
-  if (!btc_fs_read(fd, dst, len))
+  if ((size_t)btc_fs_read(fd, dst, len) != len)
     goto fail;
 
   ret = 1;
@@ -39,7 +39,7 @@ btc_fs_write_file(const char *name, const void *src, size_t len) {
   if (fd == BTC_INVALID_FD)
     return 0;
 
-  if (!btc_fs_write(fd, src, len))
+  if ((size_t)btc_fs_write(fd, src, len) != len)
     goto fail;
 
   ret = 1;
@@ -66,16 +66,12 @@ btc_fs_alloc_file(const char *name, unsigned char **dst, size_t *len) {
     goto fail;
 
   xn = size;
-
-  if (xn == 0)
-    goto fail;
-
-  xp = malloc(xn);
+  xp = malloc(xn + 1);
 
   if (xp == NULL)
     goto fail;
 
-  if (!btc_fs_read(fd, xp, xn))
+  if ((size_t)btc_fs_read(fd, xp, xn) != xn)
     goto fail;
 
   *dst = xp;

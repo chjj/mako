@@ -195,10 +195,10 @@ btc_fs_fsize(btc_fd_t fd, uint64_t *size);
 BTC_EXTERN int64_t
 btc_fs_seek(btc_fd_t fd, int64_t pos);
 
-BTC_EXTERN int
+BTC_EXTERN int64_t
 btc_fs_read(btc_fd_t fd, void *dst, size_t len);
 
-BTC_EXTERN int
+BTC_EXTERN int64_t
 btc_fs_write(btc_fd_t fd, const void *src, size_t len);
 
 BTC_EXTERN int

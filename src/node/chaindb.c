@@ -803,7 +803,7 @@ btc_chaindb_read(btc_chaindb_t *db,
   if (btc_fs_seek(fd, pos) != pos)
     goto fail;
 
-  if (!btc_fs_read(fd, hdr, 24))
+  if (btc_fs_read(fd, hdr, 24) != 24)
     goto fail;
 
   size = btc_read32le(hdr + 16);
@@ -819,7 +819,7 @@ btc_chaindb_read(btc_chaindb_t *db,
 
   memcpy(data, hdr, 24);
 
-  if (!btc_fs_read(fd, data + 24, size - 24))
+  if ((size_t)btc_fs_read(fd, data + 24, size - 24) != size - 24)
     goto fail;
 
   *raw = data;
@@ -964,7 +964,7 @@ btc_chaindb_write_block(btc_chaindb_t *db,
   if (!btc_chaindb_alloc(db, batch, &db->block, len))
     return 0;
 
-  if (!btc_fs_write(db->block.fd, db->slab, len))
+  if ((size_t)btc_fs_write(db->block.fd, db->slab, len) != len)
     return 0;
 
   if (should_sync(entry))
@@ -1017,7 +1017,7 @@ btc_chaindb_write_undo(btc_chaindb_t *db,
   if (!btc_chaindb_alloc(db, batch, &db->undo, len))
     goto fail;
 
-  if (!btc_fs_write(db->undo.fd, buf, len))
+  if ((size_t)btc_fs_write(db->undo.fd, buf, len) != len)
     goto fail;
 
   if (should_sync(entry))

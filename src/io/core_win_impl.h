@@ -18,6 +18,12 @@
 #include <io/core.h>
 
 /*
+ * Macros
+ */
+
+#define BTC_MIN(x, y) ((x) < (y) ? (x) : (y))
+
+/*
  * Types
  */
 
@@ -551,30 +557,47 @@ btc_fs_seek(btc_fd_t fd, int64_t pos) {
   return result.QuadPart;
 }
 
-int
+int64_t
 btc_fs_read(btc_fd_t fd, void *dst, size_t len) {
-  DWORD nread = 0;
+  unsigned char *buf = dst;
+  int64_t cnt = 0;
 
-  if (!ReadFile(fd, dst, len, &nread, NULL))
-    return 0;
+  while (len > 0) {
+    DWORD max = BTC_MIN(len, 1 << 30);
+    DWORD nread;
 
-  if (nread != len)
-    return 0;
+    if (!ReadFile(fd, buf, max, &nread, NULL))
+      return -1;
 
-  return 1;
+    if (nread == 0)
+      break;
+
+    buf += nread;
+    len -= nread;
+    cnt += nread;
+  }
+
+  return cnt;
 }
 
-int
+int64_t
 btc_fs_write(btc_fd_t fd, const void *src, size_t len) {
-  DWORD nwrite = 0;
+  const unsigned char *buf = src;
+  int64_t cnt = 0;
 
-  if (!WriteFile(fd, src, len, &nwrite, NULL))
-    return 0;
+  while (len > 0) {
+    DWORD max = BTC_MIN(len, 1 << 30);
+    DWORD nwrite;
 
-  if (nwrite != len)
-    return 0;
+    if (!WriteFile(fd, buf, max, &nwrite, NULL))
+      return -1;
 
-  return 1;
+    buf += nwrite;
+    len -= nwrite;
+    cnt += nwrite;
+  }
+
+  return cnt;
 }
 
 int

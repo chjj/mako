@@ -36,6 +36,12 @@
 #include <io/core.h>
 
 /*
+ * Macros
+ */
+
+#define BTC_MIN(x, y) ((x) < (y) ? (x) : (y))
+
+/*
  * Compat
  */
 
@@ -269,58 +275,55 @@ btc_fs_seek(btc_fd_t fd, int64_t pos) {
   return lseek(fd, pos, SEEK_SET);
 }
 
-int
+int64_t
 btc_fs_read(btc_fd_t fd, void *dst, size_t len) {
-  unsigned char *buf = (unsigned char *)dst;
-  size_t max = INT_MAX;
-  int nread;
+  unsigned char *buf = dst;
+  int64_t cnt = 0;
 
   while (len > 0) {
-    if (max > len)
-      max = len;
+    size_t max = BTC_MIN(len, 1 << 30);
+    int nread;
 
     do {
       nread = read(fd, buf, max);
     } while (nread < 0 && errno == EINTR);
 
-    if (nread <= 0)
-      break;
+    if (nread < 0)
+      return -1;
 
-    if ((size_t)nread > max)
-      abort();
+    if (nread == 0)
+      break;
 
     buf += nread;
     len -= nread;
+    cnt += nread;
   }
 
-  return len == 0;
+  return cnt;
 }
 
-int
+int64_t
 btc_fs_write(btc_fd_t fd, const void *src, size_t len) {
-  const unsigned char *buf = (const unsigned char *)src;
-  size_t max = INT_MAX;
-  int nwrite;
+  const unsigned char *buf = src;
+  int64_t cnt = 0;
 
   while (len > 0) {
-    if (max > len)
-      max = len;
+    size_t max = BTC_MIN(len, 1 << 30);
+    int nwrite;
 
     do {
       nwrite = write(fd, buf, max);
     } while (nwrite < 0 && errno == EINTR);
 
-    if (nwrite <= 0)
-      break;
-
-    if ((size_t)nwrite > max)
-      abort();
+    if (nwrite < 0)
+      return -1;
 
     buf += nwrite;
     len -= nwrite;
+    cnt += nwrite;
   }
 
-  return len == 0;
+  return cnt;
 }
 
 int
