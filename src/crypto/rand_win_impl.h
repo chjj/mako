@@ -4,6 +4,8 @@
  * https://github.com/chjj/mako
  */
 
+#include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <windows.h>
@@ -13,7 +15,9 @@
 #include "rand.h"
 
 #ifndef __MINGW32__
-#  pragma comment(lib, "advapi32.lib") /* GetUserNameA */
+/* RegQueryValueExA, RegCloseKey */
+/* GetCurrentHwProfileA, GetUserNameA */
+#  pragma comment(lib, "advapi32.lib")
 #endif
 
 /*
@@ -47,6 +51,93 @@ sha256_write_ptr(btc_sha256_t *hash, const void *ptr) {
 }
 
 /*
+ * Timestamp Counter
+ */
+
+static unsigned __int64
+btc_rdtsc(void) {
+#if defined(_MSC_VER) && !defined(__clang__)        \
+                      && !defined(__llvm__)         \
+                      && !defined(__INTEL_COMPILER) \
+                      && !defined(__ICL)
+  _asm rdtsc
+#elif (defined(__GNUC__) || defined(__clang__)) \
+   && (defined(__i386__) || defined(_M_IX86))
+  unsigned long long ts;
+
+  __asm__ __volatile__ (
+    "rdtsc\n"
+    : "=A" (ts)
+  );
+
+  return ts;
+#elif (defined(__GNUC__) || defined(__clang__)) \
+   && (defined(__x86_64__) || defined(_M_X64))
+  unsigned long long lo, hi;
+
+  __asm__ __volatile__ (
+    "rdtsc\n"
+    : "=a" (lo),
+      "=d" (hi)
+  );
+
+  return (hi << 32) | lo;
+#else
+  return 0;
+#endif
+}
+
+/*
+ * Performance Data
+ */
+
+static void
+sha256_write_perfdata(btc_sha256_t *hash) {
+  static const DWORD max = 1000000;
+  DWORD size = 25000; /* (max / 40) */
+  BYTE *data = (BYTE *)malloc(size);
+  DWORD nread;
+  LSTATUS ret;
+
+  if (data == NULL)
+    return;
+
+  memset(data, 0, size);
+
+  for (;;) {
+    nread = size;
+    ret = RegQueryValueExA(HKEY_PERFORMANCE_DATA,
+                           "Global", NULL, NULL,
+                           data, &nread);
+
+    if (ret != ERROR_MORE_DATA || size >= max)
+      break;
+
+    size = (size * 3) / 2;
+
+    if (size > max)
+      size = max;
+
+    data = (BYTE *)realloc(data, size);
+
+    if (data == NULL)
+      break;
+
+    memset(data, 0, size);
+
+    sha256_write_int(hash, btc_rdtsc());
+  }
+
+  RegCloseKey(HKEY_PERFORMANCE_DATA);
+
+  if (ret == ERROR_SUCCESS)
+    sha256_write_data(hash, data, nread);
+
+  if (data != NULL)
+    free(data);
+}
+
+/*
  * Environment Entropy
  */
 
@@ -61,13 +152,14 @@ btc_envrand(void *dst, size_t size) {
   /* Try RtlGenRandom first. */
   {
     BOOLEAN (NTAPI *RtlGenRandom)(PVOID, ULONG);
-    HMODULE handle;
+    HMODULE handle = GetModuleHandleA("advapi32.dll");
 
-    /* Should be loaded (GetUserNameA requires advapi32). */
-    handle = GetModuleHandleA("advapi32.dll");
-
-    if (handle == NULL)
-      abort(); /* LCOV_EXCL_LINE */
+    /* Should be loaded. */
+    if (handle == NULL) {
+      fprintf(stderr, "Could not load advapi32.dll\n");
+      fflush(stderr);
+      abort();
+    }
 
     /* Available only on Windows XP. */
     *((FARPROC *)&RtlGenRandom) = GetProcAddress(handle, "SystemFunction036");
@@ -81,6 +173,31 @@ btc_envrand(void *dst, size_t size) {
   /* Fall back to environmental randomness. */
   btc_sha256_init(&hash);
 
+  sha256_write_int(&hash, btc_rdtsc());
+
+  /* Some compile-time static properties. */
+#if defined(__GNUC__) && defined(__GNUC_MINOR__) && defined(__GNUC_PATCHLEVEL__)
+  sha256_write_int(&hash, __GNUC__);
+  sha256_write_int(&hash, __GNUC_MINOR__);
+  sha256_write_int(&hash, __GNUC_PATCHLEVEL__);
+#endif
+
+#ifdef _MSC_VER
+  sha256_write_int(&hash, _MSC_VER);
+#endif
+
+#ifdef PACKAGE_STRING
+  sha256_write_string(&hash, PACKAGE_STRING);
+#endif
+
+  /* Memory locations. */
+  sha256_write_ptr(&hash, dst);
+  sha256_write_ptr(&hash, &hash);
+  sha256_write_ptr(&hash, &errno);
+  sha256_write_ptr(&hash, GetModuleHandleA("kernel32.dll"));
+
+  sha256_write_int(&hash, btc_rdtsc());
+
   /* Timing information. */
   {
     LARGE_INTEGER ctr;
@@ -88,6 +205,36 @@ btc_envrand(void *dst, size_t size) {
     if (QueryPerformanceCounter(&ctr))
       sha256_write_int(&hash, ctr.QuadPart);
   }
+
+  sha256_write_int(&hash, btc_rdtsc());
+
+  /* OS information. */
+  {
+    OSVERSIONINFOA info;
+
+    memset(&info, 0, sizeof(info));
+
+    info.dwOSVersionInfoSize = sizeof(info);
+
+    if (GetVersionExA(&info))
+      sha256_write(&hash, &info, sizeof(info));
+
+    sha256_write_int(&hash, GetVersion());
+  }
+
+  sha256_write_int(&hash, btc_rdtsc());
+
+  /* Hardware Profile (requires Windows 95 OSR2 or later). */
+  {
+    HW_PROFILE_INFOA info;
+
+    memset(&info, 0, sizeof(info));
+
+    if (GetCurrentHwProfileA(&info))
+      sha256_write(&hash, &info, sizeof(info));
+  }
+
+  sha256_write_int(&hash, btc_rdtsc());
 
   /* System information. */
   {
@@ -100,6 +247,8 @@ btc_envrand(void *dst, size_t size) {
     sha256_write(&hash, &info, sizeof(info));
   }
 
+  sha256_write_int(&hash, btc_rdtsc());
+
   /* Performance frequency. */
   {
     LARGE_INTEGER freq;
@@ -107,6 +256,8 @@ btc_envrand(void *dst, size_t size) {
     if (QueryPerformanceFrequency(&freq))
       sha256_write_int(&hash, freq.QuadPart);
   }
+
+  sha256_write_int(&hash, btc_rdtsc());
 
   /* Disk information. */
   {
@@ -127,6 +278,8 @@ btc_envrand(void *dst, size_t size) {
     sha256_write_int(&hash, GetLogicalDrives());
   }
 
+  sha256_write_int(&hash, btc_rdtsc());
+
   /* Hostname. */
   {
     char name[MAX_COMPUTERNAME_LENGTH + 1];
@@ -135,6 +288,8 @@ btc_envrand(void *dst, size_t size) {
     if (GetComputerNameA(name, &len))
       sha256_write_string(&hash, name);
   }
+
+  sha256_write_int(&hash, btc_rdtsc());
 
   /* Current directory. */
   {
@@ -147,6 +302,8 @@ btc_envrand(void *dst, size_t size) {
       sha256_write_string(&hash, cwd);
   }
 
+  sha256_write_int(&hash, btc_rdtsc());
+
   /* Console title. */
   {
     char title[1024 + 1];
@@ -154,6 +311,8 @@ btc_envrand(void *dst, size_t size) {
     if (GetConsoleTitleA(title, sizeof(title)))
       sha256_write_string(&hash, title);
   }
+
+  sha256_write_int(&hash, btc_rdtsc());
 
   /* Command line. */
   {
@@ -164,6 +323,8 @@ btc_envrand(void *dst, size_t size) {
       sha256_write_string(&hash, cmd);
     }
   }
+
+  sha256_write_int(&hash, btc_rdtsc());
 
   /* Environment variables. */
   {
@@ -183,6 +344,8 @@ btc_envrand(void *dst, size_t size) {
     }
   }
 
+  sha256_write_int(&hash, btc_rdtsc());
+
   /* Username. */
   {
     char name[256 + 1]; /* UNLEN + 1 */
@@ -192,9 +355,13 @@ btc_envrand(void *dst, size_t size) {
       sha256_write_string(&hash, name);
   }
 
+  sha256_write_int(&hash, btc_rdtsc());
+
   /* Process/Thread ID. */
   sha256_write_int(&hash, GetCurrentProcessId());
   sha256_write_int(&hash, GetCurrentThreadId());
+
+  sha256_write_int(&hash, btc_rdtsc());
 
   /* System time. */
   {
@@ -206,6 +373,8 @@ btc_envrand(void *dst, size_t size) {
 
     sha256_write(&hash, &ftime, sizeof(ftime));
   }
+
+  sha256_write_int(&hash, btc_rdtsc());
 
   /* Various clocks. */
   {
@@ -227,6 +396,8 @@ btc_envrand(void *dst, size_t size) {
       sha256_write_int(&hash, ctr.QuadPart);
   }
 
+  sha256_write_int(&hash, btc_rdtsc());
+
   /* Memory usage. */
   {
     MEMORYSTATUS status;
@@ -240,6 +411,8 @@ btc_envrand(void *dst, size_t size) {
     sha256_write(&hash, &status, sizeof(status));
   }
 
+  sha256_write_int(&hash, btc_rdtsc());
+
   /* Disk usage. */
   {
     DWORD spc, bps, nfc, tnc;
@@ -252,6 +425,8 @@ btc_envrand(void *dst, size_t size) {
     }
   }
 
+  sha256_write_int(&hash, btc_rdtsc());
+
   /* Disk usage (requires Windows 95 OSR2 or later). */
   {
     ULARGE_INTEGER caller, total, avail;
@@ -262,6 +437,14 @@ btc_envrand(void *dst, size_t size) {
       sha256_write_int(&hash, avail.QuadPart);
     }
   }
+
+  sha256_write_int(&hash, btc_rdtsc());
+
+  /* Performance data (NT only). */
+  if (GetVersion() < 0x80000000)
+    sha256_write_perfdata(&hash);
+
+  sha256_write_int(&hash, btc_rdtsc());
 
   /* Stack and heap location. */
   {
@@ -275,6 +458,8 @@ btc_envrand(void *dst, size_t size) {
     }
   }
 
+  sha256_write_int(&hash, btc_rdtsc());
+
   /* Timing information. */
   {
     LARGE_INTEGER ctr;
@@ -282,6 +467,8 @@ btc_envrand(void *dst, size_t size) {
     if (QueryPerformanceCounter(&ctr))
       sha256_write_int(&hash, ctr.QuadPart);
   }
+
+  sha256_write_int(&hash, btc_rdtsc());
 
   btc_sha256_final(&hash, seed);
 
