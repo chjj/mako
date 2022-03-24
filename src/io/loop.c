@@ -48,6 +48,12 @@
 #include <io/loop.h>
 
 /*
+ * Macros
+ */
+
+#define BTC_MIN(x, y) ((x) < (y) ? (x) : (y))
+
+/*
  * Compat
  */
 
@@ -987,15 +993,15 @@ btc_socket_talk(btc_socket_t *socket, int family) {
 static int
 btc_socket_flush_write(btc_socket_t *socket) {
   chunk_t *chunk, *next;
+  size_t max;
   int len;
 
   for (chunk = socket->head; chunk != NULL; chunk = next) {
     next = chunk->next;
 
-    CHECK(chunk->len <= INT_MAX);
-
     while (chunk->len > 0) {
-      len = send(socket->fd, (void *)chunk->raw, chunk->len, BTC_NOSIGNAL);
+      max = BTC_MIN(chunk->len, 1 << 30);
+      len = send(socket->fd, (void *)chunk->raw, max, BTC_NOSIGNAL);
 
       if (len == BTC_SOCKET_ERROR) {
         int error = btc_errno;
@@ -1013,12 +1019,6 @@ btc_socket_flush_write(btc_socket_t *socket) {
 
         return -1;
       }
-
-      if (len == 0)
-        break;
-
-      if ((size_t)len > chunk->len)
-        abort(); /* LCOV_EXCL_LINE */
 
       chunk->raw += len;
       chunk->len -= len;
@@ -1073,12 +1073,6 @@ btc_socket_write(btc_socket_t *socket, void *data, size_t len) {
     return !socket->draining;
   }
 
-  if (len > INT_MAX) {
-    socket->loop->error = BTC_EMSGSIZE;
-    free(data);
-    return -1;
-  }
-
   chunk = (chunk_t *)safe_malloc(sizeof(chunk_t));
 
   chunk->addr = NULL;
@@ -1113,7 +1107,7 @@ btc_socket_flush_send(btc_socket_t *socket) {
   for (chunk = socket->head; chunk != NULL; chunk = next) {
     next = chunk->next;
 
-    CHECK(chunk->len <= INT_MAX);
+    CHECK(chunk->len <= (1 << 30));
 
     addrlen = sa_addrlen(chunk->addr);
 
@@ -1186,7 +1180,7 @@ btc_socket_send(btc_socket_t *socket,
     return 1;
   }
 
-  if (len > INT_MAX) {
+  if (len > (1 << 30)) {
     socket->loop->error = BTC_EMSGSIZE;
     free(data);
     return -1;
@@ -1583,8 +1577,6 @@ fail:
       btc_sockfd_t fd = socket->fd;
       int len;
 
-      CHECK(size <= INT_MAX);
-
       while (socket->state == BTC_SOCKET_CONNECTED) {
         len = recv(fd, (void *)buf, size, 0);
 
@@ -1628,8 +1620,6 @@ fail:
       btc_sockaddr_t addr;
       btc_socklen_t fromlen;
       int len;
-
-      CHECK(size <= INT_MAX);
 
       while (socket->state == BTC_SOCKET_BOUND) {
         memset(&storage, 0, sizeof(storage));
