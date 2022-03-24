@@ -123,7 +123,7 @@ lcdb_sources = src/util/arena.c               \
 #
 
 liblcdb_la_SOURCES = $(lcdb_headers) $(lcdb_sources)
-liblcdb_la_CFLAGS = $(WARN_FLAGS)
+liblcdb_la_CFLAGS = $(WARN_FLAGS) -I$(srcdir)/include
 liblcdb_la_LDFLAGS = -static
 
 noinst_LTLIBRARIES = liblcdb.la

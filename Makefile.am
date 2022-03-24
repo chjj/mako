@@ -230,17 +230,17 @@ client_sources = src/client/client.c
 # Targets
 #
 
-if MINGW
-mako_ldflags = -avoid-version -Wl,--output-def,.libs/libmako.def
-else
-mako_ldflags = -version-info @ABI_VERSION@
-endif
-
 libmako_la_SOURCES = $(mako_sources)
 libmako_la_CFLAGS = $(WARN_FLAGS)
+
 if ENABLE_SHARED
 libmako_la_CFLAGS += -DBTC_EXPORT
-libmako_la_LDFLAGS = -no-undefined $(mako_ldflags)
+libmako_la_LDFLAGS = -no-undefined
+if MINGW
+libmako_la_LDFLAGS += -avoid-version -Wl,--output-def,.libs/libmako.def
+else
+libmako_la_LDFLAGS += -version-info @ABI_VERSION@
+endif
 endif
 
 lib_LTLIBRARIES = libmako.la
