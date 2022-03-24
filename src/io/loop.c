@@ -1363,29 +1363,27 @@ btc_loop_off_tick(btc_loop_t *loop, btc_loop_tick_cb *handler, void *data) {
 const char *
 btc_loop_strerror(btc_loop_t *loop) {
 #if defined(_WIN32)
-  /* https://stackoverflow.com/questions/3400922 */
-  DWORD flags, length;
-
-  memset(loop->errmsg, 0, sizeof(loop->errmsg));
-
-  flags = FORMAT_MESSAGE_FROM_SYSTEM
-        | FORMAT_MESSAGE_IGNORE_INSERTS
-        | FORMAT_MESSAGE_MAX_WIDTH_MASK;
+  DWORD version = GetVersion();
+  DWORD length = 0;
 
   /* Winsock error messages only available on Windows 2000 and up. */
   /* See: https://tangentsoft.net/wskfaq/articles/history.html */
-  length = FormatMessageA(flags,
-                          NULL,
-                          loop->error,
-                          MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                          loop->errmsg,
-                          sizeof(loop->errmsg),
-                          NULL);
+  if (version < 0x80000000 && (version & 0xff) >= 5) {
+    static const DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM
+                             | FORMAT_MESSAGE_IGNORE_INSERTS
+                             | FORMAT_MESSAGE_MAX_WIDTH_MASK;
 
-  if (length == 0 || loop->errmsg[0] == '\0')
+    length = FormatMessageA(flags,
+                            NULL,
+                            loop->error,
+                            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                            loop->errmsg,
+                            sizeof(loop->errmsg),
+                            NULL);
+  }
+
+  if (length == 0)
     sprintf(loop->errmsg, "WSA Error: %d", loop->error);
-
-  loop->errmsg[sizeof(loop->errmsg) - 1] = '\0';
 
   return loop->errmsg;
 #else
