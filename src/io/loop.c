@@ -1598,9 +1598,6 @@ fail:
           break;
         }
 
-        if ((size_t)len > size)
-          abort(); /* LCOV_EXCL_LINE */
-
         if (!socket->on_data(socket, buf, len))
           break;
 
@@ -1645,9 +1642,6 @@ fail:
 
           break;
         }
-
-        if ((size_t)len > size)
-          abort(); /* LCOV_EXCL_LINE */
 
         btc_sockaddr_set(&addr, from);
 
