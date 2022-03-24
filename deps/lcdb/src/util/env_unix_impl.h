@@ -243,8 +243,89 @@ ldb_open(const char *name, int flags, uint32_t mode) {
   return fd;
 }
 
+static int64_t
+ldb_read(int fd, void *dst, size_t len) {
+  unsigned char *buf = dst;
+  int64_t cnt = 0;
+
+  while (len > 0) {
+    size_t max = LDB_MIN(len, 1 << 30);
+    int nread;
+
+    do {
+      nread = read(fd, buf, max);
+    } while (nread < 0 && errno == EINTR);
+
+    if (nread < 0)
+      return -1;
+
+    if (nread == 0)
+      break;
+
+    buf += nread;
+    len -= nread;
+    cnt += nread;
+  }
+
+  return cnt;
+}
+
+#ifdef HAVE_PREAD
+static int64_t
+ldb_pread(int fd, void *dst, size_t len, uint64_t off) {
+  unsigned char *buf = dst;
+  int64_t cnt = 0;
+
+  while (len > 0) {
+    size_t max = LDB_MIN(len, 1 << 30);
+    int nread;
+
+    do {
+      nread = pread(fd, buf, max, off);
+    } while (nread < 0 && errno == EINTR);
+
+    if (nread < 0)
+      return -1;
+
+    if (nread == 0)
+      break;
+
+    buf += nread;
+    len -= nread;
+    off += nread;
+    cnt += nread;
+  }
+
+  return cnt;
+}
+#endif
+
+static int64_t
+ldb_write(int fd, const void *src, size_t len) {
+  const unsigned char *buf = src;
+  int64_t cnt = 0;
+
+  while (len > 0) {
+    size_t max = LDB_MIN(len, 1 << 30);
+    int nwrite;
+
+    do {
+      nwrite = write(fd, buf, max);
+    } while (nwrite < 0 && errno == EINTR);
+
+    if (nwrite < 0)
+      return -1;
+
+    buf += nwrite;
+    len -= nwrite;
+    cnt += nwrite;
+  }
+
+  return cnt;
+}
+
 static int
-ldb_sync_fd(int fd) {
+ldb_fsync(int fd) {
 #if defined(__APPLE__) && defined(F_FULLFSYNC)
   if (fcntl(fd, F_FULLFSYNC) == 0)
     return LDB_OK;
@@ -262,15 +343,13 @@ ldb_sync_fd(int fd) {
 }
 
 static int
-ldb_lock_or_unlock(int fd, int lock) {
+ldb_flock(int fd, int lock) {
 #if defined(HAVE_SETLK)
   struct flock info;
 
-  errno = 0;
-
   memset(&info, 0, sizeof(info));
 
-  info.l_type = (lock ? F_WRLCK : F_UNLCK);
+  info.l_type = lock ? F_WRLCK : F_UNLCK;
   info.l_whence = SEEK_SET;
 
   return fcntl(fd, F_SETLK, &info) == 0;
@@ -528,7 +607,7 @@ ldb_lock_file(const char *filename, ldb_filelock_t **lock) {
     return LDB_POSIX_ERROR(errno);
   }
 
-  if (!ldb_lock_or_unlock(fd, 1)) {
+  if (!ldb_flock(fd, 1)) {
     ldb_mutex_unlock(&file_mutex);
     close(fd);
     return LDB_IOERR;
@@ -558,7 +637,7 @@ ldb_unlock_file(ldb_filelock_t *lock) {
     ok = 1;
   }
 
-  ok &= ldb_lock_or_unlock(lock->fd, 0);
+  ok &= ldb_flock(lock->fd, 0);
 
   close(lock->fd);
 
@@ -681,11 +760,7 @@ ldb_rfile_read(ldb_rfile_t *file,
                ldb_slice_t *result,
                void *buf,
                size_t count) {
-  ssize_t nread;
-
-  do {
-    nread = read(file->fd, buf, count);
-  } while (nread < 0 && errno == EINTR);
+  int64_t nread = ldb_read(file->fd, buf, count);
 
   if (nread < 0)
     return LDB_IOERR;
@@ -710,7 +785,7 @@ ldb_rfile_pread(ldb_rfile_t *file,
                 size_t count,
                 uint64_t offset) {
   int fd = file->fd;
-  ssize_t nread;
+  int64_t nread;
 
   if (file->mapped) {
     if (offset + count > file->length)
@@ -732,19 +807,14 @@ ldb_rfile_pread(ldb_rfile_t *file,
   }
 
 #ifdef HAVE_PREAD
-  do {
-    nread = pread(fd, buf, count, offset);
-  } while (nread < 0 && errno == EINTR);
+  nread = ldb_pread(fd, buf, count, offset);
 #else
   ldb_mutex_lock(&file->mutex);
 
-  if ((uint64_t)lseek(fd, offset, SEEK_SET) == offset) {
-    do {
-      nread = read(fd, buf, count);
-    } while (nread < 0 && errno == EINTR);
-  } else {
+  if ((uint64_t)lseek(fd, offset, SEEK_SET) == offset)
+    nread = ldb_read(fd, buf, count);
+  else
     nread = -1;
-  }
 
   ldb_mutex_unlock(&file->mutex);
 #endif
@@ -921,19 +991,8 @@ ldb_wfile_close(ldb_wfile_t *file) {
 
 static int
 ldb_wfile_write(ldb_wfile_t *file, const unsigned char *data, size_t size) {
-  while (size > 0) {
-    ssize_t nwrite = write(file->fd, data, size);
-
-    if (nwrite < 0) {
-      if (errno == EINTR)
-        continue;
-
-      return LDB_IOERR;
-    }
-
-    data += nwrite;
-    size -= nwrite;
-  }
+  if (ldb_write(file->fd, data, size) < 0)
+    return LDB_IOERR;
 
   return LDB_OK;
 }
@@ -950,7 +1009,7 @@ ldb_wfile_sync_dir(ldb_wfile_t *file) {
   if (fd < 0) {
     rc = LDB_POSIX_ERROR(errno);
   } else {
-    rc = ldb_sync_fd(fd);
+    rc = ldb_fsync(fd);
     close(fd);
   }
 
@@ -1004,7 +1063,7 @@ ldb_wfile_sync(ldb_wfile_t *file) {
   if ((rc = ldb_wfile_flush(file)))
     return rc;
 
-  return ldb_sync_fd(file->fd);
+  return ldb_fsync(file->fd);
 }
 
 /*

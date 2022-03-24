@@ -271,6 +271,81 @@ ldb_basename_w(const WCHAR *fname) {
   return (WCHAR *)fname + len;
 }
 
+static int64_t
+ldb_read(HANDLE handle, void *dst, size_t len) {
+  unsigned char *buf = dst;
+  int64_t cnt = 0;
+
+  while (len > 0) {
+    DWORD max = LDB_MIN(len, 1 << 30);
+    DWORD nread;
+
+    if (!ReadFile(handle, buf, max, &nread, NULL))
+      return -1;
+
+    if (nread == 0)
+      break;
+
+    buf += nread;
+    len -= nread;
+    cnt += nread;
+  }
+
+  return cnt;
+}
+
+static int64_t
+ldb_pread(HANDLE handle, void *dst, size_t len, uint64_t off) {
+  unsigned char *buf = dst;
+  ULARGE_INTEGER ul;
+  int64_t cnt = 0;
+  OVERLAPPED ol;
+
+  while (len > 0) {
+    DWORD max = LDB_MIN(len, 1 << 30);
+    DWORD nread;
+
+    memset(&ol, 0, sizeof(ol));
+
+    ul.QuadPart = off;
+    ol.OffsetHigh = ul.HighPart;
+    ol.Offset = ul.LowPart;
+
+    if (!ReadFile(handle, buf, max, &nread, &ol))
+      return -1;
+
+    if (nread == 0)
+      break;
+
+    buf += nread;
+    len -= nread;
+    off += nread;
+    cnt += nread;
+  }
+
+  return cnt;
+}
+
+static int64_t
+ldb_write(HANDLE handle, const void *src, size_t len) {
+  const unsigned char *buf = src;
+  int64_t cnt = 0;
+
+  while (len > 0) {
+    DWORD max = LDB_MIN(len, 1 << 30);
+    DWORD nwrite;
+
+    if (!WriteFile(handle, buf, max, &nwrite, NULL))
+      return -1;
+
+    buf += nwrite;
+    len -= nwrite;
+    cnt += nwrite;
+  }
+
+  return cnt;
+}
+
 /*
  * Filesystem
  */
@@ -870,9 +945,9 @@ ldb_rfile_read(ldb_rfile_t *file,
                ldb_slice_t *result,
                void *buf,
                size_t count) {
-  DWORD nread = 0;
+  int64_t nread = ldb_read(file->handle, buf, count);
 
-  if (!ReadFile(file->handle, buf, count, &nread, NULL))
+  if (nread < 0)
     return LDB_IOERR;
 
   ldb_slice_set(result, buf, nread);
@@ -898,7 +973,7 @@ ldb_rfile_pread(ldb_rfile_t *file,
                 void *buf,
                 size_t count,
                 uint64_t offset) {
-  DWORD nread = 0;
+  int64_t nread;
 
   if (file->mapped) {
     if (offset + count > file->length)
@@ -922,7 +997,9 @@ ldb_rfile_pread(ldb_rfile_t *file,
       return LDB_IOERR;
     }
 
-    if (!ReadFile(file->handle, buf, (DWORD)count, &nread, NULL)) {
+    nread = ldb_read(file->handle, buf, count);
+
+    if (nread < 0) {
       LeaveCriticalSection(&file->mutex);
       return LDB_IOERR;
     }
@@ -930,14 +1007,9 @@ ldb_rfile_pread(ldb_rfile_t *file,
     LeaveCriticalSection(&file->mutex);
   } else {
     /* Windows NT. */
-    OVERLAPPED ol;
+    nread = ldb_pread(file->handle, buf, count, offset);
 
-    memset(&ol, 0, sizeof(ol));
-
-    ol.OffsetHigh = (DWORD)(offset >> 32);
-    ol.Offset = (DWORD)offset;
-
-    if (!ReadFile(file->handle, buf, (DWORD)count, &nread, &ol))
+    if (nread < 0)
       return LDB_IOERR;
   }
 
@@ -1094,9 +1166,7 @@ ldb_wfile_close(ldb_wfile_t *file) {
 
 static int
 ldb_wfile_write(ldb_wfile_t *file, const unsigned char *data, size_t size) {
-  DWORD nwrite = 0;
-
-  if (!WriteFile(file->handle, data, (DWORD)size, &nwrite, NULL))
+  if (ldb_write(file->handle, data, size) < 0)
     return LDB_IOERR;
 
   return LDB_OK;
