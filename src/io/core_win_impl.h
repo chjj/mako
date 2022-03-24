@@ -95,7 +95,6 @@ btc_wide_export(char *zp, size_t zn, const btc_wide_t *x) {
 
 static int
 BTCIsWindowsNT(void) {
-  /* Logic from libsodium/core.c */
   static volatile long state = 0;
   static DWORD version = 0;
   long value;
@@ -667,7 +666,7 @@ btc_ps_fdlimit(int minfd) {
 static BOOL WINAPI
 real_handler(DWORD type) {
   /* Note: this runs on a separate thread. */
-  /* May need to add a mutex for `loop->running`? */
+  /* May need to add synchronization for `loop->running`. */
   (void)type;
 
   if (global_handler != NULL) {
@@ -692,10 +691,65 @@ btc_ps_onterm(void (*handler)(void *), void *arg) {
   }
 }
 
+/* We could include <psapi.h>, but that wouldn't be as fun. */
+typedef struct BTC__PROCESS_MEMORY_COUNTERS {
+  DWORD cb;
+  DWORD PageFaultCount;
+  size_t PeakWorkingSetSize;
+  size_t WorkingSetSize;
+  size_t QuotaPeakPagedPoolUsage;
+  size_t QuotaPagedPoolUsage;
+  size_t QuotaPeakNonPagedPoolUsage;
+  size_t QuotaNonPagedPoolUsage;
+  size_t PagefileUsage;
+  size_t PeakPagefileUsage;
+} BTC_PROCESS_MEMORY_COUNTERS;
+
 size_t
 btc_ps_rss(void) {
-  /* GetProcessMemoryInfo is NT-only. */
-  return 0;
+  static BOOL (WINAPI *BTCGetProcessMemoryInfo)(HANDLE,
+                                                BTC_PROCESS_MEMORY_COUNTERS *,
+                                                DWORD) = NULL;
+  static volatile long state = 0;
+  BTC_PROCESS_MEMORY_COUNTERS pmc;
+  long value;
+
+  while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
+    Sleep(0);
+
+  if (value == 0) {
+    HMODULE handle1 = GetModuleHandleA("kernel32.dll");
+
+    if (handle1 == NULL)
+      abort(); /* LCOV_EXCL_LINE */
+
+    /* Windows 7 exposes an identical call in kernel32.dll. */
+    *((FARPROC *)&BTCGetProcessMemoryInfo) =
+      GetProcAddress(handle1, "K32GetProcessMemoryInfo");
+
+    /* Try to load psapi.dll otherwise. */
+    if (BTCGetProcessMemoryInfo == NULL) {
+      HINSTANCE handle2 = LoadLibraryA("psapi.dll");
+
+      if (handle2 != NULL) {
+        *((FARPROC *)&BTCGetProcessMemoryInfo) =
+          GetProcAddress(handle2, "GetProcessMemoryInfo");
+      }
+    }
+
+    if (InterlockedExchange(&state, 2) != 1)
+      abort(); /* LCOV_EXCL_LINE */
+  } else {
+    assert(value == 2);
+  }
+
+  if (BTCGetProcessMemoryInfo == NULL)
+    return 0;
+
+  if (!BTCGetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+    return 0;
+
+  return pmc.WorkingSetSize;
 }
 
 /*
@@ -717,7 +771,6 @@ btc_sys_datadir(char *buf, size_t size, const char *name) {
   char path[MAX_PATH * 4];
   long value;
 
-  /* Logic from libsodium/core.c */
   while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
     Sleep(0);
 
@@ -779,7 +832,6 @@ btc_sys_datadir(char *buf, size_t size, const char *name) {
 
 static double
 btc_time_qpf(void) {
-  /* Logic from libsodium/core.c */
   static volatile long state = 0;
   static double freq_inv = 0.0;
   LARGE_INTEGER freq;
