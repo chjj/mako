@@ -145,7 +145,7 @@ ldb_twoiter_skip_forward(ldb_twoiter_t *iter) {
     ldb_twoiter_init_data_block(iter);
 
     if (iter->data_iter.iter != NULL)
-      ldb_wrapiter_seek_first(&iter->data_iter);
+      ldb_wrapiter_first(&iter->data_iter);
   }
 }
 
@@ -162,7 +162,7 @@ ldb_twoiter_skip_backward(ldb_twoiter_t *iter) {
     ldb_twoiter_init_data_block(iter);
 
     if (iter->data_iter.iter != NULL)
-      ldb_wrapiter_seek_last(&iter->data_iter);
+      ldb_wrapiter_last(&iter->data_iter);
   }
 }
 
@@ -178,23 +178,23 @@ ldb_twoiter_seek(ldb_twoiter_t *iter, const ldb_slice_t *target) {
 }
 
 static void
-ldb_twoiter_seek_first(ldb_twoiter_t *iter) {
-  ldb_wrapiter_seek_first(&iter->index_iter);
+ldb_twoiter_first(ldb_twoiter_t *iter) {
+  ldb_wrapiter_first(&iter->index_iter);
   ldb_twoiter_init_data_block(iter);
 
   if (iter->data_iter.iter != NULL)
-    ldb_wrapiter_seek_first(&iter->data_iter);
+    ldb_wrapiter_first(&iter->data_iter);
 
   ldb_twoiter_skip_forward(iter);
 }
 
 static void
-ldb_twoiter_seek_last(ldb_twoiter_t *iter) {
-  ldb_wrapiter_seek_last(&iter->index_iter);
+ldb_twoiter_last(ldb_twoiter_t *iter) {
+  ldb_wrapiter_last(&iter->index_iter);
   ldb_twoiter_init_data_block(iter);
 
   if (iter->data_iter.iter != NULL)
-    ldb_wrapiter_seek_last(&iter->data_iter);
+    ldb_wrapiter_last(&iter->data_iter);
 
   ldb_twoiter_skip_backward(iter);
 }

@@ -145,16 +145,10 @@
 #define ldb_atomic_fetch_sub(object, operand, order) \
   __sync_fetch_and_sub(object, operand)
 
-#define ldb_atomic_load(object, order) __extension__ ({ \
-  __typeof__(*(object) + 0) _result;                    \
-  __sync_synchronize();                                 \
-  _result = *(object);                                  \
-  __sync_synchronize();                                 \
-  _result;                                              \
-})
+#define ldb_atomic_load(object, order) \
+  (__sync_synchronize(), *(object))
 
 #define ldb_atomic_store(object, desired, order) do { \
-  __sync_synchronize();                               \
   *(object) = (desired);                              \
   __sync_synchronize();                               \
 } while (0)

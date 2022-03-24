@@ -521,7 +521,7 @@ ldb_create(const char *dbname, const ldb_dbopt_t *options) {
 }
 
 static void
-ldb_destroy(ldb_t *db) {
+ldb_destroy_inner(ldb_t *db) {
   /* Wait for background work to finish. */
   ldb_mutex_lock(&db->mutex);
 
@@ -931,7 +931,7 @@ ldb_recover_log_file(ldb_t *db, uint64_t log_number,
     assert(db->log == NULL);
     assert(db->mem == NULL);
 
-    if (ldb_get_file_size(fname, &lfile_size) == LDB_OK &&
+    if (ldb_file_size(fname, &lfile_size) == LDB_OK &&
         ldb_appendfile_create(fname, &db->logfile) == LDB_OK) {
       ldb_log(db->options.info_log, "Reusing old log %s", fname);
 
@@ -1327,7 +1327,7 @@ ldb_do_compaction_work(ldb_t *db, ldb_cstate_t *compact) {
   /* Release mutex while we're actually doing the compaction work. */
   ldb_mutex_unlock(&db->mutex);
 
-  ldb_iter_seek_first(input);
+  ldb_iter_first(input);
 
   while (ldb_iter_valid(input) &&
         !ldb_atomic_load(&db->shutting_down, ldb_order_acquire)) {
@@ -1935,7 +1935,7 @@ ldb_open(const char *dbname, const ldb_dbopt_t *options, ldb_t **dbptr) {
     assert(db->mem != NULL);
     *dbptr = db;
   } else {
-    ldb_destroy(db);
+    ldb_destroy_inner(db);
   }
 
   ldb_vedit_clear(&edit);
@@ -1945,7 +1945,7 @@ ldb_open(const char *dbname, const ldb_dbopt_t *options, ldb_t **dbptr) {
 
 void
 ldb_close(ldb_t *db) {
-  ldb_destroy(db);
+  ldb_destroy_inner(db);
 }
 
 int
@@ -2171,7 +2171,7 @@ ldb_write(ldb_t *db, ldb_batch_t *updates, const ldb_writeopt_t *options) {
 }
 
 const ldb_snapshot_t *
-ldb_get_snapshot(ldb_t *db) {
+ldb_snapshot(ldb_t *db) {
   ldb_snapshot_t *snap;
   ldb_seqnum_t seq;
 
@@ -2186,7 +2186,7 @@ ldb_get_snapshot(ldb_t *db) {
 }
 
 void
-ldb_release_snapshot(ldb_t *db, const ldb_snapshot_t *snapshot) {
+ldb_release(ldb_t *db, const ldb_snapshot_t *snapshot) {
   ldb_mutex_lock(&db->mutex);
 
   ldb_snaplist_delete(&db->snapshots, snapshot);
@@ -2214,7 +2214,7 @@ ldb_iterator(ldb_t *db, const ldb_readopt_t *options) {
 }
 
 int
-ldb_get_property(ldb_t *db, const char *property, char **value) {
+ldb_property(ldb_t *db, const char *property, char **value) {
   const char *in = property;
 
   *value = NULL;
@@ -2325,9 +2325,9 @@ ldb_get_property(ldb_t *db, const char *property, char **value) {
 }
 
 void
-ldb_get_approximate_sizes(ldb_t *db, const ldb_range_t *range,
-                                     size_t length,
-                                     uint64_t *sizes) {
+ldb_approximate_sizes(ldb_t *db, const ldb_range_t *range,
+                                 size_t length,
+                                 uint64_t *sizes) {
   uint64_t start, limit;
   ldb_ikey_t k1, k2;
   ldb_version_t *v;
@@ -2362,7 +2362,7 @@ ldb_get_approximate_sizes(ldb_t *db, const ldb_range_t *range,
 }
 
 void
-ldb_compact_range(ldb_t *db, const ldb_slice_t *begin, const ldb_slice_t *end) {
+ldb_compact(ldb_t *db, const ldb_slice_t *begin, const ldb_slice_t *end) {
   int max_level_with_files = 1;
   int level;
 
@@ -2392,7 +2392,7 @@ ldb_compact_range(ldb_t *db, const ldb_slice_t *begin, const ldb_slice_t *end) {
  */
 
 int
-ldb_destroy_db(const char *dbname, const ldb_dbopt_t *options) {
+ldb_destroy(const char *dbname, const ldb_dbopt_t *options) {
   char lockname[LDB_PATH_MAX];
   char path[LDB_PATH_MAX];
   ldb_filelock_t *lock;

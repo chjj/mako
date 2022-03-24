@@ -87,6 +87,7 @@
  * Keywords/Attributes
  */
 
+#undef noreturn
 #undef unused
 
 #if LDB_STDC_VERSION >= 199901L

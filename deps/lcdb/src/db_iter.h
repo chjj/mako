@@ -14,6 +14,8 @@
 #define LDB_DB_ITER_H
 
 #include <stdint.h>
+#include "util/extern.h"
+#include "util/types.h"
 
 struct ldb_s;
 struct ldb_comparator_s;
@@ -25,5 +27,8 @@ ldb_dbiter_create(struct ldb_s *db,
                   struct ldb_iter_s *internal_iter,
                   uint64_t sequence,
                   uint32_t seed);
+
+LDB_EXTERN int
+ldb_iter_compare(struct ldb_iter_s *iter, const ldb_slice_t *key);
 
 #endif /* LDB_DB_ITER_H */

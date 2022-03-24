@@ -277,7 +277,7 @@ ldb_dbiter_next(ldb_dbiter_t *iter) {
        so advance into the range of entries for key() and then
        use the normal skipping code below. */
     if (!ldb_iter_valid(iter->iter))
-      ldb_iter_seek_first(iter->iter);
+      ldb_iter_first(iter->iter);
     else
       ldb_iter_next(iter->iter);
 
@@ -369,12 +369,12 @@ ldb_dbiter_seek(ldb_dbiter_t *iter, const ldb_slice_t *target) {
 }
 
 static void
-ldb_dbiter_seek_first(ldb_dbiter_t *iter) {
+ldb_dbiter_first(ldb_dbiter_t *iter) {
   iter->direction = LDB_FORWARD;
 
   clear_saved_value(iter);
 
-  ldb_iter_seek_first(iter->iter);
+  ldb_iter_first(iter->iter);
 
   if (ldb_iter_valid(iter->iter))
     find_next_user_entry(iter, 0, &iter->saved_key);
@@ -383,12 +383,12 @@ ldb_dbiter_seek_first(ldb_dbiter_t *iter) {
 }
 
 static void
-ldb_dbiter_seek_last(ldb_dbiter_t *iter) {
+ldb_dbiter_last(ldb_dbiter_t *iter) {
   iter->direction = LDB_REVERSE;
 
   clear_saved_value(iter);
 
-  ldb_iter_seek_last(iter->iter);
+  ldb_iter_last(iter->iter);
 
   find_prev_user_entry(iter);
 }
@@ -404,4 +404,11 @@ ldb_dbiter_create(ldb_t *db,
   ldb_dbiter_t *iter = ldb_malloc(sizeof(ldb_dbiter_t));
   ldb_dbiter_init(iter, db, user_comparator, internal_iter, sequence, seed);
   return ldb_iter_create(iter, &ldb_dbiter_table);
+}
+
+int
+ldb_iter_compare(ldb_iter_t *iter, const ldb_slice_t *key) {
+  ldb_dbiter_t *it = iter->ptr;
+  ldb_slice_t x = ldb_dbiter_key(it);
+  return ldb_compare(it->ucmp, &x, key);
 }

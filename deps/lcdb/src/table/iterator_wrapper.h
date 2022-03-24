@@ -88,16 +88,16 @@ ldb_wrapiter_seek(ldb_wrapiter_t *wrap, const ldb_slice_t *k) {
 }
 
 LDB_UNUSED static void
-ldb_wrapiter_seek_first(ldb_wrapiter_t *wrap) {
+ldb_wrapiter_first(ldb_wrapiter_t *wrap) {
   assert(wrap->iter != NULL);
-  ldb_iter_seek_first(wrap->iter);
+  ldb_iter_first(wrap->iter);
   ldb_wrapiter_update(wrap);
 }
 
 LDB_UNUSED static void
-ldb_wrapiter_seek_last(ldb_wrapiter_t *wrap) {
+ldb_wrapiter_last(ldb_wrapiter_t *wrap) {
   assert(wrap->iter != NULL);
-  ldb_iter_seek_last(wrap->iter);
+  ldb_iter_last(wrap->iter);
   ldb_wrapiter_update(wrap);
 }
 

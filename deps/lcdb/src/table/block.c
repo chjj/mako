@@ -348,13 +348,13 @@ ldb_blockiter_seek(ldb_blockiter_t *iter, const ldb_slice_t *target) {
 }
 
 static void
-ldb_blockiter_seek_first(ldb_blockiter_t *iter) {
+ldb_blockiter_first(ldb_blockiter_t *iter) {
   ldb_blockiter_seek_restart(iter, 0);
   ldb_blockiter_parse_next_key(iter);
 }
 
 static void
-ldb_blockiter_seek_last(ldb_blockiter_t *iter) {
+ldb_blockiter_last(ldb_blockiter_t *iter) {
   ldb_blockiter_seek_restart(iter, iter->num_restarts - 1);
 
   while (ldb_blockiter_parse_next_key(iter)

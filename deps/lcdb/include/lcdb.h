@@ -171,6 +171,37 @@ struct ldb_comparator_s {
 extern const ldb_comparator_t *ldb_bytewise_comparator;
 
 /*
+ * Comparator Macros
+ */
+
+#define ldb_comparator_init(cmp, name_, compare_, state_) do { \
+  (cmp)->name = (name_);                                       \
+  (cmp)->compare = (compare_);                                 \
+  (cmp)->shortest_separator = NULL;                            \
+  (cmp)->short_successor = NULL;                               \
+  (cmp)->user_comparator = NULL;                               \
+  (cmp)->state = (state_);                                     \
+} while (0)
+
+/**
+ * Static initialization of a comparator.
+ *
+ * Example:
+ *
+ *   static int
+ *   compare(const ldb_comparator_t *cmp,
+ *           const ldb_slice_t *x,
+ *           const ldb_slice_t *y) {
+ *     ...
+ *   }
+ *
+ *   static const ldb_comparator_t comparator =
+ *     ldb_comparator("leveldb.MyComparator", compare, NULL);
+ */
+#define ldb_comparator(name, compare, state) \
+  { (name), (compare), NULL, NULL, NULL, (state) }
+
+/*
  * Database
  */
 
@@ -200,30 +231,30 @@ int
 ldb_write(ldb_t *db, ldb_batch_t *updates, const ldb_writeopt_t *options);
 
 const ldb_snapshot_t *
-ldb_get_snapshot(ldb_t *db);
+ldb_snapshot(ldb_t *db);
 
 void
-ldb_release_snapshot(ldb_t *db, const ldb_snapshot_t *snapshot);
+ldb_release(ldb_t *db, const ldb_snapshot_t *snapshot);
 
 ldb_iter_t *
 ldb_iterator(ldb_t *db, const ldb_readopt_t *options);
 
 int
-ldb_get_property(ldb_t *db, const char *property, char **value);
+ldb_property(ldb_t *db, const char *property, char **value);
 
 void
-ldb_get_approximate_sizes(ldb_t *db, const ldb_range_t *range,
-                                     size_t length,
-                                     ldb_uint64_t *sizes);
+ldb_approximate_sizes(ldb_t *db, const ldb_range_t *range,
+                                 size_t length,
+                                 ldb_uint64_t *sizes);
 
 void
-ldb_compact_range(ldb_t *db, const ldb_slice_t *begin, const ldb_slice_t *end);
+ldb_compact(ldb_t *db, const ldb_slice_t *begin, const ldb_slice_t *end);
 
 int
-ldb_repair_db(const char *dbname, const ldb_dbopt_t *options);
+ldb_repair(const char *dbname, const ldb_dbopt_t *options);
 
 int
-ldb_destroy_db(const char *dbname, const ldb_dbopt_t *options);
+ldb_destroy(const char *dbname, const ldb_dbopt_t *options);
 
 /*
  * Filesystem
@@ -257,8 +288,8 @@ struct ldb_iter_s {
   const struct ldb_itertbl_s {
     void (*clear)(void *iter);
     int (*valid)(const void *iter);
-    void (*seek_first)(void *iter);
-    void (*seek_last)(void *iter);
+    void (*first)(void *iter);
+    void (*last)(void *iter);
     void (*seek)(void *iter, const ldb_slice_t *target);
     void (*next)(void *iter);
     void (*prev)(void *iter);
@@ -269,17 +300,61 @@ struct ldb_iter_s {
 };
 
 #define ldb_iter_valid(x) (x)->table->valid((x)->ptr)
-#define ldb_iter_seek_first(x) (x)->table->seek_first((x)->ptr)
-#define ldb_iter_seek_last(x) (x)->table->seek_last((x)->ptr)
+#define ldb_iter_first(x) (x)->table->first((x)->ptr)
+#define ldb_iter_last(x) (x)->table->last((x)->ptr)
 #define ldb_iter_seek(x, y) (x)->table->seek((x)->ptr, y)
 #define ldb_iter_next(x) (x)->table->next((x)->ptr)
 #define ldb_iter_prev(x) (x)->table->prev((x)->ptr)
 #define ldb_iter_key(x) (x)->table->key((x)->ptr)
 #define ldb_iter_value(x) (x)->table->value((x)->ptr)
 #define ldb_iter_status(x) (x)->table->status((x)->ptr)
+#define ldb_iter_val ldb_iter_value
+
+int
+ldb_iter_compare(ldb_iter_t *iter, const ldb_slice_t *key);
 
 void
 ldb_iter_destroy(ldb_iter_t *iter);
+
+/*
+ * Iterator Macros
+ */
+
+/**
+ * Iterate over each key.
+ *
+ * Example:
+ *
+ *  ldb_iter_each(it) {
+ *    ldb_slice_t key = ldb_iter_key(it);
+ *    ldb_slice_t val = ldb_iter_val(it);
+ *    ...
+ *  }
+ */
+#define ldb_iter_each(it)  \
+  for (ldb_iter_first(it); \
+       ldb_iter_valid(it); \
+       ldb_iter_next(it))
+
+/**
+ * Iterate from start to end (both inclusive).
+ *
+ * Example:
+ *
+ *   ldb_slice_t start = ldb_string("a");
+ *   ldb_slice_t end = ldb_string("z");
+ *   ldb_iter_t it = ldb_iterator(db);
+ *
+ *   ldb_iter_range(it, &start, &end) {
+ *     ldb_slice_t key = ldb_iter_key(it);
+ *     ldb_slice_t val = ldb_iter_val(it);
+ *     ...
+ *   }
+ */
+#define ldb_iter_range(it, min, max)                         \
+  for (ldb_iter_seek(it, min);                               \
+       ldb_iter_valid(it) && ldb_iter_compare(it, max) <= 0; \
+       ldb_iter_next(it))
 
 /*
  * Logging

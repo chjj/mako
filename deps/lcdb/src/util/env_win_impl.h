@@ -125,7 +125,6 @@ ldb_wide_export(char *zp, size_t zn, const ldb_wide_t *x) {
 
 static int
 LDBIsWindowsNT(void) {
-  /* Logic from libsodium/core.c */
   static volatile long state = 0;
   static DWORD version = 0;
   long value;
@@ -632,7 +631,7 @@ ldb_remove_dir(const char *dirname) {
 }
 
 int
-ldb_get_file_size(const char *filename, uint64_t *size) {
+ldb_file_size(const char *filename, uint64_t *size) {
   LARGE_INTEGER result;
   HANDLE handle;
 

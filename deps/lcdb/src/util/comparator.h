@@ -13,6 +13,7 @@
 #ifndef LDB_COMPARATOR_H
 #define LDB_COMPARATOR_H
 
+#include <stddef.h>
 #include "extern.h"
 #include "types.h"
 
@@ -76,10 +77,15 @@ typedef struct ldb_comparator_s {
 
 #define ldb_compare(cmp, x, y) (cmp)->compare(cmp, x, y)
 
-#define ldb_shortest_separator(cmp, start, limit) \
-  (cmp)->shortest_separator(cmp, start, limit)
+#define ldb_shortest_separator(cmp, start, limit) do { \
+  if ((cmp)->shortest_separator != NULL)               \
+    (cmp)->shortest_separator(cmp, start, limit);      \
+} while (0)
 
-#define ldb_short_successor(cmp, key) (cmp)->short_successor(cmp, key)
+#define ldb_short_successor(cmp, key) do { \
+  if ((cmp)->short_successor != NULL)      \
+    (cmp)->short_successor(cmp, key);      \
+} while (0)
 
 /*
  * Globals

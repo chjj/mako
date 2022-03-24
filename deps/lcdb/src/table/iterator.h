@@ -68,11 +68,11 @@ struct ldb_itertbl_s {
 
   /* Position at the first key in the source. The iterator is valid()
      after this call iff the source is not empty. */
-  void (*seek_first)(void *iter);
+  void (*first)(void *iter);
 
   /* Position at the last key in the source. The iterator is
      valid() after this call iff the source is not empty. */
-  void (*seek_last)(void *iter);
+  void (*last)(void *iter);
 
   /* Position at the first key in the source that is at or past target.
      The iterator is valid() after this call iff the source contains
@@ -123,13 +123,13 @@ name ## _seek_wrapped(void *iter, const ldb_slice_t *target) { \
 }                                                              \
                                                                \
 static void                                                    \
-name ## _seek_first_wrapped(void *iter) {                      \
-  name ## _seek_first((name ## _t *)iter);                     \
+name ## _first_wrapped(void *iter) {                           \
+  name ## _first((name ## _t *)iter);                          \
 }                                                              \
                                                                \
 static void                                                    \
-name ## _seek_last_wrapped(void *iter) {                       \
-  name ## _seek_last((name ## _t *)iter);                      \
+name ## _last_wrapped(void *iter) {                            \
+  name ## _last((name ## _t *)iter);                           \
 }                                                              \
                                                                \
 static void                                                    \
@@ -160,8 +160,8 @@ name ## _status_wrapped(const void *iter) {                    \
 static const ldb_itertbl_t name ## _table = {                  \
   /* .clear = */ name ## _clear_wrapped,                       \
   /* .valid = */ name ## _valid_wrapped,                       \
-  /* .seek_first = */ name ## _seek_first_wrapped,             \
-  /* .seek_last = */ name ## _seek_last_wrapped,               \
+  /* .first = */ name ## _first_wrapped,                       \
+  /* .last = */ name ## _last_wrapped,                         \
   /* .seek = */ name ## _seek_wrapped,                         \
   /* .next = */ name ## _next_wrapped,                         \
   /* .prev = */ name ## _prev_wrapped,                         \
@@ -184,8 +184,8 @@ static const ldb_itertbl_t name ## _table = {                  \
  */
 
 #define ldb_iter_valid(x) (x)->table->valid((x)->ptr)
-#define ldb_iter_seek_first(x) (x)->table->seek_first((x)->ptr)
-#define ldb_iter_seek_last(x) (x)->table->seek_last((x)->ptr)
+#define ldb_iter_first(x) (x)->table->first((x)->ptr)
+#define ldb_iter_last(x) (x)->table->last((x)->ptr)
 #define ldb_iter_seek(x, y) (x)->table->seek((x)->ptr, y)
 #define ldb_iter_next(x) (x)->table->next((x)->ptr)
 #define ldb_iter_prev(x) (x)->table->prev((x)->ptr)

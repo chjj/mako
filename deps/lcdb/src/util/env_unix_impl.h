@@ -78,16 +78,12 @@
 #  endif
 #endif
 
-#if defined(__linux__) || defined(__sun) || defined(__NetBSD__)
-#  ifdef LDB_HAVE_FDATASYNC
-#    define HAVE_FDATASYNC
-#  endif
+#ifdef LDB_HAVE_FDATASYNC
+#  define HAVE_FDATASYNC
 #endif
 
-#if !defined(__WATCOMC__) && !defined(__DJGPP__)
-#  ifdef LDB_HAVE_PREAD
-#    define HAVE_PREAD
-#  endif
+#ifdef LDB_HAVE_PREAD
+#  define HAVE_PREAD
 #endif
 
 /*
@@ -488,7 +484,7 @@ ldb_remove_dir(const char *dirname) {
 }
 
 int
-ldb_get_file_size(const char *filename, uint64_t *size) {
+ldb_file_size(const char *filename, uint64_t *size) {
   struct stat st;
 
   if (stat(filename, &st) != 0)

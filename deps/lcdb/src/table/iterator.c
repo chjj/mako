@@ -108,12 +108,12 @@ ldb_emptyiter_seek(ldb_emptyiter_t *iter, const ldb_slice_t *target) {
 }
 
 static void
-ldb_emptyiter_seek_first(ldb_emptyiter_t *iter) {
+ldb_emptyiter_first(ldb_emptyiter_t *iter) {
   (void)iter;
 }
 
 static void
-ldb_emptyiter_seek_last(ldb_emptyiter_t *iter) {
+ldb_emptyiter_last(ldb_emptyiter_t *iter) {
   (void)iter;
 }
 

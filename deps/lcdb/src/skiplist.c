@@ -348,12 +348,12 @@ ldb_skipiter_seek(ldb_skipiter_t *iter, const uint8_t *target) {
 }
 
 void
-ldb_skipiter_seek_first(ldb_skipiter_t *iter) {
+ldb_skipiter_first(ldb_skipiter_t *iter) {
   iter->node = ldb_skipnode_next(iter->list->head, 0);
 }
 
 void
-ldb_skipiter_seek_last(ldb_skipiter_t *iter) {
+ldb_skipiter_last(ldb_skipiter_t *iter) {
   iter->node = ldb_skiplist_find_last(iter->list);
 
   if (iter->node == iter->list->head)

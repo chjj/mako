@@ -60,8 +60,7 @@ struct leveldb_filterpolicy_s {
 };
 
 struct leveldb_env_s {
-  void *rep;
-  int is_default;
+  void *dummy;
 };
 
 typedef struct iterate_opts_s {
@@ -179,19 +178,19 @@ leveldb_create_iterator(leveldb_t *db, const leveldb_readoptions_t *options) {
 
 const leveldb_snapshot_t *
 leveldb_create_snapshot(leveldb_t *db) {
-  return ldb_get_snapshot(db);
+  return ldb_snapshot(db);
 }
 
 void
 leveldb_release_snapshot(leveldb_t *db, const leveldb_snapshot_t *snapshot) {
-  ldb_release_snapshot(db, snapshot);
+  ldb_release(db, snapshot);
 }
 
 char *
 leveldb_property_value(leveldb_t *db, const char *propname) {
   char *result;
 
-  if (ldb_get_property(db, propname, &result))
+  if (ldb_property(db, propname, &result))
     return result;
 
   return NULL;
@@ -215,7 +214,7 @@ leveldb_approximate_sizes(leveldb_t *db, int num_ranges,
                                                      range_limit_key_len[i]);
   }
 
-  ldb_get_approximate_sizes(db, ranges, num_ranges, sizes);
+  ldb_approximate_sizes(db, ranges, num_ranges, sizes);
   ldb_free(ranges);
 }
 
@@ -228,19 +227,19 @@ leveldb_compact_range(leveldb_t *db,
   ldb_slice_set(&start, (const uint8_t *)start_key, start_key_len);
   ldb_slice_set(&limit, (const uint8_t *)limit_key, limit_key_len);
 
-  ldb_compact_range(db, &start, &limit);
+  ldb_compact(db, &start, &limit);
 }
 
 void
 leveldb_destroy_db(const leveldb_options_t *options,
                    const char *name, char **errptr) {
-  save_error(errptr, ldb_destroy_db(name, options));
+  save_error(errptr, ldb_destroy(name, options));
 }
 
 void
 leveldb_repair_db(const leveldb_options_t *options,
                   const char *name, char **errptr) {
-  save_error(errptr, ldb_repair_db(name, options));
+  save_error(errptr, ldb_repair(name, options));
 }
 
 void
@@ -255,12 +254,12 @@ leveldb_iter_valid(const leveldb_iterator_t *iter) {
 
 void
 leveldb_iter_seek_to_first(leveldb_iterator_t *iter) {
-  ldb_iter_seek_first(iter);
+  ldb_iter_first(iter);
 }
 
 void
 leveldb_iter_seek_to_last(leveldb_iterator_t *iter) {
-  ldb_iter_seek_last(iter);
+  ldb_iter_last(iter);
 }
 
 void
@@ -468,21 +467,6 @@ slice_compare(const ldb_comparator_t *comparator,
                                   (const char *)y->data, y->size);
 }
 
-static void
-shortest_separator(const ldb_comparator_t *comparator,
-                   ldb_buffer_t *start,
-                   const ldb_slice_t *limit) {
-  (void)comparator;
-  (void)start;
-  (void)limit;
-}
-
-static void
-short_successor(const ldb_comparator_t *comparator, ldb_buffer_t *key) {
-  (void)comparator;
-  (void)key;
-}
-
 leveldb_comparator_t *
 leveldb_comparator_create(void *state,
                           void (*destructor)(void *),
@@ -493,8 +477,8 @@ leveldb_comparator_create(void *state,
 
   cmp->rep.name = name(state);
   cmp->rep.compare = slice_compare;
-  cmp->rep.shortest_separator = shortest_separator;
-  cmp->rep.short_successor = short_successor;
+  cmp->rep.shortest_separator = NULL;
+  cmp->rep.short_successor = NULL;
   cmp->rep.user_comparator = NULL;
   cmp->rep.state = cmp;
 
@@ -661,12 +645,7 @@ leveldb_cache_destroy(leveldb_cache_t *cache) {
 
 leveldb_env_t *
 leveldb_create_default_env(void) {
-  leveldb_env_t *env = ldb_malloc(sizeof(leveldb_env_t));
-
-  env->rep = NULL;
-  env->is_default = 1;
-
-  return env;
+  return ldb_malloc(sizeof(leveldb_env_t));
 }
 
 void

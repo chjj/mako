@@ -42,7 +42,7 @@ ldb_build_table(const char *prefix,
 
   meta->file_size = 0;
 
-  ldb_iter_seek_first(iter);
+  ldb_iter_first(iter);
 
   if (!ldb_table_filename(fname, sizeof(fname), prefix, meta->number))
     return LDB_INVALID;

@@ -22,40 +22,60 @@ ldb_atomic_no_empty_translation_unit(void) {
 
 long
 ldb_atomic__fetch_add(volatile long *object, long operand) {
-  /* Windows 98 or above. */
+  /* Windows 98 and above. */
   return InterlockedExchangeAdd(object, operand);
 }
 
 long
 ldb_atomic__load(volatile long *object) {
-  /* Windows 98 or above. */
+#if defined(MemoryBarrier)
+  /* Modern MSVC. */
+  MemoryBarrier();
+  return *object;
+#else
+  /* Windows 98 and above. */
   return InterlockedCompareExchange(object, 0, 0);
+#endif
 }
 
 void
 ldb_atomic__store(volatile long *object, long desired) {
-  /* Windows 95 or above. */
+#if defined(MemoryBarrier)
+  /* Modern MSVC. */
+  *object = desired;
+  MemoryBarrier();
+#else
+  /* Windows 95 and above. */
   (void)InterlockedExchange(object, desired);
+#endif
 }
 
 void *
 ldb_atomic__load_ptr(void *volatile *object) {
-#ifdef _WIN64
-  /* Windows XP or above. */
+#if defined(MemoryBarrier)
+  /* Modern MSVC. */
+  MemoryBarrier();
+  return *object;
+#elif defined(_WIN64)
+  /* Windows XP and above. */
   return InterlockedCompareExchangePointer(object, NULL, NULL);
 #else
-  /* Windows 98 or above. */
+  /* Windows 98 and above. */
   return InterlockedCompareExchange((volatile long *)object, 0, 0);
 #endif
 }
 
 void
 ldb_atomic__store_ptr(void *volatile *object, void *desired) {
-#ifdef _WIN64
-  /* Windows XP or above. */
+#if defined(MemoryBarrier)
+  /* Modern MSVC. */
+  *object = desired;
+  MemoryBarrier();
+#elif defined(_WIN64)
+  /* Windows XP and above. */
   (void)InterlockedExchangePointer(object, desired);
 #else
-  /* Windows 98 or above. */
+  /* Windows 98 and above. */
   (void)InterlockedExchange((volatile long *)object, desired);
 #endif
 }

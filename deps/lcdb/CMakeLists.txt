@@ -252,6 +252,11 @@ endif()
 if(MINGW)
   # Ensure we are redistributable on windows.
   list(APPEND ldb_ldflags -static-libgcc)
+  # Much compatibility.
+  if(MINGW_ARCH STREQUAL "i686")
+    list(APPEND ldb_cflags -march=i486 -mtune=i686)
+    list(APPEND ldb_ldflags -march=i486 -mtune=i686)
+  endif()
 endif()
 
 #

@@ -152,11 +152,11 @@ ldb_mergeiter_find_largest(ldb_mergeiter_t *mi) {
 }
 
 static void
-ldb_mergeiter_seek_first(ldb_mergeiter_t *mi) {
+ldb_mergeiter_first(ldb_mergeiter_t *mi) {
   int i;
 
   for (i = 0; i < mi->n; i++)
-    ldb_wrapiter_seek_first(&mi->children[i]);
+    ldb_wrapiter_first(&mi->children[i]);
 
   ldb_mergeiter_find_smallest(mi);
 
@@ -164,11 +164,11 @@ ldb_mergeiter_seek_first(ldb_mergeiter_t *mi) {
 }
 
 static void
-ldb_mergeiter_seek_last(ldb_mergeiter_t *mi) {
+ldb_mergeiter_last(ldb_mergeiter_t *mi) {
   int i;
 
   for (i = 0; i < mi->n; i++)
-    ldb_wrapiter_seek_last(&mi->children[i]);
+    ldb_wrapiter_last(&mi->children[i]);
 
   ldb_mergeiter_find_largest(mi);
 
@@ -248,7 +248,7 @@ ldb_mergeiter_prev(ldb_mergeiter_t *mi) {
           ldb_wrapiter_prev(child);
         } else {
           /* Child has no entries >= key(). Position at last entry. */
-          ldb_wrapiter_seek_last(child);
+          ldb_wrapiter_last(child);
         }
       }
     }

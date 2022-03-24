@@ -517,12 +517,12 @@ rb_iter_reset(rb_iter_t *iter) {
 }
 
 void
-rb_iter_seek_first(rb_iter_t *iter) {
+rb_iter_first(rb_iter_t *iter) {
   iter->node = rb_node_min(iter->root);
 }
 
 void
-rb_iter_seek_last(rb_iter_t *iter) {
+rb_iter_last(rb_iter_t *iter) {
   iter->node = rb_node_max(iter->root);
 }
 
@@ -573,7 +573,7 @@ rb_iter_next(rb_iter_t *iter) {
 int
 rb_iter_start(rb_iter_t *iter, const rb_tree_t *tree) {
   rb_iter_init(iter, tree);
-  rb_iter_seek_first(iter);
+  rb_iter_first(iter);
   return 0;
 }
 

@@ -103,11 +103,11 @@ ldb_skipiter_seek(ldb_skipiter_t *iter, const uint8_t *target);
 /* Position at the first entry in list. */
 /* Final state of iterator is valid() iff list is not empty. */
 void
-ldb_skipiter_seek_first(ldb_skipiter_t *iter);
+ldb_skipiter_first(ldb_skipiter_t *iter);
 
 /* Position at the last entry in list. */
 /* Final state of iterator is valid() iff list is not empty. */
 void
-ldb_skipiter_seek_last(ldb_skipiter_t *iter);
+ldb_skipiter_last(ldb_skipiter_t *iter);
 
 #endif /* LDB_SKIPLIST_H */

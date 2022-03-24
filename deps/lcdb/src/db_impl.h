@@ -72,34 +72,34 @@ LDB_EXTERN int
 ldb_write(ldb_t *db, struct ldb_batch_s *updates, const ldb_writeopt_t *options);
 
 LDB_EXTERN const struct ldb_snapshot_s *
-ldb_get_snapshot(ldb_t *db);
+ldb_snapshot(ldb_t *db);
 
 LDB_EXTERN void
-ldb_release_snapshot(ldb_t *db, const struct ldb_snapshot_s *snapshot);
+ldb_release(ldb_t *db, const struct ldb_snapshot_s *snapshot);
 
 LDB_EXTERN struct ldb_iter_s *
 ldb_iterator(ldb_t *db, const ldb_readopt_t *options);
 
 LDB_EXTERN int
-ldb_get_property(ldb_t *db, const char *property, char **value);
+ldb_property(ldb_t *db, const char *property, char **value);
 
 LDB_EXTERN void
-ldb_get_approximate_sizes(ldb_t *db, const ldb_range_t *range,
-                                     size_t length,
-                                     uint64_t *sizes);
+ldb_approximate_sizes(ldb_t *db, const ldb_range_t *range,
+                                 size_t length,
+                                 uint64_t *sizes);
 
 LDB_EXTERN void
-ldb_compact_range(ldb_t *db, const ldb_slice_t *begin, const ldb_slice_t *end);
+ldb_compact(ldb_t *db, const ldb_slice_t *begin, const ldb_slice_t *end);
 
 /*
  * Static
  */
 
 LDB_EXTERN int
-ldb_repair_db(const char *dbname, const ldb_dbopt_t *options);
+ldb_repair(const char *dbname, const ldb_dbopt_t *options);
 
 LDB_EXTERN int
-ldb_destroy_db(const char *dbname, const ldb_dbopt_t *options);
+ldb_destroy(const char *dbname, const ldb_dbopt_t *options);
 
 /*
  * Testing

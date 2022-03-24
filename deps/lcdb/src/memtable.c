@@ -220,13 +220,13 @@ ldb_memiter_seek(ldb_memiter_t *iter, const ldb_slice_t *key) {
 }
 
 static void
-ldb_memiter_seek_first(ldb_memiter_t *iter) {
-  ldb_skipiter_seek_first(&iter->iter);
+ldb_memiter_first(ldb_memiter_t *iter) {
+  ldb_skipiter_first(&iter->iter);
 }
 
 static void
-ldb_memiter_seek_last(ldb_memiter_t *iter) {
-  ldb_skipiter_seek_last(&iter->iter);
+ldb_memiter_last(ldb_memiter_t *iter) {
+  ldb_skipiter_last(&iter->iter);
 }
 
 static void

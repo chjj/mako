@@ -252,12 +252,12 @@ ldb_numiter_seek(ldb_numiter_t *iter, const ldb_slice_t *target) {
 }
 
 static void
-ldb_numiter_seek_first(ldb_numiter_t *iter) {
+ldb_numiter_first(ldb_numiter_t *iter) {
   iter->index = 0;
 }
 
 static void
-ldb_numiter_seek_last(ldb_numiter_t *iter) {
+ldb_numiter_last(ldb_numiter_t *iter) {
   iter->index = iter->flist->length == 0 ? 0 : iter->flist->length - 1;
 }
 
@@ -1363,7 +1363,7 @@ ldb_vset_reuse_manifest(ldb_vset_t *vset, const char *dscname) {
 
   if (!ldb_parse_filename(&manifest_type, &manifest_number, dscbase)
       || manifest_type != LDB_FILE_DESC
-      || ldb_get_file_size(dscname, &manifest_size) != LDB_OK
+      || ldb_file_size(dscname, &manifest_size) != LDB_OK
       /* Make new compacted MANIFEST if old one is too big. */
       || manifest_size >= target_file_size(vset->options)) {
     return 0;

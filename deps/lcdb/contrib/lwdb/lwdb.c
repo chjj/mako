@@ -11,11 +11,19 @@
  */
 
 #include <assert.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <leveldb/c.h>
+
+/*
+ * Options
+ */
+
+/* Define to assume latest leveldb version. */
+/* #undef LWDB_LATEST */
 
 /*
  * Macros
@@ -68,7 +76,7 @@ typedef struct ldb_range_s {
 
 typedef struct ldb_s ldb_t;
 typedef struct ldb_batch_s ldb_batch_t;
-typedef leveldb_filterpolicy_t ldb_bloom_t;
+typedef struct ldb_bloom_s ldb_bloom_t;
 typedef struct ldb_comparator_s ldb_comparator_t;
 typedef struct ldb_dbopt_s ldb_dbopt_t;
 typedef struct ldb_handler_s ldb_handler_t;
@@ -80,8 +88,21 @@ typedef struct ldb_readopt_s ldb_readopt_t;
 typedef leveldb_snapshot_t ldb_snapshot_t;
 typedef struct ldb_writeopt_s ldb_writeopt_t;
 
+struct ldb_comparator_s {
+  const char *name;
+  int (*compare)(const ldb_comparator_t *,
+                 const ldb_slice_t *,
+                 const ldb_slice_t *);
+  void (*dummy1)(void);
+  void (*dummy2)(void);
+  void *dummy3;
+  void *dummy4;
+};
+
 struct ldb_s {
+  ldb_comparator_t ucmp;
   leveldb_comparator_t *cmp;
+  leveldb_filterpolicy_t *policy;
   leveldb_options_t *options;
   leveldb_readoptions_t *read_options;
   leveldb_writeoptions_t *write_options;
@@ -97,15 +118,8 @@ struct ldb_batch_s {
   } props;
 };
 
-struct ldb_comparator_s {
-  const char *name;
-  int (*compare)(const ldb_comparator_t *,
-                 const ldb_slice_t *,
-                 const ldb_slice_t *);
-  void (*dummy1)(void);
-  void (*dummy2)(void);
-  void *dummy3;
-  void *dummy4;
+struct ldb_bloom_s {
+  leveldb_filterpolicy_t *rep;
 };
 
 struct ldb_dbopt_s {
@@ -141,8 +155,8 @@ struct ldb_handler_s {
 struct ldb_itertbl_s {
   void (*clear)(leveldb_iterator_t *iter);
   int (*valid)(const leveldb_iterator_t *iter);
-  void (*seek_first)(leveldb_iterator_t *iter);
-  void (*seek_last)(leveldb_iterator_t *iter);
+  void (*first)(leveldb_iterator_t *iter);
+  void (*last)(leveldb_iterator_t *iter);
   void (*seek)(leveldb_iterator_t *iter, const ldb_slice_t *target);
   void (*next)(leveldb_iterator_t *iter);
   void (*prev)(leveldb_iterator_t *iter);
@@ -156,10 +170,14 @@ struct ldb_iter_s {
   struct {
     void (*dummy1)(void);
     leveldb_readoptions_t *options;
+    const ldb_comparator_t *ucmp;
     void *dummy2;
-    void *dummy3;
   } props;
   const ldb_itertbl_t *table;
+};
+
+struct ldb_logger_s {
+  void *dummy;
 };
 
 struct ldb_readopt_s {
@@ -182,6 +200,154 @@ LDB_EXTERN extern const ldb_dbopt_t *ldb_dbopt_default;
 LDB_EXTERN extern const ldb_readopt_t *ldb_readopt_default;
 LDB_EXTERN extern const ldb_writeopt_t *ldb_writeopt_default;
 LDB_EXTERN extern const ldb_readopt_t *ldb_iteropt_default;
+
+/*
+ * Functions
+ */
+
+/* Batch */
+LDB_EXTERN ldb_batch_t *
+ldb_batch_create(void);
+
+LDB_EXTERN void
+ldb_batch_destroy(ldb_batch_t *batch);
+
+LDB_EXTERN void
+ldb_batch_init(ldb_batch_t *batch);
+
+LDB_EXTERN void
+ldb_batch_clear(ldb_batch_t *batch);
+
+LDB_EXTERN void
+ldb_batch_reset(ldb_batch_t *batch);
+
+LDB_EXTERN size_t
+ldb_batch_approximate_size(const ldb_batch_t *batch);
+
+LDB_EXTERN void
+ldb_batch_put(ldb_batch_t *batch,
+              const ldb_slice_t *key,
+              const ldb_slice_t *value);
+
+LDB_EXTERN void
+ldb_batch_del(ldb_batch_t *batch, const ldb_slice_t *key);
+
+LDB_EXTERN int
+ldb_batch_iterate(const ldb_batch_t *batch, ldb_handler_t *handler);
+
+LDB_EXTERN void
+ldb_batch_append(ldb_batch_t *dst, const ldb_batch_t *src);
+
+/* Bloom */
+LDB_EXTERN ldb_bloom_t *
+ldb_bloom_create(int bits_per_key);
+
+LDB_EXTERN void
+ldb_bloom_destroy(ldb_bloom_t *bloom);
+
+/* Cache */
+LDB_EXTERN ldb_lru_t *
+ldb_lru_create(size_t capacity);
+
+LDB_EXTERN void
+ldb_lru_destroy(ldb_lru_t *lru);
+
+/* Database */
+LDB_EXTERN int
+ldb_open(const char *dbname, const ldb_dbopt_t *options, ldb_t **dbptr);
+
+LDB_EXTERN void
+ldb_close(ldb_t *db);
+
+LDB_EXTERN int
+ldb_get(ldb_t *db, const ldb_slice_t *key,
+                   ldb_slice_t *value,
+                   const ldb_readopt_t *options);
+
+LDB_EXTERN int
+ldb_has(ldb_t *db, const ldb_slice_t *key, const ldb_readopt_t *options);
+
+LDB_EXTERN int
+ldb_put(ldb_t *db, const ldb_slice_t *key,
+                   const ldb_slice_t *value,
+                   const ldb_writeopt_t *options);
+
+LDB_EXTERN int
+ldb_del(ldb_t *db, const ldb_slice_t *key, const ldb_writeopt_t *options);
+
+LDB_EXTERN int
+ldb_write(ldb_t *db, ldb_batch_t *updates, const ldb_writeopt_t *options);
+
+LDB_EXTERN const ldb_snapshot_t *
+ldb_snapshot(ldb_t *db);
+
+LDB_EXTERN void
+ldb_release(ldb_t *db, const ldb_snapshot_t *snapshot);
+
+LDB_EXTERN int
+ldb_property(ldb_t *db, const char *property, char **value);
+
+LDB_EXTERN void
+ldb_approximate_sizes(ldb_t *db, const ldb_range_t *range,
+                                 size_t length,
+                                 uint64_t *sizes);
+
+LDB_EXTERN void
+ldb_compact(ldb_t *db, const ldb_slice_t *begin, const ldb_slice_t *end);
+
+LDB_EXTERN int
+ldb_repair(const char *dbname, const ldb_dbopt_t *options);
+
+LDB_EXTERN int
+ldb_destroy(const char *dbname, const ldb_dbopt_t *options);
+
+/* Filesystem */
+LDB_EXTERN int
+ldb_test_directory(char *result, size_t size);
+
+LDB_EXTERN int
+ldb_test_filename(char *result, size_t size, const char *name);
+
+/* Internal */
+LDB_EXTERN void
+ldb_assert_fail(const char *file, int line, const char *expr);
+
+LDB_EXTERN void
+ldb_free(void *ptr);
+
+/* Iterator */
+LDB_EXTERN ldb_iter_t *
+ldb_iterator(ldb_t *db, const ldb_readopt_t *options);
+
+LDB_EXTERN int
+ldb_iter_compare(ldb_iter_t *iter, const ldb_slice_t *key);
+
+LDB_EXTERN void
+ldb_iter_destroy(ldb_iter_t *iter);
+
+/* Logging */
+LDB_EXTERN int
+ldb_logger_open(const char *filename, ldb_logger_t **result);
+
+LDB_EXTERN void
+ldb_logger_destroy(ldb_logger_t *logger);
+
+LDB_EXTERN void
+ldb_log(ldb_logger_t *logger, const char *fmt, ...);
+
+/* Slice */
+LDB_EXTERN ldb_slice_t
+ldb_slice(const void *xp, size_t xn);
+
+LDB_EXTERN ldb_slice_t
+ldb_string(const char *xp);
+
+LDB_EXTERN int
+ldb_slice_compare(const ldb_slice_t *x, const ldb_slice_t *y);
+
+/* Status */
+LDB_EXTERN const char *
+ldb_strerror(int code);
 
 /*
  * Helpers
@@ -252,6 +418,14 @@ handle_error(char *err) {
   return rc;
 }
 
+static int
+slice_compare(const ldb_comparator_t *comparator,
+              const ldb_slice_t *x,
+              const ldb_slice_t *y) {
+  (void)comparator;
+  return ldb_slice_compare(x, y);
+}
+
 static void
 comparator_destructor(void *state) {
   (void)state;
@@ -279,17 +453,25 @@ comparator_name(void *state) {
 }
 
 static leveldb_comparator_t *
-convert_comparator(ldb_comparator_t *x) {
-  if (x == NULL)
+convert_comparator(ldb_comparator_t *cmp) {
+  if (cmp == NULL)
     return NULL;
 
-  return leveldb_comparator_create(x, comparator_destructor,
-                                      comparator_compare,
-                                      comparator_name);
+  if (cmp->name == ldb_bytewise_comparator->name
+      && cmp->compare == ldb_bytewise_comparator->compare) {
+    return NULL;
+  }
+
+  return leveldb_comparator_create(cmp, comparator_destructor,
+                                        comparator_compare,
+                                        comparator_name);
 }
 
 static leveldb_options_t *
-convert_dbopt(const ldb_dbopt_t *x, leveldb_comparator_t *cmp) {
+convert_dbopt(const ldb_dbopt_t *x,
+              leveldb_comparator_t *cmp,
+              leveldb_filterpolicy_t **policy) {
+  /* Currently no way to set info_log, reuse_logs, or use_mmap. */
   leveldb_options_t *z = leveldb_options_create();
 
   if (cmp != NULL)
@@ -306,11 +488,20 @@ convert_dbopt(const ldb_dbopt_t *x, leveldb_comparator_t *cmp) {
 
   leveldb_options_set_block_size(z, x->block_size);
   leveldb_options_set_block_restart_interval(z, x->block_restart_interval);
+#ifdef LWDB_LATEST
+  /* Requires leveldb 1.21 (March 2019). */
   leveldb_options_set_max_file_size(z, x->max_file_size);
+#endif
   leveldb_options_set_compression(z, x->compression);
 
-  if (x->filter_policy != NULL)
-    leveldb_options_set_filter_policy(z, x->filter_policy);
+  if (x->filter_policy != NULL) {
+    if (x->filter_policy->rep == NULL) {
+      *policy = leveldb_filterpolicy_create_bloom(10);
+      leveldb_options_set_filter_policy(z, *policy);
+    } else {
+      leveldb_options_set_filter_policy(z, x->filter_policy->rep);
+    }
+  }
 
   return z;
 }
@@ -339,30 +530,30 @@ convert_writeopt(const ldb_writeopt_t *x) {
  * Batch
  */
 
-LDB_EXTERN ldb_batch_t *
+ldb_batch_t *
 ldb_batch_create(void) {
   ldb_batch_t *batch = safe_malloc(sizeof(ldb_batch_t));
   batch->props.rep = leveldb_writebatch_create();
   return batch;
 }
 
-LDB_EXTERN void
+void
 ldb_batch_destroy(ldb_batch_t *batch) {
   leveldb_writebatch_destroy(batch->props.rep);
   safe_free(batch);
 }
 
-LDB_EXTERN void
+void
 ldb_batch_init(ldb_batch_t *batch) {
   batch->props.rep = leveldb_writebatch_create();
 }
 
-LDB_EXTERN void
+void
 ldb_batch_clear(ldb_batch_t *batch) {
   leveldb_writebatch_destroy(batch->props.rep);
 }
 
-LDB_EXTERN void
+void
 ldb_batch_reset(ldb_batch_t *batch) {
   leveldb_writebatch_destroy(batch->props.rep);
 
@@ -386,14 +577,14 @@ size_del(void *state, const char *k, size_t klen) {
   *((size_t *)state) += klen;
 }
 
-LDB_EXTERN size_t
+size_t
 ldb_batch_approximate_size(const ldb_batch_t *batch) {
   size_t result = 0;
   leveldb_writebatch_iterate(batch->props.rep, &result, size_put, size_del);
   return result;
 }
 
-LDB_EXTERN void
+void
 ldb_batch_put(ldb_batch_t *batch,
               const ldb_slice_t *key,
               const ldb_slice_t *value) {
@@ -401,7 +592,7 @@ ldb_batch_put(ldb_batch_t *batch,
                                            value->data, value->size);
 }
 
-LDB_EXTERN void
+void
 ldb_batch_del(ldb_batch_t *batch, const ldb_slice_t *key) {
   leveldb_writebatch_delete(batch->props.rep, key->data, key->size);
 }
@@ -432,43 +623,68 @@ batch_del(void *state, const char *k, size_t klen) {
   handler->del(handler, &key);
 }
 
-LDB_EXTERN int
+int
 ldb_batch_iterate(const ldb_batch_t *batch, ldb_handler_t *handler) {
   leveldb_writebatch_iterate(batch->props.rep, handler, batch_put, batch_del);
   return LDB_OK;
 }
 
-LDB_EXTERN void
+#ifndef LWDB_LATEST
+static void
+append_put(void *state, const char *k, size_t klen,
+                        const char *v, size_t vlen) {
+  leveldb_writebatch_put(state, k, klen, v, vlen);
+}
+
+static void
+append_del(void *state, const char *k, size_t klen) {
+  leveldb_writebatch_delete(state, k, klen);
+}
+#endif
+
+void
 ldb_batch_append(ldb_batch_t *dst, const ldb_batch_t *src) {
+#ifdef LWDB_LATEST
+  /* Requires leveldb 1.21 (March 2019). */
   leveldb_writebatch_append(dst->props.rep, src->props.rep);
+#else
+  leveldb_writebatch_iterate(src->props.rep, dst->props.rep,
+                             append_put, append_del);
+#endif
 }
 
 /*
  * Bloom
  */
 
-LDB_EXTERN ldb_bloom_t *
+static const ldb_bloom_t bloom_default = {NULL};
+
+const ldb_bloom_t *ldb_bloom_default = &bloom_default;
+
+ldb_bloom_t *
 ldb_bloom_create(int bits_per_key) {
-  return leveldb_filterpolicy_create_bloom(bits_per_key);
+  ldb_bloom_t *bloom = safe_malloc(sizeof(ldb_bloom_t));
+  /* Requires leveldb 1.4 (April 2012). */
+  bloom->rep = leveldb_filterpolicy_create_bloom(bits_per_key);
+  return bloom;
 }
 
-LDB_EXTERN void
+void
 ldb_bloom_destroy(ldb_bloom_t *bloom) {
-  leveldb_filterpolicy_destroy(bloom);
+  leveldb_filterpolicy_destroy(bloom->rep);
+  safe_free(bloom);
 }
-
-const ldb_bloom_t *ldb_bloom_default = NULL;
 
 /*
  * Cache
  */
 
-LDB_EXTERN ldb_lru_t *
+ldb_lru_t *
 ldb_lru_create(size_t capacity) {
   return leveldb_cache_create_lru(capacity);
 }
 
-LDB_EXTERN void
+void
 ldb_lru_destroy(ldb_lru_t *lru) {
   leveldb_cache_destroy(lru);
 }
@@ -477,16 +693,22 @@ ldb_lru_destroy(ldb_lru_t *lru) {
  * Comparator
  */
 
-const ldb_comparator_t *ldb_bytewise_comparator = NULL;
+static const ldb_comparator_t bytewise_comparator = {
+  /* .name = */ "leveldb.BytewiseComparator",
+  /* .compare = */ slice_compare,
+  /* .shortest_separator = */ NULL,
+  /* .short_successor = */ NULL,
+  /* .user_comparator = */ NULL,
+  /* .state = */ NULL
+};
+
+const ldb_comparator_t *ldb_bytewise_comparator = &bytewise_comparator;
 
 /*
  * Database
  */
 
-LDB_EXTERN void
-ldb_close(ldb_t *db);
-
-LDB_EXTERN int
+int
 ldb_open(const char *dbname, const ldb_dbopt_t *options, ldb_t **dbptr) {
   ldb_t *db = safe_malloc(sizeof(ldb_t));
   char *err = NULL;
@@ -495,8 +717,11 @@ ldb_open(const char *dbname, const ldb_dbopt_t *options, ldb_t **dbptr) {
   if (options == NULL)
     options = ldb_dbopt_default;
 
-  db->cmp = convert_comparator(options->comparator);
-  db->options = convert_dbopt(options, db->cmp);
+  db->ucmp = options->comparator != NULL ? *options->comparator
+                                         : bytewise_comparator;
+  db->cmp = convert_comparator(&db->ucmp);
+  db->policy = NULL;
+  db->options = convert_dbopt(options, db->cmp, &db->policy);
   db->read_options = convert_readopt(ldb_readopt_default);
   db->write_options = convert_writeopt(ldb_writeopt_default);
   db->iter_options = convert_readopt(ldb_iteropt_default);
@@ -514,13 +739,16 @@ ldb_open(const char *dbname, const ldb_dbopt_t *options, ldb_t **dbptr) {
   return rc;
 }
 
-LDB_EXTERN void
+void
 ldb_close(ldb_t *db) {
   if (db->level != NULL)
     leveldb_close(db->level);
 
   if (db->cmp != NULL)
     leveldb_comparator_destroy(db->cmp);
+
+  if (db->policy != NULL)
+    leveldb_filterpolicy_destroy(db->policy);
 
   leveldb_options_destroy(db->options);
   leveldb_readoptions_destroy(db->read_options);
@@ -530,7 +758,7 @@ ldb_close(ldb_t *db) {
   safe_free(db);
 }
 
-LDB_EXTERN int
+int
 ldb_get(ldb_t *db, const ldb_slice_t *key,
                    ldb_slice_t *value,
                    const ldb_readopt_t *options) {
@@ -564,7 +792,7 @@ done:
   return rc;
 }
 
-LDB_EXTERN int
+int
 ldb_has(ldb_t *db, const ldb_slice_t *key, const ldb_readopt_t *options) {
   ldb_slice_t val;
   int rc;
@@ -577,7 +805,7 @@ ldb_has(ldb_t *db, const ldb_slice_t *key, const ldb_readopt_t *options) {
   return rc;
 }
 
-LDB_EXTERN int
+int
 ldb_put(ldb_t *db, const ldb_slice_t *key,
                    const ldb_slice_t *value,
                    const ldb_writeopt_t *options) {
@@ -601,7 +829,7 @@ ldb_put(ldb_t *db, const ldb_slice_t *key,
   return handle_error(err);
 }
 
-LDB_EXTERN int
+int
 ldb_del(ldb_t *db, const ldb_slice_t *key, const ldb_writeopt_t *options) {
   leveldb_writeoptions_t *opt = db->write_options;
   char *err = NULL;
@@ -617,7 +845,7 @@ ldb_del(ldb_t *db, const ldb_slice_t *key, const ldb_writeopt_t *options) {
   return handle_error(err);
 }
 
-LDB_EXTERN int
+int
 ldb_write(ldb_t *db, ldb_batch_t *updates, const ldb_writeopt_t *options) {
   leveldb_writeoptions_t *opt = db->write_options;
   char *err = NULL;
@@ -633,26 +861,26 @@ ldb_write(ldb_t *db, ldb_batch_t *updates, const ldb_writeopt_t *options) {
   return handle_error(err);
 }
 
-LDB_EXTERN const ldb_snapshot_t *
-ldb_get_snapshot(ldb_t *db) {
+const ldb_snapshot_t *
+ldb_snapshot(ldb_t *db) {
   return leveldb_create_snapshot(db->level);
 }
 
-LDB_EXTERN void
-ldb_release_snapshot(ldb_t *db, const ldb_snapshot_t *snapshot) {
+void
+ldb_release(ldb_t *db, const ldb_snapshot_t *snapshot) {
   leveldb_release_snapshot(db->level, snapshot);
 }
 
-LDB_EXTERN int
-ldb_get_property(ldb_t *db, const char *property, char **value) {
+int
+ldb_property(ldb_t *db, const char *property, char **value) {
   *value = leveldb_property_value(db->level, property);
   return *value != NULL;
 }
 
-LDB_EXTERN void
-ldb_get_approximate_sizes(ldb_t *db, const ldb_range_t *range,
-                                     size_t length,
-                                     uint64_t *sizes) {
+void
+ldb_approximate_sizes(ldb_t *db, const ldb_range_t *range,
+                                 size_t length,
+                                 uint64_t *sizes) {
   const char **start_keys = safe_malloc(length * sizeof(char *));
   const char **limit_keys = safe_malloc(length * sizeof(char *));
   size_t *start_lens = safe_malloc(length * sizeof(size_t));
@@ -677,8 +905,8 @@ ldb_get_approximate_sizes(ldb_t *db, const ldb_range_t *range,
   safe_free(limit_lens);
 }
 
-LDB_EXTERN void
-ldb_compact_range(ldb_t *db, const ldb_slice_t *begin, const ldb_slice_t *end) {
+void
+ldb_compact(ldb_t *db, const ldb_slice_t *begin, const ldb_slice_t *end) {
   static const ldb_slice_t empty = {NULL, 0, 0};
 
   if (begin == NULL)
@@ -691,8 +919,9 @@ ldb_compact_range(ldb_t *db, const ldb_slice_t *begin, const ldb_slice_t *end) {
                                    end->data, end->size);
 }
 
-LDB_EXTERN int
-ldb_repair_db(const char *dbname, const ldb_dbopt_t *options) {
+int
+ldb_repair(const char *dbname, const ldb_dbopt_t *options) {
+  leveldb_filterpolicy_t *policy = NULL;
   leveldb_comparator_t *cmp;
   leveldb_options_t *opt;
   char *err = NULL;
@@ -701,20 +930,24 @@ ldb_repair_db(const char *dbname, const ldb_dbopt_t *options) {
     options = ldb_dbopt_default;
 
   cmp = convert_comparator(options->comparator);
-  opt = convert_dbopt(options, cmp);
+  opt = convert_dbopt(options, cmp, &policy);
 
   leveldb_repair_db(opt, dbname, &err);
 
   if (cmp != NULL)
     leveldb_comparator_destroy(cmp);
 
+  if (policy != NULL)
+    leveldb_filterpolicy_destroy(policy);
+
   leveldb_options_destroy(opt);
 
   return handle_error(err);
 }
 
-LDB_EXTERN int
-ldb_destroy_db(const char *dbname, const ldb_dbopt_t *options) {
+int
+ldb_destroy(const char *dbname, const ldb_dbopt_t *options) {
+  leveldb_filterpolicy_t *policy = NULL;
   leveldb_comparator_t *cmp;
   leveldb_options_t *opt;
   char *err = NULL;
@@ -723,12 +956,15 @@ ldb_destroy_db(const char *dbname, const ldb_dbopt_t *options) {
     options = ldb_dbopt_default;
 
   cmp = convert_comparator(options->comparator);
-  opt = convert_dbopt(options, cmp);
+  opt = convert_dbopt(options, cmp, &policy);
 
   leveldb_destroy_db(opt, dbname, &err);
 
   if (cmp != NULL)
     leveldb_comparator_destroy(cmp);
+
+  if (policy != NULL)
+    leveldb_filterpolicy_destroy(policy);
 
   leveldb_options_destroy(opt);
 
@@ -739,32 +975,64 @@ ldb_destroy_db(const char *dbname, const ldb_dbopt_t *options) {
  * Filesystem
  */
 
-LDB_EXTERN int
+#ifndef LWDB_LATEST
+#  ifdef _WIN32
+#    include <windows.h>
+#  else
+#    include <sys/types.h>
+#    include <sys/stat.h>
+#  endif
+#endif
+
+int
 ldb_test_directory(char *result, size_t size) {
+#ifdef LWDB_LATEST
   leveldb_env_t *env = leveldb_create_default_env();
+  /* Requires leveldb 1.21 (March 2019). */
   char *path = leveldb_env_get_test_directory(env);
-  int ret = 0;
   size_t len;
 
-  if (path == NULL) {
-    leveldb_env_destroy(env);
+  leveldb_env_destroy(env);
+
+  if (path == NULL)
     return 0;
-  }
 
   len = strlen(path);
 
-  if (size >= len + 1) {
-    memcpy(result, path, len + 1);
-    ret = 1;
+  if (len + 1 > size) {
+    safe_free(path);
+    return 0;
   }
 
-  leveldb_env_destroy(env);
+  memcpy(result, path, len + 1);
+
   safe_free(path);
 
-  return ret;
+  return 1;
+#else /* !LWDB_LATEST */
+#ifdef _WIN32
+  static const char tmp[] = "C:/temp/leveldbtest";
+#else
+  static const char tmp[] = "/tmp/leveldbtest";
+#endif
+
+  if (sizeof(tmp) > size)
+    return 0;
+
+  memcpy(result, tmp, sizeof(tmp));
+
+#ifdef _WIN32
+  CreateDirectoryA("C:/temp", NULL);
+  CreateDirectoryA(tmp, NULL);
+#else
+  mkdir(tmp, 0755);
+#endif
+
+  return 1;
+#endif /* !LWDB_LATEST */
 }
 
-LDB_EXTERN int
+int
 ldb_test_filename(char *result, size_t size, const char *name) {
   char path[1024];
 
@@ -783,7 +1051,7 @@ ldb_test_filename(char *result, size_t size, const char *name) {
  * Internal
  */
 
-LDB_EXTERN void
+void
 ldb_assert_fail(const char *file, int line, const char *expr) {
   /* LCOV_EXCL_START */
   fprintf(stderr, "%s:%d: Assertion `%s' failed.\n", file, line, expr);
@@ -792,7 +1060,7 @@ ldb_assert_fail(const char *file, int line, const char *expr) {
   /* LCOV_EXCL_STOP */
 }
 
-LDB_EXTERN void
+void
 ldb_free(void *ptr) {
   leveldb_free(ptr);
 }
@@ -807,12 +1075,12 @@ iter_valid(const leveldb_iterator_t *iter) {
 }
 
 static void
-iter_seek_first(leveldb_iterator_t *iter) {
+iter_first(leveldb_iterator_t *iter) {
   leveldb_iter_seek_to_first(iter);
 }
 
 static void
-iter_seek_last(leveldb_iterator_t *iter) {
+iter_last(leveldb_iterator_t *iter) {
   leveldb_iter_seek_to_last(iter);
 }
 
@@ -857,8 +1125,8 @@ iter_status(const leveldb_iterator_t *iter) {
 static const ldb_itertbl_t iter_table = {
   /* .clear = */ NULL,
   /* .valid = */ iter_valid,
-  /* .seek_first = */ iter_seek_first,
-  /* .seek_last = */ iter_seek_last,
+  /* .first = */ iter_first,
+  /* .last = */ iter_last,
   /* .seek = */ iter_seek,
   /* .next = */ iter_next,
   /* .prev = */ iter_prev,
@@ -867,7 +1135,7 @@ static const ldb_itertbl_t iter_table = {
   /* .status = */ iter_status
 };
 
-LDB_EXTERN ldb_iter_t *
+ldb_iter_t *
 ldb_iterator(ldb_t *db, const ldb_readopt_t *options) {
   ldb_iter_t *iter = safe_malloc(sizeof(ldb_iter_t));
   leveldb_readoptions_t *opt = db->iter_options;
@@ -880,12 +1148,20 @@ ldb_iterator(ldb_t *db, const ldb_readopt_t *options) {
   }
 
   iter->rep = leveldb_create_iterator(db->level, opt);
+  iter->props.ucmp = &db->ucmp;
   iter->table = &iter_table;
 
   return iter;
 }
 
-LDB_EXTERN void
+int
+ldb_iter_compare(ldb_iter_t *iter, const ldb_slice_t *key) {
+  const ldb_comparator_t *cmp = iter->props.ucmp;
+  ldb_slice_t x = iter_key(iter->rep);
+  return cmp->compare(cmp, &x, key);
+}
+
+void
 ldb_iter_destroy(ldb_iter_t *iter) {
   leveldb_iter_destroy(iter->rep);
 
@@ -893,6 +1169,35 @@ ldb_iter_destroy(ldb_iter_t *iter) {
     leveldb_readoptions_destroy(iter->props.options);
 
   safe_free(iter);
+}
+
+/*
+ * Logging
+ */
+
+int
+ldb_logger_open(const char *filename, ldb_logger_t **result) {
+  if (filename == NULL)
+    return LDB_INVALID;
+
+  *result = safe_malloc(sizeof(ldb_logger_t));
+
+  return LDB_OK;
+}
+
+void
+ldb_logger_destroy(ldb_logger_t *logger) {
+  safe_free(logger);
+}
+
+void
+ldb_log(ldb_logger_t *logger, const char *fmt, ...) {
+  va_list ap;
+
+  (void)logger;
+
+  va_start(ap, fmt);
+  va_end(ap);
 }
 
 /*
@@ -942,7 +1247,7 @@ const ldb_readopt_t *ldb_iteropt_default = &iter_options;
  * Slice
  */
 
-LDB_EXTERN ldb_slice_t
+ldb_slice_t
 ldb_slice(const void *xp, size_t xn) {
   ldb_slice_t ret;
   ret.data = (void *)xp;
@@ -951,7 +1256,7 @@ ldb_slice(const void *xp, size_t xn) {
   return ret;
 }
 
-LDB_EXTERN ldb_slice_t
+ldb_slice_t
 ldb_string(const char *xp) {
   ldb_slice_t ret;
   ret.data = (void *)xp;
@@ -960,7 +1265,7 @@ ldb_string(const char *xp) {
   return ret;
 }
 
-LDB_EXTERN int
+int
 ldb_slice_compare(const ldb_slice_t *x, const ldb_slice_t *y) {
   size_t n = x->size < y->size ? x->size : y->size;
   int r = n ? memcmp(x->data, y->data, n) : 0;
@@ -988,7 +1293,7 @@ static const char *ldb_errmsg[] = {
   /* .LDB_IOERR = */ "IO error"
 };
 
-LDB_EXTERN const char *
+const char *
 ldb_strerror(int code) {
   if (code < 0)
     code = -code;

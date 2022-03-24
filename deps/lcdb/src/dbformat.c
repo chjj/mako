@@ -323,10 +323,16 @@ void
 ldb_ikc_init(ldb_comparator_t *ikc, const ldb_comparator_t *user_comparator) {
   ikc->name = "leveldb.InternalKeyComparator";
   ikc->compare = ldb_ikc_compare;
-  ikc->shortest_separator = ldb_ikc_shortest_separator;
-  ikc->short_successor = ldb_ikc_short_successor;
+  ikc->shortest_separator = NULL;
+  ikc->short_successor = NULL;
   ikc->user_comparator = user_comparator;
   ikc->state = NULL;
+
+  if (user_comparator->shortest_separator != NULL)
+    ikc->shortest_separator = ldb_ikc_shortest_separator;
+
+  if (user_comparator->short_successor != NULL)
+    ikc->short_successor = ldb_ikc_short_successor;
 }
 
 /*
