@@ -190,6 +190,28 @@ BTCCreateFile(LPCSTR filename,
                      temp);
 }
 
+static int
+BTCGetFullPathNameW(const btc_wide_t *path, btc_wide_t *result) {
+  DWORD size, len;
+  WCHAR ch;
+
+  size = GetFullPathNameW(path->data, 1, &ch, NULL);
+
+  if (size <= 1)
+    return 0;
+
+  btc_wide_init(result, size);
+
+  len = GetFullPathNameW(path->data, size, result->data, NULL);
+
+  if (len == 0 || len >= size) {
+    btc_wide_clear(result);
+    return 0;
+  }
+
+  return 1;
+}
+
 /*
  * Filesystem
  */
@@ -644,21 +666,18 @@ btc_path_absolute(char *buf, size_t size, const char *name) {
   DWORD len;
 
   if (BTCIsWindowsNT()) {
-    btc_wide_t path, tmp;
+    btc_wide_t path, result;
     int ret = 0;
 
     if (!btc_wide_import(&path, name))
       return 0;
 
-    btc_wide_init(&tmp, size * 4);
-
-    len = GetFullPathNameW(path.data, size * 4, tmp.data, NULL);
-
-    if (len > 0 && len < size * 4)
-      ret = btc_wide_export(buf, size, &tmp);
+    if (BTCGetFullPathNameW(&path, &result)) {
+      ret = btc_wide_export(buf, size, &result);
+      btc_wide_clear(&result);
+    }
 
     btc_wide_clear(&path);
-    btc_wide_clear(&tmp);
 
     return ret;
   }
