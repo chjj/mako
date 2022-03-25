@@ -373,15 +373,13 @@ name_local(const char *name) {
 
 static struct hostent *
 watcom_gethostbyname(const char *name) {
-  static struct hostent entry = {NULL, NULL, AF_INET, 4, NULL};
   static char h_name[256] = {0};
   static char *h_aliases[1] = {NULL};
   static char *h_addr_list[64] = {NULL};
-  static char h_addr_local[4] = {127, 0, 0, 1};
-
-  entry.h_name = h_name;
-  entry.h_aliases = h_aliases;
-  entry.h_addr_list = h_addr_list;
+  static struct hostent entry = {h_name,
+                                 h_aliases,
+                                 AF_INET, 4,
+                                 h_addr_list};
 
   if (strlen(name) + 1 > sizeof(h_name))
     return NULL;
@@ -389,8 +387,11 @@ watcom_gethostbyname(const char *name) {
   name_normal(h_name, name);
 
   if (name_local(h_name)) {
+    static char h_addr_local[4] = {127, 0, 0, 1};
+
     entry.h_addr_list[0] = h_addr_local;
     entry.h_addr_list[1] = NULL;
+
     return &entry;
   }
 
