@@ -138,7 +138,7 @@ btc_getaddrinfo(btc_sockaddr_t **res, const char *name, int port) {
   }
 
   return 1;
-#endif
+#endif /* !BTC_HAVE_GETADDRINFO */
 }
 
 void
