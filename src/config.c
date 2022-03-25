@@ -9,12 +9,17 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include <mako/config.h>
 #include <mako/net.h>
 #include <mako/netaddr.h>
 #include <mako/network.h>
 #include <mako/util.h>
 #include <mako/vector.h>
+
 #include "internal.h"
 
 /*
@@ -42,15 +47,6 @@
                                   \
   memcpy(zp, xp, _xn + 1);        \
 } while (0)
-
-/*
- * Declarations (for avoiding windows.h)
- */
-
-#ifdef _WIN32
-__declspec(dllimport) unsigned long __stdcall
-GetEnvironmentVariableA(const char *name, char *buf, unsigned long size);
-#endif
 
 /*
  * Helpers
@@ -190,13 +186,26 @@ btc_match__path(char *zp, size_t zn, const char *xp, const char *yp) {
 
 #if defined(_WIN32)
   if (val[0] == '~' && (val[1] == '/' || val[1] == '\\') && val[2] != '\0') {
-    unsigned long ret;
-    char home[260];
+    char home[MAX_PATH];
+    DWORD ret;
 
-    ret = GetEnvironmentVariableA("USERPROFILE", home, sizeof(home));
+    if (GetVersion() < 0x80000000) {
+      WCHAR tmp[MAX_PATH * 4];
 
-    if (ret < 1 || ret >= sizeof(home))
-      btc_str_assign(home, "C:\\");
+      ret = GetEnvironmentVariableW(L"USERPROFILE", tmp, lengthof(tmp));
+
+      if (ret == 0 || ret >= lengthof(tmp)
+          || WideCharToMultiByte(CP_UTF8, 0, tmp, -1,
+                                 home, sizeof(home),
+                                 NULL, NULL) <= 0) {
+        btc_str_assign(home, "C:");
+      }
+    } else {
+      ret = GetEnvironmentVariableA("USERPROFILE", home, sizeof(home));
+
+      if (ret == 0 || ret >= sizeof(home))
+        btc_str_assign(home, "C:");
+    }
 
     return btc_join(zp, zn, home, val + 2, NULL);
   }
