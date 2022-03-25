@@ -23,7 +23,7 @@
 
 int
 ldb_write_file(const char *fname, const ldb_slice_t *data, int should_sync) {
-  ldb_wfile_t *file;
+  ldb_wfile_t *file = NULL;
   int rc;
 
   if ((rc = ldb_truncfile_create(fname, &file)))

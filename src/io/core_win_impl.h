@@ -17,6 +17,10 @@
 #include <shlobj.h>
 #include <io/core.h>
 
+#ifdef __GNUC__
+#  pragma GCC diagnostic ignored "-Wcast-function-type"
+#endif
+
 /*
  * Macros
  */
@@ -749,10 +753,9 @@ typedef struct BTC__PROCESS_MEMORY_COUNTERS {
 
 size_t
 btc_ps_rss(void) {
-  static BOOL (WINAPI *BTCGetProcessMemoryInfo)(HANDLE,
-                                                BTC_PROCESS_MEMORY_COUNTERS *,
-                                                DWORD) = NULL;
+  typedef BOOL (WINAPI *P)(HANDLE, BTC_PROCESS_MEMORY_COUNTERS *, DWORD);
   static volatile long state = 0;
+  static P GetMemoryInfo = NULL;
   BTC_PROCESS_MEMORY_COUNTERS pmc;
   long value;
 
@@ -760,23 +763,20 @@ btc_ps_rss(void) {
     Sleep(0);
 
   if (value == 0) {
-    HMODULE handle1 = GetModuleHandleA("kernel32.dll");
+    HMODULE h1 = GetModuleHandleA("kernel32.dll");
 
-    if (handle1 == NULL)
+    if (h1 == NULL)
       abort(); /* LCOV_EXCL_LINE */
 
     /* Windows 7 exposes an identical call in kernel32.dll. */
-    *((FARPROC *)&BTCGetProcessMemoryInfo) =
-      GetProcAddress(handle1, "K32GetProcessMemoryInfo");
+    GetMemoryInfo = (P)GetProcAddress(h1, "K32GetProcessMemoryInfo");
 
     /* Try to load psapi.dll otherwise. */
-    if (BTCGetProcessMemoryInfo == NULL) {
-      HINSTANCE handle2 = LoadLibraryA("psapi.dll");
+    if (GetMemoryInfo == NULL) {
+      HINSTANCE h2 = LoadLibraryA("psapi.dll");
 
-      if (handle2 != NULL) {
-        *((FARPROC *)&BTCGetProcessMemoryInfo) =
-          GetProcAddress(handle2, "GetProcessMemoryInfo");
-      }
+      if (h2 != NULL)
+        GetMemoryInfo = (P)GetProcAddress(h2, "GetProcessMemoryInfo");
     }
 
     if (InterlockedExchange(&state, 2) != 1)
@@ -785,10 +785,10 @@ btc_ps_rss(void) {
     assert(value == 2);
   }
 
-  if (BTCGetProcessMemoryInfo == NULL)
+  if (GetMemoryInfo == NULL)
     return 0;
 
-  if (!BTCGetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+  if (!GetMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
     return 0;
 
   return pmc.WorkingSetSize;
@@ -807,9 +807,11 @@ btc_sys_numcpu(void) {
 
 int
 btc_sys_datadir(char *buf, size_t size, const char *name) {
-  static BOOL (WINAPI *GetSpecialFolderPathW)(HWND, LPWSTR, int, BOOL) = NULL;
-  static BOOL (WINAPI *GetSpecialFolderPathA)(HWND, LPSTR, int, BOOL) = NULL;
+  typedef BOOL (WINAPI *PW)(HWND, LPWSTR, int, BOOL);
+  typedef BOOL (WINAPI *PA)(HWND, LPSTR, int, BOOL);
   static volatile long state = 0;
+  static PW SpecialW = NULL;
+  static PA SpecialA = NULL;
   char path[MAX_PATH * 4];
   long value;
 
@@ -817,14 +819,11 @@ btc_sys_datadir(char *buf, size_t size, const char *name) {
     Sleep(0);
 
   if (value == 0) {
-    HINSTANCE handle = LoadLibraryA("shell32.dll");
+    HINSTANCE h = LoadLibraryA("shell32.dll");
 
-    if (handle != NULL) {
-      *((FARPROC *)&GetSpecialFolderPathW) =
-        GetProcAddress(handle, "SHGetSpecialFolderPathW");
-
-      *((FARPROC *)&GetSpecialFolderPathA) =
-        GetProcAddress(handle, "SHGetSpecialFolderPathA");
+    if (h != NULL) {
+      SpecialW = (PW)GetProcAddress(h, "SHGetSpecialFolderPathW");
+      SpecialA = (PA)GetProcAddress(h, "SHGetSpecialFolderPathA");
     }
 
     if (InterlockedExchange(&state, 2) != 1)
@@ -838,8 +837,7 @@ btc_sys_datadir(char *buf, size_t size, const char *name) {
 
     wpath[0] = 0;
 
-    if (GetSpecialFolderPathW == NULL
-        || !GetSpecialFolderPathW(NULL, wpath, CSIDL_APPDATA, FALSE)) {
+    if (SpecialW == NULL || !SpecialW(NULL, wpath, CSIDL_APPDATA, FALSE)) {
       DWORD len = GetEnvironmentVariableW(L"USERPROFILE", wpath, MAX_PATH);
 
       if (len == 0 || len >= MAX_PATH)
@@ -851,8 +849,7 @@ btc_sys_datadir(char *buf, size_t size, const char *name) {
   } else {
     path[0] = 0;
 
-    if (GetSpecialFolderPathA == NULL
-        || !GetSpecialFolderPathA(NULL, path, CSIDL_APPDATA, FALSE)) {
+    if (SpecialA == NULL || !SpecialA(NULL, path, CSIDL_APPDATA, FALSE)) {
       DWORD len = GetEnvironmentVariableA("USERPROFILE", path, MAX_PATH);
 
       if (len == 0 || len >= MAX_PATH)

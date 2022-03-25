@@ -20,6 +20,10 @@
 #  pragma comment(lib, "advapi32.lib")
 #endif
 
+#ifdef __GNUC__
+#  pragma GCC diagnostic ignored "-Wcast-function-type"
+#endif
+
 /*
  * Helpers
  */
@@ -151,18 +155,19 @@ btc_envrand(void *dst, size_t size) {
 
   /* Try RtlGenRandom first. */
   {
-    BOOLEAN (NTAPI *RtlGenRandom)(PVOID, ULONG);
-    HMODULE handle = GetModuleHandleA("advapi32.dll");
+    typedef BOOLEAN (NTAPI *P)(PVOID, ULONG);
+    HMODULE h = GetModuleHandleA("advapi32.dll");
+    P RtlGenRandom;
 
     /* Should be loaded. */
-    if (handle == NULL) {
+    if (h == NULL) {
       fprintf(stderr, "Could not load advapi32.dll\n");
       fflush(stderr);
       abort();
     }
 
     /* Available only on Windows XP. */
-    *((FARPROC *)&RtlGenRandom) = GetProcAddress(handle, "SystemFunction036");
+    RtlGenRandom = (P)GetProcAddress(h, "SystemFunction036");
 
     if (RtlGenRandom != NULL) {
       if (RtlGenRandom(seed, 32))
