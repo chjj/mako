@@ -699,13 +699,10 @@ ldb_wfile_destroy(ldb_wfile_t *file) {
  * Logging
  */
 
-ldb_logger_t *
-ldb_logger_create(FILE *stream);
-
 int
 ldb_logger_open(const char *filename, ldb_logger_t **result) {
   (void)filename;
-  *result = ldb_logger_create(NULL);
+  *result = ldb_logger_create(NULL, NULL);
   return LDB_OK;
 }
 

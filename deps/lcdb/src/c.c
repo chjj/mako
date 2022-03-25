@@ -387,13 +387,13 @@ leveldb_options_destroy(leveldb_options_t *options) {
 void
 leveldb_options_set_comparator(leveldb_options_t *opt,
                                leveldb_comparator_t *cmp) {
-  opt->comparator = &cmp->rep;
+  opt->comparator = cmp != NULL ? &cmp->rep : NULL;
 }
 
 void
 leveldb_options_set_filter_policy(leveldb_options_t *opt,
                                   leveldb_filterpolicy_t *policy) {
-  opt->filter_policy = &policy->rep;
+  opt->filter_policy = policy != NULL ? &policy->rep : NULL;
 }
 
 void

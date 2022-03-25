@@ -18,6 +18,7 @@ extern "C" {
 #endif
 
 #include <limits.h>
+#include <stdarg.h>
 #include <stddef.h>
 
 /*
@@ -360,14 +361,11 @@ ldb_iter_destroy(ldb_iter_t *iter);
  * Logging
  */
 
-int
-ldb_logger_open(const char *filename, ldb_logger_t **result);
+ldb_logger_t *
+ldb_logger_create(void (*logv)(void *, const char *, va_list), void *state);
 
 void
 ldb_logger_destroy(ldb_logger_t *logger);
-
-void
-ldb_log(ldb_logger_t *logger, const char *fmt, ...);
 
 /*
  * Options

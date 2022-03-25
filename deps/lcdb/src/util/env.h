@@ -13,8 +13,10 @@
 #ifndef LDB_ENV_H
 #define LDB_ENV_H
 
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "extern.h"
 #include "slice.h"
@@ -138,14 +140,20 @@ ldb_wfile_sync(ldb_wfile_t *file);
  * Logging
  */
 
-LDB_EXTERN int
-ldb_logger_open(const char *filename, ldb_logger_t **result);
+LDB_EXTERN ldb_logger_t *
+ldb_logger_create(void (*logv)(void *, const char *, va_list), void *state);
 
 LDB_EXTERN void
 ldb_logger_destroy(ldb_logger_t *logger);
 
-LDB_EXTERN void
+void
 ldb_log(ldb_logger_t *logger, const char *fmt, ...);
+
+ldb_logger_t *
+ldb_logger_fopen(FILE *stream);
+
+int
+ldb_logger_open(const char *filename, ldb_logger_t **result);
 
 /*
  * Time

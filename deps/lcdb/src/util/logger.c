@@ -12,6 +12,7 @@
 
 #undef HAVE_GETTID
 
+#include <assert.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -45,7 +46,9 @@
  */
 
 struct ldb_logger_s {
-  FILE *stream;
+  void (*logv)(void *, const char *, va_list);
+  void (*destroy)(void *);
+  void *state;
 };
 
 /*
@@ -78,24 +81,65 @@ ldb_date(char *zp, int64_t x) {
 }
 
 /*
+ * Default Logger
+ */
+
+static void
+stream_log(void *state, const char *fmt, va_list ap) {
+  FILE *stream = state;
+  unsigned long tid = 0;
+  char date[64];
+
+  ldb_date(date, ldb_now_usec());
+
+#if defined(_WIN32)
+  tid = GetCurrentThreadId();
+#elif defined(HAVE_GETTID)
+  tid = syscall(__NR_gettid);
+#elif defined(LDB_PTHREAD)
+  {
+    pthread_t thread = pthread_self();
+
+    memcpy(&tid, &thread, LDB_MIN(sizeof(tid), sizeof(thread)));
+  }
+#elif !defined(__wasi__)
+  tid = getpid();
+#endif
+
+  fprintf(stream, "%s %lu ", date, tid);
+
+  vfprintf(stream, fmt, ap);
+
+  fputc('\n', stream);
+
+  fflush(stream);
+}
+
+static void
+stream_close(void *state) {
+  fclose(state);
+}
+
+/*
  * Logger
  */
 
 ldb_logger_t *
-ldb_logger_create(FILE *stream);
-
-ldb_logger_t *
-ldb_logger_create(FILE *stream) {
+ldb_logger_create(void (*logv)(void *, const char *, va_list), void *state) {
   ldb_logger_t *logger = ldb_malloc(sizeof(ldb_logger_t));
-  logger->stream = stream;
+
+  logger->logv = logv;
+  logger->destroy = NULL;
+  logger->state = state;
+
   return logger;
 }
 
 void
 ldb_logger_destroy(ldb_logger_t *logger) {
   if (logger != NULL) {
-    if (logger->stream != NULL)
-      fclose(logger->stream);
+    if (logger->destroy != NULL)
+      logger->destroy(logger->state);
 
     ldb_free(logger);
   }
@@ -103,37 +147,25 @@ ldb_logger_destroy(ldb_logger_t *logger) {
 
 void
 ldb_log(ldb_logger_t *logger, const char *fmt, ...) {
-  unsigned long tid = 0;
-  char date[64];
   va_list ap;
 
   va_start(ap, fmt);
 
-  if (logger != NULL && logger->stream != NULL) {
-    ldb_date(date, ldb_now_usec());
-
-#if defined(_WIN32)
-    tid = GetCurrentThreadId();
-#elif defined(HAVE_GETTID)
-    tid = syscall(__NR_gettid);
-#elif defined(LDB_PTHREAD)
-    {
-      pthread_t thread = pthread_self();
-
-      memcpy(&tid, &thread, LDB_MIN(sizeof(tid), sizeof(thread)));
-    }
-#elif !defined(__wasi__)
-    tid = getpid();
-#endif
-
-    fprintf(logger->stream, "%s %lu ", date, tid);
-
-    vfprintf(logger->stream, fmt, ap);
-
-    fputc('\n', logger->stream);
-
-    fflush(logger->stream);
-  }
+  if (logger != NULL && logger->logv != NULL)
+    logger->logv(logger->state, fmt, ap);
 
   va_end(ap);
+}
+
+ldb_logger_t *
+ldb_logger_fopen(FILE *stream) {
+  ldb_logger_t *logger = ldb_malloc(sizeof(ldb_logger_t));
+
+  assert(stream != NULL);
+
+  logger->logv = stream_log;
+  logger->destroy = stream_close;
+  logger->state = stream;
+
+  return logger;
 }

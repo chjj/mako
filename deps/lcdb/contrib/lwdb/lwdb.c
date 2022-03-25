@@ -177,7 +177,7 @@ struct ldb_iter_s {
 };
 
 struct ldb_logger_s {
-  void *dummy;
+  leveldb_logger_t *rep;
 };
 
 struct ldb_readopt_s {
@@ -326,14 +326,11 @@ LDB_EXTERN void
 ldb_iter_destroy(ldb_iter_t *iter);
 
 /* Logging */
-LDB_EXTERN int
-ldb_logger_open(const char *filename, ldb_logger_t **result);
+LDB_EXTERN ldb_logger_t *
+ldb_logger_create(void (*logv)(void *, const char *, va_list), void *state);
 
 LDB_EXTERN void
 ldb_logger_destroy(ldb_logger_t *logger);
-
-LDB_EXTERN void
-ldb_log(ldb_logger_t *logger, const char *fmt, ...);
 
 /* Slice */
 LDB_EXTERN ldb_slice_t
@@ -471,7 +468,6 @@ static leveldb_options_t *
 convert_dbopt(const ldb_dbopt_t *x,
               leveldb_comparator_t *cmp,
               leveldb_filterpolicy_t **policy) {
-  /* Currently no way to set info_log, reuse_logs, or use_mmap. */
   leveldb_options_t *z = leveldb_options_create();
 
   if (cmp != NULL)
@@ -480,6 +476,10 @@ convert_dbopt(const ldb_dbopt_t *x,
   leveldb_options_set_create_if_missing(z, x->create_if_missing);
   leveldb_options_set_error_if_exists(z, x->error_if_exists);
   leveldb_options_set_paranoid_checks(z, x->paranoid_checks);
+
+  if (x->info_log != NULL)
+    leveldb_options_set_info_log(z, x->info_log->rep);
+
   leveldb_options_set_write_buffer_size(z, x->write_buffer_size);
   leveldb_options_set_max_open_files(z, x->max_open_files);
 
@@ -493,6 +493,9 @@ convert_dbopt(const ldb_dbopt_t *x,
   leveldb_options_set_max_file_size(z, x->max_file_size);
 #endif
   leveldb_options_set_compression(z, x->compression);
+
+  /* Maybe someday... */
+  /* leveldb_options_set_reuse_logs(z, x->reuse_logs); */
 
   if (x->filter_policy != NULL) {
     if (x->filter_policy->rep == NULL) {
@@ -1175,29 +1178,22 @@ ldb_iter_destroy(ldb_iter_t *iter) {
  * Logging
  */
 
-int
-ldb_logger_open(const char *filename, ldb_logger_t **result) {
-  if (filename == NULL)
-    return LDB_INVALID;
+ldb_logger_t *
+ldb_logger_create(void (*logv)(void *, const char *, va_list), void *state) {
+  ldb_logger_t *result = safe_malloc(sizeof(ldb_logger_t));
 
-  *result = safe_malloc(sizeof(ldb_logger_t));
+  (void)logv;
+  (void)state;
 
-  return LDB_OK;
+  /* No way to instantiate. */
+  result->rep = NULL;
+
+  return result;
 }
 
 void
 ldb_logger_destroy(ldb_logger_t *logger) {
   safe_free(logger);
-}
-
-void
-ldb_log(ldb_logger_t *logger, const char *fmt, ...) {
-  va_list ap;
-
-  (void)logger;
-
-  va_start(ap, fmt);
-  va_end(ap);
 }
 
 /*

@@ -1113,9 +1113,6 @@ ldb_wfile_destroy(ldb_wfile_t *file) {
  * Logging
  */
 
-ldb_logger_t *
-ldb_logger_create(FILE *stream);
-
 int
 ldb_logger_open(const char *filename, ldb_logger_t **result) {
   int fd = ldb_open(filename, O_APPEND | O_WRONLY | O_CREAT, 0644);
@@ -1132,7 +1129,7 @@ ldb_logger_open(const char *filename, ldb_logger_t **result) {
     return LDB_POSIX_ERROR(code);
   }
 
-  *result = ldb_logger_create(stream);
+  *result = ldb_logger_fopen(stream);
 
   return LDB_OK;
 }

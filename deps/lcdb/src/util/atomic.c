@@ -28,7 +28,7 @@ ldb_atomic__fetch_add(volatile long *object, long operand) {
 
 long
 ldb_atomic__load(volatile long *object) {
-#if defined(MemoryBarrier)
+#ifdef MemoryBarrier
   /* Modern MSVC. */
   MemoryBarrier();
   return *object;
@@ -40,7 +40,7 @@ ldb_atomic__load(volatile long *object) {
 
 void
 ldb_atomic__store(volatile long *object, long desired) {
-#if defined(MemoryBarrier)
+#ifdef MemoryBarrier
   /* Modern MSVC. */
   *object = desired;
   MemoryBarrier();
