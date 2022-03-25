@@ -214,6 +214,72 @@ LDBCreateFile(LPCSTR filename,
                      temp);
 }
 
+static int
+LDBGetFullPathNameW(const ldb_wide_t *path, ldb_wide_t *result) {
+  DWORD size, len;
+  WCHAR ch;
+
+  size = GetFullPathNameW(path->data, 1, &ch, NULL);
+
+  if (size <= 1)
+    return 0;
+
+  ldb_wide_init(result, size);
+
+  len = GetFullPathNameW(path->data, size, result->data, NULL);
+
+  if (len == 0 || len >= size) {
+    ldb_wide_clear(result);
+    return 0;
+  }
+
+  return 1;
+}
+
+static int
+LDBGetEnvironmentVariableW(const WCHAR *name, ldb_wide_t *result) {
+  DWORD size, len;
+  WCHAR ch;
+
+  size = GetEnvironmentVariableW(name, &ch, 1);
+
+  if (size <= 1)
+    return 0;
+
+  ldb_wide_init(result, size);
+
+  len = GetEnvironmentVariableW(name, result->data, size);
+
+  if (len == 0 || len >= size) {
+    ldb_wide_clear(result);
+    return 0;
+  }
+
+  return 1;
+}
+
+static int
+LDBGetTempPathW(ldb_wide_t *result) {
+  DWORD size, len;
+  WCHAR ch;
+
+  size = GetTempPathW(1, &ch);
+
+  if (size <= 1)
+    return 0;
+
+  ldb_wide_init(result, size);
+
+  len = GetTempPathW(size, result->data);
+
+  if (len == 0 || len >= size) {
+    ldb_wide_clear(result);
+    return 0;
+  }
+
+  return 1;
+}
+
 /*
  * Limiter
  */
@@ -355,21 +421,18 @@ ldb_path_absolute(char *buf, size_t size, const char *name) {
   DWORD len;
 
   if (LDBIsWindowsNT()) {
-    ldb_wide_t path, tmp;
+    ldb_wide_t path, result;
     int ret = 0;
 
     if (!ldb_wide_import(&path, name))
       return 0;
 
-    ldb_wide_init(&tmp, size * 4);
-
-    len = GetFullPathNameW(path.data, size * 4, tmp.data, NULL);
-
-    if (len > 0 && len < size * 4)
-      ret = ldb_wide_export(buf, size, &tmp);
+    if (LDBGetFullPathNameW(&path, &result)) {
+      ret = ldb_wide_export(buf, size, &result);
+      ldb_wide_clear(&result);
+    }
 
     ldb_wide_clear(&path);
-    ldb_wide_clear(&tmp);
 
     return ret;
   }
@@ -815,37 +878,25 @@ static int
 ldb_test_directory_wide(char *result, size_t size) {
   ldb_wide_t path, tmp;
   int ret = 0;
-  DWORD len;
 
-  ldb_wide_init(&path, size * 4);
-
-  len = GetEnvironmentVariableW(L"TEST_TMPDIR", path.data, size * 4);
-
-  if (len > 0 && len < size * 4) {
+  if (LDBGetEnvironmentVariableW(L"TEST_TMPDIR", &path)) {
     ret = ldb_wide_export(result, size, &path);
-  } else {
-    ldb_wide_init(&tmp, 1024);
+    ldb_wide_clear(&path);
+  } else if (LDBGetTempPathW(&tmp)) {
+    DWORD n = lstrlenW(tmp.data) + 12 + 20 + 1;
 
-    if (GetTempPathW(1024, tmp.data)) {
-      DWORD tid = GetCurrentThreadId();
-      int count;
+    ldb_wide_init(&path, n);
 
-      count = _snwprintf(path.data, size * 4,
-                         L"%sleveldbtest-%lu",
-                         tmp.data,
-                         (unsigned long)tid);
+    _snwprintf(path.data, n, L"%sleveldbtest-%lu",
+               tmp.data, GetCurrentThreadId());
 
-      if (count > 0 && (size_t)count < size * 4) {
-        CreateDirectoryW(path.data, NULL);
+    CreateDirectoryW(path.data, NULL);
 
-        ret = ldb_wide_export(result, size, &path);
-      }
-    }
+    ret = ldb_wide_export(result, size, &path);
 
+    ldb_wide_clear(&path);
     ldb_wide_clear(&tmp);
   }
-
-  ldb_wide_clear(&path);
 
   return ret;
 }
@@ -853,7 +904,7 @@ ldb_test_directory_wide(char *result, size_t size) {
 static int
 ldb_test_directory_ansi(char *result, size_t size) {
   char tmp[MAX_PATH];
-  DWORD len, tid;
+  DWORD len;
 
   len = GetEnvironmentVariableA("TEST_TMPDIR", result, size);
 
@@ -866,9 +917,8 @@ ldb_test_directory_ansi(char *result, size_t size) {
   if (strlen(tmp) + 12 + 20 + 1 > size)
     return 0;
 
-  tid = GetCurrentThreadId();
-
-  sprintf(result, "%sleveldbtest-%lu", tmp, (unsigned long)tid);
+  sprintf(result, "%sleveldbtest-%lu",
+          tmp, GetCurrentThreadId());
 
   CreateDirectoryA(result, NULL);
 

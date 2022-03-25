@@ -46,9 +46,9 @@
  */
 
 struct ldb_logger_s {
+  void *state;
   void (*logv)(void *, const char *, va_list);
   void (*destroy)(void *);
-  void *state;
 };
 
 /*
@@ -128,9 +128,9 @@ ldb_logger_t *
 ldb_logger_create(void (*logv)(void *, const char *, va_list), void *state) {
   ldb_logger_t *logger = ldb_malloc(sizeof(ldb_logger_t));
 
+  logger->state = state;
   logger->logv = logv;
   logger->destroy = NULL;
-  logger->state = state;
 
   return logger;
 }
@@ -163,9 +163,9 @@ ldb_logger_fopen(FILE *stream) {
 
   assert(stream != NULL);
 
+  logger->state = stream;
   logger->logv = stream_log;
   logger->destroy = stream_close;
-  logger->state = stream;
 
   return logger;
 }
