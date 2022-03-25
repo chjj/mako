@@ -287,22 +287,6 @@ btc_chainfile_update(btc_chainfile_t *z, const btc_entry_t *entry) {
 }
 
 /*
- * Database Helpers
- */
-
-static int
-ldb_iter_le(ldb_iter_t *iter, const ldb_slice_t *key) {
-  ldb_slice_t k;
-
-  if (!ldb_iter_valid(iter))
-    return 0;
-
-  k = ldb_iter_key(iter);
-
-  return ldb_compare(&k, key) <= 0;
-}
-
-/*
  * Chain Database
  */
 
@@ -497,17 +481,13 @@ btc_chaindb_load_files(btc_chaindb_t *db) {
   /* Read file index and build vector. */
   it = ldb_iterator(db->lsm, 0);
 
-  ldb_iter_seek(it, &file_min);
-
-  while (ldb_iter_le(it, &file_max)) {
+  ldb_iter_range(it, &file_min, &file_max) {
     file = btc_chainfile_create();
     val = ldb_iter_value(it);
 
     CHECK(btc_chainfile_import(file, val.data, val.size));
 
     btc_list_push(&db->files, file, btc_chainfile_t);
-
-    ldb_iter_next(it);
   }
 
   CHECK(ldb_iter_status(it) == LDB_OK);
@@ -597,16 +577,12 @@ btc_chaindb_load_index(btc_chaindb_t *db) {
   /* Read block index and create hash->entry map. */
   it = ldb_iterator(db->lsm, 0);
 
-  ldb_iter_seek(it, &entry_min);
-
-  while (ldb_iter_le(it, &entry_max)) {
+  ldb_iter_range(it, &entry_min, &entry_max) {
     entry = btc_entry_create();
     val = ldb_iter_value(it);
 
     CHECK(btc_entry_import(entry, val.data, val.size));
     CHECK(btc_hashmap_put(db->hashes, entry->hash, entry));
-
-    ldb_iter_next(it);
   }
 
   CHECK(ldb_iter_status(it) == LDB_OK);
