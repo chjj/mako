@@ -1042,30 +1042,21 @@ ldb_rfile_pread(ldb_rfile_t *file,
 
     EnterCriticalSection(&file->mutex);
 
-    if (!LDBSetFilePointerEx(file->handle, dist, NULL, FILE_BEGIN)) {
-      LeaveCriticalSection(&file->mutex);
-      return LDB_IOERR;
-    }
-
-    nread = ldb_read(file->handle, buf, count);
-
-    if (nread < 0) {
-      LeaveCriticalSection(&file->mutex);
-      return LDB_IOERR;
-    }
+    if (LDBSetFilePointerEx(file->handle, dist, NULL, FILE_BEGIN))
+      nread = ldb_read(file->handle, buf, count);
+    else
+      nread = -1;
 
     LeaveCriticalSection(&file->mutex);
   } else {
     /* Windows NT. */
     nread = ldb_pread(file->handle, buf, count, offset);
-
-    if (nread < 0)
-      return LDB_IOERR;
   }
 
-  ldb_slice_set(result, buf, nread);
+  if (nread >= 0)
+    ldb_slice_set(result, buf, nread);
 
-  return LDB_OK;
+  return nread < 0 ? LDB_IOERR : LDB_OK;
 }
 
 static int
