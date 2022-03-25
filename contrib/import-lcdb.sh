@@ -41,15 +41,18 @@ rsync -av "$prefix/cmake/" deps/lcdb/cmake/
 rsync -av "$prefix/contrib/" deps/lcdb/contrib/
 rsync -av "$prefix/include/" deps/lcdb/include/
 
-rsync -av --exclude '*.o'       \
-          --exclude '*.lo'      \
-          --exclude '.deps'     \
-          --exclude '.dirstamp' \
-          --exclude '.libs'     \
-          --exclude '*.md'      \
-          --exclude '*_test.c'  \
-          --exclude '*_data.h'  \
-          "$prefix/src/"        \
+rsync -av --exclude '*.o'         \
+          --exclude '*.lo'        \
+          --exclude '.deps'       \
+          --exclude '.dirstamp'   \
+          --exclude '.libs'       \
+          --exclude '*.md'        \
+          --exclude '*_test.c'    \
+          --exclude '*_data.h'    \
+          --exclude 'dbutil.c'    \
+          --exclude 'histogram.*' \
+          --exclude 'testutil.*'  \
+          "$prefix/src/"          \
           deps/lcdb/src/
 
 rm -f deps/lcdb/contrib/Makefile.am
