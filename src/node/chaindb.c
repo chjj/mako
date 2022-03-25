@@ -361,17 +361,15 @@ static int
 btc_chaindb_load_prefix(btc_chaindb_t *db, const char *prefix) {
   char path[BTC_PATH_MAX];
 
+  btc_fs_mkdir(prefix);
+
   if (!btc_strcpy(db->prefix, sizeof(db->prefix), prefix))
     return 0;
 
-  if (!btc_fs_mkdirp(db->prefix))
+  if (!btc_path_join(path, sizeof(path), prefix, "blocks"))
     return 0;
 
-  if (!btc_path_join(path, sizeof(path), db->prefix, "blocks"))
-    return 0;
-
-  if (!btc_fs_exists(path) && !btc_fs_mkdir(path))
-    return 0;
+  btc_fs_mkdir(path);
 
   return 1;
 }

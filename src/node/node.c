@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <io/core.h>
@@ -132,8 +133,12 @@ int
 btc_node_open(btc_node_t *node, const char *prefix, unsigned int flags) {
   char file[BTC_PATH_MAX];
 
-  if (!btc_fs_mkdirp(prefix))
+  btc_fs_mkdir(prefix);
+
+  if (!btc_fs_exists(prefix)) {
+    fprintf(stderr, "ERROR: '%s' does not exist.\n", prefix);
     return 0;
+  }
 
   if (!btc_path_join(file, sizeof(file), prefix, "debug.log"))
     return 0;

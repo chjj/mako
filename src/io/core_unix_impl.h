@@ -659,6 +659,12 @@ btc_sys_datadir(char *buf, size_t size, const char *name) {
   if (strlen(home) + strlen(name) + 30 > size)
     return 0;
 
+  sprintf(buf, "%s/Library", home);
+  mkdir(buf, 0755);
+
+  sprintf(buf, "%s/Library/Application Support", home);
+  mkdir(buf, 0755);
+
   sprintf(buf, "%s/Library/Application Support/%c%s",
                home, name[0] & ~32, name + 1);
 #else

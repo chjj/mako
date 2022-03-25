@@ -2411,6 +2411,8 @@ btc_pool_open(btc_pool_t *pool, const char *prefix, unsigned int flags) {
 
   btc_pool_info(pool, "Opening pool.");
 
+  btc_fs_mkdir(prefix);
+
   if (!btc_path_join(file, sizeof(file), prefix, "peers.dat"))
     return 0;
 
