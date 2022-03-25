@@ -15,41 +15,7 @@
  */
 
 int
-btc_fs_read_file(const char *name, void *dst, size_t len) {
-  btc_fd_t fd = btc_fs_open(name);
-  int ret = 0;
-
-  if (fd == BTC_INVALID_FD)
-    return 0;
-
-  if ((size_t)btc_fs_read(fd, dst, len) != len)
-    goto fail;
-
-  ret = 1;
-fail:
-  btc_fs_close(fd);
-  return ret;
-}
-
-int
-btc_fs_write_file(const char *name, const void *src, size_t len) {
-  btc_fd_t fd = btc_fs_create(name);
-  int ret = 0;
-
-  if (fd == BTC_INVALID_FD)
-    return 0;
-
-  if ((size_t)btc_fs_write(fd, src, len) != len)
-    goto fail;
-
-  ret = 1;
-fail:
-  btc_fs_close(fd);
-  return ret;
-}
-
-int
-btc_fs_alloc_file(const char *name, unsigned char **dst, size_t *len) {
+btc_fs_read_file(const char *name, unsigned char **dst, size_t *len) {
   btc_fd_t fd = btc_fs_open(name);
   uint8_t *xp = NULL;
   uint64_t size;
@@ -85,6 +51,23 @@ fail:
   if (xp != NULL)
     free(xp);
 
+  return ret;
+}
+
+int
+btc_fs_write_file(const char *name, const void *src, size_t len) {
+  btc_fd_t fd = btc_fs_create(name);
+  int ret = 0;
+
+  if (fd == BTC_INVALID_FD)
+    return 0;
+
+  if ((size_t)btc_fs_write(fd, src, len) != len)
+    goto fail;
+
+  ret = 1;
+fail:
+  btc_fs_close(fd);
   return ret;
 }
 

@@ -422,7 +422,7 @@ btc_addrman_read_file(btc_addrman_t *man, const char *file) {
   uint8_t *xp;
   size_t xn;
 
-  if (!btc_fs_alloc_file(file, &xp, &xn))
+  if (!btc_fs_read_file(file, &xp, &xn))
     return 0;
 
   if (!btc_addrman_import(man, xp, xn)) {

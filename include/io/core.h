@@ -211,13 +211,10 @@ BTC_EXTERN int
 btc_fs_unlock(btc_fd_t fd);
 
 BTC_EXTERN int
-btc_fs_read_file(const char *name, void *dst, size_t len);
+btc_fs_read_file(const char *name, unsigned char **dst, size_t *len);
 
 BTC_EXTERN int
 btc_fs_write_file(const char *name, const void *src, size_t len);
-
-BTC_EXTERN int
-btc_fs_alloc_file(const char *name, unsigned char **dst, size_t *len);
 
 /*
  * Network
