@@ -229,18 +229,6 @@ btc_envrand(void *dst, size_t size) {
 
   sha256_write_int(&hash, btc_rdtsc());
 
-  /* Hardware Profile (requires Windows 95 OSR2 or later). */
-  {
-    HW_PROFILE_INFOA info;
-
-    memset(&info, 0, sizeof(info));
-
-    if (GetCurrentHwProfileA(&info))
-      sha256_write(&hash, &info, sizeof(info));
-  }
-
-  sha256_write_int(&hash, btc_rdtsc());
-
   /* System information. */
   {
     SYSTEM_INFO info;

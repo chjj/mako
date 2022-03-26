@@ -644,7 +644,7 @@ btc_fs_lock(const char *name) {
   if (handle == INVALID_HANDLE_VALUE)
     return INVALID_HANDLE_VALUE;
 
-  if (!LockFile(handle, 0, 0, MAXDWORD, MAXDWORD)) {
+  if (!LockFile(handle, 0, 0, 4096, 0)) {
     CloseHandle(handle);
     return INVALID_HANDLE_VALUE;
   }
@@ -654,7 +654,7 @@ btc_fs_lock(const char *name) {
 
 int
 btc_fs_unlock(btc_fd_t fd) {
-  BOOL result = UnlockFile(fd, 0, 0, MAXDWORD, MAXDWORD);
+  BOOL result = UnlockFile(fd, 0, 0, 4096, 0);
 
   CloseHandle(fd);
 
@@ -751,8 +751,8 @@ typedef struct BTC__PROCESS_MEMORY_COUNTERS {
   size_t PeakPagefileUsage;
 } BTC_PROCESS_MEMORY_COUNTERS;
 
-size_t
-btc_ps_rss(void) {
+static size_t
+btc_ps_rss_nt(void) {
   typedef BOOL (WINAPI *P)(HANDLE, BTC_PROCESS_MEMORY_COUNTERS *, DWORD);
   static volatile long state = 0;
   static P GetMemoryInfo = NULL;
@@ -792,6 +792,27 @@ btc_ps_rss(void) {
     return 0;
 
   return pmc.WorkingSetSize;
+}
+
+static size_t
+btc_ps_rss_9x(void) {
+  MEMORYSTATUS status;
+
+  memset(&status, 0, sizeof(status));
+
+  status.dwLength = sizeof(status);
+
+  GlobalMemoryStatus(&status);
+
+  return status.dwTotalVirtual - status.dwAvailVirtual;
+}
+
+size_t
+btc_ps_rss(void) {
+  if (BTCIsWindowsNT())
+    return btc_ps_rss_nt();
+
+  return btc_ps_rss_9x();
 }
 
 /*
@@ -852,8 +873,18 @@ btc_sys_datadir(char *buf, size_t size, const char *name) {
     if (SpecialA == NULL || !SpecialA(NULL, path, CSIDL_APPDATA, FALSE)) {
       DWORD len = GetEnvironmentVariableA("USERPROFILE", path, MAX_PATH);
 
-      if (len == 0 || len >= MAX_PATH)
-        return 0;
+      if (len == 0 || len >= MAX_PATH) {
+        DWORD version = GetVersion();
+        DWORD major = (version >> 0) & 0xff;
+        DWORD minor = (version >> 8) & 0xff;
+
+        /* Rule out windows 98 and above. */
+        if (major > 4 || (major == 4 && minor >= 10))
+          return 0;
+
+        /* Use C: in windows 95. */
+        strcpy(path, "C:");
+      }
     }
   }
 

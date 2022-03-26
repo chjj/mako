@@ -851,7 +851,7 @@ ldb_lock_file(const char *filename, ldb_filelock_t **lock) {
   if (handle == INVALID_HANDLE_VALUE)
     return LDB_WIN32_ERROR(GetLastError());
 
-  if (!LockFile(handle, 0, 0, MAXDWORD, MAXDWORD)) {
+  if (!LockFile(handle, 0, 0, 4096, 0)) {
     CloseHandle(handle);
     return LDB_IOERR;
   }
@@ -865,7 +865,7 @@ ldb_lock_file(const char *filename, ldb_filelock_t **lock) {
 
 int
 ldb_unlock_file(ldb_filelock_t *lock) {
-  BOOL result = UnlockFile(lock->handle, 0, 0, MAXDWORD, MAXDWORD);
+  BOOL result = UnlockFile(lock->handle, 0, 0, 4096, 0);
 
   CloseHandle(lock->handle);
 
