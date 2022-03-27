@@ -470,19 +470,15 @@
 /* include <stdlib.h> */ /* getrandom (-isystem libc/isystem) */
 #  define HAVE_GETRANDOM
 #elif defined(_WIN32)
-#  include <windows.h> /* _WIN32_WINNT */
-#  ifdef BTC_HAVE_RTLGENRANDOM /* Windows XP (2001) */
-#    define RtlGenRandom SystemFunction036
-#    ifdef __cplusplus
-extern "C"
-#    endif
-BOOLEAN NTAPI
-RtlGenRandom(PVOID RandomBuffer, ULONG RandomBufferLength);
-#    ifndef __MINGW32__
-#      pragma comment(lib, "advapi32.lib")
-#    endif
-#    define HAVE_RTLGENRANDOM
+#  include <stdio.h> /* fprintf, fflush */
+#  include <windows.h> /* GetModuleHandleA, GetProcAddress */
+#  ifndef __MINGW32__
+#    pragma comment(lib, "advapi32.lib")
 #  endif
+#  ifdef __GNUC__
+#    pragma GCC diagnostic ignored "-Wcast-function-type"
+#  endif
+#  define HAVE_RTLGENRANDOM
 #elif defined(EGD_TEST)
 #  define HAVE_EGD
 #elif defined(__linux__)
@@ -866,8 +862,38 @@ EM_JS(unsigned short, js_random_get, (unsigned char *dst, unsigned long len), {
 static int
 btc_callrand(void *dst, size_t size) {
 #if defined(HAVE_RTLGENRANDOM)
-  unsigned char *data = (unsigned char *)dst;
-  size_t max = ULONG_MAX;
+  typedef BOOLEAN (NTAPI *P)(PVOID, ULONG);
+  static volatile long state = 0;
+  static P RtlGenRandom = NULL;
+  unsigned char *data;
+  size_t max;
+  long value;
+
+  while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
+    Sleep(0);
+
+  if (value == 0) {
+    HMODULE handle = GetModuleHandleA("advapi32.dll");
+
+    /* Should be loaded. */
+    if (handle == NULL) {
+      fprintf(stderr, "Could not load advapi32.dll\n");
+      fflush(stderr);
+      abort();
+    }
+
+    /* Available on Windows XP and above. */
+    RtlGenRandom = (P)GetProcAddress(handle, "SystemFunction036");
+
+    if (InterlockedExchange(&state, 2) != 1)
+      abort();
+  }
+
+  if (RtlGenRandom == NULL)
+    return 0;
+
+  data = (unsigned char *)dst;
+  max = ULONG_MAX;
 
   while (size > 0) {
     if (max > size)

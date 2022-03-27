@@ -49,7 +49,6 @@ include(TestBigEndian)
 option(MAKO_ASM "Use inline assembly if available" ON)
 option(MAKO_COVERAGE "Enable coverage" OFF)
 option(MAKO_INT128 "Use __int128 if available" ON)
-option(MAKO_LEGACY "Use legacy winsock" OFF)
 option(MAKO_LEVELDB "Use leveldb" OFF)
 option(MAKO_NODE "Build the fullnode" ON)
 option(MAKO_PIC "Enable PIC" OFF)
@@ -174,17 +173,6 @@ check_c_source_compiles([=[
 
 if(NOT WIN32)
   check_c_source_compiles([=[
-#   include <stddef.h>
-#   include <sys/types.h>
-#   include <sys/socket.h>
-#   include <netdb.h>
-    int main(void) {
-      struct addrinfo *info;
-      return getaddrinfo("localhost", NULL, NULL, &info);
-    }
-  ]=] MAKO_HAVE_GETADDRINFO)
-
-  check_c_source_compiles([=[
 #   include <unistd.h>
     int main(void) {
       char name[256];
@@ -203,32 +191,26 @@ if(NOT WIN32)
   ]=] MAKO_HAVE_GETIFADDRS)
 
   check_c_source_compiles([=[
+#   include <stddef.h>
 #   include <sys/types.h>
 #   include <sys/socket.h>
 #   include <netinet/in.h>
+#   include <netdb.h>
     int main(void) {
       struct sockaddr_storage storage;
       struct sockaddr_in6 sai6;
-      return 0;
+      struct addrinfo *info;
+      return getaddrinfo("localhost", NULL, NULL, &info);
     }
-  ]=] MAKO_HAVE_INET6)
-
-  set(MAKO_HAVE_RTLGENRANDOM 0)
+  ]=] MAKO_HAVE_RFC3493)
 else()
-  if(MAKO_LEGACY OR MAKO_PORTABLE)
-    # NT 4.0 features.
-    set(MAKO_HAVE_GETADDRINFO 0)
-    set(MAKO_HAVE_GETHOSTNAME 1)
-    set(MAKO_HAVE_GETIFADDRS 0)
-    set(MAKO_HAVE_INET6 0)
-    set(MAKO_HAVE_RTLGENRANDOM 0)
+  set(MAKO_HAVE_GETHOSTNAME 1)
+  set(MAKO_HAVE_GETIFADDRS 0)
+
+  if(MAKO_PORTABLE)
+    set(MAKO_HAVE_RFC3493 0)
   else()
-    # XP features.
-    set(MAKO_HAVE_GETADDRINFO 1)
-    set(MAKO_HAVE_GETHOSTNAME 1)
-    set(MAKO_HAVE_GETIFADDRS 0)
-    set(MAKO_HAVE_INET6 1)
-    set(MAKO_HAVE_RTLGENRANDOM 1)
+    set(MAKO_HAVE_RFC3493 1)
   endif()
 endif()
 
@@ -457,10 +439,6 @@ endif()
 
 list(APPEND mako_defines $<$<CONFIG:Debug>:BTC_DEBUG>)
 
-if(MAKO_HAVE_GETADDRINFO)
-  list(APPEND mako_defines BTC_HAVE_GETADDRINFO)
-endif()
-
 if(MAKO_HAVE_GETHOSTNAME)
   list(APPEND mako_defines BTC_HAVE_GETHOSTNAME)
 endif()
@@ -469,24 +447,16 @@ if(MAKO_HAVE_GETIFADDRS)
   list(APPEND mako_defines BTC_HAVE_GETIFADDRS)
 endif()
 
-if(MAKO_HAVE_INET6)
-  list(APPEND mako_defines BTC_HAVE_INET6)
-endif()
-
 if(MAKO_HAVE_INT128)
   list(APPEND mako_defines BTC_HAVE_INT128)
-endif()
-
-if(MAKO_LEGACY)
-  list(APPEND mako_defines BTC_WSOCK32)
 endif()
 
 if(MAKO_HAVE_PTHREAD)
   list(APPEND mako_defines BTC_PTHREAD)
 endif()
 
-if(MAKO_HAVE_RTLGENRANDOM)
-  list(APPEND mako_defines BTC_HAVE_RTLGENRANDOM)
+if(MAKO_HAVE_RFC3493)
+  list(APPEND mako_defines BTC_HAVE_RFC3493)
 endif()
 
 if(MAKO_HAVE_ZLIB)
@@ -524,13 +494,7 @@ list(APPEND mako_includes ${PROJECT_SOURCE_DIR}/include)
 #
 
 if(WIN32)
-  list(APPEND mako_libs kernel32 advapi32)
-
-  if(MAKO_LEGACY)
-    list(APPEND mako_libs wsock32)
-  else()
-    list(APPEND mako_libs ws2_32)
-  endif()
+  list(APPEND mako_libs kernel32 advapi32 ws2_32)
 else()
   if(NOT CMAKE_C_COMPILER_ID MATCHES "Watcom$")
     list(APPEND mako_libs m)

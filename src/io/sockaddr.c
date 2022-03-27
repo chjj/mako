@@ -11,19 +11,12 @@
 #include <io/core.h>
 
 #ifdef _WIN32
-#  ifdef BTC_WSOCK32 /* Windows 95 & NT 3.51 (1995) */
-#    include <winsock.h>
-#    ifndef __MINGW32__
-#      pragma comment(lib, "wsock32.lib")
-#    endif
-#  else /* NT 4.0 (1996) */
-#    include <winsock2.h>
-#    ifdef BTC_HAVE_INET6 /* Windows XP (2001) */
-#      include <ws2tcpip.h>
-#    endif
-#    ifndef __MINGW32__
-#      pragma comment(lib, "ws2_32.lib")
-#    endif
+#  include <winsock2.h>
+#  ifdef BTC_HAVE_RFC3493
+#    include <ws2tcpip.h>
+#  endif
+#  ifndef __MINGW32__
+#    pragma comment(lib, "ws2_32.lib")
 #  endif
 #else
 #  include <sys/types.h>
@@ -32,7 +25,7 @@
 #  include <arpa/inet.h>
 #endif
 
-#ifndef BTC_HAVE_INET6
+#ifndef BTC_HAVE_RFC3493
 #  define sockaddr_storage sockaddr_in
 #endif
 
@@ -84,7 +77,7 @@ btc_sockaddr_set(btc_sockaddr_t *z, const struct sockaddr *x) {
     return 1;
   }
 
-#ifdef BTC_HAVE_INET6
+#ifdef BTC_HAVE_RFC3493
   if (x->sa_family == AF_INET6) {
     const struct sockaddr_in6 *sai = (const struct sockaddr_in6 *)(void *)x;
 
@@ -117,7 +110,7 @@ btc_sockaddr_get(struct sockaddr *z, const btc_sockaddr_t *x) {
     return 1;
   }
 
-#ifdef BTC_HAVE_INET6
+#ifdef BTC_HAVE_RFC3493
   if (x->family == BTC_AF_INET6) {
     struct sockaddr_in6 *sai = (struct sockaddr_in6 *)(void *)z;
 

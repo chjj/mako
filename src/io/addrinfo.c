@@ -10,19 +10,12 @@
 #include <io/core.h>
 
 #ifdef _WIN32
-#  ifdef BTC_WSOCK32 /* Windows 95 & NT 3.51 (1995) */
-#    include <winsock.h>
-#    ifndef __MINGW32__
-#      pragma comment(lib, "wsock32.lib")
-#    endif
-#  else /* NT 4.0 (1996) */
-#    include <winsock2.h>
-#    ifdef BTC_HAVE_INET6 /* Windows XP (2001) */
-#      include <ws2tcpip.h>
-#    endif
-#    ifndef __MINGW32__
-#      pragma comment(lib, "ws2_32.lib")
-#    endif
+#  include <winsock2.h>
+#  ifdef BTC_HAVE_RFC3493
+#    include <ws2tcpip.h>
+#  endif
+#  ifndef __MINGW32__
+#    pragma comment(lib, "ws2_32.lib")
 #  endif
 #else
 #  include <sys/types.h>
@@ -45,7 +38,7 @@
 
 int
 btc_getaddrinfo(btc_sockaddr_t **res, const char *name, int port) {
-#if defined(BTC_HAVE_GETADDRINFO)
+#if defined(BTC_HAVE_RFC3493)
   struct addrinfo hints, *info, *it;
   btc_sockaddr_t *addr = NULL;
   btc_sockaddr_t *prev = NULL;
@@ -95,7 +88,7 @@ btc_getaddrinfo(btc_sockaddr_t **res, const char *name, int port) {
   freeaddrinfo(info);
 
   return 1;
-#else /* !BTC_HAVE_GETADDRINFO */
+#else /* !BTC_HAVE_RFC3493 */
   struct hostent *info = gethostbyname(name);
   btc_sockaddr_t *addr = NULL;
   btc_sockaddr_t *prev = NULL;
@@ -138,7 +131,7 @@ btc_getaddrinfo(btc_sockaddr_t **res, const char *name, int port) {
   }
 
   return 1;
-#endif /* !BTC_HAVE_GETADDRINFO */
+#endif /* !BTC_HAVE_RFC3493 */
 }
 
 void

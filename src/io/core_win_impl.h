@@ -862,7 +862,7 @@ btc_sys_datadir(char *buf, size_t size, const char *name) {
       DWORD len = GetEnvironmentVariableW(L"USERPROFILE", wpath, MAX_PATH);
 
       if (len == 0 || len >= MAX_PATH)
-        return 0;
+        lstrcpyW(wpath, L"C:");
     }
 
     if (!btc_utf8_write(path, sizeof(path), wpath))
@@ -873,18 +873,8 @@ btc_sys_datadir(char *buf, size_t size, const char *name) {
     if (SpecialA == NULL || !SpecialA(NULL, path, CSIDL_APPDATA, FALSE)) {
       DWORD len = GetEnvironmentVariableA("USERPROFILE", path, MAX_PATH);
 
-      if (len == 0 || len >= MAX_PATH) {
-        DWORD version = GetVersion();
-        DWORD major = (version >> 0) & 0xff;
-        DWORD minor = (version >> 8) & 0xff;
-
-        /* Rule out windows 98 and above. */
-        if (major > 4 || (major == 4 && minor >= 10))
-          return 0;
-
-        /* Use C: in windows 95. */
+      if (len == 0 || len >= MAX_PATH)
         strcpy(path, "C:");
-      }
     }
   }
 
@@ -924,12 +914,12 @@ btc_time_qpf(void) {
 }
 
 static int64_t
-btc_time_qpc(double scale) {
+btc_time_qpc(unsigned int scale) {
+  static const uint64_t epoch = UINT64_C(116444736000000000);
   double freq_inv = btc_time_qpf();
   LARGE_INTEGER ctr;
 
   if (freq_inv == 0.0) {
-    static const uint64_t epoch = UINT64_C(116444736000000000);
     ULARGE_INTEGER ul;
     uint64_t units;
     FILETIME ft;
@@ -941,13 +931,13 @@ btc_time_qpc(double scale) {
 
     units = ul.QuadPart - epoch;
 
-    if (scale == 1.0)
+    if (scale == 1)
       return units / 10000000;
 
-    if (scale == 1000.0)
+    if (scale == 1000)
       return units / 10000;
 
-    if (scale == 1000000.0)
+    if (scale == 1000000)
       return units / 10;
 
     return units * 100;
@@ -956,22 +946,22 @@ btc_time_qpc(double scale) {
   if (!QueryPerformanceCounter(&ctr))
     abort(); /* LCOV_EXCL_LINE */
 
-  return ((double)ctr.QuadPart * freq_inv) * scale;
+  return ((double)ctr.QuadPart * freq_inv) * (double)scale;
 }
 
 int64_t
 btc_time_sec(void) {
-  return btc_time_qpc(1.0);
+  return btc_time_qpc(1);
 }
 
 int64_t
 btc_time_msec(void) {
-  return btc_time_qpc(1000.0);
+  return btc_time_qpc(1000);
 }
 
 int64_t
 btc_time_usec(void) {
-  return btc_time_qpc(1000000.0);
+  return btc_time_qpc(1000000);
 }
 
 void

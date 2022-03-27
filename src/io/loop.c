@@ -15,19 +15,12 @@
 
 #ifdef _WIN32
 #  include <stdio.h>
-#  ifdef BTC_WSOCK32 /* Windows 95 & NT 3.51 (1995) */
-#    include <winsock.h>
-#    ifndef __MINGW32__
-#      pragma comment(lib, "wsock32.lib")
-#    endif
-#  else /* NT 4.0 (1996) */
-#    include <winsock2.h>
-#    ifdef BTC_HAVE_INET6 /* Windows XP (2001) */
-#      include <ws2tcpip.h>
-#    endif
-#    ifndef __MINGW32__
-#      pragma comment(lib, "ws2_32.lib")
-#    endif
+#  include <winsock2.h>
+#  ifdef BTC_HAVE_RFC3493
+#    include <ws2tcpip.h>
+#  endif
+#  ifndef __MINGW32__
+#    pragma comment(lib, "ws2_32.lib")
 #  endif
 #  include <windows.h>
 #else
@@ -103,7 +96,7 @@ typedef int btc_sockopt_t;
 #  define btc_closesocket close
 #endif
 
-#ifndef BTC_HAVE_INET6
+#ifndef BTC_HAVE_RFC3493
 #  define sockaddr_storage sockaddr_in
 #endif
 
@@ -373,7 +366,7 @@ sa_domain(const struct sockaddr *addr) {
   switch (addr->sa_family) {
     case AF_INET:
       return PF_INET;
-#ifdef BTC_HAVE_INET6
+#ifdef BTC_HAVE_RFC3493
     case AF_INET6:
       return PF_INET6;
 #endif
@@ -387,7 +380,7 @@ sa_addrlen(const struct sockaddr *addr) {
   switch (addr->sa_family) {
     case AF_INET:
       return sizeof(struct sockaddr_in);
-#ifdef BTC_HAVE_INET6
+#ifdef BTC_HAVE_RFC3493
     case AF_INET6:
       return sizeof(struct sockaddr_in6);
 #endif
@@ -961,7 +954,7 @@ btc_socket_talk(btc_socket_t *socket, int family) {
     case BTC_AF_INET:
       domain = PF_INET;
       break;
-#ifdef BTC_HAVE_INET6
+#ifdef BTC_HAVE_RFC3493
     case BTC_AF_INET6:
       domain = PF_INET6;
       break;

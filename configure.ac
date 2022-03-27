@@ -92,14 +92,6 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_ENABLE(
-  legacy,
-  AS_HELP_STRING([--enable-legacy],
-                 [use legacy winsock [default=no]]),
-  [enable_legacy=$enableval],
-  [enable_legacy=no]
-)
-
-AC_ARG_ENABLE(
   leveldb,
   AS_HELP_STRING([--enable-leveldb],
                  [use leveldb [default=no]]),
@@ -189,14 +181,12 @@ has_asm=no
 has_big=no
 has_clock=no
 has_fdatasync=no
-has_getaddrinfo=no
 has_gethostname=no
 has_getifaddrs=no
-has_inet6=no
 has_int128=no
 has_pread=no
 has_pthread=no
-has_rtlgenrandom=no
+has_rfc3493=no
 has_zlib=no
 
 AC_MSG_CHECKING(for 64-bit support)
@@ -284,23 +274,6 @@ AC_LINK_IFELSE([
 AC_MSG_RESULT([$has_fdatasync])
 
 AS_IF([test x"$MINGW" = x''], [
-  AC_MSG_CHECKING(for getaddrinfo support)
-  AC_LINK_IFELSE([
-    AC_LANG_SOURCE([[
-#     include <stddef.h>
-#     include <sys/types.h>
-#     include <sys/socket.h>
-#     include <netdb.h>
-      int main(void) {
-        struct addrinfo *info;
-        return getaddrinfo("localhost", NULL, NULL, &info);
-      }
-    ]])
-  ], [
-    has_getaddrinfo=yes
-  ])
-  AC_MSG_RESULT([$has_getaddrinfo])
-
   AC_MSG_CHECKING(for gethostname support)
   AC_LINK_IFELSE([
     AC_LANG_SOURCE([[
@@ -331,38 +304,31 @@ AS_IF([test x"$MINGW" = x''], [
   ])
   AC_MSG_RESULT([$has_getifaddrs])
 
-  AC_MSG_CHECKING(for inet6 support)
+  AC_MSG_CHECKING(for rfc3493 support)
   AC_LINK_IFELSE([
     AC_LANG_SOURCE([[
+#     include <stddef.h>
 #     include <sys/types.h>
 #     include <sys/socket.h>
 #     include <netinet/in.h>
+#     include <netdb.h>
       int main(void) {
         struct sockaddr_storage storage;
         struct sockaddr_in6 sai6;
-        return 0;
+        struct addrinfo *info;
+        return getaddrinfo("localhost", NULL, NULL, &info);
       }
    ]])
   ], [
-    has_inet6=yes
+    has_rfc3493=yes
   ])
-  AC_MSG_RESULT([$has_inet6])
+  AC_MSG_RESULT([$has_rfc3493])
 ], [
-  AS_IF([test x"$enable_legacy" = x'yes' -o x"$enable_portable" = x'yes'], [
-    # NT 4.0 features.
-    has_getaddrinfo=no
-    has_gethostname=yes
-    has_getifaddrs=no
-    has_inet6=no
-    has_rtlgenrandom=no
-  ], [
-    # XP features.
-    has_getaddrinfo=yes
-    has_gethostname=yes
-    has_getifaddrs=no
-    has_inet6=yes
-    has_rtlgenrandom=yes
-  ])
+  has_gethostname=yes
+  has_getifaddrs=no
+
+  AS_IF([test x"$enable_portable" = x'yes'],
+        [has_rfc3493=no], [has_rfc3493=yes])
 ])
 
 AS_IF([test x"$enable_int128" = x'yes'], [
@@ -496,10 +462,6 @@ AS_IF([test x"$has_fdatasync" = x'yes'], [
   AC_DEFINE([LDB_HAVE_FDATASYNC])
 ])
 
-AS_IF([test x"$has_getaddrinfo" = x'yes'], [
-  AC_DEFINE([BTC_HAVE_GETADDRINFO])
-])
-
 AS_IF([test x"$has_gethostname" = x'yes'], [
   AC_DEFINE([BTC_HAVE_GETHOSTNAME])
 ])
@@ -508,16 +470,8 @@ AS_IF([test x"$has_getifaddrs" = x'yes'], [
   AC_DEFINE([BTC_HAVE_GETIFADDRS])
 ])
 
-AS_IF([test x"$has_inet6" = x'yes'], [
-  AC_DEFINE([BTC_HAVE_INET6])
-])
-
 AS_IF([test x"$has_int128" = x'yes'], [
   AC_DEFINE([BTC_HAVE_INT128])
-])
-
-AS_IF([test x"$enable_legacy" = x'yes'], [
-  AC_DEFINE([BTC_WSOCK32])
 ])
 
 AS_IF([test x"$has_pread" = x'yes'], [
@@ -529,8 +483,8 @@ AS_IF([test x"$has_pthread" = x'yes'], [
   AC_DEFINE([LDB_PTHREAD])
 ])
 
-AS_IF([test x"$has_rtlgenrandom" = x'yes'], [
-  AC_DEFINE([BTC_HAVE_RTLGENRANDOM])
+AS_IF([test x"$has_rfc3493" = x'yes'], [
+  AC_DEFINE([BTC_HAVE_RFC3493])
 ])
 
 AS_IF([test x"$has_zlib" = x'yes'], [
@@ -558,13 +512,7 @@ AS_CASE([$host_os], [aix*], [
 #
 
 AS_IF([test x"$MINGW" != x''], [
-  LIBS="$LIBS -lkernel32 -ladvapi32"
-
-  AS_IF([test x"$enable_legacy" = x'yes'], [
-    LIBS="$LIBS -lwsock32"
-  ], [
-    LIBS="$LIBS -lws2_32"
-  ])
+  LIBS="$LIBS -lkernel32 -ladvapi32 -lws2_32"
 ], [
   AC_CHECK_DEFINE([__WATCOMC__], [], [
     LIBS="$LIBS -lm"
@@ -632,18 +580,15 @@ AC_MSG_NOTICE([Build Options:
   debug        = $enable_debug
   emscripten   = $EMSCRIPTEN
   fdatasync    = $has_fdatasync
-  getaddrinfo  = $has_getaddrinfo
   gethostname  = $has_gethostname
   getifaddrs   = $has_getifaddrs
-  inet6        = $has_inet6
   int128       = $has_int128
-  legacy       = $enable_legacy
   leveldb      = $enable_leveldb
   node         = $enable_node
   portable     = $enable_portable
   pread        = $has_pread
   pthread      = $has_pthread
-  rtlgenrandom = $has_rtlgenrandom
+  rfc3493      = $has_rfc3493
   tests        = $enable_tests
   tls          = $has_tls
   wasi         = $WASI
