@@ -166,6 +166,11 @@ if(MAKO_PORTABLE)
   set(MAKO_HAVE_GETHOSTNAME ${WIN32})
   set(MAKO_HAVE_GETIFADDRS 0)
   set(MAKO_HAVE_RFC3493 0)
+elseif(WIN32)
+  set(MAKO_HAVE_CLOCK 0)
+  set(MAKO_HAVE_GETHOSTNAME 1)
+  set(MAKO_HAVE_GETIFADDRS 0)
+  set(MAKO_HAVE_RFC3493 1)
 else()
   check_c_source_compiles([=[
 #   include <time.h>
@@ -177,43 +182,37 @@ else()
     }
   ]=] MAKO_HAVE_CLOCK)
 
-  if(WIN32)
-    set(MAKO_HAVE_GETHOSTNAME 1)
-    set(MAKO_HAVE_GETIFADDRS 0)
-    set(MAKO_HAVE_RFC3493 1)
-  else()
-    check_c_source_compiles([=[
-#     include <unistd.h>
-      int main(void) {
-        char name[256];
-        return gethostname(name, sizeof(name));
-      }
-    ]=] MAKO_HAVE_GETHOSTNAME)
+  check_c_source_compiles([=[
+#   include <unistd.h>
+    int main(void) {
+      char name[256];
+      return gethostname(name, sizeof(name));
+    }
+  ]=] MAKO_HAVE_GETHOSTNAME)
 
-    check_c_source_compiles([=[
-#     include <sys/types.h>
-#     include <ifaddrs.h>
-#     include <net/if.h>
-      int main(void) {
-        struct ifaddrs *addrs;
-        return getifaddrs(&addrs);
-      }
-    ]=] MAKO_HAVE_GETIFADDRS)
+  check_c_source_compiles([=[
+#   include <sys/types.h>
+#   include <ifaddrs.h>
+#   include <net/if.h>
+    int main(void) {
+      struct ifaddrs *addrs;
+      return getifaddrs(&addrs);
+    }
+  ]=] MAKO_HAVE_GETIFADDRS)
 
-    check_c_source_compiles([=[
-#     include <stddef.h>
-#     include <sys/types.h>
-#     include <sys/socket.h>
-#     include <netinet/in.h>
-#     include <netdb.h>
-      int main(void) {
-        struct sockaddr_storage storage;
-        struct sockaddr_in6 sai6;
-        struct addrinfo *info;
-        return getaddrinfo("localhost", NULL, NULL, &info);
-      }
-    ]=] MAKO_HAVE_RFC3493)
-  endif()
+  check_c_source_compiles([=[
+#   include <stddef.h>
+#   include <sys/types.h>
+#   include <sys/socket.h>
+#   include <netinet/in.h>
+#   include <netdb.h>
+    int main(void) {
+      struct sockaddr_storage storage;
+      struct sockaddr_in6 sai6;
+      struct addrinfo *info;
+      return getaddrinfo("localhost", NULL, NULL, &info);
+    }
+  ]=] MAKO_HAVE_RFC3493)
 endif()
 
 if(MAKO_INT128)
