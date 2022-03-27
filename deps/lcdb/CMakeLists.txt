@@ -48,6 +48,11 @@ option(LDB_PORTABLE "Be as portable as possible" OFF)
 option(LDB_SHARED "Build shared library" OFF)
 option(LDB_TESTS "Build tests" ON)
 
+# Hack: inherit mako's portable option.
+if(DEFINED MAKO_PORTABLE)
+  set(LDB_PORTABLE ${MAKO_PORTABLE})
+endif()
+
 #
 # Variables
 #
@@ -111,7 +116,7 @@ endif()
 # Feature Testing
 #
 
-if(LDB_PORTABLE OR MAKO_PORTABLE)
+if(LDB_PORTABLE)
   set(LDB_HAVE_FDATASYNC OFF)
   set(LDB_HAVE_PREAD OFF)
 else()
@@ -256,7 +261,7 @@ if(MINGW)
   # Ensure we are redistributable on windows.
   list(APPEND ldb_ldflags -static-libgcc)
   # Much compatibility.
-  if(MINGW_ARCH STREQUAL "i686")
+  if(LDB_PORTABLE AND MINGW_ARCH STREQUAL "i686")
     list(APPEND ldb_cflags -march=i486 -mtune=i686)
     list(APPEND ldb_ldflags -march=i486 -mtune=i686)
   endif()

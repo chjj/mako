@@ -421,7 +421,7 @@ AS_IF([test x"$MINGW" != x''], [
   # Ensure we are redistributable on windows.
   LDFLAGS="$LDFLAGS -static-libgcc"
   # Much compatibility.
-  AS_IF([test x"$MINGW_ARCH" = x'i686'], [
+  AS_IF([test x"$enable_portable $MINGW_ARCH" = x'yes i686'], [
     CFLAGS="$CFLAGS -march=i486 -mtune=i686"
   ])
 ])

@@ -412,7 +412,7 @@ if(MINGW)
   # Ensure we are redistributable on windows.
   list(APPEND mako_ldflags -static-libgcc)
   # Much compatibility.
-  if(MINGW_ARCH STREQUAL "i686")
+  if(MAKO_PORTABLE AND MINGW_ARCH STREQUAL "i686")
     list(APPEND mako_cflags -march=i486 -mtune=i686)
     list(APPEND mako_ldflags -march=i486 -mtune=i686)
   endif()
