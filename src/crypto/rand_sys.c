@@ -664,7 +664,6 @@
 #  if !defined(__wasi__) && !defined(__EMSCRIPTEN__)
 #    undef HAVE_GETENTROPY
 #  endif
-#  undef HAVE_SYSCTL_ARND
 #endif
 
 #if defined(DEV_RANDOM_NAME) || defined(HAVE_EGD)
@@ -813,6 +812,41 @@ btc_socket(int domain, int type, int protocol) {
 #endif /* HAVE_EGD */
 
 /*
+ * RtlGenRandom Loading
+ */
+
+#ifdef HAVE_RTLGENRANDOM
+static FARPROC
+LoadRtlGenRandom(void) {
+  static volatile long state = 0;
+  static FARPROC addr = NULL;
+  long value;
+
+  while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
+    Sleep(0);
+
+  if (value == 0) {
+    HMODULE handle = GetModuleHandleA("advapi32.dll");
+
+    /* Should be loaded. */
+    if (handle == NULL) {
+      fprintf(stderr, "Could not load advapi32.dll\n");
+      fflush(stderr);
+      abort();
+    }
+
+    /* Available on Windows XP and above. */
+    addr = GetProcAddress(handle, "SystemFunction036");
+
+    if (InterlockedExchange(&state, 2) != 1)
+      abort(); /* LCOV_EXCL_LINE */
+  }
+
+  return addr;
+}
+#endif /* HAVE_RTLGENRANDOM */
+
+/*
  * Emscripten Entropy
  */
 
@@ -873,31 +907,9 @@ static int
 btc_callrand(void *dst, size_t size) {
 #if defined(HAVE_RTLGENRANDOM)
   typedef BOOLEAN (NTAPI *P)(PVOID, ULONG);
-  static volatile long state = 0;
-  static P RtlGenRandom = NULL;
+  P RtlGenRandom = (P)LoadRtlGenRandom();
   unsigned char *data;
   size_t max;
-  long value;
-
-  while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
-    Sleep(0);
-
-  if (value == 0) {
-    HMODULE handle = GetModuleHandleA("advapi32.dll");
-
-    /* Should be loaded. */
-    if (handle == NULL) {
-      fprintf(stderr, "Could not load advapi32.dll\n");
-      fflush(stderr);
-      abort();
-    }
-
-    /* Available on Windows XP and above. */
-    RtlGenRandom = (P)GetProcAddress(handle, "SystemFunction036");
-
-    if (InterlockedExchange(&state, 2) != 1)
-      abort();
-  }
 
   if (RtlGenRandom == NULL)
     return 0;
