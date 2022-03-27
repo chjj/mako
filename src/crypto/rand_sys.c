@@ -10,7 +10,6 @@
  *
  * Windows:
  *   https://docs.microsoft.com/en-us/windows/win32/api/ntsecapi/nf-ntsecapi-rtlgenrandom
- *   https://docs.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptgenrandom
  *
  * Linux:
  *   https://man7.org/linux/man-pages/man4/random.4.html
@@ -184,11 +183,9 @@
  * Our current entropy backends are as follows...
  *
  * Windows:
- *   Source: BCryptGenRandom
- *   Fallback: RtlGenRandom (SystemFunction036)
+ *   Source: RtlGenRandom (SystemFunction036)
+ *   Fallback: none
  *   Support: RtlGenRandom added in Windows XP (2001).
- *            BCryptGenRandom added in Windows Vista (2007).
- *            BCRYPT_USE_SYSTEM_PREFERRED_RNG added in Windows 7 (2009).
  *
  * Linux:
  *   Source: getrandom(2)
@@ -661,7 +658,11 @@
 #  ifndef __linux__
 #    undef HAVE_GETRANDOM
 #  endif
-#  if !defined(__wasi__) && !defined(__EMSCRIPTEN__)
+#  if defined(__APPLE__)
+#    if MAC_OS_X_VERSION_MIN_ALLOWED >= 101200 /* 10.12 (2016) */
+#      undef HAVE_GETENTROPY /* not a weak symbol */
+#    endif
+#  elif !defined(__wasi__) && !defined(__EMSCRIPTEN__)
 #    undef HAVE_GETENTROPY
 #  endif
 #endif
