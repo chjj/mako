@@ -176,7 +176,6 @@ AC_CHECK_DEFINE([__WATCOMC__], [
 # Feature Testing
 #
 
-has_64bit=no
 has_asm=no
 has_big=no
 has_clock=no
@@ -188,17 +187,6 @@ has_pread=no
 has_pthread=no
 has_rfc3493=no
 has_zlib=no
-
-AC_MSG_CHECKING(for 64-bit support)
-AC_COMPILE_IFELSE([
-  AC_LANG_SOURCE([[
-    typedef char check_voidptr_t[sizeof(void *) >= 8 ? 1 : -1];
-    int main(void) {
-      return 0;
-    }
-  ]])
-], [has_64bit=yes])
-AC_MSG_RESULT([$has_64bit])
 
 AS_IF([test x"$enable_asm" = x'yes'], [
   AC_MSG_CHECKING(for inline asm support)
@@ -244,91 +232,109 @@ AC_C_BIGENDIAN([has_big=yes], [:], [
   AC_MSG_ERROR([universal endianness])
 ])
 
-AC_MSG_CHECKING(for clock_gettime support)
-AC_LINK_IFELSE([
-  AC_LANG_SOURCE([[
-#   include <time.h>
-    int main(void) {
-      struct timespec ts;
-      (void)clock_gettime((clockid_t)CLOCK_REALTIME, &ts);
-      (void)clock_gettime((clockid_t)CLOCK_MONOTONIC, &ts);
-      return ts.tv_sec & ts.tv_nsec & 0x7f;
-    }
-  ]])
+AS_IF([test x"$enable_portable" = x'yes'], [
+  AS_IF([test x"$MINGW" != x''], [
+    has_gethostname=yes
+  ])
 ], [
-  has_clock=yes
-])
-AC_MSG_RESULT([$has_clock])
+  AC_MSG_CHECKING(for clock_gettime support)
+  AC_LINK_IFELSE([
+    AC_LANG_SOURCE([[
+#     include <time.h>
+      int main(void) {
+        struct timespec ts;
+        (void)clock_gettime((clockid_t)CLOCK_REALTIME, &ts);
+        (void)clock_gettime((clockid_t)CLOCK_MONOTONIC, &ts);
+        return ts.tv_sec & ts.tv_nsec & 0x7f;
+      }
+    ]])
+  ], [
+    has_clock=yes
+  ])
+  AC_MSG_RESULT([$has_clock])
 
-AC_MSG_CHECKING(for fdatasync support)
-AC_LINK_IFELSE([
-  AC_LANG_SOURCE([[
-#   include <unistd.h>
-    int main(void) {
-      return fdatasync(1);
-    }
-  ]])
-], [
-  has_fdatasync=yes
-])
-AC_MSG_RESULT([$has_fdatasync])
-
-AS_IF([test x"$MINGW" = x''], [
-  AC_MSG_CHECKING(for gethostname support)
+  AC_MSG_CHECKING(for fdatasync support)
   AC_LINK_IFELSE([
     AC_LANG_SOURCE([[
 #     include <unistd.h>
       int main(void) {
-        char name[256];
-        return gethostname(name, sizeof(name));
+        return fdatasync(1);
       }
     ]])
   ], [
+    has_fdatasync=yes
+  ])
+  AC_MSG_RESULT([$has_fdatasync])
+
+  AS_IF([test x"$MINGW" != x''], [
     has_gethostname=yes
-  ])
-  AC_MSG_RESULT([$has_gethostname])
+    has_getifaddrs=no
+    has_rfc3493=yes
+  ], [
+    AC_MSG_CHECKING(for gethostname support)
+    AC_LINK_IFELSE([
+      AC_LANG_SOURCE([[
+#       include <unistd.h>
+        int main(void) {
+          char name[256];
+          return gethostname(name, sizeof(name));
+        }
+      ]])
+    ], [
+      has_gethostname=yes
+    ])
+    AC_MSG_RESULT([$has_gethostname])
 
-  AC_MSG_CHECKING(for getifaddrs support)
+    AC_MSG_CHECKING(for getifaddrs support)
+    AC_LINK_IFELSE([
+      AC_LANG_SOURCE([[
+#       include <sys/types.h>
+#       include <ifaddrs.h>
+#       include <net/if.h>
+        int main(void) {
+          struct ifaddrs *addrs;
+          return getifaddrs(&addrs);
+        }
+      ]])
+    ], [
+      has_getifaddrs=yes
+    ])
+    AC_MSG_RESULT([$has_getifaddrs])
+
+    AC_MSG_CHECKING(for rfc3493 support)
+    AC_LINK_IFELSE([
+      AC_LANG_SOURCE([[
+#       include <stddef.h>
+#       include <sys/types.h>
+#       include <sys/socket.h>
+#       include <netinet/in.h>
+#       include <netdb.h>
+        int main(void) {
+          struct sockaddr_storage storage;
+          struct sockaddr_in6 sai6;
+          struct addrinfo *info;
+          return getaddrinfo("localhost", NULL, NULL, &info);
+        }
+     ]])
+    ], [
+      has_rfc3493=yes
+    ])
+    AC_MSG_RESULT([$has_rfc3493])
+  ])
+
+  AC_MSG_CHECKING(for pread support)
   AC_LINK_IFELSE([
     AC_LANG_SOURCE([[
-#     include <sys/types.h>
-#     include <ifaddrs.h>
-#     include <net/if.h>
+#     include <unistd.h>
       int main(void) {
-        struct ifaddrs *addrs;
-        return getifaddrs(&addrs);
+        char buf[32];
+        return pread(0, buf, sizeof(buf), 0);
       }
     ]])
   ], [
-    has_getifaddrs=yes
+    has_pread=yes
   ])
-  AC_MSG_RESULT([$has_getifaddrs])
-
-  AC_MSG_CHECKING(for rfc3493 support)
-  AC_LINK_IFELSE([
-    AC_LANG_SOURCE([[
-#     include <stddef.h>
-#     include <sys/types.h>
-#     include <sys/socket.h>
-#     include <netinet/in.h>
-#     include <netdb.h>
-      int main(void) {
-        struct sockaddr_storage storage;
-        struct sockaddr_in6 sai6;
-        struct addrinfo *info;
-        return getaddrinfo("localhost", NULL, NULL, &info);
-      }
-   ]])
-  ], [
-    has_rfc3493=yes
-  ])
-  AC_MSG_RESULT([$has_rfc3493])
-], [
-  has_gethostname=yes
-  has_getifaddrs=no
-
-  AS_IF([test x"$enable_portable" = x'yes'],
-        [has_rfc3493=no], [has_rfc3493=yes])
+  AC_MSG_RESULT([$has_pread])
 ])
 
 AS_IF([test x"$enable_int128" = x'yes'], [
@@ -352,20 +358,6 @@ AS_IF([test x"$enable_int128" = x'yes'], [
   ])
   AC_MSG_RESULT([$has_int128])
 ])
-
-AC_MSG_CHECKING(for pread support)
-AC_LINK_IFELSE([
-  AC_LANG_SOURCE([[
-#   include <unistd.h>
-    int main(void) {
-      char buf[32];
-      return pread(0, buf, sizeof(buf), 0);
-    }
-  ]])
-], [
-  has_pread=yes
-])
-AC_MSG_RESULT([$has_pread])
 
 AS_IF([test x"$MINGW$WASI$EMSCRIPTEN" = x''], [
   AC_CHECK_DEFINE([__WATCOMC__], [], [
@@ -474,6 +466,10 @@ AS_IF([test x"$has_int128" = x'yes'], [
   AC_DEFINE([BTC_HAVE_INT128])
 ])
 
+AS_IF([test x"$enable_portable" = x'yes'], [
+  AC_DEFINE([BTC_PORTABLE])
+])
+
 AS_IF([test x"$has_pread" = x'yes'], [
   AC_DEFINE([LDB_HAVE_PREAD])
 ])
@@ -572,7 +568,6 @@ AC_OUTPUT
 
 AC_MSG_NOTICE([Build Options:
 
-  64-bit       = $has_64bit
   asm          = $has_asm
   big          = $has_big
   clock        = $has_clock

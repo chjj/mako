@@ -657,6 +657,16 @@
 #  endif
 #endif
 
+#ifdef BTC_PORTABLE
+#  ifndef __linux__
+#    undef HAVE_GETRANDOM
+#  endif
+#  if !defined(__wasi__) && !defined(__EMSCRIPTEN__)
+#    undef HAVE_GETENTROPY
+#  endif
+#  undef HAVE_SYSCTL_ARND
+#endif
+
 #if defined(DEV_RANDOM_NAME) || defined(HAVE_EGD)
 #  include <sys/types.h> /* ssize_t, pid_t */
 #  include <sys/time.h> /* select */

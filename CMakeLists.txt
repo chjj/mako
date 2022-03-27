@@ -161,56 +161,58 @@ endif()
 
 test_big_endian(MAKO_BIGENDIAN)
 
-check_c_source_compiles([=[
-# include <time.h>
-  int main(void) {
-    struct timespec ts;
-    (void)clock_gettime((clockid_t)CLOCK_REALTIME, &ts);
-    (void)clock_gettime((clockid_t)CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec & ts.tv_nsec & 0x7f;
-  }
-]=] MAKO_HAVE_CLOCK)
-
-if(NOT WIN32)
-  check_c_source_compiles([=[
-#   include <unistd.h>
-    int main(void) {
-      char name[256];
-      return gethostname(name, sizeof(name));
-    }
-  ]=] MAKO_HAVE_GETHOSTNAME)
-
-  check_c_source_compiles([=[
-#   include <sys/types.h>
-#   include <ifaddrs.h>
-#   include <net/if.h>
-    int main(void) {
-      struct ifaddrs *addrs;
-      return getifaddrs(&addrs);
-    }
-  ]=] MAKO_HAVE_GETIFADDRS)
-
-  check_c_source_compiles([=[
-#   include <stddef.h>
-#   include <sys/types.h>
-#   include <sys/socket.h>
-#   include <netinet/in.h>
-#   include <netdb.h>
-    int main(void) {
-      struct sockaddr_storage storage;
-      struct sockaddr_in6 sai6;
-      struct addrinfo *info;
-      return getaddrinfo("localhost", NULL, NULL, &info);
-    }
-  ]=] MAKO_HAVE_RFC3493)
-else()
-  set(MAKO_HAVE_GETHOSTNAME 1)
+if(MAKO_PORTABLE)
+  set(MAKO_HAVE_CLOCK 0)
+  set(MAKO_HAVE_GETHOSTNAME ${WIN32})
   set(MAKO_HAVE_GETIFADDRS 0)
+  set(MAKO_HAVE_RFC3493 0)
+else()
+  check_c_source_compiles([=[
+#   include <time.h>
+    int main(void) {
+      struct timespec ts;
+      (void)clock_gettime((clockid_t)CLOCK_REALTIME, &ts);
+      (void)clock_gettime((clockid_t)CLOCK_MONOTONIC, &ts);
+      return ts.tv_sec & ts.tv_nsec & 0x7f;
+    }
+  ]=] MAKO_HAVE_CLOCK)
 
-  if(MAKO_PORTABLE)
-    set(MAKO_HAVE_RFC3493 0)
-  else()
+  if(WIN32)
+    set(MAKO_HAVE_GETHOSTNAME 1)
+    set(MAKO_HAVE_GETIFADDRS 0)
     set(MAKO_HAVE_RFC3493 1)
+  else()
+    check_c_source_compiles([=[
+#     include <unistd.h>
+      int main(void) {
+        char name[256];
+        return gethostname(name, sizeof(name));
+      }
+    ]=] MAKO_HAVE_GETHOSTNAME)
+
+    check_c_source_compiles([=[
+#     include <sys/types.h>
+#     include <ifaddrs.h>
+#     include <net/if.h>
+      int main(void) {
+        struct ifaddrs *addrs;
+        return getifaddrs(&addrs);
+      }
+    ]=] MAKO_HAVE_GETIFADDRS)
+
+    check_c_source_compiles([=[
+#     include <stddef.h>
+#     include <sys/types.h>
+#     include <sys/socket.h>
+#     include <netinet/in.h>
+#     include <netdb.h>
+      int main(void) {
+        struct sockaddr_storage storage;
+        struct sockaddr_in6 sai6;
+        struct addrinfo *info;
+        return getaddrinfo("localhost", NULL, NULL, &info);
+      }
+    ]=] MAKO_HAVE_RFC3493)
   endif()
 endif()
 
@@ -234,9 +236,8 @@ endif()
 
 set(MAKO_HAVE_PTHREAD 0)
 
-if(CMAKE_C_COMPILER_ID MATCHES "Watcom$")
-  # Nothing.
-elseif(NOT WIN32 AND NOT WASI AND NOT EMSCRIPTEN)
+if(NOT WIN32 AND NOT WASI AND NOT EMSCRIPTEN
+   AND NOT CMAKE_C_COMPILER_ID MATCHES "Watcom$")
   set(THREADS_PREFER_PTHREAD_FLAG ON)
 
   find_package(Threads)
@@ -451,6 +452,10 @@ if(MAKO_HAVE_INT128)
   list(APPEND mako_defines BTC_HAVE_INT128)
 endif()
 
+if(MAKO_PORTABLE)
+  list(APPEND mako_defines BTC_PORTABLE)
+endif()
+
 if(MAKO_HAVE_PTHREAD)
   list(APPEND mako_defines BTC_PTHREAD)
 endif()
@@ -566,8 +571,8 @@ function(mako_build_full)
 
   if(MAKO_SHARED)
     add_library(mako_shared SHARED ${mako_sources})
-    target_link_libraries(mako_shared PRIVATE mako)
     target_compile_definitions(mako_shared PRIVATE BTC_EXPORT)
+    target_link_libraries(mako_shared PRIVATE mako)
     set_property(TARGET mako_shared PROPERTY OUTPUT_NAME mako)
 
     if (NOT MAKO_CHIBICC) # chibicc doesn't support .so versioning.
