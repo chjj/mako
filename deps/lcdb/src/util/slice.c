@@ -129,17 +129,3 @@ ldb_slice_import(ldb_slice_t *z, const ldb_slice_t *x) {
   ldb_slice_t tmp = *x;
   return ldb_slice_slurp(z, &tmp);
 }
-
-ldb_slice_t
-ldb_slice_decode(const uint8_t *xp) {
-  uint32_t zn = 0;
-  size_t xn = 5;
-  ldb_slice_t z;
-
-  if (!ldb_varint32_read(&zn, &xp, &xn))
-    abort(); /* LCOV_EXCL_LINE */
-
-  ldb_slice_set(&z, xp, zn);
-
-  return z;
-}

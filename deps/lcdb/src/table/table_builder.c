@@ -267,7 +267,6 @@ ldb_tablebuilder_add(ldb_tablebuilder_t *tb,
   if (tb->filter_block != NULL)
     ldb_filterbuilder_add_key(tb->filter_block, key);
 
-  /* ldb_buffer_set(&tb->last_key, key->data, key->size); */
   ldb_buffer_copy(&tb->last_key, key);
 
   tb->num_entries++;

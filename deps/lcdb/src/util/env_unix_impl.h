@@ -1010,6 +1010,10 @@ ldb_wfile_sync_dir(ldb_wfile_t *file) {
     rc = LDB_POSIX_ERROR(errno);
   } else {
     rc = ldb_fsync(fd);
+
+    if (rc == LDB_IOERR && errno == EINVAL)
+      rc = LDB_OK;
+
     close(fd);
   }
 

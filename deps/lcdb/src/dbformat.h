@@ -16,6 +16,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "util/slice.h"
 #include "util/types.h"
 
 /*
@@ -110,8 +111,7 @@ typedef struct ldb_lkey_s {
  * Helpers
  */
 
-ldb_slice_t
-ldb_extract_user_key(const ldb_slice_t *key);
+#define ldb_extract_user_key(x) ldb_slice((x)->data, (x)->size - 8)
 
 /*
  * ParsedInternalKey
@@ -157,8 +157,7 @@ ldb_ikey_clear(ldb_ikey_t *ikey);
 void
 ldb_ikey_copy(ldb_ikey_t *z, const ldb_ikey_t *x);
 
-ldb_slice_t
-ldb_ikey_user_key(const ldb_ikey_t *ikey);
+#define ldb_ikey_user_key ldb_extract_user_key
 
 /* PutLengthPrefixedSlice */
 void
@@ -180,16 +179,13 @@ void
 ldb_lkey_clear(ldb_lkey_t *lkey);
 
 /* Return a key suitable for lookup in a MemTable. */
-ldb_slice_t
-ldb_lkey_memtable_key(const ldb_lkey_t *lkey);
+#define ldb_lkey_memtable_key(x) ldb_slice((x)->start, (x)->end - (x)->start)
 
 /* Return an internal key (suitable for passing to an internal iterator) */
-ldb_slice_t
-ldb_lkey_internal_key(const ldb_lkey_t *lkey);
+#define ldb_lkey_internal_key(x) ldb_slice((x)->kstart, (x)->end - (x)->kstart)
 
 /* Return the user key */
-ldb_slice_t
-ldb_lkey_user_key(const ldb_lkey_t *lkey);
+#define ldb_lkey_user_key(x) ldb_slice((x)->kstart, (x)->end - (x)->kstart - 8)
 
 /*
  * InternalKeyComparator

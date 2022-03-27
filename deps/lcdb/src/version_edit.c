@@ -452,6 +452,9 @@ ldb_vedit_import(ldb_vedit_t *edit, const ldb_slice_t *src) {
         if (!ldb_slice_slurp(&key, &input))
           return 0;
 
+        if (key.size < 8)
+          return 0;
+
         ldb_vedit_set_compact_pointer(edit, level, &key);
 
         break;
@@ -483,6 +486,9 @@ ldb_vedit_import(ldb_vedit_t *edit, const ldb_slice_t *src) {
           return 0;
 
         if (!ldb_slice_slurp(&largest, &input))
+          return 0;
+
+        if (smallest.size < 8 || largest.size < 8)
           return 0;
 
         ldb_vedit_add_file(edit, level, number, file_size, &smallest, &largest);

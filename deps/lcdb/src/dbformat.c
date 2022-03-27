@@ -34,17 +34,6 @@ pack_seqtype(uint64_t sequence, ldb_valtype_t type) {
   return (sequence << 8) | type;
 }
 
-ldb_slice_t
-ldb_extract_user_key(const ldb_slice_t *key) {
-  ldb_slice_t ret;
-
-  assert(key->size >= 8);
-
-  ldb_slice_set(&ret, key->data, key->size - 8);
-
-  return ret;
-}
-
 /*
  * ParsedInternalKey
  */
@@ -159,11 +148,6 @@ ldb_ikey_copy(ldb_ikey_t *z, const ldb_ikey_t *x) {
   ldb_buffer_copy(z, x);
 }
 
-ldb_slice_t
-ldb_ikey_user_key(const ldb_ikey_t *ikey) {
-  return ldb_extract_user_key(ikey);
-}
-
 void
 ldb_ikey_export(ldb_ikey_t *z, const ldb_ikey_t *x) {
   ldb_buffer_export(z, x);
@@ -215,27 +199,6 @@ ldb_lkey_clear(ldb_lkey_t *lkey) {
     ldb_free((void *)lkey->start);
 }
 
-ldb_slice_t
-ldb_lkey_memtable_key(const ldb_lkey_t *lkey) {
-  ldb_slice_t ret;
-  ldb_slice_set(&ret, lkey->start, lkey->end - lkey->start);
-  return ret;
-}
-
-ldb_slice_t
-ldb_lkey_internal_key(const ldb_lkey_t *lkey) {
-  ldb_slice_t ret;
-  ldb_slice_set(&ret, lkey->kstart, lkey->end - lkey->kstart);
-  return ret;
-}
-
-ldb_slice_t
-ldb_lkey_user_key(const ldb_lkey_t *lkey) {
-  ldb_slice_t ret;
-  ldb_slice_set(&ret, lkey->kstart, lkey->end - lkey->kstart - 8);
-  return ret;
-}
-
 /*
  * InternalKeyComparator
  */
@@ -277,6 +240,7 @@ ldb_ikc_shortest_separator(const ldb_comparator_t *ikc,
   ldb_buffer_t tmp;
 
   ldb_buffer_init(&tmp);
+  ldb_buffer_grow(&tmp, user_start.size + 8);
   ldb_buffer_copy(&tmp, &user_start);
 
   ldb_shortest_separator(uc, &tmp, &user_limit);
@@ -302,6 +266,7 @@ ldb_ikc_short_successor(const ldb_comparator_t *ikc, ldb_buffer_t *key) {
   ldb_buffer_t tmp;
 
   ldb_buffer_init(&tmp);
+  ldb_buffer_grow(&tmp, user_key.size + 8);
   ldb_buffer_copy(&tmp, &user_key);
 
   ldb_short_successor(uc, &tmp);

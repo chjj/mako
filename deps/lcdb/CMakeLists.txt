@@ -44,8 +44,9 @@ include(GNUInstallDirs)
 
 option(LDB_COVERAGE "Enable coverage" OFF)
 option(LDB_PIC "Enable PIC" OFF)
+option(LDB_PORTABLE "Be as portable as possible" OFF)
 option(LDB_SHARED "Build shared library" OFF)
-option(LDB_TESTS "Build tests" OFF)
+option(LDB_TESTS "Build tests" ON)
 
 #
 # Variables
@@ -110,14 +111,18 @@ endif()
 # Feature Testing
 #
 
-check_symbol_exists(fdatasync unistd.h LDB_HAVE_FDATASYNC)
-check_symbol_exists(pread unistd.h LDB_HAVE_PREAD)
+if(LDB_PORTABLE OR MAKO_PORTABLE)
+  set(LDB_HAVE_FDATASYNC OFF)
+  set(LDB_HAVE_PREAD OFF)
+else()
+  check_symbol_exists(fdatasync unistd.h LDB_HAVE_FDATASYNC)
+  check_symbol_exists(pread unistd.h LDB_HAVE_PREAD)
+endif()
 
 set(LDB_HAVE_PTHREAD 0)
 
-if(CMAKE_C_COMPILER_ID MATCHES "Watcom$")
-  # Nothing.
-elseif(NOT WIN32 AND NOT WASI AND NOT EMSCRIPTEN)
+if(NOT WIN32 AND NOT WASI AND NOT EMSCRIPTEN
+   AND NOT CMAKE_C_COMPILER_ID MATCHES "Watcom$")
   set(THREADS_PREFER_PTHREAD_FLAG ON)
 
   find_package(Threads)
@@ -182,37 +187,35 @@ list(APPEND ldb_sources # util
                         src/version_set.c
                         src/write_batch.c)
 
-if(LDB_TESTS)
-  list(APPEND ldb_sources # util
-                          src/util/arena_test.c
-                          src/util/bloom_test.c
-                          src/util/cache_test.c
-                          src/util/coding_test.c
-                          src/util/crc32c_test.c
-                          src/util/env_test.c
-                          src/util/hash_test.c
-                          src/util/rbt_test.c
-                          src/util/snappy_test.c
-                          src/util/strutil_test.c
-                          src/util/status_test.c
-                          src/util/testutil.c
-                          # table
-                          src/table/filter_block_test.c
-                          src/table/table_test.c
-                          # db
-                          src/autocompact_test.c
-                          src/c_test.c
-                          src/corruption_test.c
-                          src/dbformat_test.c
-                          src/db_test.c
-                          src/filename_test.c
-                          src/log_test.c
-                          src/recovery_test.c
-                          src/skiplist_test.c
-                          src/version_edit_test.c
-                          src/version_set_test.c
-                          src/write_batch_test.c)
-endif()
+list(APPEND test_sources # util
+                         src/util/arena_test.c
+                         src/util/bloom_test.c
+                         src/util/cache_test.c
+                         src/util/coding_test.c
+                         src/util/crc32c_test.c
+                         src/util/env_test.c
+                         src/util/hash_test.c
+                         src/util/rbt_test.c
+                         src/util/snappy_test.c
+                         src/util/strutil_test.c
+                         src/util/status_test.c
+                         src/util/testutil.c
+                         # table
+                         src/table/filter_block_test.c
+                         src/table/table_test.c
+                         # db
+                         src/autocompact_test.c
+                         src/c_test.c
+                         src/corruption_test.c
+                         src/dbformat_test.c
+                         src/db_test.c
+                         src/filename_test.c
+                         src/log_test.c
+                         src/recovery_test.c
+                         src/skiplist_test.c
+                         src/version_edit_test.c
+                         src/version_set_test.c
+                         src/write_batch_test.c)
 
 #
 # Flags
@@ -337,12 +340,15 @@ endif()
 # Targets
 #
 
+add_library(lcdb INTERFACE)
+target_compile_definitions(lcdb INTERFACE ${ldb_defines})
+target_compile_options(lcdb INTERFACE ${ldb_cflags})
+target_include_directories(lcdb INTERFACE ${ldb_includes})
+target_link_options(lcdb INTERFACE ${ldb_ldflags})
+target_link_libraries(lcdb INTERFACE ${ldb_libs})
+
 add_library(lcdb_static STATIC ${ldb_sources})
-target_compile_definitions(lcdb_static PRIVATE ${ldb_defines})
-target_compile_options(lcdb_static PUBLIC ${ldb_cflags})
-target_include_directories(lcdb_static PUBLIC ${ldb_includes})
-target_link_options(lcdb_static PUBLIC ${ldb_ldflags})
-target_link_libraries(lcdb_static PRIVATE ${ldb_libs})
+target_link_libraries(lcdb_static PRIVATE lcdb)
 set_property(TARGET lcdb_static PROPERTY POSITION_INDEPENDENT_CODE ${LDB_PIC})
 
 if(WIN32)
@@ -355,13 +361,16 @@ if(MINGW)
   set_target_properties(lcdb_static PROPERTIES PREFIX "" SUFFIX ".lib")
 endif()
 
+if(LDB_TESTS)
+  add_library(lcdb_test STATIC ${test_sources})
+  target_link_libraries(lcdb_test PRIVATE lcdb lcdb_static)
+  set_property(TARGET lcdb_test PROPERTY OUTPUT_NAME test)
+endif()
+
 if(LDB_SHARED)
   add_library(lcdb_shared SHARED ${ldb_sources})
-  target_compile_definitions(lcdb_shared PRIVATE ${ldb_defines} LDB_EXPORT)
-  target_compile_options(lcdb_shared PUBLIC ${ldb_cflags})
-  target_include_directories(lcdb_shared PUBLIC ${ldb_includes})
-  target_link_options(lcdb_shared PUBLIC ${ldb_ldflags})
-  target_link_libraries(lcdb_shared PRIVATE ${ldb_libs})
+  target_compile_definitions(lcdb_shared PRIVATE LDB_EXPORT)
+  target_link_libraries(lcdb_shared PRIVATE lcdb)
   set_property(TARGET lcdb_shared PROPERTY OUTPUT_NAME lcdb)
 
   if (NOT LDB_CHIBICC) # chibicc doesn't support .so versioning.
@@ -384,7 +393,7 @@ else()
 endif()
 
 add_executable(lcdb_util src/dbutil.c)
-target_link_libraries(lcdb_util PRIVATE ${lcdb_name})
+target_link_libraries(lcdb_util PRIVATE lcdb ${lcdb_name})
 set_property(TARGET lcdb_util PROPERTY OUTPUT_NAME lcdbutil)
 
 #
@@ -424,7 +433,7 @@ if(LDB_TESTS)
 
   foreach(name ${tests})
     add_executable(t-${name} test/t-${name}.c)
-    target_link_libraries(t-${name} PRIVATE ${lcdb_name})
+    target_link_libraries(t-${name} PRIVATE lcdb lcdb_test)
     add_test(NAME ${name} COMMAND t-${name})
   endforeach()
 endif()

@@ -125,7 +125,6 @@ ldb_twoiter_init_data_block(ldb_twoiter_t *iter) {
                                                    &handle);
 
       ldb_buffer_copy(&iter->data_block_handle, &handle);
-      /* ldb_buffer_set(&iter->data_block_handle, handle.data, handle.size); */
 
       ldb_twoiter_set_data_iter(iter, data_iter);
     }

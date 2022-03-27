@@ -279,19 +279,26 @@ ldb_numiter_prev(ldb_numiter_t *iter) {
 
 static ldb_slice_t
 ldb_numiter_key(const ldb_numiter_t *iter) {
+  const ldb_filemeta_t *file;
+
   assert(ldb_numiter_valid(iter));
-  return ((ldb_filemeta_t *)iter->flist->items[iter->index])->largest;
+
+  file = iter->flist->items[iter->index];
+
+  return file->largest;
 }
 
 static ldb_slice_t
 ldb_numiter_value(const ldb_numiter_t *iter) {
-  const ldb_filemeta_t **flist = (const ldb_filemeta_t **)iter->flist->items;
   uint8_t *value = (uint8_t *)iter->value;
+  const ldb_filemeta_t *file;
 
   assert(ldb_numiter_valid(iter));
 
-  ldb_fixed64_write(value + 0, flist[iter->index]->number);
-  ldb_fixed64_write(value + 8, flist[iter->index]->file_size);
+  file = iter->flist->items[iter->index];
+
+  ldb_fixed64_write(value + 0, file->number);
+  ldb_fixed64_write(value + 8, file->file_size);
 
   return ldb_slice(value, sizeof(iter->value));
 }

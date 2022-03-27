@@ -126,7 +126,13 @@ int main(void) {
 Build with:
 
 ``` sh
-$ cc -o example example.c -llcdb -lpthread
+$ cc -o example example.c -llcdb
+```
+
+Or:
+
+``` sh
+$ cc -o example -I./include example.c liblcdb.a -lpthread
 ```
 
 See the [header file][h] for more information.

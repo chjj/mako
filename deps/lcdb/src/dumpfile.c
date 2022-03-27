@@ -20,6 +20,7 @@
 #include "table/table.h"
 
 #include "util/buffer.h"
+#include "util/comparator.h"
 #include "util/env.h"
 #include "util/internal.h"
 #include "util/options.h"
@@ -243,7 +244,11 @@ dump_table(const char *fname, FILE *dst) {
        comparator used in this database. However this should not cause
        problems since we only use Table operations that do not require
        any comparisons. In particular, we do not call Seek or Prev. */
-    rc = ldb_table_open(ldb_dbopt_default, file, file_size, &table);
+    ldb_dbopt_t options = *ldb_dbopt_default;
+
+    options.comparator = ldb_bytewise_comparator;
+
+    rc = ldb_table_open(&options, file, file_size, &table);
   }
 
   if (rc != LDB_OK) {

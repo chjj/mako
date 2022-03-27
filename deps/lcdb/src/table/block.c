@@ -274,12 +274,20 @@ ldb_blockiter_prev(ldb_blockiter_t *iter) {
 
 static void
 ldb_blockiter_seek(ldb_blockiter_t *iter, const ldb_slice_t *target) {
+  int is_internal = (iter->comparator->user_comparator != NULL);
+  int current_key_compare, skip_seek;
+  uint32_t left, right;
+
+  if (is_internal && target->size < 8) {
+    ldb_blockiter_corruption(iter);
+    return;
+  }
+
   /* Binary search in restart array to find the
      last restart point with a key < target. */
-  uint32_t left = 0;
-  uint32_t right = iter->num_restarts - 1;
-  int current_key_compare = 0;
-  int skip_seek;
+  left = 0;
+  right = iter->num_restarts - 1;
+  current_key_compare = 0;
 
   if (ldb_blockiter_valid(iter)) {
     /* If we're already scanning, use the current position as a starting
@@ -310,6 +318,11 @@ ldb_blockiter_seek(ldb_blockiter_t *iter, const ldb_slice_t *target) {
     ldb_slice_t mid_key;
 
     if (key_ptr == NULL || (shared != 0)) {
+      ldb_blockiter_corruption(iter);
+      return;
+    }
+
+    if (is_internal && non_shared < 8) {
       ldb_blockiter_corruption(iter);
       return;
     }
@@ -365,6 +378,7 @@ ldb_blockiter_last(ldb_blockiter_t *iter) {
 
 static int
 ldb_blockiter_parse_next_key(ldb_blockiter_t *iter) {
+  int is_internal = (iter->comparator->user_comparator != NULL);
   uint32_t shared, non_shared, value_length;
   const uint8_t *p, *limit;
 
@@ -384,6 +398,11 @@ ldb_blockiter_parse_next_key(ldb_blockiter_t *iter) {
   p = ldb_decode_entry(&shared, &non_shared, &value_length, p, limit);
 
   if (p == NULL || iter->key.size < shared) {
+    ldb_blockiter_corruption(iter);
+    return 0;
+  }
+
+  if (is_internal && shared + non_shared < 8) {
     ldb_blockiter_corruption(iter);
     return 0;
   }
