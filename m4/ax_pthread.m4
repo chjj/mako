@@ -461,20 +461,6 @@ if test "x$ax_pthread_ok" = "xyes"; then
               [PTHREAD_CFLAGS="$ax_cv_PTHREAD_SPECIAL_FLAGS $PTHREAD_CFLAGS"
                ax_pthread_special_flags_added=yes])
 
-        AC_CACHE_CHECK([for PTHREAD_PRIO_INHERIT],
-            [ax_cv_PTHREAD_PRIO_INHERIT],
-            [AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <pthread.h>]],
-                                             [[int i = PTHREAD_PRIO_INHERIT;
-                                               return i;]])],
-                            [ax_cv_PTHREAD_PRIO_INHERIT=yes],
-                            [ax_cv_PTHREAD_PRIO_INHERIT=no])
-            ])
-        AS_IF([test "x$ax_cv_PTHREAD_PRIO_INHERIT" = "xyes" && \
-               test "x$ax_pthread_prio_inherit_defined" != "xyes"],
-              [AC_DEFINE([HAVE_PTHREAD_PRIO_INHERIT], [1], [Have PTHREAD_PRIO_INHERIT.])
-               ax_pthread_prio_inherit_defined=yes
-              ])
-
         CFLAGS="$ax_pthread_save_CFLAGS"
         LIBS="$ax_pthread_save_LIBS"
 

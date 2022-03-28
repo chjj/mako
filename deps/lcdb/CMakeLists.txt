@@ -91,28 +91,6 @@ if(APPLE)
 endif()
 
 #
-# Compiler Fixes
-#
-
-# Encourage the user to build with xlc_r.
-if(CMAKE_C_COMPILER_ID STREQUAL "XL" AND CMAKE_SYSTEM_NAME STREQUAL "AIX")
-  check_symbol_exists(_THREAD_SAFE "" LDB_XLC_R)
-
-  if(NOT LDB_XLC_R)
-    message(WARNING "Please use a thread-safe compiler invocation.\n"
-                    "For example, `cmake . -DCMAKE_C_COMPILER=xlc_r`.")
-  endif()
-endif()
-
-# CMake doesn't know about chibicc's -fPIC.
-check_symbol_exists(__chibicc__ "" LDB_CHIBICC)
-
-if(LDB_CHIBICC)
-  set(CMAKE_C_COMPILE_OPTIONS_PIC "-fPIC")
-  set(CMAKE_SHARED_LIBRARY_C_FLAGS "-fPIC")
-endif()
-
-#
 # Feature Testing
 #
 
@@ -377,10 +355,7 @@ if(LDB_SHARED)
   target_compile_definitions(lcdb_shared PRIVATE LDB_EXPORT)
   target_link_libraries(lcdb_shared PRIVATE lcdb)
   set_property(TARGET lcdb_shared PROPERTY OUTPUT_NAME lcdb)
-
-  if (NOT LDB_CHIBICC) # chibicc doesn't support .so versioning.
-    set_target_version_info(lcdb_shared ${LDB_ABI_VERSION})
-  endif()
+  set_target_version_info(lcdb_shared ${LDB_ABI_VERSION})
 
   if(MINGW)
     set_target_properties(lcdb_shared PROPERTIES PREFIX ""

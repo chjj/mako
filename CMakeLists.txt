@@ -100,28 +100,6 @@ if(APPLE)
 endif()
 
 #
-# Compiler Fixes
-#
-
-# Encourage the user to build with xlc_r.
-if(CMAKE_C_COMPILER_ID STREQUAL "XL" AND CMAKE_SYSTEM_NAME STREQUAL "AIX")
-  check_symbol_exists(_THREAD_SAFE "" MAKO_XLC_R)
-
-  if(NOT MAKO_XLC_R)
-    message(WARNING "Please use a thread-safe compiler invocation.\n"
-                    "For example, `cmake . -DCMAKE_C_COMPILER=xlc_r`.")
-  endif()
-endif()
-
-# CMake doesn't know about chibicc's -fPIC.
-check_symbol_exists(__chibicc__ "" MAKO_CHIBICC)
-
-if(MAKO_CHIBICC)
-  set(CMAKE_C_COMPILE_OPTIONS_PIC "-fPIC")
-  set(CMAKE_SHARED_LIBRARY_C_FLAGS "-fPIC")
-endif()
-
-#
 # Feature Testing
 #
 
@@ -573,10 +551,7 @@ function(mako_build_full)
     target_compile_definitions(mako_shared PRIVATE BTC_EXPORT)
     target_link_libraries(mako_shared PRIVATE mako)
     set_property(TARGET mako_shared PROPERTY OUTPUT_NAME mako)
-
-    if (NOT MAKO_CHIBICC) # chibicc doesn't support .so versioning.
-      set_target_version_info(mako_shared ${MAKO_ABI_VERSION})
-    endif()
+    set_target_version_info(mako_shared ${MAKO_ABI_VERSION})
 
     if(MINGW)
       set_target_properties(mako_shared PROPERTIES PREFIX ""

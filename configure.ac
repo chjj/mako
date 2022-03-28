@@ -27,6 +27,8 @@ AM_SILENT_RULES([yes])
 LT_PREREQ([2.2.8])
 LT_INIT([static disable-shared])
 
+echo > confdefs.h
+
 #
 # Sanity Checks
 #
@@ -148,28 +150,6 @@ AC_COMPILE_IFELSE([
 AS_CASE([$host_os], [darwin*], [
   AX_CHECK_COMPILE_FLAG([-mmacosx-version-min=10.7],
                         [CFLAGS="$CFLAGS -mmacosx-version-min=10.7"])
-])
-
-#
-# Compiler Fixes
-#
-
-# Encourage the user to build with xlc_r.
-AC_COMPILE_IFELSE([
-  AC_LANG_PROGRAM([[]], [[
-#   if defined(__xlC__) && defined(_AIX) && !defined(_THREAD_SAFE)
-      choke me
-#   endif
-  ]])
-], [], [
-  AC_MSG_WARN([Please use a thread-safe compiler invocation.])
-  AC_MSG_WARN([For example, './configure CC=xlc_r'.])
-])
-
-# Hack to get OpenWatcom's owcc working.
-AC_CHECK_DEFINE([__WATCOMC__], [
-  grep -v '#define PACKAGE_STRING' confdefs.h > confdefs.h.tmp
-  mv -f confdefs.h.tmp confdefs.h
 ])
 
 #
