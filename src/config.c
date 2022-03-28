@@ -456,6 +456,7 @@ conf_init(btc_conf_t *conf) {
   conf->level = 4; /* BTC_LOG_DEBUG */
   conf->network_active = 1;
   conf->disable_wallet = 0;
+  conf->cache_size = 128;
   conf->checkpoints = 1;
   conf->prune = 0;
   conf->workers = 0;
@@ -577,6 +578,9 @@ conf_read_file(btc_conf_t *conf, const char *file) {
       continue;
 
     if (btc_match_bool(&conf->disable_wallet, opt, "disablewallet="))
+      continue;
+
+    if (btc_match_range(&conf->cache_size, opt, "dbcache=", 8, 2048))
       continue;
 
     if (btc_match_bool(&conf->checkpoints, opt, "checkpoints="))
@@ -718,6 +722,9 @@ conf_parse_args(btc_conf_t *conf, int argc, char **argv, int allow_params) {
       continue;
 
     if (btc_match_argbool(&conf->disable_wallet, arg, "-disablewallet="))
+      continue;
+
+    if (btc_match_range(&conf->cache_size, arg, "-dbcache=", 8, 2048))
       continue;
 
     if (btc_match_argbool(&conf->checkpoints, arg, "-checkpoints="))

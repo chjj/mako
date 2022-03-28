@@ -84,6 +84,9 @@ BTC_EXTERN void
 btc_chain_set_threads(btc_chain_t *chain, int threads);
 
 BTC_EXTERN void
+btc_chain_set_cache(btc_chain_t *chain, size_t cache_size);
+
+BTC_EXTERN void
 btc_chain_on_block(btc_chain_t *chain, btc_chain_block_cb *handler);
 
 BTC_EXTERN void

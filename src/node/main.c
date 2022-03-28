@@ -53,6 +53,7 @@ set_config(btc_node_t *node, const btc_conf_t *conf) {
   btc_logger_set_level(node->logger, conf->level);
 
   btc_chain_set_threads(node->chain, conf->workers);
+  btc_chain_set_cache(node->chain, (size_t)conf->cache_size << 20);
 
   btc_pool_set_port(node->pool, conf->port);
 

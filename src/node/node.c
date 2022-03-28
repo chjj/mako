@@ -148,20 +148,30 @@ btc_node_open(btc_node_t *node, const char *prefix, unsigned int flags) {
 
   btc_log_info(node, "Opening node.");
 
-  if (!btc_chain_open(node->chain, prefix, flags))
+  if (!btc_chain_open(node->chain, prefix, flags)) {
+    btc_log_error(node, "Failed to open chain.");
     goto fail1;
+  }
 
-  if (!btc_mempool_open(node->mempool, prefix, flags))
+  if (!btc_mempool_open(node->mempool, prefix, flags)) {
+    btc_log_error(node, "Failed to open mempool.");
     goto fail2;
+  }
 
-  if (!btc_miner_open(node->miner, flags))
+  if (!btc_miner_open(node->miner, flags)) {
+    btc_log_error(node, "Failed to open miner.");
     goto fail3;
+  }
 
-  if (!btc_pool_open(node->pool, prefix, flags))
+  if (!btc_pool_open(node->pool, prefix, flags)) {
+    btc_log_error(node, "Failed to open pool.");
     goto fail4;
+  }
 
-  if (!btc_rpc_open(node->rpc, flags))
+  if (!btc_rpc_open(node->rpc, flags)) {
+    btc_log_error(node, "Failed to open RPC.");
     goto fail5;
+  }
 
   return 1;
 fail5:

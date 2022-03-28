@@ -26,6 +26,7 @@ struct btc_conf_s {
   int level;
   int network_active;
   int disable_wallet;
+  int cache_size;
   int checkpoints;
   int prune;
   int workers;

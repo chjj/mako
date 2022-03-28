@@ -294,6 +294,7 @@ struct btc_chaindb_s {
   const btc_network_t *network;
   char prefix[BTC_PATH_MAX - 26];
   unsigned int flags;
+  size_t cache_size;
   ldb_t *lsm;
   ldb_lru_t *block_cache;
   btc_hashmap_t *hashes;
@@ -329,6 +330,7 @@ btc_chaindb_init(btc_chaindb_t *db, const btc_network_t *network) {
   db->prefix[0] = '/';
   db->hashes = btc_hashmap_create();
   db->flags = BTC_CHAIN_DEFAULT_FLAGS;
+  db->cache_size = 128 << 20;
 
   btc_vector_init(&db->heights);
 
@@ -376,7 +378,6 @@ btc_chaindb_load_prefix(btc_chaindb_t *db, const char *prefix) {
 
 static int
 btc_chaindb_load_database(btc_chaindb_t *db) {
-  static const size_t cache_size = 128 << 20;
   ldb_dbopt_t options = *ldb_dbopt_default;
   char path[BTC_PATH_MAX];
   int rc;
@@ -386,11 +387,11 @@ btc_chaindb_load_database(btc_chaindb_t *db) {
     return 0;
   }
 
-  db->block_cache = ldb_lru_create(cache_size / 2);
+  db->block_cache = ldb_lru_create(db->cache_size / 2);
 
   options.create_if_missing = 1;
   options.block_cache = db->block_cache;
-  options.write_buffer_size = cache_size / 4;
+  options.write_buffer_size = db->cache_size / 4;
   options.compression = LDB_NO_COMPRESSION;
   options.filter_policy = NULL; /* ldb_bloom_default */
   options.use_mmap = 0;
@@ -648,6 +649,11 @@ btc_chaindb_unload_index(btc_chaindb_t *db) {
 
   db->head = NULL;
   db->tail = NULL;
+}
+
+void
+btc_chaindb_set_cache(btc_chaindb_t *db, size_t cache_size) {
+  db->cache_size = cache_size;
 }
 
 int
