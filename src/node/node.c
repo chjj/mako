@@ -136,15 +136,17 @@ btc_node_open(btc_node_t *node, const char *prefix, unsigned int flags) {
   btc_fs_mkdir(prefix);
 
   if (!btc_fs_exists(prefix)) {
-    fprintf(stderr, "ERROR: '%s' does not exist.\n", prefix);
+    fprintf(stderr, "ERROR: Could not create prefix '%s'.\n", prefix);
     return 0;
   }
 
   if (!btc_path_join(file, sizeof(file), prefix, "debug.log"))
     return 0;
 
-  if (!btc_logger_open(node->logger, file))
+  if (!btc_logger_open(node->logger, file)) {
+    fprintf(stderr, "ERROR: Cannot open log file '%s'.\n", file);
     return 0;
+  }
 
   btc_log_info(node, "Opening node.");
 
