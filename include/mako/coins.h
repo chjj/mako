@@ -21,18 +21,17 @@ extern "C" {
  * Types
  */
 
+struct btc_coins_s {
+  uint8_t hash[32];
+  btc_intmap_t map;
+};
+
+struct btc_view_s {
+  btc_hashmap_t map;
+  btc_undo_t undo;
+};
+
 typedef btc_coin_t *btc_coin_read_cb(const btc_outpoint_t *prevout, void *arg);
-
-struct btc_coins_s;
-
-typedef struct btc_viewiter_s {
-  const struct btc_view_s *view;
-  unsigned int itv;
-  unsigned int itc;
-  struct btc_coins_s *coins;
-  const uint8_t *hash;
-  uint32_t index;
-} btc_viewiter_t;
 
 /*
  * Coin
@@ -102,15 +101,6 @@ btc_view_fill(btc_view_t *view,
 
 BTC_EXTERN void
 btc_view_add(btc_view_t *view, const btc_tx_t *tx, int32_t height, int spent);
-
-BTC_EXTERN void
-btc_view_iterate(btc_viewiter_t *iter, const btc_view_t *view);
-
-BTC_EXTERN int
-btc_view_next(const btc_coin_t **coin, btc_viewiter_t *iter);
-
-BTC_EXTERN btc_undo_t *
-btc_view_undo(const btc_view_t *view);
 
 #ifdef __cplusplus
 }

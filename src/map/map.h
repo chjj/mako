@@ -29,15 +29,7 @@
  */
 
 #define DEFINE_MAP_TYPES(name, key_t, val_t) \
-                                             \
-typedef struct kh_##name##_s name##_t;       \
-                                             \
-typedef struct name##iter_s {                \
-  const struct kh_##name##_s *map;           \
-  khint_t it;                                \
-  key_t key;                                 \
-  val_t val;                                 \
-} name##iter_t
+typedef struct kh_##name##_s name##_t
 
 #define DEFINE_MAP(name, key_t, val_t, key_hash, key_equal, sentinel, scope) \
                                                                              \
@@ -59,6 +51,16 @@ name##_destroy(kh_##name##_t *map) {                                         \
 }                                                                            \
                                                                              \
 scope void                                                                   \
+name##_init(kh_##name##_t *map) {                                            \
+  kh_init2_##name(map);                                                      \
+}                                                                            \
+                                                                             \
+scope void                                                                   \
+name##_clear(kh_##name##_t *map) {                                           \
+  kh_destroy2_##name(map);                                                   \
+}                                                                            \
+                                                                             \
+scope void                                                                   \
 name##_reset(kh_##name##_t *map) {                                           \
   kh_clear_##name(map);                                                      \
 }                                                                            \
@@ -68,46 +70,56 @@ name##_resize(kh_##name##_t *map, size_t size) {                             \
   kh_resize_##name(map, size);                                               \
 }                                                                            \
                                                                              \
-scope size_t                                                                 \
-name##_size(const kh_##name##_t *map) {                                      \
-  return kh_size(map);                                                       \
+scope btc_mapiter_t                                                          \
+name##_lookup(const kh_##name##_t *map, const key_t key) {                   \
+  return kh_get_##name(map, (key_t)key);                                     \
 }                                                                            \
                                                                              \
-scope size_t                                                                 \
-name##_buckets(const kh_##name##_t *map) {                                   \
-  return kh_n_buckets(map);                                                  \
+scope btc_mapiter_t                                                          \
+name##_insert(kh_##name##_t *map, const key_t key, int *exists) {            \
+  khiter_t it;                                                               \
+  int ret;                                                                   \
+                                                                             \
+  it = kh_put_##name(map, (key_t)key, &ret);                                 \
+                                                                             \
+  if (ret < 0)                                                               \
+    abort(); /* LCOV_EXCL_LINE */                                            \
+                                                                             \
+  *exists = (ret == 0);                                                      \
+                                                                             \
+  return it;                                                                 \
 }                                                                            \
                                                                              \
 scope int                                                                    \
 name##_has(const kh_##name##_t *map, const key_t key) {                      \
   khiter_t it = kh_get_##name(map, (key_t)key);                              \
-  return it != kh_end(map);                                                  \
+  return it != map->n_buckets;                                               \
 }                                                                            \
                                                                              \
 scope val_t                                                                  \
 name##_get(const kh_##name##_t *map, const key_t key) {                      \
   khiter_t it = kh_get_##name(map, (key_t)key);                              \
                                                                              \
-  if (it == kh_end(map))                                                     \
+  if (it == map->n_buckets)                                                  \
     return (sentinel);                                                       \
                                                                              \
-  return (val_t)kh_value(map, it);                                           \
+  return (val_t)map->vals[it];                                               \
 }                                                                            \
                                                                              \
 scope int                                                                    \
 name##_put(kh_##name##_t *map, const key_t key, const val_t val) {           \
-  int ret = -1;                                                              \
   khiter_t it;                                                               \
+  int ret;                                                                   \
                                                                              \
   it = kh_put_##name(map, (key_t)key, &ret);                                 \
                                                                              \
-  if (ret == -1)                                                             \
+  if (ret < 0)                                                               \
     abort(); /* LCOV_EXCL_LINE */                                            \
                                                                              \
   if (ret == 0)                                                              \
     return 0;                                                                \
                                                                              \
-  kh_value(map, it) = (val_t)val;                                            \
+  map->vals[it] = (val_t)val;                                                \
                                                                              \
   return 1;                                                                  \
 }                                                                            \
@@ -117,53 +129,14 @@ name##_del(kh_##name##_t *map, const key_t key) {                            \
   khiter_t it = kh_get_##name(map, (key_t)key);                              \
   key_t ret;                                                                 \
                                                                              \
-  if (it == kh_end(map))                                                     \
+  if (it == map->n_buckets)                                                  \
     return (key_t)0;                                                         \
                                                                              \
-  ret = kh_key(map, it);                                                     \
+  ret = map->keys[it];                                                       \
                                                                              \
   kh_del_##name(map, it);                                                    \
                                                                              \
   return ret;                                                                \
-}                                                                            \
-                                                                             \
-scope val_t                                                                  \
-name##_rem(kh_##name##_t *map, const key_t key) {                            \
-  khiter_t it = kh_get_##name(map, (key_t)key);                              \
-  val_t ret;                                                                 \
-                                                                             \
-  if (it == kh_end(map))                                                     \
-    return (sentinel);                                                       \
-                                                                             \
-  ret = kh_value(map, it);                                                   \
-                                                                             \
-  kh_del_##name(map, it);                                                    \
-                                                                             \
-  return ret;                                                                \
-}                                                                            \
-                                                                             \
-scope void                                                                   \
-name##_iterate(name##iter_t *iter, const kh_##name##_t *map) {               \
-  iter->map = map;                                                           \
-  iter->it = kh_begin(map);                                                  \
-  iter->key = (key_t)0;                                                      \
-  iter->val = (sentinel);                                                    \
-}                                                                            \
-                                                                             \
-scope int                                                                    \
-name##_next(name##iter_t *iter) {                                            \
-  const kh_##name##_t *map = iter->map;                                      \
-                                                                             \
-  for (; iter->it != kh_end(map); iter->it++) {                              \
-    if (kh_exist(map, iter->it)) {                                           \
-      iter->key = kh_key(map, iter->it);                                     \
-      iter->val = kh_val(map, iter->it);                                     \
-      iter->it++;                                                            \
-      return 1;                                                              \
-    }                                                                        \
-  }                                                                          \
-                                                                             \
-  return 0;                                                                  \
 }
 
 /*
@@ -171,100 +144,98 @@ name##_next(name##iter_t *iter) {                                            \
  */
 
 #define DEFINE_SET_TYPES(name, key_t) \
-  DEFINE_MAP_TYPES(name, key_t, int)
+  DEFINE_MAP_TYPES(name, key_t, char)
 
-#define DEFINE_SET(name, key_t, key_hash, key_equal, scope)    \
-                                                               \
-KHASH_INIT(name, key_t, char, 0, key_hash, key_equal)          \
-                                                               \
-scope kh_##name##_t *                                          \
-name##_create(void) {                                          \
-  kh_##name##_t *map = kh_init_##name();                       \
-                                                               \
-  if (map == NULL)                                             \
-    abort(); /* LCOV_EXCL_LINE */                              \
-                                                               \
-  return map;                                                  \
-}                                                              \
-                                                               \
-scope void                                                     \
-name##_destroy(kh_##name##_t *map) {                           \
-  kh_destroy_##name(map);                                      \
-}                                                              \
-                                                               \
-scope void                                                     \
-name##_reset(kh_##name##_t *map) {                             \
-  kh_clear_##name(map);                                        \
-}                                                              \
-                                                               \
-scope void                                                     \
-name##_resize(kh_##name##_t *map, size_t size) {               \
-  kh_resize_##name(map, size);                                 \
-}                                                              \
-                                                               \
-scope size_t                                                   \
-name##_size(const kh_##name##_t *map) {                        \
-  return kh_size(map);                                         \
-}                                                              \
-                                                               \
-scope size_t                                                   \
-name##_buckets(const kh_##name##_t *map) {                     \
-  return kh_n_buckets(map);                                    \
-}                                                              \
-                                                               \
-scope int                                                      \
-name##_has(const kh_##name##_t *map, const key_t key) {        \
-  khiter_t it = kh_get_##name(map, (key_t)key);                \
-  return it != kh_end(map);                                    \
-}                                                              \
-                                                               \
-scope int                                                      \
-name##_put(kh_##name##_t *map, const key_t key) {              \
-  int ret = -1;                                                \
-                                                               \
-  kh_put_##name(map, (key_t)key, &ret);                        \
-                                                               \
-  if (ret == -1)                                               \
-    abort(); /* LCOV_EXCL_LINE */                              \
-                                                               \
-  return ret > 0;                                              \
-}                                                              \
-                                                               \
-scope key_t                                                    \
-name##_del(kh_##name##_t *map, const key_t key) {              \
-  khiter_t it = kh_get_##name(map, (key_t)key);                \
-  key_t ret;                                                   \
-                                                               \
-  if (it == kh_end(map))                                       \
-    return (key_t)0;                                           \
-                                                               \
-  ret = kh_key(map, it);                                       \
-                                                               \
-  kh_del_##name(map, it);                                      \
-                                                               \
-  return ret;                                                  \
-}                                                              \
-                                                               \
-scope void                                                     \
-name##_iterate(name##iter_t *iter, const kh_##name##_t *map) { \
-  iter->map = map;                                             \
-  iter->it = kh_begin(map);                                    \
-  iter->key = (key_t)0;                                        \
-}                                                              \
-                                                               \
-scope int                                                      \
-name##_next(name##iter_t *iter) {                              \
-  const kh_##name##_t *map = iter->map;                        \
-                                                               \
-  for (; iter->it != kh_end(map); iter->it++) {                \
-    if (kh_exist(map, iter->it)) {                             \
-      iter->key = kh_key(map, iter->it);                       \
-      iter->it++;                                              \
-      return 1;                                                \
-    }                                                          \
-  }                                                            \
-                                                               \
-  return 0;                                                    \
+#define DEFINE_SET(name, key_t, key_hash, key_equal, scope)       \
+                                                                  \
+KHASH_INIT(name, key_t, char, 0, key_hash, key_equal)             \
+                                                                  \
+scope kh_##name##_t *                                             \
+name##_create(void) {                                             \
+  kh_##name##_t *map = kh_init_##name();                          \
+                                                                  \
+  if (map == NULL)                                                \
+    abort(); /* LCOV_EXCL_LINE */                                 \
+                                                                  \
+  return map;                                                     \
+}                                                                 \
+                                                                  \
+scope void                                                        \
+name##_destroy(kh_##name##_t *map) {                              \
+  kh_destroy_##name(map);                                         \
+}                                                                 \
+                                                                  \
+scope void                                                        \
+name##_init(kh_##name##_t *map) {                                 \
+  kh_init2_##name(map);                                           \
+}                                                                 \
+                                                                  \
+scope void                                                        \
+name##_clear(kh_##name##_t *map) {                                \
+  kh_destroy2_##name(map);                                        \
+}                                                                 \
+                                                                  \
+scope void                                                        \
+name##_reset(kh_##name##_t *map) {                                \
+  kh_clear_##name(map);                                           \
+}                                                                 \
+                                                                  \
+scope void                                                        \
+name##_resize(kh_##name##_t *map, size_t size) {                  \
+  kh_resize_##name(map, size);                                    \
+}                                                                 \
+                                                                  \
+scope btc_mapiter_t                                               \
+name##_lookup(const kh_##name##_t *map, const key_t key) {        \
+  return kh_get_##name(map, (key_t)key);                          \
+}                                                                 \
+                                                                  \
+scope btc_mapiter_t                                               \
+name##_insert(kh_##name##_t *map, const key_t key, int *exists) { \
+  khiter_t it;                                                    \
+  int ret;                                                        \
+                                                                  \
+  it = kh_put_##name(map, (key_t)key, &ret);                      \
+                                                                  \
+  if (ret < 0)                                                    \
+    abort(); /* LCOV_EXCL_LINE */                                 \
+                                                                  \
+  *exists = (ret == 0);                                           \
+                                                                  \
+  return it;                                                      \
+}                                                                 \
+                                                                  \
+scope int                                                         \
+name##_has(const kh_##name##_t *map, const key_t key) {           \
+  khiter_t it = kh_get_##name(map, (key_t)key);                   \
+  return it != map->n_buckets;                                    \
+}                                                                 \
+                                                                  \
+scope int                                                         \
+name##_put(kh_##name##_t *map, const key_t key) {                 \
+  int ret;                                                        \
+                                                                  \
+  (void)kh_put_##name(map, (key_t)key, &ret);                     \
+                                                                  \
+  if (ret < 0)                                                    \
+    abort(); /* LCOV_EXCL_LINE */                                 \
+                                                                  \
+  return ret != 0;                                                \
+}                                                                 \
+                                                                  \
+scope key_t                                                       \
+name##_del(kh_##name##_t *map, const key_t key) {                 \
+  khiter_t it = kh_get_##name(map, (key_t)key);                   \
+  key_t ret;                                                      \
+                                                                  \
+  if (it == map->n_buckets)                                       \
+    return (key_t)0;                                              \
+                                                                  \
+  ret = map->keys[it];                                            \
+                                                                  \
+  kh_del_##name(map, it);                                         \
+                                                                  \
+  return ret;                                                     \
 }
 
 /*

@@ -48,7 +48,7 @@ typedef struct btc_selector_s {
   int64_t inpval;
   int64_t outval;
   size_t size;
-  btc_outset_t *inputs;
+  btc_outset_t inputs;
   btc_vector_t utxos;
 } btc_selector_t;
 

@@ -22,8 +22,6 @@ extern "C" {
  * Types
  */
 
-typedef btc_hashmapiter_t btc_mpiter_t;
-
 typedef void btc_mempool_tx_cb(const btc_mpentry_t *entry,
                                const btc_view_t *view,
                                void *arg);
@@ -103,11 +101,8 @@ btc_mempool_has_reject(btc_mempool_t *mp, const uint8_t *hash);
 BTC_EXTERN btc_vector_t *
 btc_mempool_missing(btc_mempool_t *mp, const btc_tx_t *tx);
 
-BTC_EXTERN void
-btc_mempool_iterate(btc_mpiter_t *iter, btc_mempool_t *mp);
-
-BTC_EXTERN int
-btc_mempool_next(const btc_mpentry_t **entry, btc_mpiter_t *iter);
+BTC_EXTERN const btc_hashmap_t *
+btc_mempool_map(const btc_mempool_t *mp);
 
 #ifdef __cplusplus
 }

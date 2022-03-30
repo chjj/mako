@@ -377,24 +377,26 @@ void
 btc_merkleblock_set_hashes(btc_merkleblock_t *tree,
                            const btc_block_t *block,
                            const btc_vector_t *hashes) {
-  btc_hashset_t *filter = btc_hashset_create();
   size_t size = block->txs.length;
   uint8_t *matches = btc_malloc(size);
+  btc_hashset_t filter;
   size_t i;
+
+  btc_hashset_init(&filter);
 
   memset(matches, 0, size);
 
   for (i = 0; i < hashes->length; i++)
-    btc_hashset_put(filter, hashes->items[i]);
+    btc_hashset_put(&filter, hashes->items[i]);
 
   for (i = 0; i < block->txs.length; i++) {
     const btc_tx_t *tx = block->txs.items[i];
 
-    matches[i] = btc_hashset_has(filter, tx->hash);
+    matches[i] = btc_hashset_has(&filter, tx->hash);
   }
 
   btc_merkleblock_set_matches(tree, block, matches);
 
-  btc_hashset_destroy(filter);
+  btc_hashset_clear(&filter);
   btc_free(matches);
 }

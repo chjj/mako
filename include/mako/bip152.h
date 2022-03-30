@@ -28,7 +28,7 @@ typedef struct btc_cmpct_s {
   btc_array_t ids;
   btc_txvec_t ptx;
   btc_vector_t avail;
-  btc_longtab_t *id_map;
+  btc_longtab_t id_map;
   size_t count;
   uint8_t sipkey[32];
   int64_t now;
@@ -70,7 +70,7 @@ BTC_EXTERN int
 btc_cmpct_setup(btc_cmpct_t *blk);
 
 BTC_EXTERN int
-btc_cmpct_fill_mempool(btc_cmpct_t *blk, btc_hashmapiter_t *iter, int witness);
+btc_cmpct_fill_mempool(btc_cmpct_t *blk, const btc_hashmap_t *map, int witness);
 
 BTC_EXTERN int
 btc_cmpct_fill_missing(btc_cmpct_t *blk, const btc_blocktxn_t *msg);

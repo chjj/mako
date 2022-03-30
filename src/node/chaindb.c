@@ -297,7 +297,7 @@ struct btc_chaindb_s {
   size_t cache_size;
   ldb_t *lsm;
   ldb_lru_t *block_cache;
-  btc_hashmap_t *hashes;
+  btc_hashmap_t hashes;
   btc_vector_t heights;
   btc_entry_t *head;
   btc_entry_t *tail;
@@ -328,7 +328,7 @@ btc_chaindb_init(btc_chaindb_t *db, const btc_network_t *network) {
 
   db->network = network;
   db->prefix[0] = '/';
-  db->hashes = btc_hashmap_create();
+  btc_hashmap_init(&db->hashes);
   db->flags = BTC_CHAIN_DEFAULT_FLAGS;
   db->cache_size = 128 << 20;
 
@@ -339,7 +339,7 @@ btc_chaindb_init(btc_chaindb_t *db, const btc_network_t *network) {
 
 static void
 btc_chaindb_clear(btc_chaindb_t *db) {
-  btc_hashmap_destroy(db->hashes);
+  btc_hashmap_clear(&db->hashes);
   btc_vector_clear(&db->heights);
   btc_free(db->slab);
 
@@ -552,8 +552,8 @@ static int
 btc_chaindb_load_index(btc_chaindb_t *db) {
   btc_entry_t *entry, *tip;
   btc_entry_t *gen = NULL;
-  btc_hashmapiter_t iter;
   uint8_t tip_hash[32];
+  btc_mapiter_t iter;
   ldb_slice_t val;
   ldb_iter_t *it;
   int rc;
@@ -581,7 +581,7 @@ btc_chaindb_load_index(btc_chaindb_t *db) {
     val = ldb_iter_value(it);
 
     CHECK(btc_entry_import(entry, val.data, val.size));
-    CHECK(btc_hashmap_put(db->hashes, entry->hash, entry));
+    CHECK(btc_hashmap_put(&db->hashes, entry->hash, entry));
   }
 
   CHECK(ldb_iter_status(it) == LDB_OK);
@@ -589,17 +589,15 @@ btc_chaindb_load_index(btc_chaindb_t *db) {
   ldb_iter_destroy(it);
 
   /* Create `prev` links and retrieve genesis block. */
-  btc_hashmap_iterate(&iter, db->hashes);
-
-  while (btc_hashmap_next(&iter)) {
-    entry = iter.val;
+  btc_map_each(&db->hashes, iter) {
+    entry = db->hashes.vals[iter];
 
     if (entry->height == 0) {
       gen = entry;
       continue;
     }
 
-    entry->prev = btc_hashmap_get(db->hashes, entry->header.prev_block);
+    entry->prev = btc_hashmap_get(&db->hashes, entry->header.prev_block);
 
     CHECK(entry->prev != NULL);
   }
@@ -607,12 +605,12 @@ btc_chaindb_load_index(btc_chaindb_t *db) {
   CHECK(gen != NULL);
 
   /* Retrieve tip. */
-  tip = btc_hashmap_get(db->hashes, tip_hash);
+  tip = btc_hashmap_get(&db->hashes, tip_hash);
 
   CHECK(tip != NULL);
 
   /* Create height->entry vector. */
-  btc_vector_grow(&db->heights, (btc_hashmap_size(db->hashes) * 3) / 2);
+  btc_vector_grow(&db->heights, (db->hashes.size * 3) / 2);
   btc_vector_resize(&db->heights, tip->height + 1);
 
   /* Populate height vector and create `next` links. */
@@ -637,14 +635,12 @@ btc_chaindb_load_index(btc_chaindb_t *db) {
 
 static void
 btc_chaindb_unload_index(btc_chaindb_t *db) {
-  btc_hashmapiter_t iter;
+  btc_mapiter_t it;
 
-  btc_hashmap_iterate(&iter, db->hashes);
+  btc_map_each(&db->hashes, it)
+    btc_entry_destroy(db->hashes.vals[it]);
 
-  while (btc_hashmap_next(&iter))
-    btc_entry_destroy(iter.val);
-
-  btc_hashmap_reset(db->hashes);
+  btc_hashmap_reset(&db->hashes);
   btc_vector_clear(&db->heights);
 
   db->head = NULL;
@@ -734,9 +730,8 @@ btc_chaindb_save_view(btc_chaindb_t *db,
                       const btc_view_t *view) {
   uint8_t kbuf[COIN_KEYLEN];
   uint8_t *vbuf = db->slab;
-  const btc_coin_t *coin;
   ldb_slice_t key, val;
-  btc_viewiter_t iter;
+  btc_mapiter_t i, j;
 
   key.data = kbuf;
   key.size = sizeof(kbuf);
@@ -744,17 +739,23 @@ btc_chaindb_save_view(btc_chaindb_t *db,
   val.data = vbuf;
   val.size = 0;
 
-  btc_view_iterate(&iter, view);
+  btc_map_each(&view->map, i) {
+    const uint8_t *hash = view->map.keys[i];
+    const btc_coins_t *coins = view->map.vals[i];
 
-  while (btc_view_next(&coin, &iter)) {
-    coin_key(kbuf, iter.hash, iter.index);
+    btc_map_each(&coins->map, j) {
+      uint32_t index = coins->map.keys[j];
+      const btc_coin_t *coin = coins->map.vals[j];
 
-    if (coin->spent) {
-      ldb_batch_del(batch, &key);
-    } else {
-      val.size = btc_coin_export(vbuf, coin);
+      coin_key(kbuf, hash, index);
 
-      ldb_batch_put(batch, &key, &val);
+      if (coin->spent) {
+        ldb_batch_del(batch, &key);
+      } else {
+        val.size = btc_coin_export(vbuf, coin);
+
+        ldb_batch_put(batch, &key, &val);
+      }
     }
   }
 }
@@ -1087,7 +1088,7 @@ btc_chaindb_connect_block(btc_chaindb_t *db,
   btc_chaindb_save_view(db, batch, view);
 
   /* Write undo coins (if there are any). */
-  undo = btc_view_undo(view);
+  undo = &view->undo;
 
   if (undo->length != 0 && entry->undo_pos == -1) {
     if (!btc_chaindb_write_undo(db, batch, entry, undo))
@@ -1221,7 +1222,7 @@ btc_chaindb_save(btc_chaindb_t *db,
     goto fail;
 
   /* Update hashes. */
-  CHECK(btc_hashmap_put(db->hashes, entry->hash, entry));
+  CHECK(btc_hashmap_put(&db->hashes, entry->hash, entry));
 
   /* Main-chain-only stuff. */
   if (view != NULL) {
@@ -1368,7 +1369,7 @@ btc_chaindb_height(btc_chaindb_t *db) {
 
 const btc_entry_t *
 btc_chaindb_by_hash(btc_chaindb_t *db, const uint8_t *hash) {
-  return btc_hashmap_get(db->hashes, hash);
+  return btc_hashmap_get(&db->hashes, hash);
 }
 
 const btc_entry_t *

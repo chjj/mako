@@ -48,8 +48,6 @@ typedef struct btc_addrent_s {
   struct btc_addrent_s *next;
 } btc_addrent_t;
 
-typedef btc_netmapiter_t btc_addriter_t;
-
 /*
  * Address Manager
  */
@@ -144,11 +142,8 @@ BTC_EXTERN int
 btc_addrman_mark_local(btc_addrman_t *man,
                        const btc_netaddr_t *addr);
 
-BTC_EXTERN void
-btc_addrman_iterate(btc_addriter_t *iter, btc_addrman_t *man);
-
-BTC_EXTERN int
-btc_addrman_next(const btc_addrent_t **entry, btc_addriter_t *iter);
+BTC_EXTERN const btc_netmap_t *
+btc_addrman_map(const btc_addrman_t *man);
 
 BTC_EXTERN btc_vector_t *
 btc_addrman_getaddr(btc_addrman_t *man);

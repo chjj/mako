@@ -632,20 +632,22 @@ btc_tx_sigops(const btc_tx_t *tx, const btc_view_t *view, unsigned int flags) {
 
 int
 btc_tx_has_duplicate_inputs(const btc_tx_t *tx) {
-  btc_outset_t *set = btc_outset_create();
   const btc_input_t *input;
+  btc_outset_t set;
   size_t i;
+
+  btc_outset_init(&set);
 
   for (i = 0; i < tx->inputs.length; i++) {
     input = tx->inputs.items[i];
 
-    if (!btc_outset_put(set, &input->prevout)) {
-      btc_outset_destroy(set);
+    if (!btc_outset_put(&set, &input->prevout)) {
+      btc_outset_clear(&set);
       return 1;
     }
   }
 
-  btc_outset_destroy(set);
+  btc_outset_clear(&set);
 
   return 0;
 }
@@ -1002,15 +1004,16 @@ btc_tx_matches(const btc_tx_t *tx, btc_bloom_t *filter) {
 
 btc_vector_t *
 btc_tx_input_addrs(const btc_tx_t *tx, const btc_view_t *view) {
-  btc_addrset_t *set = btc_addrset_create();
   btc_vector_t *out = btc_vector_create();
   const btc_input_t *input;
   const btc_coin_t *coin;
   btc_address_t *addr;
   btc_address_t key;
+  btc_addrset_t set;
   size_t i;
 
   btc_vector_grow(out, tx->inputs.length);
+  btc_addrset_init(&set);
 
   for (i = 0; i < tx->inputs.length; i++) {
     input = tx->inputs.items[i];
@@ -1022,30 +1025,31 @@ btc_tx_input_addrs(const btc_tx_t *tx, const btc_view_t *view) {
     if (!btc_address_set_script(&key, &coin->output.script))
       continue;
 
-    if (btc_addrset_has(set, &key))
+    if (btc_addrset_has(&set, &key))
       continue;
 
     addr = btc_address_clone(&key);
 
-    btc_addrset_put(set, addr);
+    btc_addrset_put(&set, addr);
     btc_vector_push(out, addr);
   }
 
-  btc_addrset_destroy(set);
+  btc_addrset_clear(&set);
 
   return out;
 }
 
 btc_vector_t *
 btc_tx_output_addrs(const btc_tx_t *tx) {
-  btc_addrset_t *set = btc_addrset_create();
   btc_vector_t *out = btc_vector_create();
   const btc_output_t *output;
   btc_address_t *addr;
   btc_address_t key;
+  btc_addrset_t set;
   size_t i;
 
   btc_vector_grow(out, tx->outputs.length);
+  btc_addrset_init(&set);
 
   for (i = 0; i < tx->outputs.length; i++) {
     output = tx->outputs.items[i];
@@ -1053,16 +1057,16 @@ btc_tx_output_addrs(const btc_tx_t *tx) {
     if (!btc_address_set_script(&key, &output->script))
       continue;
 
-    if (btc_addrset_has(set, &key))
+    if (btc_addrset_has(&set, &key))
       continue;
 
     addr = btc_address_clone(&key);
 
-    btc_addrset_put(set, addr);
+    btc_addrset_put(&set, addr);
     btc_vector_push(out, addr);
   }
 
-  btc_addrset_destroy(set);
+  btc_addrset_clear(&set);
 
   return out;
 }

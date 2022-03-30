@@ -29,16 +29,22 @@ scope void                                                   \
 name##_destroy(name##_t *map);                               \
                                                              \
 scope void                                                   \
+name##_init(name##_t *map);                                  \
+                                                             \
+scope void                                                   \
+name##_clear(name##_t *map);                                 \
+                                                             \
+scope void                                                   \
 name##_reset(name##_t *map);                                 \
                                                              \
 scope void                                                   \
 name##_resize(name##_t *map, size_t size);                   \
                                                              \
-scope size_t                                                 \
-name##_size(const name##_t *map);                            \
+scope btc_mapiter_t                                          \
+name##_lookup(const name##_t *map, const key_t key);         \
                                                              \
-scope size_t                                                 \
-name##_buckets(const name##_t *map);                         \
+scope btc_mapiter_t                                          \
+name##_insert(name##_t *map, const key_t key, int *exists);  \
                                                              \
 scope int                                                    \
 name##_has(const name##_t *map, const key_t key);            \
@@ -50,55 +56,46 @@ scope int                                                    \
 name##_put(name##_t *map, const key_t key, const val_t val); \
                                                              \
 scope key_t                                                  \
-name##_del(name##_t *map, const key_t key);                  \
-                                                             \
-scope val_t                                                  \
-name##_rem(name##_t *map, const key_t key);                  \
-                                                             \
-scope void                                                   \
-name##_iterate(name##iter_t *iter, const name##_t *map);     \
-                                                             \
-scope int                                                    \
-name##_next(name##iter_t *iter)
+name##_del(name##_t *map, const key_t key)
 
 /*
  * Set
  */
 
-#define BTC_DEFINE_SET(name, key_t, scope)               \
-                                                         \
-scope name##_t *                                         \
-name##_create(void);                                     \
-                                                         \
-scope void                                               \
-name##_destroy(name##_t *map);                           \
-                                                         \
-scope void                                               \
-name##_reset(name##_t *map);                             \
-                                                         \
-scope void                                               \
-name##_resize(name##_t *map, size_t size);               \
-                                                         \
-scope size_t                                             \
-name##_size(const name##_t *map);                        \
-                                                         \
-scope size_t                                             \
-name##_buckets(const name##_t *map);                     \
-                                                         \
-scope int                                                \
-name##_has(const name##_t *map, const key_t key);        \
-                                                         \
-scope int                                                \
-name##_put(name##_t *map, const key_t key);              \
-                                                         \
-scope key_t                                              \
-name##_del(name##_t *map, const key_t key);              \
-                                                         \
-scope void                                               \
-name##_iterate(name##iter_t *iter, const name##_t *map); \
-                                                         \
-scope int                                                \
-name##_next(name##iter_t *iter)
+#define BTC_DEFINE_SET(name, key_t, scope)                  \
+                                                            \
+scope name##_t *                                            \
+name##_create(void);                                        \
+                                                            \
+scope void                                                  \
+name##_destroy(name##_t *map);                              \
+                                                            \
+scope void                                                  \
+name##_init(name##_t *map);                                 \
+                                                            \
+scope void                                                  \
+name##_clear(name##_t *map);                                \
+                                                            \
+scope void                                                  \
+name##_reset(name##_t *map);                                \
+                                                            \
+scope void                                                  \
+name##_resize(name##_t *map, size_t size);                  \
+                                                            \
+scope btc_mapiter_t                                         \
+name##_lookup(const name##_t *map, const key_t key);        \
+                                                            \
+scope btc_mapiter_t                                         \
+name##_insert(name##_t *map, const key_t key, int *exists); \
+                                                            \
+scope int                                                   \
+name##_has(const name##_t *map, const key_t key);           \
+                                                            \
+scope int                                                   \
+name##_put(name##_t *map, const key_t key);                 \
+                                                            \
+scope key_t                                                 \
+name##_del(name##_t *map, const key_t key)
 
 /*
  * Maps (Key->Pointer)
@@ -135,6 +132,17 @@ BTC_DEFINE_SET(btc_outset, btc_outpoint_t *, BTC_EXTERN);
 /* BTC_DEFINE_SET(btc_invset, btc_invitem_t *, BTC_EXTERN); */
 /* BTC_DEFINE_SET(btc_netset, btc_netaddr_t *, BTC_EXTERN); */
 BTC_DEFINE_SET(btc_addrset, btc_address_t *, BTC_EXTERN);
+
+/*
+ * Macros
+ */
+
+#define btc_map_exist(map, it) \
+  ((((map)->flags[(it) >> 4] >> (((it) & 0x0f) << 1)) & 3) == 0)
+
+#define btc_map_each(map, it)                     \
+  for ((it) = 0; (it) < (map)->n_buckets; (it)++) \
+    if (btc_map_exist(map, it))
 
 #ifdef __cplusplus
 }

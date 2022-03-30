@@ -245,14 +245,14 @@ btc_selector_init(btc_selector_t *sel, const btc_selopt_t *opt, btc_tx_t *tx) {
   sel->inpval = 0;
   sel->outval = btc_tx_output_value(tx);
   sel->size = 12 + btc_outvec_size(&tx->outputs) + 34;
-  sel->inputs = btc_outset_create();
 
+  btc_outset_init(&sel->inputs);
   btc_vector_init(&sel->utxos);
 
   for (i = 0; i < tx->inputs.length; i++) {
     btc_input_t *input = tx->inputs.items[i];
 
-    CHECK(btc_outset_put(sel->inputs, &input->prevout));
+    CHECK(btc_outset_put(&sel->inputs, &input->prevout));
   }
 }
 
@@ -260,7 +260,7 @@ void
 btc_selector_clear(btc_selector_t *sel) {
   size_t i;
 
-  btc_outset_destroy(sel->inputs);
+  btc_outset_clear(&sel->inputs);
 
   for (i = 0; i < sel->utxos.length; i++)
     btc_free(sel->utxos.items[i]);
@@ -274,10 +274,10 @@ btc_selector_push(btc_selector_t *sel,
                   const btc_coin_t *coin) {
   btc_utxo_t *utxo;
 
-  if (btc_outset_has(sel->inputs, prevout)) {
+  if (btc_outset_has(&sel->inputs, prevout)) {
     sel->inpval += coin->output.value;
     sel->size += btc_estimate_input_size(&coin->output.script);
-    btc_outset_del(sel->inputs, prevout);
+    btc_outset_del(&sel->inputs, prevout);
     return;
   }
 
@@ -471,7 +471,7 @@ btc_selector_fill(btc_selector_t *sel, const btc_address_t *addr) {
   int64_t fee = 0;
 
   /* Ensure there are no unresolved inputs. */
-  if (btc_outset_size(sel->inputs) != 0)
+  if (sel->inputs.size != 0)
     return 0;
 
   /* Select necessary coins. */

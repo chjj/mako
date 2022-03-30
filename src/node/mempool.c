@@ -218,10 +218,10 @@ struct btc_mempool_s {
   const btc_timedata_t *timedata;
   btc_chain_t *chain;
   size_t size;
-  btc_hashmap_t *map;
-  btc_hashmap_t *waiting;
-  btc_hashmap_t *orphans;
-  btc_outmap_t *spents;
+  btc_hashmap_t map;
+  btc_hashmap_t waiting;
+  btc_hashmap_t orphans;
+  btc_outmap_t spents;
   btc_filter_t rejects;
   btc_verify_error_t error;
   unsigned int flags;
@@ -241,10 +241,12 @@ btc_mempool_create(const btc_network_t *network, btc_chain_t *chain) {
 
   mp->network = network;
   mp->chain = chain;
-  mp->map = btc_hashmap_create();
-  mp->waiting = btc_hashmap_create(); /* orphan prevout hashes */
-  mp->orphans = btc_hashmap_create();
-  mp->spents = btc_outmap_create(); /* mempool entry's outpoints */
+
+  btc_hashmap_init(&mp->map);
+  btc_hashmap_init(&mp->waiting); /* orphan prevout hashes */
+  btc_hashmap_init(&mp->orphans);
+  btc_outmap_init(&mp->spents); /* mempool entry's outpoints */
+
   mp->flags = BTC_MEMPOOL_DEFAULT_FLAGS;
   mp->file[0] = '\0';
 
@@ -256,29 +258,23 @@ btc_mempool_create(const btc_network_t *network, btc_chain_t *chain) {
 
 void
 btc_mempool_destroy(btc_mempool_t *mp) {
-  btc_hashmapiter_t iter;
+  btc_mapiter_t it;
 
-  btc_hashmap_iterate(&iter, mp->map);
+  btc_map_each(&mp->map, it)
+    btc_mpentry_destroy(mp->map.vals[it]);
 
-  while (btc_hashmap_next(&iter))
-    btc_mpentry_destroy(iter.val);
-
-  btc_hashmap_iterate(&iter, mp->waiting);
-
-  while (btc_hashmap_next(&iter)) {
-    btc_free(iter.key);
-    btc_hashset_destroy(iter.val);
+  btc_map_each(&mp->waiting, it) {
+    btc_free(mp->waiting.keys[it]);
+    btc_hashset_destroy(mp->waiting.vals[it]);
   }
 
-  btc_hashmap_iterate(&iter, mp->orphans);
+  btc_map_each(&mp->orphans, it)
+    btc_orphan_destroy(mp->orphans.vals[it]);
 
-  while (btc_hashmap_next(&iter))
-    btc_orphan_destroy(iter.val);
-
-  btc_hashmap_destroy(mp->map);
-  btc_hashmap_destroy(mp->waiting);
-  btc_hashmap_destroy(mp->orphans);
-  btc_outmap_destroy(mp->spents);
+  btc_hashmap_clear(&mp->map);
+  btc_hashmap_clear(&mp->waiting);
+  btc_hashmap_clear(&mp->orphans);
+  btc_outmap_clear(&mp->spents);
   btc_filter_clear(&mp->rejects);
 
   btc_free(mp);
@@ -369,7 +365,7 @@ btc_mempool_throw(btc_mempool_t *mp,
 
 static int
 btc_mempool_remove_orphan(btc_mempool_t *mp, const uint8_t *hash) {
-  btc_orphan_t *orphan = btc_hashmap_get(mp->orphans, hash);
+  btc_orphan_t *orphan = btc_hashmap_get(&mp->orphans, hash);
   const btc_tx_t *tx;
   size_t i;
 
@@ -381,20 +377,20 @@ btc_mempool_remove_orphan(btc_mempool_t *mp, const uint8_t *hash) {
   for (i = 0; i < tx->inputs.length; i++) {
     const btc_input_t *input = tx->inputs.items[i];
     const btc_outpoint_t *prevout = &input->prevout;
-    btc_hashset_t *set = btc_hashmap_get(mp->waiting, prevout->hash);
+    btc_hashset_t *set = btc_hashmap_get(&mp->waiting, prevout->hash);
 
     if (set == NULL)
       continue;
 
     btc_hashset_del(set, hash);
 
-    if (btc_hashset_size(set) == 0) {
-      btc_free(btc_hashmap_del(mp->waiting, prevout->hash));
+    if (set->size == 0) {
+      btc_free(btc_hashmap_del(&mp->waiting, prevout->hash));
       btc_hashset_destroy(set);
     }
   }
 
-  btc_hashmap_del(mp->orphans, hash);
+  btc_hashmap_del(&mp->orphans, hash);
   btc_orphan_destroy(orphan);
 
   return 1;
@@ -403,18 +399,16 @@ btc_mempool_remove_orphan(btc_mempool_t *mp, const uint8_t *hash) {
 static int
 btc_mempool_limit_orphans(btc_mempool_t *mp) {
   const uint8_t *hash = NULL;
-  btc_hashmapiter_t iter;
+  btc_mapiter_t it;
   size_t index;
 
-  if (btc_hashmap_size(mp->orphans) < BTC_MEMPOOL_MAX_ORPHANS)
+  if (mp->orphans.size < BTC_MEMPOOL_MAX_ORPHANS)
     return 0;
 
-  index = btc_uniform(btc_hashmap_size(mp->orphans));
+  index = btc_uniform(mp->orphans.size);
 
-  btc_hashmap_iterate(&iter, mp->orphans);
-
-  while (btc_hashmap_next(&iter)) {
-    hash = iter.key;
+  btc_map_each(&mp->orphans, it) {
+    hash = mp->orphans.keys[it];
 
     if (index == 0)
       break;
@@ -498,9 +492,11 @@ btc_mempool_add_orphan(btc_mempool_t *mp,
                        const btc_view_t *view,
                        unsigned int id) {
   btc_orphan_t *orphan = btc_orphan_create();
-  btc_hashset_t *hashes = btc_hashset_create();
-  btc_hashsetiter_t iter;
+  btc_hashset_t hashes;
+  btc_mapiter_t it;
   size_t i;
+
+  btc_hashset_init(&hashes);
 
   orphan->tx = btc_tx_refconst(tx);
   orphan->hash = orphan->tx->hash;
@@ -513,57 +509,53 @@ btc_mempool_add_orphan(btc_mempool_t *mp,
     const btc_input_t *input = orphan->tx->inputs.items[i];
 
     if (!btc_view_has(view, &input->prevout))
-      btc_hashset_put(hashes, input->prevout.hash);
+      btc_hashset_put(&hashes, input->prevout.hash);
   }
 
-  btc_hashset_iterate(&iter, hashes);
+  btc_map_each(&hashes, it) {
+    const uint8_t *prev = hashes.keys[it];
 
-  while (btc_hashset_next(&iter)) {
-    const uint8_t *prev = iter.key;
+    if (!btc_hashmap_has(&mp->waiting, prev))
+      btc_hashmap_put(&mp->waiting, btc_hash_clone(prev), btc_hashset_create());
 
-    if (!btc_hashmap_has(mp->waiting, prev))
-      btc_hashmap_put(mp->waiting, btc_hash_clone(prev), btc_hashset_create());
-
-    btc_hashset_put(btc_hashmap_get(mp->waiting, prev), orphan->hash);
+    btc_hashset_put(btc_hashmap_get(&mp->waiting, prev), orphan->hash);
 
     orphan->missing++;
   }
 
-  btc_hashset_destroy(hashes);
+  btc_hashset_clear(&hashes);
 
-  CHECK(btc_hashmap_put(mp->orphans, orphan->hash, orphan));
+  CHECK(btc_hashmap_put(&mp->orphans, orphan->hash, orphan));
 
   btc_log_debug(mp, "Added orphan %H to mempool.", tx->hash);
 }
 
 static btc_vector_t *
 btc_mempool_resolve_orphans(btc_mempool_t *mp, const uint8_t *parent) {
-  btc_hashset_t *set = btc_hashmap_get(mp->waiting, parent);
+  btc_hashset_t *set = btc_hashmap_get(&mp->waiting, parent);
   btc_vector_t *resolved;
-  btc_hashsetiter_t iter;
+  btc_mapiter_t it;
 
   if (set == NULL)
     return NULL;
 
-  CHECK(btc_hashset_size(set) > 0);
+  CHECK(set->size > 0);
 
   resolved = btc_vector_create();
 
-  btc_hashset_iterate(&iter, set);
-
-  while (btc_hashset_next(&iter)) {
-    const uint8_t *hash = iter.key;
-    btc_orphan_t *orphan = btc_hashmap_get(mp->orphans, hash);
+  btc_map_each(set, it) {
+    const uint8_t *hash = set->keys[it];
+    btc_orphan_t *orphan = btc_hashmap_get(&mp->orphans, hash);
 
     CHECK(orphan != NULL);
 
     if (--orphan->missing == 0) {
-      btc_hashmap_del(mp->orphans, hash);
+      btc_hashmap_del(&mp->orphans, hash);
       btc_vector_push(resolved, orphan);
     }
   }
 
-  btc_free(btc_hashmap_del(mp->waiting, parent));
+  btc_free(btc_hashmap_del(&mp->waiting, parent));
 
   btc_hashset_destroy(set);
 
@@ -601,7 +593,7 @@ btc_mempool_handle_orphans(btc_mempool_t *mp, const uint8_t *parent) {
     /* Can happen if an existing parent is
        evicted in the interim between fetching
        the non-present parents. */
-    if (btc_hashmap_has(mp->orphans, hash)) {
+    if (btc_hashmap_has(&mp->orphans, hash)) {
       btc_log_debug(mp, "Transaction %H was double-orphaned in mempool.",
                         hash);
       btc_mempool_remove_orphan(mp, hash);
@@ -626,7 +618,7 @@ btc_mempool_view(btc_mempool_t *mp, const btc_tx_t *tx) {
   for (i = 0; i < tx->inputs.length; i++) {
     const btc_input_t *input = tx->inputs.items[i];
     const btc_outpoint_t *prevout = &input->prevout;
-    btc_mpentry_t *parent = btc_hashmap_get(mp->map, prevout->hash);
+    btc_mpentry_t *parent = btc_hashmap_get(&mp->map, prevout->hash);
     btc_coin_t *coin;
 
     if (parent == NULL)
@@ -684,7 +676,7 @@ traverse_ancestors(btc_mempool_t *mp,
   for (i = 0; i < tx->inputs.length; i++) {
     const btc_input_t *input = tx->inputs.items[i];
     const btc_outpoint_t *prevout = &input->prevout;
-    btc_mpentry_t *parent = btc_hashmap_get(mp->map, prevout->hash);
+    btc_mpentry_t *parent = btc_hashmap_get(&mp->map, prevout->hash);
 
     if (parent == NULL)
       continue;
@@ -697,16 +689,16 @@ traverse_ancestors(btc_mempool_t *mp,
     if (map != NULL)
       map(parent, child);
 
-    if (btc_hashset_size(set) > BTC_MEMPOOL_MAX_ANCESTORS)
+    if (set->size > BTC_MEMPOOL_MAX_ANCESTORS)
       break;
 
     traverse_ancestors(mp, parent, set, child, map);
 
-    if (btc_hashset_size(set) > BTC_MEMPOOL_MAX_ANCESTORS)
+    if (set->size > BTC_MEMPOOL_MAX_ANCESTORS)
       break;
   }
 
-  return btc_hashset_size(set);
+  return set->size;
 }
 
 static size_t
@@ -714,10 +706,14 @@ btc_mempool_update_ancestors(btc_mempool_t *mp,
                              const btc_mpentry_t *entry,
                              void (*map)(btc_mpentry_t *,
                                          const btc_mpentry_t *)) {
-  btc_hashset_t *set = btc_hashset_create();
-  size_t count = traverse_ancestors(mp, entry, set, entry, map);
+  btc_hashset_t set;
+  size_t count;
 
-  btc_hashset_destroy(set);
+  btc_hashset_init(&set);
+
+  count = traverse_ancestors(mp, entry, &set, entry, map);
+
+  btc_hashset_clear(&set);
 
   return count;
 }
@@ -730,10 +726,10 @@ btc_mempool_count_ancestors(btc_mempool_t *mp,
 
 static int
 btc_mempool_exists(btc_mempool_t *mp, const uint8_t *hash) {
-  if (btc_hashmap_has(mp->orphans, hash))
+  if (btc_hashmap_has(&mp->orphans, hash))
     return 1;
 
-  return btc_hashmap_has(mp->map, hash);
+  return btc_hashmap_has(&mp->map, hash);
 }
 
 static int
@@ -743,7 +739,7 @@ btc_mempool_is_double_spend(btc_mempool_t *mp, const btc_tx_t *tx) {
   for (i = 0; i < tx->inputs.length; i++) {
     const btc_input_t *input = tx->inputs.items[i];
 
-    if (btc_outmap_has(mp->spents, &input->prevout))
+    if (btc_outmap_has(&mp->spents, &input->prevout))
       return 1;
   }
 
@@ -756,12 +752,12 @@ btc_mempool_track_entry(btc_mempool_t *mp, btc_mpentry_t *entry) {
   size_t i;
 
   CHECK(!btc_tx_is_coinbase(tx));
-  CHECK(btc_hashmap_put(mp->map, entry->hash, entry));
+  CHECK(btc_hashmap_put(&mp->map, entry->hash, entry));
 
   for (i = 0; i < tx->inputs.length; i++) {
     const btc_input_t *input = tx->inputs.items[i];
 
-    btc_outmap_put(mp->spents, &input->prevout, entry);
+    btc_outmap_put(&mp->spents, &input->prevout, entry);
   }
 
   mp->size += entry->size;
@@ -778,7 +774,7 @@ btc_mempool_add_entry(btc_mempool_t *mp,
     mp->on_tx(entry, view, mp->arg);
 
   btc_log_debug(mp, "Added %H to mempool (txs=%zu).",
-                    entry->hash, btc_hashmap_size(mp->map));
+                    entry->hash, (size_t)mp->map.size);
 
   btc_mempool_handle_orphans(mp, entry->hash);
 }
@@ -790,12 +786,12 @@ btc_mempool_untrack_entry(btc_mempool_t *mp,
   size_t i;
 
   CHECK(!btc_tx_is_coinbase(tx));
-  CHECK(btc_hashmap_del(mp->map, entry->hash));
+  CHECK(btc_hashmap_del(&mp->map, entry->hash));
 
   for (i = 0; i < tx->inputs.length; i++) {
     const btc_input_t *input = tx->inputs.items[i];
 
-    CHECK(btc_outmap_del(mp->spents, &input->prevout));
+    CHECK(btc_outmap_del(&mp->spents, &input->prevout));
   }
 
   mp->size -= entry->size;
@@ -817,7 +813,7 @@ btc_mempool_remove_spenders(btc_mempool_t *mp,
   for (i = 0; i < entry->tx->outputs.length; i++) {
     btc_outpoint_set(&prevout, entry->hash, i);
 
-    spender = btc_outmap_get(mp->spents, &prevout);
+    spender = btc_outmap_get(&mp->spents, &prevout);
 
     if (spender == NULL)
       continue;
@@ -840,7 +836,7 @@ btc_mempool_remove_double_spends(btc_mempool_t *mp, const btc_tx_t *tx) {
 
   for (i = 0; i < tx->inputs.length; i++) {
     const btc_input_t *input = tx->inputs.items[i];
-    btc_mpentry_t *spent = btc_outmap_get(mp->spents, &input->prevout);
+    btc_mpentry_t *spent = btc_outmap_get(&mp->spents, &input->prevout);
 
     if (spent == NULL)
       continue;
@@ -859,7 +855,7 @@ btc_mempool_has_dependencies(btc_mempool_t *mp, const btc_tx_t *tx) {
   for (i = 0; i < tx->inputs.length; i++) {
     const btc_input_t *input = tx->inputs.items[i];
 
-    if (btc_hashmap_has(mp->map, input->prevout.hash))
+    if (btc_hashmap_has(&mp->map, input->prevout.hash))
       return 1;
   }
 
@@ -907,8 +903,8 @@ cmp_rate(const void *ap, const void *bp) {
 
 static int
 btc_mempool_limit_size(btc_mempool_t *mp, const uint8_t *added) {
-  btc_hashmapiter_t iter;
   btc_vector_t queue;
+  btc_mapiter_t it;
   int64_t now;
 
   if (mp->size <= BTC_MEMPOOL_MAX_SIZE)
@@ -918,10 +914,8 @@ btc_mempool_limit_size(btc_mempool_t *mp, const uint8_t *added) {
 
   btc_vector_init(&queue);
 
-  btc_hashmap_iterate(&iter, mp->map);
-
-  while (btc_hashmap_next(&iter)) {
-    btc_mpentry_t *entry = iter.val;
+  btc_map_each(&mp->map, it) {
+    btc_mpentry_t *entry = mp->map.vals[it];
 
     if (btc_mempool_has_dependencies(mp, entry->tx))
       continue;
@@ -949,7 +943,7 @@ btc_mempool_limit_size(btc_mempool_t *mp, const uint8_t *added) {
 
   btc_vector_clear(&queue);
 
-  return !btc_hashmap_has(mp->map, added);
+  return !btc_hashmap_has(&mp->map, added);
 }
 
 /*
@@ -1300,7 +1294,7 @@ btc_mempool_add_block(btc_mempool_t *mp,
   int total = 0;
   size_t i;
 
-  if (btc_hashmap_size(mp->map) == 0)
+  if (mp->map.size == 0)
     return;
 
   CHECK(block->txs.length > 0);
@@ -1309,7 +1303,7 @@ btc_mempool_add_block(btc_mempool_t *mp,
     const btc_tx_t *tx = block->txs.items[i];
     btc_mpentry_t *ent;
 
-    ent = btc_hashmap_get(mp->map, tx->hash);
+    ent = btc_hashmap_get(&mp->map, tx->hash);
 
     if (ent == NULL) {
       btc_mempool_remove_orphan(mp, tx->hash);
@@ -1340,13 +1334,13 @@ btc_mempool_remove_block(btc_mempool_t *mp,
   int total = 0;
   size_t i;
 
-  if (btc_hashmap_size(mp->map) == 0)
+  if (mp->map.size == 0)
     return;
 
   for (i = 1; i < block->txs.length; i++) {
     const btc_tx_t *tx = block->txs.items[i];
 
-    if (btc_hashmap_has(mp->map, tx->hash))
+    if (btc_hashmap_has(&mp->map, tx->hash))
       continue;
 
     total += btc_mempool_insert(mp, tx, -1);
@@ -1366,12 +1360,10 @@ btc_mempool_handle_reorg(btc_mempool_t *mp) {
   const btc_entry_t *tip = btc_chain_tip(mp->chain);
   int64_t mtp = btc_entry_median_time(tip);
   int32_t height = tip->height + 1;
-  btc_hashmapiter_t iter;
+  btc_mapiter_t it;
 
-  btc_hashmap_iterate(&iter, mp->map);
-
-  while (btc_hashmap_next(&iter)) {
-    btc_mpentry_t *entry = iter.val;
+  btc_map_each(&mp->map, it) {
+    btc_mpentry_t *entry = mp->map.vals[it];
     btc_tx_t *tx = entry->tx;
     btc_view_t *view;
 
@@ -1430,22 +1422,22 @@ btc_mempool_error(btc_mempool_t *mp) {
 
 size_t
 btc_mempool_size(btc_mempool_t *mp) {
-  return btc_hashmap_size(mp->map);
+  return mp->map.size;
 }
 
 int
 btc_mempool_has(btc_mempool_t *mp, const uint8_t *hash) {
-  return btc_hashmap_has(mp->map, hash);
+  return btc_hashmap_has(&mp->map, hash);
 }
 
 const btc_mpentry_t *
 btc_mempool_get(btc_mempool_t *mp, const uint8_t *hash) {
-  return btc_hashmap_get(mp->map, hash);
+  return btc_hashmap_get(&mp->map, hash);
 }
 
 int
 btc_mempool_has_orphan(btc_mempool_t *mp, const uint8_t *hash) {
-  return btc_hashmap_has(mp->orphans, hash);
+  return btc_hashmap_has(&mp->orphans, hash);
 }
 
 int
@@ -1461,10 +1453,10 @@ btc_mempool_missing(btc_mempool_t *mp, const btc_tx_t *tx) {
   for (i = 0; i < tx->inputs.length; i++) {
     const btc_input_t *input = tx->inputs.items[i];
 
-    if (!btc_hashmap_has(mp->waiting, input->prevout.hash))
+    if (!btc_hashmap_has(&mp->waiting, input->prevout.hash))
       continue;
 
-    if (btc_hashmap_has(mp->orphans, input->prevout.hash))
+    if (btc_hashmap_has(&mp->orphans, input->prevout.hash))
       continue;
 
     btc_vector_push(missing, input->prevout.hash);
@@ -1473,16 +1465,7 @@ btc_mempool_missing(btc_mempool_t *mp, const btc_tx_t *tx) {
   return missing;
 }
 
-void
-btc_mempool_iterate(btc_mpiter_t *iter, btc_mempool_t *mp) {
-  btc_hashmap_iterate(iter, mp->map);
-}
-
-int
-btc_mempool_next(const btc_mpentry_t **entry, btc_mpiter_t *iter) {
-  if (btc_hashmap_next(iter)) {
-    *entry = iter->val;
-    return 1;
-  }
-  return 0;
+const btc_hashmap_t *
+btc_mempool_map(const btc_mempool_t *mp) {
+  return &mp->map;
 }

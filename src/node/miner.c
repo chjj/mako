@@ -1108,18 +1108,18 @@ cmp_rate(const void *ap, const void *bp) {
 
 static void
 btc_miner_assemble(btc_miner_t *miner, btc_tmpl_t *bt) {
-  btc_hashmap_t *depmap = btc_hashmap_create();
+  const btc_hashmap_t *map = btc_mempool_map(miner->mempool);
   int64_t locktime = btc_tmpl_locktime(bt);
-  const btc_mpentry_t *entry;
+  btc_hashmap_t depmap;
   btc_vector_t queue;
-  btc_mpiter_t iter;
+  btc_mapiter_t it;
   size_t i;
 
+  btc_hashmap_init(&depmap);
   btc_vector_init(&queue);
 
-  btc_mempool_iterate(&iter, miner->mempool);
-
-  while (btc_mempool_next(&entry, &iter)) {
+  btc_map_each(map, it) {
+    const btc_mpentry_t *entry = map->vals[it];
     btc_blockentry_t *item = btc_blockentry_create();
 
     btc_blockentry_set_mpentry(item, entry);
@@ -1133,10 +1133,10 @@ btc_miner_assemble(btc_miner_t *miner, btc_tmpl_t *bt) {
 
       item->dep_count += 1;
 
-      if (!btc_hashmap_has(depmap, hash))
-        btc_hashmap_put(depmap, hash, btc_vector_create());
+      if (!btc_hashmap_has(&depmap, hash))
+        btc_hashmap_put(&depmap, hash, btc_vector_create());
 
-      btc_vector_push(btc_hashmap_get(depmap, hash), item);
+      btc_vector_push(btc_hashmap_get(&depmap, hash), item);
     }
 
     if (item->dep_count > 0)
@@ -1169,7 +1169,7 @@ btc_miner_assemble(btc_miner_t *miner, btc_tmpl_t *bt) {
 
     btc_vector_push(&bt->txs, item);
 
-    deps = btc_hashmap_get(depmap, item->hash);
+    deps = btc_hashmap_get(&depmap, item->hash);
 
     if (deps == NULL)
       continue;
@@ -1184,12 +1184,10 @@ btc_miner_assemble(btc_miner_t *miner, btc_tmpl_t *bt) {
 
   btc_tmpl_refresh(bt);
 
-  btc_hashmap_iterate(&iter, depmap);
+  btc_map_each(&depmap, it)
+    btc_vector_destroy(depmap.vals[it]);
 
-  while (btc_hashmap_next(&iter))
-    btc_vector_destroy(iter.val);
-
-  btc_hashmap_destroy(depmap);
+  btc_hashmap_clear(&depmap);
   btc_vector_clear(&queue);
 }
 

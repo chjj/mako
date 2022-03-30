@@ -15,6 +15,15 @@
  */
 
 #define BTC_DEFINE_MAP_TYPES(name, key_t, val_t) \
+typedef struct kh_##name##_s {                   \
+  unsigned int n_buckets;                        \
+  unsigned int size;                             \
+  unsigned int n_occupied;                       \
+  unsigned int upper_bound;                      \
+  unsigned int *flags;                           \
+  key_t *keys;                                   \
+  val_t *vals;                                   \
+} kh_##name##_t;                                 \
                                                  \
 typedef struct kh_##name##_s name##_t;           \
                                                  \
@@ -25,12 +34,14 @@ typedef struct name##iter_s {                    \
   val_t val;                                     \
 } name##iter_t
 
+typedef unsigned int btc_mapiter_t;
+
 /*
  * Set
  */
 
 #define BTC_DEFINE_SET_TYPES(name, key_t) \
-  BTC_DEFINE_MAP_TYPES(name, key_t, int)
+  BTC_DEFINE_MAP_TYPES(name, key_t, char)
 
 /*
  * Types
@@ -178,6 +189,9 @@ typedef struct btc_undo_s {
   size_t length;
 } btc_undo_t;
 
+typedef struct btc_coins_s btc_coins_t;
+typedef struct btc_view_s btc_view_t;
+
 typedef struct btc_multikey_s {
   const uint8_t *data;
   size_t length;
@@ -201,7 +215,6 @@ typedef struct btc_verify_error_s {
 } btc_verify_error_t;
 
 typedef struct btc_network_s btc_network_t;
-typedef struct btc_view_s btc_view_t;
 typedef struct btc_sha256_s btc__hash256_t;
 
 typedef struct btc_netaddr_s {

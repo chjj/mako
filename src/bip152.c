@@ -38,7 +38,7 @@ btc_cmpct_init(btc_cmpct_t *z) {
   btc_array_init(&z->ids);
   btc_txvec_init(&z->ptx);
   btc_vector_init(&z->avail);
-  z->id_map = btc_longtab_create();
+  btc_longtab_init(&z->id_map);
   z->count = 0;
   btc_hash_init(z->sipkey);
   z->now = 0;
@@ -59,7 +59,7 @@ btc_cmpct_clear(btc_cmpct_t *z) {
   }
 
   btc_vector_clear(&z->avail);
-  btc_longtab_destroy(z->id_map);
+  btc_longtab_clear(&z->id_map);
 }
 
 void
@@ -158,7 +158,7 @@ btc_cmpct_setup(btc_cmpct_t *blk) {
     blk->count += 1;
   }
 
-  btc_longtab_reset(blk->id_map);
+  btc_longtab_reset(&blk->id_map);
 
   for (i = 0; i < blk->ids.length; i++) {
     uint64_t id = blk->ids.items[i];
@@ -166,7 +166,7 @@ btc_cmpct_setup(btc_cmpct_t *blk) {
     while (blk->avail.items[i + offset] != NULL)
       offset += 1;
 
-    if (!btc_longtab_put(blk->id_map, id, i + offset)) {
+    if (!btc_longtab_put(&blk->id_map, id, i + offset)) {
       /* Fails on siphash collision. */
       return 0;
     }
@@ -176,10 +176,11 @@ btc_cmpct_setup(btc_cmpct_t *blk) {
 }
 
 int
-btc_cmpct_fill_mempool(btc_cmpct_t *blk, btc_hashmapiter_t *iter, int witness) {
+btc_cmpct_fill_mempool(btc_cmpct_t *blk, const btc_hashmap_t *map, int witness) {
   size_t total = blk->ptx.length + blk->ids.length;
   const btc_mpentry_t *entry;
-  btc_longset_t *set;
+  btc_longset_t set;
+  btc_mapiter_t it;
   uint64_t id;
   int index;
 
@@ -188,24 +189,24 @@ btc_cmpct_fill_mempool(btc_cmpct_t *blk, btc_hashmapiter_t *iter, int witness) {
 
   CHECK(blk->avail.length == total);
 
-  set = btc_longset_create();
+  btc_longset_init(&set);
 
-  while (btc_hashmap_next(iter)) {
-    entry = iter->val;
+  btc_map_each(map, it) {
+    entry = map->vals[it];
 
     if (witness)
       id = btc_cmpct_sid(blk, entry->whash);
     else
       id = btc_cmpct_sid(blk, entry->hash);
 
-    index = btc_longtab_get(blk->id_map, id);
+    index = btc_longtab_get(&blk->id_map, id);
 
     if (index == -1)
       continue;
 
     CHECK((size_t)index < blk->avail.length);
 
-    if (!btc_longset_put(set, index)) {
+    if (!btc_longset_put(&set, index)) {
       /* Siphash collision, just request it. */
       btc_tx_destroy((btc_tx_t *)blk->avail.items[index]);
       blk->avail.items[index] = NULL;
@@ -219,12 +220,12 @@ btc_cmpct_fill_mempool(btc_cmpct_t *blk, btc_hashmapiter_t *iter, int witness) {
     /* We actually may have a siphash collision
        here, but exit early anyway for perf. */
     if (blk->count == total) {
-      btc_longset_destroy(set);
+      btc_longset_clear(&set);
       return 1;
     }
   }
 
-  btc_longset_destroy(set);
+  btc_longset_clear(&set);
 
   return 0;
 }
