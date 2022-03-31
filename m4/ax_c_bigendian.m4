@@ -4,11 +4,11 @@
 #
 # SYNOPSIS
 #
-#   AX_C_BIGENDIAN([action-if-found], [action-if-not-found])
+#   AX_C_BIGENDIAN([action-if-true], [action-if-false], [action-if-unknown])
 #
 # DESCRIPTION
 #
-#   Borrow a trick from cmake for a better endianness check.
+#   A simpler endianness check (based on cmake).
 
 AC_DEFUN([AX_C_BIGENDIAN], [
   AC_CACHE_CHECK([for big endian], [ax_cv_endian_big], [
@@ -48,7 +48,7 @@ AC_DEFUN([AX_C_BIGENDIAN], [
     AS_IF([test x"$ax_cv_endian_big$ax_cv_endian_lit" = x'yesyes'], [
       AC_COMPILE_IFELSE([
         AC_LANG_PROGRAM([[]], [[
-#         if !(defined(__powerpc__) || defined(__ppc__) || defined(__PPC__))
+#         if !defined(__powerpc__) && !defined(__ppc__) && !defined(__PPC__)
             choke me
 #         endif
         ]])
@@ -62,7 +62,7 @@ AC_DEFUN([AX_C_BIGENDIAN], [
     ])
   ])
 
-  AS_IF([test x"$ax_cv_endian_big$ax_cv_endian_lit" = x'nono'], [$3], [
-    AS_IF([test x"$ax_cv_endian_big" = x'yes'], [$1], [$2])
-  ])
+  AS_IF([test x"$ax_cv_endian_big$ax_cv_endian_lit" = x'nono'], [$3],
+        [test x"$ax_cv_endian_big" = x'no'], [$2],
+        [$1])
 ])
