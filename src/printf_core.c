@@ -6,13 +6,13 @@
 
 #include <errno.h>
 #include <limits.h>
-#include <math.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <mako/netaddr.h>
 #include <mako/printf.h>
+#include "math.h"
 #include "printf_core.h"
 
 /*
@@ -284,9 +284,9 @@ btc_float(char *zp, double x, const state_t *st) {
     x = -x;
   }
 
-  frac = modf(x, &iptr);
+  frac = btc_modf(x, &iptr);
   hi = (unsigned long long)iptr;
-  lo = (unsigned long long)(frac * pow(10, prec));
+  lo = (unsigned long long)(frac * btc_pow(10, prec));
 
   zp += btc_uint_write(zp, hi);
 

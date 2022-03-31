@@ -92,13 +92,19 @@ noinst_HEADERS = src/bio.h                         \
                  src/crypto/fields/secp256k1_32.h  \
                  src/crypto/fields/secp256k1_64.h  \
                  src/crypto/rand.h                 \
+                 src/crypto/rand_unix_impl.h       \
+                 src/crypto/rand_win_impl.h        \
                  src/crypto/secp256k1.h            \
                  src/impl.h                        \
                  src/internal.h                    \
+                 src/io/core_unix_impl.h           \
+                 src/io/core_win_impl.h            \
                  src/io/http/http_common.h         \
                  src/io/http/http_parser.h         \
+                 src/io/watcom_dns.h               \
                  src/map/khash.h                   \
                  src/map/map.h                     \
+                 src/math.h                        \
                  src/printf_core.h                 \
                  src/words.h                       \
                  test/data/bip32_vectors.h         \
@@ -111,6 +117,8 @@ noinst_HEADERS = src/bio.h                         \
                  test/data/sighash_vectors.h       \
                  test/data/tx_invalid_vectors.h    \
                  test/data/tx_valid_vectors.h      \
+                 test/lib/rimraf_unix_impl.h       \
+                 test/lib/rimraf_win_impl.h        \
                  test/lib/tests.h
 
 #
@@ -177,6 +185,7 @@ mako_sources = src/crypto/chacha20.c   \
                src/internal.c          \
                src/json.c              \
                src/mainnet.c           \
+               src/math.c              \
                src/mpi.c               \
                src/murmur3.c           \
                src/netaddr.c           \

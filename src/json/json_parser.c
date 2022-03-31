@@ -42,7 +42,7 @@ const struct _json_value json_value_none;
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <math.h>
+#include "../math.h"
 
 typedef unsigned int json_uchar;
 
@@ -851,7 +851,7 @@ json_value * json_parse_ex (json_settings * settings,
                      }
                      else
                      {
-                        top->u.dbl += num_fraction / pow (10.0, num_digits);
+                        top->u.dbl += num_fraction / btc_pow (10.0, num_digits);
                      }
                   }
 
@@ -878,7 +878,7 @@ json_value * json_parse_ex (json_settings * settings,
                      goto e_failed;
                   }
 
-                  top->u.dbl *= pow (10.0, (flags & flag_num_e_negative ? - num_e : num_e));
+                  top->u.dbl *= btc_pow (10.0, (flags & flag_num_e_negative ? - num_e : num_e));
                }
 
                if (flags & flag_num_negative)

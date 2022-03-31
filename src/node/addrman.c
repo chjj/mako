@@ -6,7 +6,6 @@
  * Logic based on both Bitcoin Core and btcd.
  */
 
-#include <math.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -30,6 +29,7 @@
 #include "../bio.h"
 #include "../impl.h"
 #include "../internal.h"
+#include "../math.h"
 
 /*
  * Constants
@@ -131,7 +131,7 @@ btc_addrent_chance(const btc_addrent_t *entry, int64_t now) {
   if (now - entry->last_attempt < 60 * 10)
     c *= 0.01;
 
-  c *= pow(0.66, attempts);
+  c *= btc_pow(0.66, attempts);
 
   return c;
 }

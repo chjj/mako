@@ -299,6 +299,7 @@ list(APPEND mako_sources src/crypto/chacha20.c
                          src/internal.c
                          src/json.c
                          src/mainnet.c
+                         src/math.c
                          src/mpi.c
                          src/murmur3.c
                          src/netaddr.c
