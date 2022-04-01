@@ -1,5 +1,5 @@
 /*!
- * math.h - math functions for mako
+ * math.h - math shim for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
  * https://github.com/chjj/mako
  */
@@ -7,11 +7,19 @@
 #ifndef BTC_MATH_H
 #define BTC_MATH_H
 
+/*
+ * Compat
+ */
+
 #undef BTC_HAVE_MATH
 
 #ifndef __dietlibc__
 #  define BTC_HAVE_MATH
 #endif
+
+/*
+ * Math Shim
+ */
 
 double
 btc_round(double x);

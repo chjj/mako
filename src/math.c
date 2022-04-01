@@ -1,22 +1,26 @@
 /*!
- * math.c - math functions for mako
+ * math.c - math shim for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
  * https://github.com/chjj/mako
  */
 
-#include "math.h"
+#include <stdint.h>
 #include <stdlib.h>
+#include "math.h"
 
 /*
- * Math
+ * Math Shim
+ *
+ * The code below isn't perfect, but it
+ * should be good enough for our uses.
  */
 
 double
 btc_round(double x) {
   if (x < 0.0)
-    return -(double)((unsigned long)(-x + 0.5));
+    return -(double)((uint64_t)(-x + 0.5));
 
-  return (double)((unsigned long)(x + 0.5));
+  return (double)((uint64_t)(x + 0.5));
 }
 
 #ifndef BTC_HAVE_MATH
@@ -25,21 +29,27 @@ btc_floor(double x) {
   if (x < 0.0)
     return -btc_ceil(-x);
 
-  return (double)((unsigned long)x);
+  return (double)((uint64_t)x);
 }
 
 double
 btc_ceil(double x) {
+  uint64_t hi;
+  double lo;
+
   if (x < 0.0)
     return -btc_floor(-x);
 
-  return (double)((unsigned long)(x + 0.99));
+  hi = (uint64_t)x;
+  lo = x - (double)hi;
+
+  return (double)(hi + (lo != 0.0));
 }
 
 double
 btc_pow(double x, double y) {
   double z = 1.0;
-  unsigned int e;
+  uint64_t e;
 
   if (y < 0.0) {
     if (x == 0.0)
@@ -49,7 +59,7 @@ btc_pow(double x, double y) {
     y = -y;
   }
 
-  e = (unsigned int)y;
+  e = (uint64_t)y;
 
   while (e > 0) {
     if (e & 1)
@@ -64,7 +74,7 @@ btc_pow(double x, double y) {
 
 double
 btc_modf(double x, double *iptr) {
-  *iptr = (double)((long long)x);
+  *iptr = (double)((int64_t)x);
   return x - *iptr;
 }
 
