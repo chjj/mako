@@ -148,15 +148,14 @@ ldb_logwriter_add_record(ldb_logwriter_t *lw, const ldb_slice_t *slice) {
     fragment_length = (left < avail) ? left : avail;
     end = (left == fragment_length);
 
-    if (begin && end) {
+    if (begin && end)
       type = LDB_TYPE_FULL;
-    } else if (begin) {
+    else if (begin)
       type = LDB_TYPE_FIRST;
-    } else if (end) {
+    else if (end)
       type = LDB_TYPE_LAST;
-    } else {
+    else
       type = LDB_TYPE_MIDDLE;
-    }
 
     rc = emit_physical_record(lw, type, ptr, fragment_length);
     ptr += fragment_length;

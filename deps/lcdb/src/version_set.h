@@ -317,10 +317,12 @@ ldb_vset_num_level_bytes(const ldb_vset_t *vset, int level);
 int64_t
 ldb_vset_max_next_level_overlapping_bytes(ldb_vset_t *vset);
 
-/* Create an iterator that reads over the compaction inputs for "*c".
-   The caller should delete the iterator when no longer needed. */
-ldb_iter_t *
-ldb_inputiter_create(ldb_vset_t *vset, ldb_compaction_t *c);
+#define add_boundary_inputs ldb__add_boundary_inputs
+
+void
+add_boundary_inputs(const ldb_comparator_t *icmp,
+                    const ldb_vector_t *level_files,
+                    ldb_vector_t *compaction_files);
 
 /* Pick level and inputs for a new compaction.
    Returns NULL if there is no compaction to be done.
@@ -328,13 +330,6 @@ ldb_inputiter_create(ldb_vset_t *vset, ldb_compaction_t *c);
    describes the compaction. Caller should delete the result. */
 ldb_compaction_t *
 ldb_vset_pick_compaction(ldb_vset_t *vset);
-
-#define add_boundary_inputs ldb__add_boundary_inputs
-
-void
-add_boundary_inputs(const ldb_comparator_t *icmp,
-                    const ldb_vector_t *level_files,
-                    ldb_vector_t *compaction_files);
 
 /* Return a compaction object for compacting the range [begin,end] in
    the specified level. Returns NULL if there is nothing in that
@@ -345,6 +340,15 @@ ldb_vset_compact_range(ldb_vset_t *vset,
                        int level,
                        const ldb_ikey_t *begin,
                        const ldb_ikey_t *end);
+
+/*
+ * VersionSet::MakeInputIterator
+ */
+
+/* Create an iterator that reads over the compaction inputs for "*c".
+   The caller should delete the iterator when no longer needed. */
+ldb_iter_t *
+ldb_inputiter_create(ldb_vset_t *vset, ldb_compaction_t *c);
 
 /*
  * Compaction

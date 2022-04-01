@@ -112,6 +112,8 @@ ldb_mutex_lock(ldb_mutex_t *mtx);
 void
 ldb_mutex_unlock(ldb_mutex_t *mtx);
 
+#define ldb_mutex_assert_held(mtx) ((void)(mtx))
+
 /*
  * Conditional
  */

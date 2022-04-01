@@ -521,7 +521,7 @@ ldb_create(const char *dbname, const ldb_dbopt_t *options) {
 }
 
 static void
-ldb_destroy_inner(ldb_t *db) {
+ldb_destroy_internal(ldb_t *db) {
   /* Wait for background work to finish. */
   ldb_mutex_lock(&db->mutex);
 
@@ -561,7 +561,6 @@ ldb_destroy_inner(ldb_t *db) {
   if (db->owns_cache)
     ldb_lru_destroy(db->options.block_cache);
 
-  /* Extra */
   assert(db->writers.length == 0);
   assert(ldb_snaplist_empty(&db->snapshots));
 
@@ -654,7 +653,7 @@ ldb_remove_obsolete_files(ldb_t *db) {
   uint64_t number;
   int i, len;
 
-  /* ldb_mutex_assert_held(&db->mutex); */
+  ldb_mutex_assert_held(&db->mutex);
 
   if (db->bg_error != LDB_OK) {
     /* After a background error, we don't know whether a new version may
@@ -750,7 +749,7 @@ ldb_write_level0_table(ldb_t *db, ldb_memtable_t *mem,
   int rc = LDB_OK;
   int level = 0;
 
-  /* ldb_mutex_assert_held(&db->mutex); */
+  ldb_mutex_assert_held(&db->mutex);
 
   ldb_filemeta_init(&meta);
   ldb_cstats_init(&stats);
@@ -843,7 +842,7 @@ ldb_recover_log_file(ldb_t *db, uint64_t log_number,
   ldb_memtable_t *mem = NULL;
   ldb_logreader_t reader;
 
-  /* ldb_mutex_assert_held(&db->mutex); */
+  ldb_mutex_assert_held(&db->mutex);
 
   /* Open the log file. */
   if (!ldb_log_filename(fname, sizeof(fname), db->dbname, log_number))
@@ -982,7 +981,7 @@ ldb_recover(ldb_t *db, ldb_vedit_t *edit, int *save_manifest) {
   int rc = LDB_OK;
   int i, len;
 
-  /* ldb_mutex_assert_held(&db->mutex); */
+  ldb_mutex_assert_held(&db->mutex);
 
   /* Ignore error from CreateDir since the creation of the DB is
      committed only when the descriptor is created, and this directory
@@ -1093,7 +1092,7 @@ fail:
 
 static void
 ldb_record_background_error(ldb_t *db, int status) {
-  /* ldb_mutex_assert_held(&db->mutex); */
+  ldb_mutex_assert_held(&db->mutex);
 
   if (db->bg_error == LDB_OK) {
     db->bg_error = status;
@@ -1110,7 +1109,7 @@ ldb_compact_memtable(ldb_t *db) {
 
   ldb_vedit_init(&edit);
 
-  /* ldb_mutex_assert_held(&db->mutex); */
+  ldb_mutex_assert_held(&db->mutex);
 
   assert(db->imm != NULL);
 
@@ -1256,7 +1255,7 @@ ldb_install_compaction_results(ldb_t *db, ldb_cstate_t *compact) {
   int level;
   size_t i;
 
-  /* ldb_mutex_assert_held(&db->mutex); */
+  ldb_mutex_assert_held(&db->mutex);
 
   ldb_log(db->options.info_log, "Compacted %d@%d + %d@%d files => %ld bytes",
           ldb_compaction_num_input_files(compact->compaction, 0),
@@ -1484,7 +1483,7 @@ static void
 ldb_cleanup_compaction(ldb_t *db, ldb_cstate_t *compact) {
   size_t i;
 
-  /* ldb_mutex_assert_held(&db->mutex); */
+  ldb_mutex_assert_held(&db->mutex);
 
   if (compact->builder != NULL) {
     /* May happen if we get a shutdown call in the middle of compaction. */
@@ -1512,7 +1511,7 @@ ldb_background_compaction(ldb_t *db) {
   ldb_compaction_t *c;
   int rc = LDB_OK;
 
-  /* ldb_mutex_assert_held(&db->mutex); */
+  ldb_mutex_assert_held(&db->mutex);
 
   if (db->imm != NULL) {
     ldb_compact_memtable(db);
@@ -1613,11 +1612,11 @@ ldb_background_compaction(ldb_t *db) {
 }
 
 static void
-ldb_background_call(void *db);
+ldb_background_call(void *ptr);
 
 static void
 ldb_maybe_schedule_compaction(ldb_t *db) {
-  /* ldb_mutex_assert_held(&db->mutex); */
+  ldb_mutex_assert_held(&db->mutex);
 
   if (db->background_compaction_scheduled) {
     /* Already scheduled. */
@@ -1725,7 +1724,7 @@ ldb_build_batch_group(ldb_t *db, ldb_writer_t **last_writer) {
   size_t size, max_size;
   ldb_writer_t *w;
 
-  /* ldb_mutex_assert_held(&db->mutex); */
+  ldb_mutex_assert_held(&db->mutex);
 
   assert(first != NULL);
 
@@ -1789,7 +1788,7 @@ ldb_make_room_for_write(ldb_t *db, int force) {
   int allow_delay = !force;
   int rc = LDB_OK;
 
-  /* ldb_mutex_assert_held(&db->mutex); */
+  ldb_mutex_assert_held(&db->mutex);
 
   assert(db->writers.length > 0);
 
@@ -1935,7 +1934,7 @@ ldb_open(const char *dbname, const ldb_dbopt_t *options, ldb_t **dbptr) {
     assert(db->mem != NULL);
     *dbptr = db;
   } else {
-    ldb_destroy_inner(db);
+    ldb_destroy_internal(db);
   }
 
   ldb_vedit_clear(&edit);
@@ -1945,7 +1944,7 @@ ldb_open(const char *dbname, const ldb_dbopt_t *options, ldb_t **dbptr) {
 
 void
 ldb_close(ldb_t *db) {
-  ldb_destroy_inner(db);
+  ldb_destroy_internal(db);
 }
 
 int

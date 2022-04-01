@@ -403,8 +403,6 @@ ldb_logreader_read_record(ldb_logreader_t *lr,
       }
     }
   }
-
-  return 0;
 }
 
 uint64_t

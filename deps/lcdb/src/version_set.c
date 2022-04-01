@@ -320,6 +320,10 @@ ldb_numiter_create(const ldb_comparator_t *icmp, const ldb_vector_t *flist) {
   return ldb_iter_create(iter, &ldb_numiter_table);
 }
 
+/*
+ * Version::NewConcatenatingIterator
+ */
+
 static ldb_iter_t *
 get_file_iterator(void *arg,
                   const ldb_readopt_t *options,
@@ -1106,7 +1110,24 @@ builder_save_to(builder_t *b, ldb_version_t *v) {
  */
 
 static void
-ldb_vset_append_version(ldb_vset_t *vset, ldb_version_t *v);
+ldb_vset_append_version(ldb_vset_t *vset, ldb_version_t *v) {
+  /* Make "v" current. */
+  assert(v->refs == 0);
+  assert(v != vset->current);
+
+  if (vset->current != NULL)
+    ldb_version_unref(vset->current);
+
+  vset->current = v;
+
+  ldb_version_ref(v);
+
+  /* Append to linked list. */
+  v->prev = vset->dummy_versions.prev;
+  v->next = &vset->dummy_versions;
+  v->prev->next = v;
+  v->next->prev = v;
+}
 
 static void
 ldb_vset_init(ldb_vset_t *vset,
@@ -1220,30 +1241,89 @@ ldb_vset_needs_compaction(const ldb_vset_t *vset) {
 }
 
 static void
-ldb_vset_append_version(ldb_vset_t *vset, ldb_version_t *v) {
-  /* Make "v" current. */
-  assert(v->refs == 0);
-  assert(v != vset->current);
+ldb_vset_finalize(ldb_vset_t *vset, ldb_version_t *v) {
+  /* Precomputed best level for next compaction. */
+  int best_level = -1;
+  double best_score = -1;
+  int level;
 
-  if (vset->current != NULL)
-    ldb_version_unref(vset->current);
+  for (level = 0; level < LDB_NUM_LEVELS - 1; level++) {
+    double score;
 
-  vset->current = v;
+    if (level == 0) {
+      /* We treat level-0 specially by bounding the number of files
+       * instead of number of bytes for two reasons:
+       *
+       * (1) With larger write-buffer sizes, it is nice not to do too
+       * many level-0 compactions.
+       *
+       * (2) The files in level-0 are merged on every read and
+       * therefore we wish to avoid too many files when the individual
+       * file size is small (perhaps because of a small write-buffer
+       * setting, or very high compression ratios, or lots of
+       * overwrites/deletions).
+       */
+      score = v->files[level].length / (double)(LDB_L0_COMPACTION_TRIGGER);
+    } else {
+      /* Compute the ratio of current size to size limit. */
+      uint64_t level_bytes = total_file_size(&v->files[level]);
 
-  ldb_version_ref(v);
+      score = (double)level_bytes / max_bytes_for_level(vset->options, level);
+    }
 
-  /* Append to linked list. */
-  v->prev = vset->dummy_versions.prev;
-  v->next = &vset->dummy_versions;
-  v->prev->next = v;
-  v->next->prev = v;
+    if (score > best_score) {
+      best_level = level;
+      best_score = score;
+    }
+  }
+
+  v->compaction_level = best_level;
+  v->compaction_score = best_score;
 }
 
-static void
-ldb_vset_finalize(ldb_vset_t *vset, ldb_version_t *v);
-
 static int
-ldb_vset_write_snapshot(ldb_vset_t *vset, ldb_logwriter_t *log);
+ldb_vset_write_snapshot(ldb_vset_t *vset, ldb_logwriter_t *log) {
+  ldb_buffer_t record;
+  ldb_vedit_t edit;
+  int level, rc;
+
+  /* Save metadata. */
+  ldb_vedit_init(&edit);
+  ldb_vedit_set_comparator_name(&edit, vset->icmp.user_comparator->name);
+
+  /* Save compaction pointers. */
+  for (level = 0; level < LDB_NUM_LEVELS; level++) {
+    if (vset->compact_pointer[level].size > 0)
+      ldb_vedit_set_compact_pointer(&edit, level,
+                                    &vset->compact_pointer[level]);
+  }
+
+  /* Save files. */
+  for (level = 0; level < LDB_NUM_LEVELS; level++) {
+    const ldb_vector_t *files = &vset->current->files[level];
+    size_t i;
+
+    for (i = 0; i < files->length; i++) {
+      const ldb_filemeta_t *f = files->items[i];
+
+      ldb_vedit_add_file(&edit, level,
+                         f->number,
+                         f->file_size,
+                         &f->smallest,
+                         &f->largest);
+    }
+  }
+
+  ldb_buffer_init(&record);
+  ldb_vedit_export(&record, &edit);
+  ldb_vedit_clear(&edit);
+
+  rc = ldb_logwriter_add_record(log, &record);
+
+  ldb_buffer_clear(&record);
+
+  return rc;
+}
 
 int
 ldb_vset_log_and_apply(ldb_vset_t *vset, ldb_vedit_t *edit, ldb_mutex_t *mu) {
@@ -1595,91 +1675,6 @@ ldb_vset_mark_file_number_used(ldb_vset_t *vset, uint64_t number) {
     vset->next_file_number = number + 1;
 }
 
-static void
-ldb_vset_finalize(ldb_vset_t *vset, ldb_version_t *v) {
-  /* Precomputed best level for next compaction. */
-  int best_level = -1;
-  double best_score = -1;
-  int level;
-
-  for (level = 0; level < LDB_NUM_LEVELS - 1; level++) {
-    double score;
-
-    if (level == 0) {
-      /* We treat level-0 specially by bounding the number of files
-       * instead of number of bytes for two reasons:
-       *
-       * (1) With larger write-buffer sizes, it is nice not to do too
-       * many level-0 compactions.
-       *
-       * (2) The files in level-0 are merged on every read and
-       * therefore we wish to avoid too many files when the individual
-       * file size is small (perhaps because of a small write-buffer
-       * setting, or very high compression ratios, or lots of
-       * overwrites/deletions).
-       */
-      score = v->files[level].length / (double)(LDB_L0_COMPACTION_TRIGGER);
-    } else {
-      /* Compute the ratio of current size to size limit. */
-      uint64_t level_bytes = total_file_size(&v->files[level]);
-
-      score = (double)level_bytes / max_bytes_for_level(vset->options, level);
-    }
-
-    if (score > best_score) {
-      best_level = level;
-      best_score = score;
-    }
-  }
-
-  v->compaction_level = best_level;
-  v->compaction_score = best_score;
-}
-
-static int
-ldb_vset_write_snapshot(ldb_vset_t *vset, ldb_logwriter_t *log) {
-  ldb_buffer_t record;
-  ldb_vedit_t edit;
-  int level, rc;
-
-  /* Save metadata. */
-  ldb_vedit_init(&edit);
-  ldb_vedit_set_comparator_name(&edit, vset->icmp.user_comparator->name);
-
-  /* Save compaction pointers. */
-  for (level = 0; level < LDB_NUM_LEVELS; level++) {
-    if (vset->compact_pointer[level].size > 0)
-      ldb_vedit_set_compact_pointer(&edit, level,
-                                    &vset->compact_pointer[level]);
-  }
-
-  /* Save files. */
-  for (level = 0; level < LDB_NUM_LEVELS; level++) {
-    const ldb_vector_t *files = &vset->current->files[level];
-    size_t i;
-
-    for (i = 0; i < files->length; i++) {
-      const ldb_filemeta_t *f = files->items[i];
-
-      ldb_vedit_add_file(&edit, level,
-                         f->number,
-                         f->file_size,
-                         &f->smallest,
-                         &f->largest);
-    }
-  }
-
-  ldb_buffer_init(&record);
-  ldb_vedit_export(&record, &edit);
-  ldb_vedit_clear(&edit);
-
-  rc = ldb_logwriter_add_record(log, &record);
-
-  ldb_buffer_clear(&record);
-
-  return rc;
-}
-
 int
 ldb_vset_num_level_files(const ldb_vset_t *vset, int level) {
   assert(level >= 0);
@@ -1870,129 +1865,6 @@ ldb_vset_get_range2(ldb_vset_t *vset,
   ldb_vset_get_range(vset, &all, smallest, largest);
 
   ldb_vector_clear(&all);
-}
-
-ldb_iter_t *
-ldb_inputiter_create(ldb_vset_t *vset, ldb_compaction_t *c) {
-  ldb_readopt_t options = *ldb_readopt_default;
-  ldb_iter_t *result;
-  ldb_iter_t **list;
-  int num = 0;
-  int space, which;
-  size_t i;
-
-  options.verify_checksums = vset->options->paranoid_checks;
-  options.fill_cache = 0;
-
-  /* Level-0 files have to be merged together. For other levels,
-     we will make a concatenating iterator per level. */
-  space = (ldb_compaction_level(c) == 0 ? c->inputs[0].length + 1 : 2);
-  list = ldb_malloc(space * sizeof(ldb_iter_t *));
-
-  for (which = 0; which < 2; which++) {
-    if (c->inputs[which].length > 0) {
-      if (ldb_compaction_level(c) + which == 0) {
-        const ldb_vector_t *files = &c->inputs[which];
-
-        for (i = 0; i < files->length; i++) {
-          const ldb_filemeta_t *file = files->items[i];
-
-          list[num++] = ldb_tcache_iterate(vset->table_cache,
-                                           &options,
-                                           file->number,
-                                           file->file_size,
-                                           NULL);
-        }
-      } else {
-        /* Create concatenating iterator for the files from this level. */
-        list[num++] = ldb_twoiter_create(ldb_numiter_create(&vset->icmp,
-                                                            &c->inputs[which]),
-                                         &get_file_iterator,
-                                         vset->table_cache,
-                                         &options);
-      }
-    }
-  }
-
-  assert(num <= space);
-
-  result = ldb_mergeiter_create(&vset->icmp, list, num);
-
-  ldb_free(list);
-
-  return result;
-}
-
-static void
-ldb_vset_setup_other_inputs(ldb_vset_t *vset, ldb_compaction_t *c);
-
-ldb_compaction_t *
-ldb_vset_pick_compaction(ldb_vset_t *vset) {
-  ldb_compaction_t *c;
-  int level;
-  size_t i;
-
-  /* We prefer compactions triggered by too much data in a level over
-     the compactions triggered by seeks. */
-  int size_compaction = (vset->current->compaction_score >= 1);
-  int seek_compaction = (vset->current->file_to_compact != NULL);
-
-  if (size_compaction) {
-    level = vset->current->compaction_level;
-
-    assert(level >= 0);
-    assert(level + 1 < LDB_NUM_LEVELS);
-
-    c = ldb_compaction_create(vset->options, level);
-
-    /* Pick the first file that comes after compact_pointer[level]. */
-    for (i = 0; i < vset->current->files[level].length; i++) {
-      ldb_filemeta_t *f = vset->current->files[level].items[i];
-
-      if (vset->compact_pointer[level].size == 0 ||
-          ldb_compare(&vset->icmp, &f->largest,
-                      &vset->compact_pointer[level]) > 0) {
-        ldb_vector_push(&c->inputs[0], f);
-        break;
-      }
-    }
-
-    if (c->inputs[0].length == 0) {
-      /* Wrap-around to the beginning of the key space. */
-      ldb_vector_push(&c->inputs[0], vset->current->files[level].items[0]);
-    }
-  } else if (seek_compaction) {
-    level = vset->current->file_to_compact_level;
-    c = ldb_compaction_create(vset->options, level);
-    ldb_vector_push(&c->inputs[0], vset->current->file_to_compact);
-  } else {
-    return NULL;
-  }
-
-  c->input_version = vset->current;
-
-  ldb_version_ref(c->input_version);
-
-  /* Files in level 0 may overlap each other,
-     so pick up all overlapping ones. */
-  if (level == 0) {
-    ldb_slice_t smallest, largest;
-
-    ldb_vset_get_range(vset, &c->inputs[0], &smallest, &largest);
-
-    /* Note that the next call will discard the file we placed in
-       c->inputs[0] earlier and replace it with an overlapping set
-       which will include the picked file. */
-    ldb_version_get_overlapping_inputs(vset->current, 0,
-                                       &smallest, &largest,
-                                       &c->inputs[0]);
-
-    assert(c->inputs[0].length > 0);
-  }
-
-  ldb_vset_setup_other_inputs(vset, c);
-
-  return c;
 }
 
 /* Finds the largest key in a vector of files. Returns true if files is not
@@ -2205,6 +2077,75 @@ ldb_vset_setup_other_inputs(ldb_vset_t *vset, ldb_compaction_t *c) {
 }
 
 ldb_compaction_t *
+ldb_vset_pick_compaction(ldb_vset_t *vset) {
+  ldb_compaction_t *c;
+  int level;
+  size_t i;
+
+  /* We prefer compactions triggered by too much data in a level over
+     the compactions triggered by seeks. */
+  int size_compaction = (vset->current->compaction_score >= 1);
+  int seek_compaction = (vset->current->file_to_compact != NULL);
+
+  if (size_compaction) {
+    level = vset->current->compaction_level;
+
+    assert(level >= 0);
+    assert(level + 1 < LDB_NUM_LEVELS);
+
+    c = ldb_compaction_create(vset->options, level);
+
+    /* Pick the first file that comes after compact_pointer[level]. */
+    for (i = 0; i < vset->current->files[level].length; i++) {
+      ldb_filemeta_t *f = vset->current->files[level].items[i];
+
+      if (vset->compact_pointer[level].size == 0 ||
+          ldb_compare(&vset->icmp, &f->largest,
+                      &vset->compact_pointer[level]) > 0) {
+        ldb_vector_push(&c->inputs[0], f);
+        break;
+      }
+    }
+
+    if (c->inputs[0].length == 0) {
+      /* Wrap-around to the beginning of the key space. */
+      ldb_vector_push(&c->inputs[0], vset->current->files[level].items[0]);
+    }
+  } else if (seek_compaction) {
+    level = vset->current->file_to_compact_level;
+    c = ldb_compaction_create(vset->options, level);
+    ldb_vector_push(&c->inputs[0], vset->current->file_to_compact);
+  } else {
+    return NULL;
+  }
+
+  c->input_version = vset->current;
+
+  ldb_version_ref(c->input_version);
+
+  /* Files in level 0 may overlap each other,
+     so pick up all overlapping ones. */
+  if (level == 0) {
+    ldb_slice_t smallest, largest;
+
+    ldb_vset_get_range(vset, &c->inputs[0], &smallest, &largest);
+
+    /* Note that the next call will discard the file we placed in
+       c->inputs[0] earlier and replace it with an overlapping set
+       which will include the picked file. */
+    ldb_version_get_overlapping_inputs(vset->current, 0,
+                                       &smallest, &largest,
+                                       &c->inputs[0]);
+
+    assert(c->inputs[0].length > 0);
+  }
+
+  ldb_vset_setup_other_inputs(vset, c);
+
+  return c;
+}
+
+ldb_compaction_t *
 ldb_vset_compact_range(ldb_vset_t *vset,
                        int level,
                        const ldb_ikey_t *begin,
@@ -2253,6 +2194,61 @@ ldb_vset_compact_range(ldb_vset_t *vset,
   ldb_vector_clear(&inputs);
 
   return c;
+}
+
+/*
+ * VersionSet::MakeInputIterator
+ */
+
+ldb_iter_t *
+ldb_inputiter_create(ldb_vset_t *vset, ldb_compaction_t *c) {
+  ldb_readopt_t options = *ldb_readopt_default;
+  ldb_iter_t *result;
+  ldb_iter_t **list;
+  int num = 0;
+  int space, which;
+  size_t i;
+
+  options.verify_checksums = vset->options->paranoid_checks;
+  options.fill_cache = 0;
+
+  /* Level-0 files have to be merged together. For other levels,
+     we will make a concatenating iterator per level. */
+  space = (ldb_compaction_level(c) == 0 ? c->inputs[0].length + 1 : 2);
+  list = ldb_malloc(space * sizeof(ldb_iter_t *));
+
+  for (which = 0; which < 2; which++) {
+    if (c->inputs[which].length > 0) {
+      if (ldb_compaction_level(c) + which == 0) {
+        const ldb_vector_t *files = &c->inputs[which];
+
+        for (i = 0; i < files->length; i++) {
+          const ldb_filemeta_t *file = files->items[i];
+
+          list[num++] = ldb_tcache_iterate(vset->table_cache,
+                                           &options,
+                                           file->number,
+                                           file->file_size,
+                                           NULL);
+        }
+      } else {
+        /* Create concatenating iterator for the files from this level. */
+        list[num++] = ldb_twoiter_create(ldb_numiter_create(&vset->icmp,
+                                                            &c->inputs[which]),
+                                         &get_file_iterator,
+                                         vset->table_cache,
+                                         &options);
+      }
+    }
+  }
+
+  assert(num <= space);
+
+  result = ldb_mergeiter_create(&vset->icmp, list, num);
+
+  ldb_free(list);
+
+  return result;
 }
 
 /*

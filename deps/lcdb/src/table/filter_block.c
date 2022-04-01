@@ -54,7 +54,37 @@ ldb_filterbuilder_clear(ldb_filterbuilder_t *fb) {
 }
 
 static void
-ldb_filterbuilder_generate_filter(ldb_filterbuilder_t *fb);
+ldb_filterbuilder_generate_filter(ldb_filterbuilder_t *fb) {
+  size_t num_keys = fb->start.length;
+  ldb_slice_t *tmp_keys;
+  size_t i;
+
+  if (num_keys == 0) {
+    /* Fast path if there are no keys for this filter. */
+    ldb_array_push(&fb->filter_offsets, fb->result.size);
+    return;
+  }
+
+  /* Make list of keys from flattened key structure. */
+  ldb_array_push(&fb->start, fb->keys.size); /* Simplify length computation. */
+
+  tmp_keys = ldb_malloc(num_keys * sizeof(ldb_slice_t));
+
+  for (i = 0; i < num_keys; i++) {
+    const uint8_t *base = fb->keys.data + fb->start.items[i];
+    size_t length = fb->start.items[i + 1] - fb->start.items[i];
+
+    ldb_slice_set(&tmp_keys[i], base, length);
+  }
+
+  /* Generate filter for current set of keys and append to result. */
+  ldb_array_push(&fb->filter_offsets, fb->result.size);
+  ldb_bloom_build(fb->policy, &fb->result, tmp_keys, num_keys);
+
+  ldb_free(tmp_keys);
+  ldb_buffer_reset(&fb->keys);
+  ldb_array_reset(&fb->start);
+}
 
 void
 ldb_filterbuilder_start_block(ldb_filterbuilder_t *fb, uint64_t block_offset) {
@@ -94,39 +124,6 @@ ldb_filterbuilder_finish(ldb_filterbuilder_t *fb) {
   ldb_buffer_push(&fb->result, LDB_FILTER_BASE_LG);
 
   return fb->result;
-}
-
-static void
-ldb_filterbuilder_generate_filter(ldb_filterbuilder_t *fb) {
-  size_t num_keys = fb->start.length;
-  ldb_slice_t *tmp_keys;
-  size_t i;
-
-  if (num_keys == 0) {
-    /* Fast path if there are no keys for this filter. */
-    ldb_array_push(&fb->filter_offsets, fb->result.size);
-    return;
-  }
-
-  /* Make list of keys from flattened key structure. */
-  ldb_array_push(&fb->start, fb->keys.size); /* Simplify length computation. */
-
-  tmp_keys = ldb_malloc(num_keys * sizeof(ldb_slice_t));
-
-  for (i = 0; i < num_keys; i++) {
-    const uint8_t *base = fb->keys.data + fb->start.items[i];
-    size_t length = fb->start.items[i + 1] - fb->start.items[i];
-
-    ldb_slice_set(&tmp_keys[i], base, length);
-  }
-
-  /* Generate filter for current set of keys and append to result. */
-  ldb_array_push(&fb->filter_offsets, fb->result.size);
-  ldb_bloom_build(fb->policy, &fb->result, tmp_keys, num_keys);
-
-  ldb_free(tmp_keys);
-  ldb_buffer_reset(&fb->keys);
-  ldb_array_reset(&fb->start);
 }
 
 /*
