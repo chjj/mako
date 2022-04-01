@@ -106,7 +106,7 @@ test_bloom2(void) {
 
   btc_bloom_t bloom;
 
-  btc_bloom_init_ex(&bloom, 952 / 8, 6, 3624314491);
+  btc_bloom_init_ex(&bloom, 952 / 8, 6, UINT32_C(3624314491));
   btc_bloom_add(&bloom, item1, sizeof(item1));
   btc_bloom_add(&bloom, item2, sizeof(item2));
 
