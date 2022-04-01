@@ -23,7 +23,7 @@
 
 static btc_coins_t *
 btc_coins_create(void) {
-  btc_coins_t *coins = (btc_coins_t *)btc_malloc(sizeof(btc_coins_t));
+  btc_coins_t *coins = btc_malloc(sizeof(btc_coins_t));
 
   btc_intmap_init(&coins->map);
 
@@ -66,16 +66,25 @@ btc_coins_put(btc_coins_t *coins, uint32_t index, btc_coin_t *coin) {
 
 btc_view_t *
 btc_view_create(void) {
-  btc_view_t *view = (btc_view_t *)btc_malloc(sizeof(btc_view_t));
-
-  btc_hashmap_init(&view->map);
-  btc_undo_init(&view->undo);
-
+  btc_view_t *view = btc_malloc(sizeof(btc_view_t));
+  btc_view_init(view);
   return view;
 }
 
 void
 btc_view_destroy(btc_view_t *view) {
+  btc_view_clear(view);
+  btc_free(view);
+}
+
+void
+btc_view_init(btc_view_t *view) {
+  btc_hashmap_init(&view->map);
+  btc_undo_init(&view->undo);
+}
+
+void
+btc_view_clear(btc_view_t *view) {
   btc_mapiter_t it;
 
   btc_map_each(&view->map, it)
@@ -83,8 +92,6 @@ btc_view_destroy(btc_view_t *view) {
 
   btc_hashmap_clear(&view->map);
   btc_undo_clear(&view->undo);
-
-  btc_free(view);
 }
 
 static btc_coins_t *
