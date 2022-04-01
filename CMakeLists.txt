@@ -32,6 +32,7 @@ endif()
 #
 
 include(cmake/AppendCCompilerFlag.cmake)
+include(cmake/FindPthread.cmake)
 include(cmake/LibtoolEmulator.cmake)
 include(cmake/TargetLinkOptions.cmake)
 include(CheckCSourceCompiles)
@@ -53,6 +54,7 @@ option(MAKO_LEVELDB "Use leveldb" OFF)
 option(MAKO_NODE "Build the fullnode" ON)
 option(MAKO_PIC "Enable PIC" OFF)
 option(MAKO_PORTABLE "Be as portable as possible" OFF)
+option(MAKO_PTHREAD "Use pthread" ON)
 option(MAKO_SHARED "Build shared library" OFF)
 option(MAKO_TESTS "Build tests" ON)
 
@@ -60,17 +62,17 @@ option(MAKO_TESTS "Build tests" ON)
 # Variables
 #
 
+set(mako_sources)
+set(mako_cflags)
+set(mako_defines)
+set(mako_includes)
+set(mako_ldflags)
+set(mako_libs)
+
 set(io_sources)
 set(node_sources)
 set(client_sources)
 set(test_sources)
-set(mako_sources)
-set(mako_defines)
-set(mako_cflags)
-set(mako_includes)
-set(mako_ldflags)
-set(mako_libs)
-set(node_libs)
 set(test_libs)
 
 #
@@ -97,6 +99,77 @@ set(CMAKE_C_VISIBILITY_PRESET hidden)
 
 if(APPLE)
   set(CMAKE_OSX_DEPLOYMENT_TARGET 10.7)
+endif()
+
+#
+# Feature Test Macros
+#
+
+if(WIN32)
+  list(APPEND mako_defines _WIN32_WINNT=0x501)
+endif()
+
+if(MAKO_GLIBC)
+  list(APPEND mako_defines _GNU_SOURCE)
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
+  list(APPEND mako_defines _TS_ERRNO)
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "AIX")
+  list(APPEND mako_defines _THREAD_SAFE_ERRNO)
+endif()
+
+#
+# System Libraries
+#
+
+if(WIN32)
+  list(APPEND mako_libs kernel32 advapi32 ws2_32)
+else()
+  check_c_source_compiles([=[
+#   include <math.h>
+    int main(int argc, char **argv) {
+      return (int)sqrt((double)argc);
+    }
+  ]=] MAKO_LIBC_MATH)
+
+  if(NOT MAKO_LIBC_MATH)
+    list(APPEND mako_libs m)
+  endif()
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    check_c_source_compiles([=[
+#     include <time.h>
+      int main(int argc, char **argv) {
+        return clock_gettime(argc, 0);
+      }
+    ]=] MAKO_LIBC_RT)
+
+    if (NOT MAKO_LIBC_RT)
+      list(APPEND mako_libs rt)
+    endif()
+  endif()
+
+  if(MAKO_PTHREAD)
+    find_pthread(_found _cflags _libs)
+
+    if(_found)
+      list(APPEND mako_cflags ${_cflags})
+      list(APPEND mako_libs ${_libs})
+      list(APPEND mako_defines BTC_PTHREAD)
+    endif()
+  endif()
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Haiku")
+    list(APPEND mako_libs network)
+  endif()
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
+    list(APPEND mako_libs socket)
+    list(APPEND mako_libs nsl)
+  endif()
 endif()
 
 #
@@ -150,6 +223,8 @@ elseif(WIN32)
   set(MAKO_HAVE_GETIFADDRS 0)
   set(MAKO_HAVE_RFC3493 1)
 else()
+  set(CMAKE_REQUIRED_LIBRARIES "${mako_libs}")
+
   check_c_source_compiles([=[
 #   include <time.h>
     int main(void) {
@@ -191,6 +266,8 @@ else()
       return getaddrinfo("localhost", NULL, NULL, &info);
     }
   ]=] MAKO_HAVE_RFC3493)
+
+  unset(CMAKE_REQUIRED_LIBRARIES)
 endif()
 
 if(MAKO_INT128)
@@ -209,19 +286,6 @@ if(MAKO_INT128)
   ]=] MAKO_HAVE_INT128)
 else()
   set(MAKO_HAVE_INT128)
-endif()
-
-set(MAKO_HAVE_PTHREAD 0)
-
-if(NOT WIN32 AND NOT WASI AND NOT EMSCRIPTEN
-   AND NOT CMAKE_C_COMPILER_ID MATCHES "Watcom$")
-  set(THREADS_PREFER_PTHREAD_FLAG ON)
-
-  find_package(Threads)
-
-  if(CMAKE_USE_PTHREADS_INIT)
-    set(MAKO_HAVE_PTHREAD 1)
-  endif()
 endif()
 
 set(MAKO_HAVE_ZLIB 0)
@@ -434,36 +498,12 @@ if(MAKO_PORTABLE)
   list(APPEND mako_defines BTC_PORTABLE)
 endif()
 
-if(MAKO_HAVE_PTHREAD)
-  list(APPEND mako_defines BTC_PTHREAD)
-endif()
-
 if(MAKO_HAVE_RFC3493)
   list(APPEND mako_defines BTC_HAVE_RFC3493)
 endif()
 
 if(MAKO_HAVE_ZLIB)
   list(APPEND mako_defines BTC_HAVE_ZLIB)
-endif()
-
-#
-# Feature Test Macros
-#
-
-if(WIN32)
-  list(APPEND mako_defines _WIN32_WINNT=0x501)
-endif()
-
-if(MAKO_GLIBC)
-  list(APPEND mako_defines _GNU_SOURCE)
-endif()
-
-if(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
-  list(APPEND mako_defines _TS_ERRNO)
-endif()
-
-if(CMAKE_SYSTEM_NAME STREQUAL "AIX")
-  list(APPEND mako_defines _THREAD_SAFE_ERRNO)
 endif()
 
 #
@@ -475,20 +515,6 @@ list(APPEND mako_includes ${PROJECT_SOURCE_DIR}/include)
 #
 # Libraries
 #
-
-if(WIN32)
-  list(APPEND mako_libs kernel32 advapi32 ws2_32)
-else()
-  if(NOT CMAKE_C_COMPILER_ID MATCHES "Watcom$")
-    list(APPEND mako_libs m)
-  endif()
-
-  if(MAKO_HAVE_PTHREAD)
-    list(APPEND mako_libs Threads::Threads)
-  endif()
-endif()
-
-list(APPEND node_libs lcdb)
 
 if(MAKO_HAVE_ZLIB)
   list(APPEND test_libs z)
@@ -568,6 +594,8 @@ function(mako_build_full)
   #
 
   if(UNIX)
+    string(REPLACE ";" " -l" PKGCONF_LIBS "-l${mako_libs}")
+
     configure_file(libmako-cmake.pc.in libmako.pc @ONLY)
 
     install(DIRECTORY include/mako/
@@ -617,7 +645,7 @@ function(mako_build_full)
   set_property(TARGET mako_io PROPERTY OUTPUT_NAME io)
 
   add_library(mako_node STATIC ${node_sources})
-  target_link_libraries(mako_node PRIVATE mako mako_io mako_static ${node_libs})
+  target_link_libraries(mako_node PRIVATE mako mako_io mako_static lcdb)
   set_property(TARGET mako_node PROPERTY OUTPUT_NAME node)
 
   add_library(mako_client STATIC ${client_sources})
@@ -758,6 +786,35 @@ function(mako_tests_node)
 endfunction()
 
 #
+# Summary
+#
+
+function(mako_build_summary)
+  set(build_type "")
+
+  if(DEFINED CMAKE_BUILD_TYPE AND CMAKE_BUILD_TYPE)
+    string(TOUPPER "${CMAKE_BUILD_TYPE}" build_type)
+  endif()
+
+  message(STATUS "Build Options:
+
+   BUILD_TYPE:     ${CMAKE_BUILD_TYPE}
+   INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}
+   SYSTEM:         ${CMAKE_SYSTEM} (${CMAKE_SYSTEM_PROCESSOR})
+   C_COMPILER:     ${CMAKE_C_COMPILER} (${CMAKE_C_COMPILER_ID})
+   C_FLAGS:        ${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${build_type}}
+   SHARED_FLAGS:   ${CMAKE_SHARED_LINKER_FLAGS}
+   EXE_FLAGS:      ${CMAKE_EXE_LINKER_FLAGS}
+
+   mako_cflags:    ${mako_cflags}
+   mako_ldflags:   ${mako_ldflags}
+   mako_defines:   ${mako_defines}
+   mako_libs:      ${mako_libs}
+   test_libs:      ${test_libs}
+")
+endfunction()
+
+#
 # Build
 #
 
@@ -765,4 +822,5 @@ if(NOT PROJECT_NAME STREQUAL CMAKE_PROJECT_NAME)
   mako_build_sub()
 else()
   mako_build_full()
+  mako_build_summary()
 endif()

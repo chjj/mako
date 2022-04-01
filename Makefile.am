@@ -9,7 +9,9 @@
 ACLOCAL_AMFLAGS = -I m4
 AM_CPPFLAGS = -I$(top_srcdir)/include
 
-includedir = $(prefix)/include/mako
+makodir = $(includedir)/mako
+cryptodir = $(includedir)/mako/crypto
+jsondir = $(includedir)/mako/json
 licensedir = $(datadir)/licenses/$(PACKAGE_NAME)
 pkgconfigdir = $(libdir)/pkgconfig
 
@@ -42,71 +44,91 @@ SUBDIRS = $(mako_dbdir) . test
 # Headers
 #
 
-include_HEADERS = include/mako/address.h           \
-                  include/mako/array.h             \
-                  include/mako/bip152.h            \
-                  include/mako/bip32.h             \
-                  include/mako/bip37.h             \
-                  include/mako/bip39.h             \
-                  include/mako/block.h             \
-                  include/mako/bloom.h             \
-                  include/mako/buffer.h            \
-                  include/mako/coins.h             \
-                  include/mako/common.h            \
-                  include/mako/config.h            \
-                  include/mako/consensus.h         \
-                  include/mako/crypto/drbg.h       \
-                  include/mako/crypto/ecc.h        \
-                  include/mako/crypto/hash.h       \
-                  include/mako/crypto/merkle.h     \
-                  include/mako/crypto/rand.h       \
-                  include/mako/crypto/siphash.h    \
-                  include/mako/crypto/stream.h     \
-                  include/mako/crypto/types.h      \
-                  include/mako/encoding.h          \
-                  include/mako/entry.h             \
-                  include/mako/header.h            \
-                  include/mako/heap.h              \
-                  include/mako/impl.h              \
-                  include/mako/json.h              \
-                  include/mako/json/json_builder.h \
-                  include/mako/json/json_parser.h  \
-                  include/mako/list.h              \
-                  include/mako/map.h               \
-                  include/mako/mpi.h               \
-                  include/mako/netaddr.h           \
-                  include/mako/net.h               \
-                  include/mako/netmsg.h            \
-                  include/mako/network.h           \
-                  include/mako/policy.h            \
-                  include/mako/printf.h            \
-                  include/mako/script.h            \
-                  include/mako/select.h            \
-                  include/mako/tx.h                \
-                  include/mako/types.h             \
-                  include/mako/util.h              \
-                  include/mako/vector.h
+crypto_HEADERS = include/mako/crypto/drbg.h    \
+                 include/mako/crypto/ecc.h     \
+                 include/mako/crypto/hash.h    \
+                 include/mako/crypto/merkle.h  \
+                 include/mako/crypto/rand.h    \
+                 include/mako/crypto/siphash.h \
+                 include/mako/crypto/stream.h  \
+                 include/mako/crypto/types.h
 
-noinst_HEADERS = src/bio.h                         \
-                 src/crypto/asn1.h                 \
+json_HEADERS = include/mako/json/json_builder.h \
+               include/mako/json/json_parser.h
+
+mako_HEADERS = include/mako/address.h   \
+               include/mako/array.h     \
+               include/mako/bip152.h    \
+               include/mako/bip32.h     \
+               include/mako/bip37.h     \
+               include/mako/bip39.h     \
+               include/mako/block.h     \
+               include/mako/bloom.h     \
+               include/mako/buffer.h    \
+               include/mako/coins.h     \
+               include/mako/common.h    \
+               include/mako/config.h    \
+               include/mako/consensus.h \
+               include/mako/encoding.h  \
+               include/mako/entry.h     \
+               include/mako/header.h    \
+               include/mako/heap.h      \
+               include/mako/impl.h      \
+               include/mako/json.h      \
+               include/mako/list.h      \
+               include/mako/map.h       \
+               include/mako/mpi.h       \
+               include/mako/netaddr.h   \
+               include/mako/net.h       \
+               include/mako/netmsg.h    \
+               include/mako/network.h   \
+               include/mako/policy.h    \
+               include/mako/printf.h    \
+               include/mako/script.h    \
+               include/mako/select.h    \
+               include/mako/tx.h        \
+               include/mako/types.h     \
+               include/mako/util.h      \
+               include/mako/vector.h
+
+noinst_HEADERS = include/client/client.h           \
+                 include/io/core.h                 \
+                 include/io/http.h                 \
+                 include/io/loop.h                 \
+                 include/io/workers.h              \
+                 include/node/addrman.h            \
+                 include/node/chaindb.h            \
+                 include/node/chain.h              \
+                 include/node/logger.h             \
+                 include/node/mempool.h            \
+                 include/node/miner.h              \
+                 include/node/node.h               \
+                 include/node/pool.h               \
+                 include/node/rpc.h                \
+                 include/node/timedata.h           \
+                 include/node/types.h              \
+                                                   \
                  src/crypto/fields/secp256k1_32.h  \
                  src/crypto/fields/secp256k1_64.h  \
+                 src/crypto/asn1.h                 \
                  src/crypto/rand.h                 \
                  src/crypto/rand_unix_impl.h       \
                  src/crypto/rand_win_impl.h        \
                  src/crypto/secp256k1.h            \
-                 src/impl.h                        \
-                 src/internal.h                    \
-                 src/io/core_unix_impl.h           \
-                 src/io/core_win_impl.h            \
                  src/io/http/http_common.h         \
                  src/io/http/http_parser.h         \
+                 src/io/core_unix_impl.h           \
+                 src/io/core_win_impl.h            \
                  src/io/watcom_dns.h               \
                  src/map/khash.h                   \
                  src/map/map.h                     \
+                 src/bio.h                         \
+                 src/impl.h                        \
+                 src/internal.h                    \
                  src/math.h                        \
                  src/printf_core.h                 \
                  src/words.h                       \
+                                                   \
                  test/data/bip32_vectors.h         \
                  test/data/bip340_vectors.h        \
                  test/data/bip39_vectors.h         \

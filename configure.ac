@@ -55,6 +55,15 @@ AC_CHECK_DEFINE([__EMSCRIPTEN__], [
   ])
 ])
 
+AC_CHECK_DEFINE([__WATCOMC__], [
+  AS_IF([test x"$WATCOM" = x''], [
+    AC_MSG_ERROR([./configure must be run with ./scripts/watcom-configure])
+  ])
+], [
+  AC_MSG_WARN([WATCOM env var set but environment is not watcom])
+  AS_UNSET([WATCOM])
+])
+
 AS_CASE([$host_os], [mingw*], [MINGW="$CC"], [AS_UNSET([MINGW])])
 
 #
@@ -118,6 +127,14 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_ENABLE(
+  pthread,
+  AS_HELP_STRING([--enable-pthread],
+                 [use pthread [default=yes]]),
+  [enable_pthread=$enableval],
+  [enable_pthread=yes]
+)
+
+AC_ARG_ENABLE(
   tests,
   AS_HELP_STRING([--enable-tests],
                  [enable tests [default=yes]]),
@@ -133,7 +150,6 @@ AX_CHECK_DEFINE([limits.h], [__GLIBC__], [
   AX_CHECK_COMPILE_FLAG([-std=c90], [CFLAGS="$CFLAGS -std=c90"], [
     AX_CHECK_COMPILE_FLAG([-std=c89], [CFLAGS="$CFLAGS -std=c89"])
   ])
-  AC_DEFINE([_GNU_SOURCE])
 ])
 
 AC_COMPILE_IFELSE([
@@ -153,6 +169,55 @@ AS_CASE([$host_os], [darwin*], [
 ])
 
 #
+# Feature Test Macros
+#
+
+AS_IF([test x"$MINGW" != x''], [
+  AC_DEFINE([_WIN32_WINNT], [0x501])
+])
+
+AX_CHECK_DEFINE([limits.h], [__GLIBC__], [
+  AC_DEFINE([_GNU_SOURCE])
+])
+
+AS_CASE([$host_os], [solaris*], [
+  AC_DEFINE([_TS_ERRNO])
+])
+
+AS_CASE([$host_os], [aix*], [
+  AC_DEFINE([_THREAD_SAFE_ERRNO])
+])
+
+#
+# System Libraries
+#
+
+AS_IF([test x"$MINGW" != x''], [
+  LIBS="$LIBS -lkernel32 -ladvapi32 -lws2_32"
+], [
+  AC_SEARCH_LIBS([gethostbyname], [nsl])
+  AC_SEARCH_LIBS([socket], [socket])
+
+  AS_CASE([$host_os], [haiku], [
+    LIBS="-lnetwork $LIBS"
+  ])
+
+  AS_IF([test x"$enable_pthread$WATCOM$WASI$EMSCRIPTEN" = x'yes'], [
+    AX_PTHREAD([
+      CC="$PTHREAD_CC"
+      CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
+      LIBS="$PTHREAD_LIBS $LIBS"
+
+      AC_DEFINE([BTC_PTHREAD])
+      AC_DEFINE([LDB_PTHREAD])
+    ])
+  ])
+
+  AC_SEARCH_LIBS([clock_gettime], [rt])
+  AC_SEARCH_LIBS([sqrt], [m])
+])
+
+#
 # Feature Testing
 #
 
@@ -164,7 +229,6 @@ has_gethostname=no
 has_getifaddrs=no
 has_int128=no
 has_pread=no
-has_pthread=no
 has_rfc3493=no
 has_zlib=no
 
@@ -209,7 +273,8 @@ AS_IF([test x"$enable_asm" = x'yes'], [
 AC_C_BIGENDIAN([has_big=yes], [:], [
   AC_MSG_ERROR([cannot determine endianness])
 ], [
-  AC_MSG_ERROR([universal endianness])
+  # Mimic CMake in the case of universal endianness.
+  AC_CHECK_DEFINE([__powerpc__], [has_big=yes])
 ])
 
 AS_IF([test x"$enable_portable" = x'yes'], [
@@ -339,12 +404,6 @@ AS_IF([test x"$enable_int128" = x'yes'], [
   AC_MSG_RESULT([$has_int128])
 ])
 
-AS_IF([test x"$MINGW$WASI$EMSCRIPTEN" = x''], [
-  AC_CHECK_DEFINE([__WATCOMC__], [], [
-    AX_PTHREAD([has_pthread=yes])
-  ])
-])
-
 AS_IF([test x"$enable_tests" = x'yes'], [
   AC_CHECK_HEADER([zlib.h], [
     AC_CHECK_LIB([z], [compress2], [has_zlib=yes])
@@ -384,7 +443,7 @@ CFLAGS="$mako_save_CFLAGS"
 
 AC_SUBST([WARN_FLAGS])
 
-AC_CHECK_DEFINE([__WATCOMC__], [
+AS_IF([test x"$WATCOM" != x''], [
   AX_CHECK_COMPILE_FLAG([-Wno-n201], [CFLAGS="$CFLAGS -Wno-n201"])
   AX_CHECK_COMPILE_FLAG([-Wno-n202], [CFLAGS="$CFLAGS -Wno-n202"])
 ])
@@ -424,10 +483,12 @@ AS_IF([test x"$has_clock" = x'yes'], [
 
 AS_IF([test x"$enable_coverage" = x'yes'], [
   AC_DEFINE([BTC_COVERAGE])
+  AC_DEFINE([LDB_COVERAGE])
 ])
 
 AS_IF([test x"$enable_debug" = x'yes'], [
   AC_DEFINE([BTC_DEBUG])
+  AC_DEFINE([LDB_DEBUG])
 ])
 
 AS_IF([test x"$has_fdatasync" = x'yes'], [
@@ -454,11 +515,6 @@ AS_IF([test x"$has_pread" = x'yes'], [
   AC_DEFINE([LDB_HAVE_PREAD])
 ])
 
-AS_IF([test x"$has_pthread" = x'yes'], [
-  AC_DEFINE([BTC_PTHREAD])
-  AC_DEFINE([LDB_PTHREAD])
-])
-
 AS_IF([test x"$has_rfc3493" = x'yes'], [
   AC_DEFINE([BTC_HAVE_RFC3493])
 ])
@@ -468,37 +524,11 @@ AS_IF([test x"$has_zlib" = x'yes'], [
 ])
 
 #
-# Feature Test Macros
-#
-
-AS_IF([test x"$MINGW" != x''], [
-  AC_DEFINE([_WIN32_WINNT], [0x501])
-])
-
-AS_CASE([$host_os], [solaris*], [
-  AC_DEFINE([_TS_ERRNO])
-])
-
-AS_CASE([$host_os], [aix*], [
-  AC_DEFINE([_THREAD_SAFE_ERRNO])
-])
-
-#
 # Libraries
 #
 
-AS_IF([test x"$MINGW" != x''], [
-  LIBS="$LIBS -lkernel32 -ladvapi32 -lws2_32"
-], [
-  AC_CHECK_DEFINE([__WATCOMC__], [], [
-    LIBS="$LIBS -lm"
-  ])
-
-  AS_IF([test x"$has_pthread" = x'yes'], [
-    CC="$PTHREAD_CC"
-    CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
-    LIBS="$LIBS $PTHREAD_LIBS"
-  ])
+AS_IF([test x"$has_zlib" = x'yes'], [
+  AC_SUBST([ZLIB], ['-lz'])
 ])
 
 #
@@ -519,10 +549,6 @@ AS_IF([test x"$EMSCRIPTEN" != x''], [
   AC_SUBST([LOG_COMPILER], [node])
 ])
 
-AS_IF([test x"$has_zlib" = x'yes'], [
-  AC_SUBST([ZLIB], ['-lz'])
-])
-
 AS_IF([test x"$WASI$EMSCRIPTEN" != x''], [
   enable_node=no
 ])
@@ -531,7 +557,6 @@ AM_CONDITIONAL([ENABLE_LEVELDB], [test x"$enable_leveldb" = x'yes'])
 AM_CONDITIONAL([ENABLE_NODE], [test x"$enable_node" = x'yes'])
 AM_CONDITIONAL([ENABLE_SHARED], [test x"$enable_shared" = x'yes'])
 AM_CONDITIONAL([ENABLE_TESTS], [test x"$enable_tests" = x'yes'])
-AM_CONDITIONAL([HAVE_PTHREAD], [test x"$has_pthread" = x'yes'])
 AM_CONDITIONAL([MINGW], [test x"$MINGW" != x''])
 
 AC_CONFIG_FILES([deps/lcdb/Makefile
@@ -548,34 +573,21 @@ AC_OUTPUT
 
 AC_MSG_NOTICE([Build Options:
 
-  asm          = $has_asm
-  big          = $has_big
-  clock        = $has_clock
-  coverage     = $enable_coverage
-  debug        = $enable_debug
-  emscripten   = $EMSCRIPTEN
-  fdatasync    = $has_fdatasync
-  gethostname  = $has_gethostname
-  getifaddrs   = $has_getifaddrs
-  int128       = $has_int128
-  leveldb      = $enable_leveldb
-  node         = $enable_node
-  portable     = $enable_portable
-  pread        = $has_pread
-  pthread      = $has_pthread
-  rfc3493      = $has_rfc3493
-  tests        = $enable_tests
-  tls          = $has_tls
-  wasi         = $WASI
-  zlib         = $has_zlib
+  coverage   = $enable_coverage
+  debug      = $enable_debug
+  leveldb    = $enable_leveldb
+  node       = $enable_node
+  portable   = $enable_portable
+  pthread    = $enable_pthread
+  tests      = $enable_tests
 
-  PREFIX       = $prefix
-  HOST         = $host
-  CC           = $CC
-  CPPFLAGS     = $CPPFLAGS
-  CFLAGS       = $CFLAGS
-  WARN_FLAGS   = $WARN_FLAGS
-  LDFLAGS      = $LDFLAGS
-  DEFS         = $DEFS
-  LIBS         = $LIBS
+  PREFIX     = $prefix
+  HOST       = $host
+  CC         = $CC
+  CPPFLAGS   = $CPPFLAGS
+  CFLAGS     = $CFLAGS
+  WARN_FLAGS = $WARN_FLAGS
+  LDFLAGS    = $LDFLAGS
+  DEFS       = $DEFS
+  LIBS       = $LIBS
 ])

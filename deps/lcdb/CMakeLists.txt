@@ -31,9 +31,22 @@ endif()
 # Includes
 #
 
-include(cmake/AppendCCompilerFlag.cmake)
-include(cmake/LibtoolEmulator.cmake)
-include(cmake/TargetLinkOptions.cmake)
+if(NOT COMMAND append_c_compiler_flag)
+  include(cmake/AppendCCompilerFlag.cmake)
+endif()
+
+if(NOT COMMAND find_pthread)
+  include(cmake/FindPthread.cmake)
+endif()
+
+if(NOT COMMAND set_target_version_info)
+  include(cmake/LibtoolEmulator.cmake)
+endif()
+
+if(NOT COMMAND target_link_options)
+  include(cmake/TargetLinkOptions.cmake)
+endif()
+
 include(CheckSymbolExists)
 include(CTest)
 include(GNUInstallDirs)
@@ -42,15 +55,24 @@ include(GNUInstallDirs)
 # Options
 #
 
+option(LDB_BENCH "Build benchmarks" OFF)
 option(LDB_COVERAGE "Enable coverage" OFF)
 option(LDB_PIC "Enable PIC" OFF)
 option(LDB_PORTABLE "Be as portable as possible" OFF)
+option(LDB_PTHREAD "Use pthread" ON)
 option(LDB_SHARED "Build shared library" OFF)
 option(LDB_TESTS "Build tests" ON)
 
-# Hack: inherit mako's portable option.
+if(DEFINED MAKO_COVERAGE)
+  set(LDB_COVERAGE ${MAKO_COVERAGE})
+endif()
+
 if(DEFINED MAKO_PORTABLE)
   set(LDB_PORTABLE ${MAKO_PORTABLE})
+endif()
+
+if(DEFINED MAKO_PTHREAD)
+  set(LDB_PTHREAD ${MAKO_PTHREAD})
 endif()
 
 #
@@ -58,11 +80,13 @@ endif()
 #
 
 set(ldb_sources)
-set(ldb_defines)
 set(ldb_cflags)
+set(ldb_defines)
 set(ldb_includes)
 set(ldb_ldflags)
 set(ldb_libs)
+
+set(bench_libs)
 
 #
 # Global Flags
@@ -91,28 +115,51 @@ if(APPLE)
 endif()
 
 #
+# Feature Test Macros
+#
+
+if(WIN32)
+  list(APPEND ldb_defines _WIN32_WINNT=0x501)
+endif()
+
+if(LDB_GLIBC)
+  list(APPEND ldb_defines _GNU_SOURCE)
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
+  list(APPEND ldb_defines _TS_ERRNO)
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "AIX")
+  list(APPEND ldb_defines _THREAD_SAFE_ERRNO)
+endif()
+
+#
+# System Libraries
+#
+
+if(WIN32)
+  list(APPEND ldb_libs kernel32)
+elseif(LDB_PTHREAD)
+  find_pthread(_found _cflags _libs)
+
+  if(_found)
+    list(APPEND ldb_cflags ${_cflags})
+    list(APPEND ldb_libs ${_libs})
+    list(APPEND ldb_defines LDB_PTHREAD)
+  endif()
+endif()
+
+#
 # Feature Testing
 #
 
 if(LDB_PORTABLE)
-  set(LDB_HAVE_FDATASYNC OFF)
-  set(LDB_HAVE_PREAD OFF)
+  set(LDB_HAVE_FDATASYNC 0)
+  set(LDB_HAVE_PREAD 0)
 else()
   check_symbol_exists(fdatasync unistd.h LDB_HAVE_FDATASYNC)
   check_symbol_exists(pread unistd.h LDB_HAVE_PREAD)
-endif()
-
-set(LDB_HAVE_PTHREAD 0)
-
-if(NOT WIN32 AND NOT WASI AND NOT EMSCRIPTEN
-   AND NOT CMAKE_C_COMPILER_ID MATCHES "Watcom$")
-  set(THREADS_PREFER_PTHREAD_FLAG ON)
-
-  find_package(Threads)
-
-  if(CMAKE_USE_PTHREADS_INIT)
-    set(LDB_HAVE_PTHREAD 1)
-  endif()
 endif()
 
 #
@@ -249,36 +296,18 @@ endif()
 # Defines
 #
 
+if(LDB_COVERAGE)
+  list(APPEND ldb_defines LDB_COVERAGE)
+endif()
+
+list(APPEND ldb_defines $<$<CONFIG:Debug>:LDB_DEBUG>)
+
 if(LDB_HAVE_FDATASYNC)
   list(APPEND ldb_defines LDB_HAVE_FDATASYNC)
 endif()
 
 if(LDB_HAVE_PREAD)
   list(APPEND ldb_defines LDB_HAVE_PREAD)
-endif()
-
-if(LDB_HAVE_PTHREAD)
-  list(APPEND ldb_defines LDB_PTHREAD)
-endif()
-
-#
-# Feature Test Macros
-#
-
-if(WIN32)
-  list(APPEND ldb_defines _WIN32_WINNT=0x501)
-endif()
-
-if(LDB_GLIBC)
-  list(APPEND ldb_defines _GNU_SOURCE)
-endif()
-
-if(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
-  list(APPEND ldb_defines _TS_ERRNO)
-endif()
-
-if(CMAKE_SYSTEM_NAME STREQUAL "AIX")
-  list(APPEND ldb_defines _THREAD_SAFE_ERRNO)
 endif()
 
 #
@@ -291,10 +320,17 @@ list(APPEND ldb_includes ${PROJECT_SOURCE_DIR}/include)
 # Libraries
 #
 
-if(WIN32)
-  list(APPEND ldb_libs kernel32)
-elseif(LDB_HAVE_PTHREAD)
-  list(APPEND ldb_libs Threads::Threads)
+if(LDB_BENCH)
+  check_c_source_compiles([=[
+#   include <math.h>
+    int main(int argc, char **argv) {
+      return (int)sqrt((double)argc);
+    }
+  ]=] LDB_LIBC_MATH)
+
+  if(NOT LDB_LIBC_MATH)
+    list(APPEND bench_libs m)
+  endif()
 endif()
 
 #
@@ -422,11 +458,9 @@ endif()
 # Install
 #
 
-if(WASI OR EMSCRIPTEN)
-  return()
-endif()
+if(UNIX AND NOT (WASI OR EMSCRIPTEN))
+  string(REPLACE ";" " -l" PKGCONF_LIBS "-l${ldb_libs}")
 
-if(UNIX)
   configure_file(lcdb-cmake.pc.in lcdb.pc @ONLY)
 
   install(FILES include/lcdb.h include/lcdb_c.h
@@ -460,3 +494,29 @@ if(WIN32)
 
   install(TARGETS lcdb_util RUNTIME DESTINATION bin/$<CONFIG>)
 endif()
+
+#
+# Summary
+#
+
+set(build_type "")
+
+if(DEFINED CMAKE_BUILD_TYPE AND CMAKE_BUILD_TYPE)
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" build_type)
+endif()
+
+message(STATUS "Build Options:
+
+   BUILD_TYPE:     ${CMAKE_BUILD_TYPE}
+   INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}
+   SYSTEM:         ${CMAKE_SYSTEM} (${CMAKE_SYSTEM_PROCESSOR})
+   C_COMPILER:     ${CMAKE_C_COMPILER} (${CMAKE_C_COMPILER_ID})
+   C_FLAGS:        ${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${build_type}}
+   SHARED_FLAGS:   ${CMAKE_SHARED_LINKER_FLAGS}
+   EXE_FLAGS:      ${CMAKE_EXE_LINKER_FLAGS}
+
+   ldb_cflags:     ${ldb_cflags}
+   ldb_ldflags:    ${ldb_ldflags}
+   ldb_defines:    ${ldb_defines}
+   ldb_libs:       ${ldb_libs}
+")

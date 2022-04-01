@@ -15,10 +15,6 @@ if test ! -d deps/lcdb; then
   mkdir deps/lcdb
 fi
 
-if test ! -d deps/lcdb/cmake; then
-  mkdir deps/lcdb/cmake
-fi
-
 if test ! -d deps/lcdb/contrib; then
   mkdir deps/lcdb/contrib
 fi
@@ -37,7 +33,6 @@ cp -f "$prefix/contrib/Makefile.am" deps/lcdb/
 cp -f "$prefix/LICENSE" deps/lcdb/
 cp -f "$prefix/README.md" deps/lcdb/
 
-rsync -av "$prefix/cmake/" deps/lcdb/cmake/
 rsync -av "$prefix/contrib/" deps/lcdb/contrib/
 rsync -av "$prefix/include/" deps/lcdb/include/
 

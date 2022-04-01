@@ -4,17 +4,15 @@
 
 AM_CPPFLAGS = $(WARN_FLAGS) -I$(top_srcdir)/include
 AM_LDFLAGS = -static
-LDADD = libtests.la
+
+if ENABLE_NODE
+LDADD = $(top_builddir)/libnode.la libtests.la @ZLIB@
+else
+LDADD = $(top_builddir)/libmako.la libtests.la @ZLIB@
+endif
 
 libtests_la_SOURCES = lib/tests.h lib/tests.c lib/rimraf.c
 
-if ENABLE_NODE
-libtests_la_LIBADD = $(top_builddir)/libnode.la @ZLIB@
-else
-libtests_la_LIBADD = $(top_builddir)/libmako.la @ZLIB@
-endif
-
-# TODO: Eventually move into separate subdirs.
 tests_crypto = t-bip340    \
                t-chacha20  \
                t-drbg      \
