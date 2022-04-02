@@ -31,22 +31,10 @@ endif()
 # Includes
 #
 
-if(NOT COMMAND append_c_compiler_flag)
-  include(cmake/AppendCCompilerFlag.cmake)
-endif()
-
-if(NOT COMMAND find_pthread)
-  include(cmake/FindPthread.cmake)
-endif()
-
-if(NOT COMMAND set_target_version_info)
-  include(cmake/LibtoolEmulator.cmake)
-endif()
-
-if(NOT COMMAND target_link_options)
-  include(cmake/TargetLinkOptions.cmake)
-endif()
-
+include(../../cmake/AppendCCompilerFlag.cmake)
+include(../../cmake/FindPthread.cmake)
+include(../../cmake/LibtoolEmulator.cmake)
+include(../../cmake/TargetLinkOptions.cmake)
 include(CheckSymbolExists)
 include(CTest)
 include(GNUInstallDirs)

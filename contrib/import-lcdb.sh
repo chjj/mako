@@ -51,3 +51,5 @@ rsync -av --exclude '*.o'         \
           deps/lcdb/src/
 
 rm -f deps/lcdb/contrib/Makefile.am
+
+sed -i 's;include(cmake/;include(../../cmake/;g' deps/lcdb/CMakeLists.txt

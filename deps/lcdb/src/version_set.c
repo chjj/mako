@@ -983,7 +983,8 @@ builder_apply(builder_t *b, const ldb_vedit_t *edit) {
     level_state_t *state = &b->levels[entry->level];
 
 #ifndef NDEBUG
-    assert(rb_set64_put(&state->deleted_files, entry->number) == 1);
+    if (!rb_set64_put(&state->deleted_files, entry->number))
+      assert(0 && "duplicate file number in deleted_files");
 #else
     rb_set64_put(&state->deleted_files, entry->number);
 #endif

@@ -112,7 +112,7 @@ ldb_slice_decode(const uint8_t *xp) {
 
 #ifndef NDEBUG
   if (!ldb_varint32_read(&zn, &xp, &xn))
-    assert(0);
+    assert(0 && "invalid slice prefix");
 #else
   ldb_varint32_read(&zn, &xp, &xn);
 #endif
