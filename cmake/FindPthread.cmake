@@ -7,10 +7,11 @@ if(COMMAND find_pthread)
 endif()
 
 function(find_pthread found cflags libs)
+  set(${found} 0 PARENT_SCOPE)
+  set(${cflags} "" PARENT_SCOPE)
+  set(${libs} "" PARENT_SCOPE)
+
   if(WIN32 OR WASI OR EMSCRIPTEN OR CMAKE_C_COMPILER_ID MATCHES "Watcom$")
-    set(${found} 0 PARENT_SCOPE)
-    set(${cflags} "" PARENT_SCOPE)
-    set(${libs} "" PARENT_SCOPE)
     return()
   endif()
 
