@@ -809,8 +809,12 @@ btc_ps_rss_9x(void) {
 
 size_t
 btc_ps_rss(void) {
-  if (BTCIsWindowsNT())
-    return btc_ps_rss_nt();
+  if (BTCIsWindowsNT()) {
+    size_t rss;
+
+    if ((rss = btc_ps_rss_nt()))
+      return rss;
+  }
 
   return btc_ps_rss_9x();
 }
