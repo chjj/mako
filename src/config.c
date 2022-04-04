@@ -214,7 +214,7 @@ btc_match__path(char *zp, size_t zn, const char *xp, const char *yp) {
     char *home = getenv("HOME");
 
     if (home == NULL)
-      home = "/";
+      home = "";
 
     return btc_join(zp, zn, home, val + 2, NULL);
   }
