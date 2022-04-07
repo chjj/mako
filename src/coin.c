@@ -24,6 +24,8 @@ btc_coin_init(btc_coin_t *z) {
   z->height = -1;
   z->coinbase = 0;
   z->spent = 0;
+  z->safe = 0;
+  z->watch = 0;
   btc_output_init(&z->output);
   z->_refs = 0;
 }
@@ -39,6 +41,8 @@ btc_coin_copy(btc_coin_t *z, const btc_coin_t *x) {
   z->height = x->height;
   z->coinbase = x->coinbase;
   z->spent = x->spent;
+  z->safe = x->safe;
+  z->watch = x->watch;
   btc_output_copy(&z->output, &x->output);
 }
 
@@ -85,6 +89,8 @@ btc_coin_read(btc_coin_t *z, const uint8_t **xp, size_t *xn) {
   z->height = flags >> 1;
   z->coinbase = flags & 1;
   z->spent = 0;
+  z->safe = 0;
+  z->watch = 0;
 
   if (z->height == INT32_MAX)
     z->height = -1;

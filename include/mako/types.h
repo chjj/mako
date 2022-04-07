@@ -177,8 +177,10 @@ typedef struct btc_entry_s {
 typedef struct btc_coin_s {
   uint32_t version;
   int32_t height;
-  int coinbase;
-  int spent;
+  uint8_t coinbase;
+  uint8_t spent;
+  uint8_t safe;
+  uint8_t watch;
   btc_output_t output;
   int _refs;
 } btc_coin_t;
