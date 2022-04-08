@@ -227,6 +227,7 @@ btc_selopt_init(btc_selopt_t *opt) {
   opt->subfee = 0;
   opt->subpos = -1;
   opt->round = 0;
+  opt->smart = 0;
 }
 
 /*

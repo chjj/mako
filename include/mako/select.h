@@ -38,6 +38,7 @@ typedef struct btc_selopt_s {
   int subfee;
   int subpos;
   int round;
+  int smart;
 } btc_selopt_t;
 
 typedef struct btc_selector_s {

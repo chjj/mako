@@ -22,6 +22,9 @@
 #include <node/rpc.h>
 #include <node/timedata.h>
 
+#include <wallet/client.h>
+#include <wallet/wallet.h>
+
 #include <mako/block.h>
 #include <mako/coins.h>
 #include <mako/consensus.h>
@@ -71,6 +74,46 @@ static void
 on_bad_tx_orphan(const btc_verify_error_t *err, unsigned int id, void *arg);
 
 /*
+ * Wallet Client Calls
+ */
+
+static const btc_entry_t *
+client_tip(void *state) {
+  btc_node_t *node = state;
+  return btc_chain_tip(node->chain);
+}
+
+static const btc_entry_t *
+client_by_hash(void *state, const uint8_t *hash) {
+  btc_node_t *node = state;
+  return btc_chain_by_hash(node->chain, hash);
+}
+
+static const btc_entry_t *
+client_by_height(void *state, int32_t height) {
+  btc_node_t *node = state;
+  return btc_chain_by_height(node->chain, height);
+}
+
+static btc_block_t *
+client_get_block(void *state, const btc_entry_t *entry) {
+  btc_node_t *node = state;
+  return btc_chain_get_block(node->chain, entry);
+}
+
+static void
+client_send(void *state, const btc_tx_t *tx) {
+  btc_node_t *node = state;
+  btc_mempool_add(node->mempool, tx, -1);
+}
+
+static void
+client_log(void *state, int level, const char *fmt, va_list ap) {
+  btc_node_t *node = state;
+  btc_logger_write(node->logger, level, "wallet", fmt, ap);
+}
+
+/*
  * Node
  */
 
@@ -90,6 +133,26 @@ btc_node_create(const btc_network_t *network) {
   node->mempool = btc_mempool_create(network, node->chain);
   node->miner = btc_miner_create(network, node->loop, node->chain, node->mempool);
   node->pool = btc_pool_create(network, node->loop, node->chain, node->mempool);
+
+  {
+    btc_walopt_t opt = *btc_walopt_default;
+    btc_wclient_t client;
+
+    btc_wclient_init(&client);
+
+    client.state = node;
+    client.tip = client_tip;
+    client.by_hash = client_by_hash;
+    client.by_height = client_by_height;
+    client.get_block = client_get_block;
+    client.send = client_send;
+    client.log = client_log;
+
+    opt.client = &client;
+
+    node->wallet = btc_wallet_create(network, &opt);
+  }
+
   node->rpc = btc_rpc_create(node);
 
   btc_chain_set_logger(node->chain, node->logger);
@@ -119,6 +182,7 @@ btc_node_create(const btc_network_t *network) {
 void
 btc_node_destroy(btc_node_t *node) {
   btc_rpc_destroy(node->rpc);
+  btc_wallet_destroy(node->wallet);
   btc_pool_destroy(node->pool);
   btc_miner_destroy(node->miner);
   btc_mempool_destroy(node->mempool);
@@ -170,12 +234,22 @@ btc_node_open(btc_node_t *node, const char *prefix, unsigned int flags) {
     goto fail4;
   }
 
-  if (!btc_rpc_open(node->rpc, flags)) {
-    btc_log_error(node, "Failed to open RPC.");
+  if (!btc_path_join(file, sizeof(file), prefix, "wallet"))
+    goto fail5;
+
+  if (!btc_wallet_open(node->wallet, file)) {
+    btc_log_error(node, "Failed to open wallet.");
     goto fail5;
   }
 
+  if (!btc_rpc_open(node->rpc, flags)) {
+    btc_log_error(node, "Failed to open RPC.");
+    goto fail6;
+  }
+
   return 1;
+fail6:
+  btc_wallet_close(node->wallet);
 fail5:
   btc_pool_close(node->pool);
 fail4:
@@ -195,6 +269,7 @@ btc_node_close(btc_node_t *node) {
   btc_log_info(node, "Closing node.");
 
   btc_rpc_close(node->rpc);
+  btc_wallet_close(node->wallet);
   btc_pool_close(node->pool);
   btc_miner_close(node->miner);
   btc_mempool_close(node->mempool);
@@ -226,6 +301,7 @@ on_connect(const btc_entry_t *entry,
   (void)view;
 
   btc_mempool_add_block(node->mempool, entry, block);
+  btc_wallet_add_block(node->wallet, entry, block);
 }
 
 static void
@@ -238,6 +314,7 @@ on_disconnect(const btc_entry_t *entry,
   (void)view;
 
   btc_mempool_remove_block(node->mempool, entry, block);
+  btc_wallet_remove_block(node->wallet, entry);
 }
 
 static void
@@ -272,6 +349,7 @@ on_tx(const btc_mpentry_t *entry, const btc_view_t *view, void *arg) {
   (void)view;
 
   btc_pool_announce_tx(node->pool, entry);
+  btc_wallet_add_tx(node->wallet, entry->tx);
 }
 
 static void

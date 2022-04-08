@@ -71,6 +71,7 @@ set(mako_libs)
 
 set(io_sources)
 set(node_sources)
+set(wallet_sources)
 set(client_sources)
 set(test_sources)
 set(test_libs)
@@ -414,6 +415,14 @@ list(APPEND node_sources src/node/addrman.c
                          src/node/rpc.c
                          src/node/timedata.c)
 
+list(APPEND wallet_sources src/wallet/account.c
+                           src/wallet/client.c
+                           src/wallet/iterator.c
+                           src/wallet/master.c
+                           src/wallet/record.c
+                           src/wallet/txdb.c
+                           src/wallet/wallet.c)
+
 list(APPEND client_sources src/client/client.c)
 
 list(APPEND test_sources test/lib/tests.c test/lib/rimraf.c)
@@ -651,12 +660,16 @@ function(mako_build_full)
   target_link_libraries(mako_node PRIVATE mako mako_io mako_static lcdb)
   set_property(TARGET mako_node PROPERTY OUTPUT_NAME node)
 
+  add_library(mako_wallet STATIC ${wallet_sources})
+  target_link_libraries(mako_wallet PRIVATE mako mako_io mako_static lcdb)
+  set_property(TARGET mako_wallet PROPERTY OUTPUT_NAME wallet)
+
   add_library(mako_client STATIC ${client_sources})
   target_link_libraries(mako_client PRIVATE mako mako_io mako_static)
   set_property(TARGET mako_client PROPERTY OUTPUT_NAME client)
 
   add_executable(mako_daemon src/node/main.c)
-  target_link_libraries(mako_daemon PRIVATE mako mako_node)
+  target_link_libraries(mako_daemon PRIVATE mako mako_node mako_wallet)
   set_property(TARGET mako_daemon PROPERTY OUTPUT_NAME makod)
 
   add_executable(mako_cli src/client/main.c)
@@ -776,6 +789,8 @@ function(mako_tests_node)
                  rpc
                  timedata)
 
+  set(tests_wallet wallet)
+
   if(MAKO_TESTS)
     foreach(name ${tests_io})
       add_executable(t-${name} test/t-${name}.c)
@@ -786,6 +801,12 @@ function(mako_tests_node)
     foreach(name ${tests_node})
       add_executable(t-${name} test/t-${name}.c)
       target_link_libraries(t-${name} PRIVATE mako mako_test mako_node)
+      add_test(NAME ${name} COMMAND t-${name})
+    endforeach()
+
+    foreach(name ${tests_wallet})
+      add_executable(t-${name} test/t-${name}.c)
+      target_link_libraries(t-${name} PRIVATE mako mako_test mako_wallet)
       add_test(NAME ${name} COMMAND t-${name})
     endforeach()
   endif()

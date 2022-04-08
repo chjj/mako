@@ -94,6 +94,17 @@ btc_view_clear(btc_view_t *view) {
   btc_undo_clear(&view->undo);
 }
 
+void
+btc_view_reset(btc_view_t *view) {
+  btc_mapiter_t it;
+
+  btc_map_each(&view->map, it)
+    btc_coins_destroy(view->map.vals[it]);
+
+  btc_hashmap_reset(&view->map);
+  btc_undo_reset(&view->undo);
+}
+
 static btc_coins_t *
 btc_view_coins(const btc_view_t *view, const uint8_t *hash) {
   return btc_hashmap_get(&view->map, hash);

@@ -6,9 +6,14 @@ AM_CPPFLAGS = $(WARN_FLAGS) -I$(top_srcdir)/include
 AM_LDFLAGS = -static
 
 if ENABLE_NODE
-LDADD = $(top_builddir)/libnode.la libtests.la @ZLIB@
+LDADD = $(top_builddir)/libnode.la   \
+        $(top_builddir)/libwallet.la \
+        libtests.la                  \
+        @ZLIB@
 else
-LDADD = $(top_builddir)/libmako.la libtests.la @ZLIB@
+LDADD = $(top_builddir)/libmako.la \
+        libtests.la                \
+        @ZLIB@
 endif
 
 libtests_la_SOURCES = lib/tests.h lib/tests.c lib/rimraf.c
@@ -81,11 +86,13 @@ tests_node = t-addrman  \
              t-rpc      \
              t-timedata
 
+tests_wallet = t-wallet
+
 check_LTLIBRARIES = libtests.la
 check_PROGRAMS = $(tests_crypto) $(tests_lib)
 
 if ENABLE_NODE
-check_PROGRAMS += $(tests_io) $(tests_node)
+check_PROGRAMS += $(tests_io) $(tests_node) $(tests_wallet)
 endif
 
 TESTS = $(check_PROGRAMS)

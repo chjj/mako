@@ -99,6 +99,8 @@ typedef struct btc_mempool_s btc_mempool_t;
 
 typedef struct btc_miner_s btc_miner_t;
 
+struct btc_wallet_s;
+
 typedef struct btc_rpc_s btc_rpc_t;
 
 typedef struct btc_node_s {
@@ -110,6 +112,7 @@ typedef struct btc_node_s {
   btc_mempool_t *mempool;
   btc_miner_t *miner;
   btc_pool_t *pool;
+  struct btc_wallet_s *wallet;
   btc_rpc_t *rpc;
 } btc_node_t;
 

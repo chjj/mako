@@ -109,6 +109,10 @@ noinst_HEADERS = include/client/client.h           \
                  include/node/rpc.h                \
                  include/node/timedata.h           \
                  include/node/types.h              \
+                 include/wallet/client.h           \
+                 include/wallet/iterator.h         \
+                 include/wallet/types.h            \
+                 include/wallet/wallet.h           \
                                                    \
                  src/crypto/fields/secp256k1_32.h  \
                  src/crypto/fields/secp256k1_64.h  \
@@ -124,6 +128,15 @@ noinst_HEADERS = include/client/client.h           \
                  src/io/watcom_dns.h               \
                  src/map/khash.h                   \
                  src/map/map.h                     \
+                 src/wallet/account.h              \
+                 src/wallet/client.h               \
+                 src/wallet/database.h             \
+                 src/wallet/iterator.h             \
+                 src/wallet/master.h               \
+                 src/wallet/record.h               \
+                 src/wallet/txdb.h                 \
+                 src/wallet/types.h                \
+                 src/wallet/wallet.h               \
                  src/bio.h                         \
                  src/impl.h                        \
                  src/internal.h                    \
@@ -260,6 +273,14 @@ node_sources = src/node/addrman.c  \
                src/node/rpc.c      \
                src/node/timedata.c
 
+wallet_sources = src/wallet/account.c  \
+                 src/wallet/client.c   \
+                 src/wallet/iterator.c \
+                 src/wallet/master.c   \
+                 src/wallet/record.c   \
+                 src/wallet/txdb.c     \
+                 src/wallet/wallet.c
+
 client_sources = src/client/client.c
 
 #
@@ -289,23 +310,28 @@ libio_la_LDFLAGS = -static
 libnode_la_SOURCES = $(node_sources)
 libnode_la_CFLAGS = $(WARN_FLAGS) -I$(top_srcdir)/deps/lcdb/include
 libnode_la_LDFLAGS = -static
-libnode_la_LIBADD = libmako.la libio.la $(mako_dbdir)/liblcdb.la
+libnode_la_LIBADD = libio.la libmako.la $(mako_dbdir)/liblcdb.la
+
+libwallet_la_SOURCES = $(wallet_sources)
+libwallet_la_CFLAGS = $(WARN_FLAGS) -I$(top_srcdir)/deps/lcdb/include
+libwallet_la_LDFLAGS = -static
+libwallet_la_LIBADD = libio.la libmako.la $(mako_dbdir)/liblcdb.la
 
 libclient_la_SOURCES = $(client_sources)
 libclient_la_CFLAGS = $(WARN_FLAGS)
 libclient_la_LDFLAGS = -static
-libclient_la_LIBADD = libmako.la libio.la
+libclient_la_LIBADD = libio.la libmako.la
 
 makod_SOURCES = src/node/main.c
 makod_CFLAGS = $(WARN_FLAGS)
 makod_LDFLAGS = -static
-makod_LDADD = libnode.la
+makod_LDADD = libnode.la libwallet.la
 
 mako_SOURCES = src/client/main.c
 mako_CFLAGS = $(WARN_FLAGS)
 mako_LDFLAGS = -static
 mako_LDADD = libclient.la
 
-noinst_LTLIBRARIES = libio.la libnode.la libclient.la
+noinst_LTLIBRARIES = libio.la libnode.la libwallet.la libclient.la
 bin_PROGRAMS = makod mako
 endif

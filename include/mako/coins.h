@@ -82,6 +82,9 @@ btc_view_init(btc_view_t *view);
 BTC_EXTERN void
 btc_view_clear(btc_view_t *view);
 
+BTC_EXTERN void
+btc_view_reset(btc_view_t *view);
+
 BTC_EXTERN int
 btc_view_has(const btc_view_t *view, const btc_outpoint_t *outpoint);
 
