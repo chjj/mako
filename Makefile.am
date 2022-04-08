@@ -47,6 +47,8 @@ SUBDIRS = $(mako_dbdir) . test
 crypto_HEADERS = include/mako/crypto/drbg.h    \
                  include/mako/crypto/ecc.h     \
                  include/mako/crypto/hash.h    \
+                 include/mako/crypto/ies.h     \
+                 include/mako/crypto/mac.h     \
                  include/mako/crypto/merkle.h  \
                  include/mako/crypto/rand.h    \
                  include/mako/crypto/siphash.h \
@@ -155,12 +157,15 @@ mako_sources = src/crypto/chacha20.c   \
                src/crypto/hmac256.c    \
                src/crypto/hmac512.c    \
                src/crypto/merkle.c     \
+               src/crypto/poly1305.c   \
                src/crypto/pbkdf256.c   \
                src/crypto/pbkdf512.c   \
                src/crypto/rand.c       \
                src/crypto/rand_env.c   \
                src/crypto/rand_sys.c   \
                src/crypto/ripemd160.c  \
+               src/crypto/salsa20.c    \
+               src/crypto/secretbox.c  \
                src/crypto/sha1.c       \
                src/crypto/sha256.c     \
                src/crypto/sha512.c     \

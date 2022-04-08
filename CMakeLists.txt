@@ -311,12 +311,15 @@ list(APPEND mako_sources src/crypto/chacha20.c
                          src/crypto/hmac256.c
                          src/crypto/hmac512.c
                          src/crypto/merkle.c
+                         src/crypto/poly1305.c
                          src/crypto/pbkdf256.c
                          src/crypto/pbkdf512.c
                          src/crypto/rand.c
                          src/crypto/rand_env.c
                          src/crypto/rand_sys.c
                          src/crypto/ripemd160.c
+                         src/crypto/salsa20.c
+                         src/crypto/secretbox.c
                          src/crypto/sha1.c
                          src/crypto/sha256.c
                          src/crypto/sha512.c
@@ -703,9 +706,12 @@ function(mako_tests_lib)
                 hash256
                 hmac
                 merkle
+                poly1305
                 pbkdf2
                 rand
                 ripemd160
+                salsa20
+                secretbox
                 sha1
                 sha256
                 sha512

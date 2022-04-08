@@ -22,8 +22,11 @@ tests_crypto = t-bip340    \
                t-hmac      \
                t-merkle    \
                t-pbkdf2    \
+               t-poly1305  \
                t-rand      \
                t-ripemd160 \
+               t-salsa20   \
+               t-secretbox \
                t-sha1      \
                t-sha256    \
                t-sha512    \

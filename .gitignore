@@ -58,6 +58,7 @@ mako
 mako.js
 makod
 makod.js
+!include/mako/
 sha256sums.txt
 t-*
 !test/t-*.c

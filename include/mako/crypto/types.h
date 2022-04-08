@@ -20,6 +20,12 @@ typedef struct btc_chacha20_s {
   size_t pos;
 } btc_chacha20_t;
 
+typedef struct btc_salsa20_s {
+  uint32_t state[16];
+  uint32_t stream[16];
+  size_t pos;
+} btc_salsa20_t;
+
 typedef struct btc_ripemd160_s {
   uint32_t state[5];
   uint8_t block[64];
