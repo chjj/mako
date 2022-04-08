@@ -58,7 +58,7 @@ ldb_rand_uniform(ldb_rand_t *rnd, uint32_t n) {
   return ldb_rand_next(rnd) % n;
 }
 
-uint32_t
+int
 ldb_rand_one_in(ldb_rand_t *rnd, uint32_t n) {
   return ldb_rand_uniform(rnd, n) == 0;
 }

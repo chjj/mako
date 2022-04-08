@@ -24,7 +24,6 @@ lcdb_headers = include/lcdb.h                 \
                src/util/extern.h              \
                src/util/hash.h                \
                src/util/internal.h            \
-               src/util/memcmp.h              \
                src/util/options.h             \
                src/util/port.h                \
                src/util/port_none_impl.h      \

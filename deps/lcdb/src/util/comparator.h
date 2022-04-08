@@ -75,7 +75,8 @@ typedef struct ldb_comparator_s {
  * Macros
  */
 
-#define ldb_compare(cmp, x, y) (cmp)->compare(cmp, x, y)
+#define ldb_compare_internal(cmp, x, y) (cmp)->compare(cmp, x, y)
+#define ldb_compare ldb_compare_internal
 
 #define ldb_shortest_separator(cmp, start, limit) do { \
   if ((cmp)->shortest_separator != NULL)               \

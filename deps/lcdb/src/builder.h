@@ -32,7 +32,7 @@ struct ldb_tcache_s;
    If no data is present in *iter, meta->file_size will be set to
    zero, and no Table file will be produced. */
 int
-ldb_build_table(const char *prefix,
+ldb_build_table(const char *dbname,
                 const struct ldb_dbopt_s *options,
                 struct ldb_tcache_s *table_cache,
                 struct ldb_iter_s *iter,

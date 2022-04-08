@@ -16,7 +16,6 @@
 #include "buffer.h"
 #include "comparator.h"
 #include "internal.h"
-#include "memcmp.h"
 #include "slice.h"
 
 /*
@@ -27,8 +26,19 @@ static int
 slice_compare(const ldb_comparator_t *comparator,
               const ldb_slice_t *x,
               const ldb_slice_t *y) {
+  size_t n = LDB_MIN(x->size, y->size);
+  int r = n ? memcmp(x->data, y->data, n) : 0;
+
   (void)comparator;
-  return ldb_memcmp4(x->data, x->size, y->data, y->size);
+
+  if (r == 0) {
+    if (x->size < y->size)
+      r = -1;
+    else if (x->size > y->size)
+      r = +1;
+  }
+
+  return r;
 }
 
 static void

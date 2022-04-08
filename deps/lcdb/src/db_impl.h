@@ -91,12 +91,27 @@ ldb_approximate_sizes(ldb_t *db, const ldb_range_t *range,
 LDB_EXTERN void
 ldb_compact(ldb_t *db, const ldb_slice_t *begin, const ldb_slice_t *end);
 
+LDB_EXTERN int
+ldb_backup(ldb_t *db, const char *name);
+
+#undef ldb_compare
+
+LDB_EXTERN int
+ldb_compare(const ldb_t *db, const ldb_slice_t *x, const ldb_slice_t *y);
+
+#ifdef ldb_compare_internal
+#  define ldb_compare ldb_compare_internal
+#endif
+
 /*
  * Static
  */
 
 LDB_EXTERN int
 ldb_repair(const char *dbname, const ldb_dbopt_t *options);
+
+LDB_EXTERN int
+ldb_copy(const char *from, const char *to, const ldb_dbopt_t *options);
 
 LDB_EXTERN int
 ldb_destroy(const char *dbname, const ldb_dbopt_t *options);

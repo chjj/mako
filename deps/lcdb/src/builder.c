@@ -32,7 +32,7 @@
  */
 
 int
-ldb_build_table(const char *prefix,
+ldb_build_table(const char *dbname,
                 const ldb_dbopt_t *options,
                 ldb_tcache_t *table_cache,
                 ldb_iter_t *iter,
@@ -44,7 +44,7 @@ ldb_build_table(const char *prefix,
 
   ldb_iter_first(iter);
 
-  if (!ldb_table_filename(fname, sizeof(fname), prefix, meta->number))
+  if (!ldb_table_filename(fname, sizeof(fname), dbname, meta->number))
     return LDB_INVALID;
 
   if (ldb_iter_valid(iter)) {

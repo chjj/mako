@@ -407,8 +407,45 @@ ldb_dbiter_create(ldb_t *db,
 }
 
 int
-ldb_iter_compare(ldb_iter_t *iter, const ldb_slice_t *key) {
-  ldb_dbiter_t *it = iter->ptr;
+ldb_iter_compare(const ldb_iter_t *iter, const ldb_slice_t *key) {
+  const ldb_dbiter_t *it = iter->ptr;
   ldb_slice_t x = ldb_dbiter_key(it);
   return ldb_compare(it->ucmp, &x, key);
+}
+
+void
+ldb_iter_seek_ge(ldb_iter_t *iter, const ldb_slice_t *target) {
+  ldb_iter_seek(iter, target);
+}
+
+void
+ldb_iter_seek_gt(ldb_iter_t *iter, const ldb_slice_t *target) {
+  ldb_iter_seek(iter, target);
+
+  if (ldb_iter_valid(iter)) {
+    if (ldb_iter_compare(iter, target) == 0)
+      ldb_iter_next(iter);
+  }
+}
+
+void
+ldb_iter_seek_le(ldb_iter_t *iter, const ldb_slice_t *target) {
+  ldb_iter_seek(iter, target);
+
+  if (ldb_iter_valid(iter)) {
+    if (ldb_iter_compare(iter, target) > 0)
+      ldb_iter_prev(iter);
+  } else {
+    ldb_iter_last(iter);
+  }
+}
+
+void
+ldb_iter_seek_lt(ldb_iter_t *iter, const ldb_slice_t *target) {
+  ldb_iter_seek(iter, target);
+
+  if (ldb_iter_valid(iter))
+    ldb_iter_prev(iter);
+  else
+    ldb_iter_last(iter);
 }

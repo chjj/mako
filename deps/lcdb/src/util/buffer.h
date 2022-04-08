@@ -60,9 +60,6 @@ ldb_buffer_hash(const ldb_buffer_t *x);
 int
 ldb_buffer_equal(const ldb_buffer_t *x, const ldb_buffer_t *y);
 
-int
-ldb_buffer_compare(const ldb_buffer_t *x, const ldb_buffer_t *y);
-
 void
 ldb_buffer_push(ldb_buffer_t *z, int x);
 

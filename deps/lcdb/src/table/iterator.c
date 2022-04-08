@@ -10,6 +10,8 @@
  * See LICENSE for more information.
  */
 
+#define LDB_ITERATOR_C
+
 #include <assert.h>
 #include <stddef.h>
 
@@ -80,6 +82,51 @@ ldb_iter_register_cleanup(ldb_iter_t *iter,
   node->func = func;
   node->arg1 = arg1;
   node->arg2 = arg2;
+}
+
+int
+ldb_iter_valid(const ldb_iter_t *iter) {
+  return iter->table->valid(iter->ptr);
+}
+
+void
+ldb_iter_first(ldb_iter_t *iter) {
+  iter->table->first(iter->ptr);
+}
+
+void
+ldb_iter_last(ldb_iter_t *iter) {
+  iter->table->last(iter->ptr);
+}
+
+void
+ldb_iter_seek(ldb_iter_t *iter, const ldb_slice_t *target) {
+  iter->table->seek(iter->ptr, target);
+}
+
+void
+ldb_iter_next(ldb_iter_t *iter) {
+  iter->table->next(iter->ptr);
+}
+
+void
+ldb_iter_prev(ldb_iter_t *iter) {
+  iter->table->prev(iter->ptr);
+}
+
+ldb_slice_t
+ldb_iter_key(const ldb_iter_t *iter) {
+  return iter->table->key(iter->ptr);
+}
+
+ldb_slice_t
+ldb_iter_value(const ldb_iter_t *iter) {
+  return iter->table->value(iter->ptr);
+}
+
+int
+ldb_iter_status(const ldb_iter_t *iter) {
+  return iter->table->status(iter->ptr);
 }
 
 /*

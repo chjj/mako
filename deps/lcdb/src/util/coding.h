@@ -168,14 +168,23 @@ ldb_varint32_write(uint8_t *zp, uint32_t x) {
 
 LDB_UNUSED static int
 ldb_varint32_read(uint32_t *z, const uint8_t **xp, size_t *xn) {
-  uint32_t result = 0;
-  uint32_t shift, byte;
+  uint32_t result, shift;
 
-  for (shift = 0; shift <= 28; shift += 7) {
-    if (*xn == 0)
-      return 0;
+  if (LIKELY(*xn > 0)) {
+    result = **xp;
 
-    byte = **xp;
+    if ((result & 128) == 0) {
+      *xp += 1;
+      *xn -= 1;
+      *z = result;
+      return 1;
+    }
+  }
+
+  result = 0;
+
+  for (shift = 0; shift <= 28 && *xn > 0; shift += 7) {
+    uint32_t byte = **xp;
 
     *xp += 1;
     *xn -= 1;
@@ -188,6 +197,8 @@ ldb_varint32_read(uint32_t *z, const uint8_t **xp, size_t *xn) {
       return 1;
     }
   }
+
+  *z = 0;
 
   return 0;
 }
@@ -227,13 +238,9 @@ LDB_UNUSED static int
 ldb_varint64_read(uint64_t *z, const uint8_t **xp, size_t *xn) {
   uint64_t result = 0;
   uint32_t shift;
-  uint64_t byte;
 
-  for (shift = 0; shift <= 63; shift += 7) {
-    if (*xn == 0)
-      return 0;
-
-    byte = **xp;
+  for (shift = 0; shift <= 63 && *xn > 0; shift += 7) {
+    uint64_t byte = **xp;
 
     *xp += 1;
     *xn -= 1;
@@ -246,6 +253,8 @@ ldb_varint64_read(uint64_t *z, const uint8_t **xp, size_t *xn) {
       return 1;
     }
   }
+
+  *z = 0;
 
   return 0;
 }

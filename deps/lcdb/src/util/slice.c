@@ -19,7 +19,6 @@
 #include "coding.h"
 #include "hash.h"
 #include "internal.h"
-#include "memcmp.h"
 #include "slice.h"
 
 /*
@@ -70,19 +69,6 @@ ldb_slice_equal(const ldb_slice_t *x, const ldb_slice_t *y) {
   return memcmp(x->data, y->data, y->size) == 0;
 }
 
-int
-ldb_slice_compare(const ldb_slice_t *x, const ldb_slice_t *y) {
-  return ldb_memcmp4(x->data, x->size, y->data, y->size);
-}
-
-void
-ldb_slice_eat(ldb_slice_t *z, size_t xn) {
-  assert(z->size >= xn);
-
-  z->data += xn;
-  z->size -= xn;
-}
-
 size_t
 ldb_slice_size(const ldb_slice_t *x) {
   return ldb_varint32_size(x->size) + x->size;
@@ -128,4 +114,9 @@ int
 ldb_slice_import(ldb_slice_t *z, const ldb_slice_t *x) {
   ldb_slice_t tmp = *x;
   return ldb_slice_slurp(z, &tmp);
+}
+
+int
+ldb_equal(const ldb_slice_t *x, const ldb_slice_t *y) {
+  return ldb_slice_equal(x, y);
 }

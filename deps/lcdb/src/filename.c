@@ -30,7 +30,7 @@
 static int
 make_filename(char *buf,
               size_t size,
-              const char *prefix,
+              const char *dbname,
               uint64_t num,
               const char *ext) {
   char tmp[128];
@@ -40,7 +40,7 @@ make_filename(char *buf,
 
   sprintf(tmp, "%s.%s", id, ext);
 
-  return ldb_join(buf, size, prefix, tmp);
+  return ldb_join(buf, size, dbname, tmp);
 }
 
 /*
@@ -48,25 +48,25 @@ make_filename(char *buf,
  */
 
 int
-ldb_log_filename(char *buf, size_t size, const char *prefix, uint64_t num) {
+ldb_log_filename(char *buf, size_t size, const char *dbname, uint64_t num) {
   assert(num > 0);
-  return make_filename(buf, size, prefix, num, "log");
+  return make_filename(buf, size, dbname, num, "log");
 }
 
 int
-ldb_table_filename(char *buf, size_t size, const char *prefix, uint64_t num) {
+ldb_table_filename(char *buf, size_t size, const char *dbname, uint64_t num) {
   assert(num > 0);
-  return make_filename(buf, size, prefix, num, "ldb");
+  return make_filename(buf, size, dbname, num, "ldb");
 }
 
 int
-ldb_sstable_filename(char *buf, size_t size, const char *prefix, uint64_t num) {
+ldb_sstable_filename(char *buf, size_t size, const char *dbname, uint64_t num) {
   assert(num > 0);
-  return make_filename(buf, size, prefix, num, "sst");
+  return make_filename(buf, size, dbname, num, "sst");
 }
 
 int
-ldb_desc_filename(char *buf, size_t size, const char *prefix, uint64_t num) {
+ldb_desc_filename(char *buf, size_t size, const char *dbname, uint64_t num) {
   char tmp[128];
   char id[32];
 
@@ -76,33 +76,33 @@ ldb_desc_filename(char *buf, size_t size, const char *prefix, uint64_t num) {
 
   sprintf(tmp, "MANIFEST-%s", id);
 
-  return ldb_join(buf, size, prefix, tmp);
+  return ldb_join(buf, size, dbname, tmp);
 }
 
 int
-ldb_current_filename(char *buf, size_t size, const char *prefix) {
-  return ldb_join(buf, size, prefix, "CURRENT");
+ldb_current_filename(char *buf, size_t size, const char *dbname) {
+  return ldb_join(buf, size, dbname, "CURRENT");
 }
 
 int
-ldb_lock_filename(char *buf, size_t size, const char *prefix) {
-  return ldb_join(buf, size, prefix, "LOCK");
+ldb_lock_filename(char *buf, size_t size, const char *dbname) {
+  return ldb_join(buf, size, dbname, "LOCK");
 }
 
 int
-ldb_temp_filename(char *buf, size_t size, const char *prefix, uint64_t num) {
+ldb_temp_filename(char *buf, size_t size, const char *dbname, uint64_t num) {
   assert(num > 0);
-  return make_filename(buf, size, prefix, num, "dbtmp");
+  return make_filename(buf, size, dbname, num, "dbtmp");
 }
 
 int
-ldb_info_filename(char *buf, size_t size, const char *prefix) {
-  return ldb_join(buf, size, prefix, "LOG");
+ldb_info_filename(char *buf, size_t size, const char *dbname) {
+  return ldb_join(buf, size, dbname, "LOG");
 }
 
 int
-ldb_oldinfo_filename(char *buf, size_t size, const char *prefix) {
-  return ldb_join(buf, size, prefix, "LOG.old");
+ldb_oldinfo_filename(char *buf, size_t size, const char *dbname) {
+  return ldb_join(buf, size, dbname, "LOG.old");
 }
 
 /* Owned filenames have the form:
@@ -156,7 +156,7 @@ ldb_parse_filename(ldb_filetype_t *type, uint64_t *num, const char *name) {
 }
 
 int
-ldb_set_current_file(const char *prefix, uint64_t desc_number) {
+ldb_set_current_file(const char *dbname, uint64_t desc_number) {
   char cur[LDB_PATH_MAX];
   char tmp[LDB_PATH_MAX];
   ldb_slice_t data;
@@ -166,10 +166,10 @@ ldb_set_current_file(const char *prefix, uint64_t desc_number) {
 
   assert(desc_number > 0);
 
-  if (!ldb_temp_filename(tmp, sizeof(tmp), prefix, desc_number))
+  if (!ldb_temp_filename(tmp, sizeof(tmp), dbname, desc_number))
     return LDB_INVALID;
 
-  if (!ldb_current_filename(cur, sizeof(cur), prefix))
+  if (!ldb_current_filename(cur, sizeof(cur), dbname))
     return LDB_INVALID;
 
   ldb_encode_int(id, desc_number, 6);

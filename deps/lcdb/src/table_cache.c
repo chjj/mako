@@ -33,7 +33,7 @@
  */
 
 struct ldb_tcache_s {
-  const char *prefix;
+  const char *dbname;
   const ldb_dbopt_t *options;
   ldb_lru_t *lru;
 };
@@ -71,10 +71,10 @@ unref_entry(void *arg1, void *arg2) {
  */
 
 ldb_tcache_t *
-ldb_tcache_create(const char *prefix, const ldb_dbopt_t *options, int entries) {
+ldb_tcache_create(const char *dbname, const ldb_dbopt_t *options, int entries) {
   ldb_tcache_t *cache = ldb_malloc(sizeof(ldb_tcache_t));
 
-  cache->prefix = prefix;
+  cache->dbname = dbname;
   cache->options = options;
   cache->lru = ldb_lru_create(entries);
 
@@ -108,13 +108,13 @@ find_table(ldb_tcache_t *cache,
     ldb_rfile_t *file = NULL;
     ldb_table_t *table = NULL;
 
-    if (!ldb_table_filename(fname, sizeof(fname), cache->prefix, file_number))
+    if (!ldb_table_filename(fname, sizeof(fname), cache->dbname, file_number))
       return LDB_INVALID;
 
     rc = ldb_randfile_create(fname, &file, use_mmap);
 
     if (rc != LDB_OK) {
-      if (!ldb_sstable_filename(fname, sizeof(fname), cache->prefix,
+      if (!ldb_sstable_filename(fname, sizeof(fname), cache->dbname,
                                                       file_number)) {
         return LDB_INVALID;
       }

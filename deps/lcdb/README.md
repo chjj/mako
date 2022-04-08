@@ -114,7 +114,7 @@ int main(void) {
   rc = ldb_get(db, &key, &ret, 0);
 
   assert(rc == LDB_OK);
-  assert(ldb_compare(&ret, &val) == 0);
+  assert(ldb_compare(db, &ret, &val) == 0);
 
   ldb_free(ret.data);
   ldb_close(db);

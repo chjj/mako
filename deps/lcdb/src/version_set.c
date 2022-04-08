@@ -1490,13 +1490,13 @@ report_corruption(ldb_reporter_t *reporter, size_t bytes, int status) {
 }
 
 static int
-read_current_filename(char *path, size_t size, const char *prefix) {
+read_current_filename(char *path, size_t size, const char *dbname) {
   ldb_buffer_t data;
   size_t len;
   char *name;
   int rc;
 
-  if (!ldb_current_filename(path, size, prefix))
+  if (!ldb_current_filename(path, size, dbname))
     return LDB_INVALID;
 
   ldb_buffer_init(&data);
@@ -1516,7 +1516,7 @@ read_current_filename(char *path, size_t size, const char *prefix) {
 
   name[len - 1] = '\0';
 
-  if (!ldb_join(path, size, prefix, name)) {
+  if (!ldb_join(path, size, dbname, name)) {
     rc = LDB_INVALID;
     goto fail;
   }

@@ -32,7 +32,7 @@ ldb_rand_next(ldb_rand_t *rnd);
 uint32_t
 ldb_rand_uniform(ldb_rand_t *rnd, uint32_t n);
 
-uint32_t
+int
 ldb_rand_one_in(ldb_rand_t *rnd, uint32_t n);
 
 uint32_t

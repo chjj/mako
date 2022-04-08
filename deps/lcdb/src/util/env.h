@@ -68,6 +68,12 @@ int
 ldb_rename_file(const char *from, const char *to);
 
 int
+ldb_copy_file(const char *from, const char *to);
+
+int
+ldb_link_file(const char *from, const char *to);
+
+int
 ldb_lock_file(const char *filename, ldb_filelock_t **lock);
 
 int

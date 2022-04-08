@@ -32,7 +32,7 @@ typedef struct ldb_tcache_s ldb_tcache_t;
  */
 
 ldb_tcache_t *
-ldb_tcache_create(const char *prefix, const ldb_dbopt_t *options, int entries);
+ldb_tcache_create(const char *dbname, const ldb_dbopt_t *options, int entries);
 
 void
 ldb_tcache_destroy(ldb_tcache_t *cache);

@@ -583,6 +583,78 @@ ldb_rename_file(const char *from, const char *to) {
 }
 
 int
+ldb_copy_file(const char *from, const char *to) {
+  static const size_t buflen = 512 << 10;
+  unsigned char *buf, *ptr;
+  int len, nwrite;
+  int nread = -1;
+  int rfd = -1;
+  int wfd = -1;
+
+  rfd = ldb_open(from, O_RDONLY, 0);
+
+  if (rfd < 0)
+    return LDB_POSIX_ERROR(errno);
+
+  wfd = ldb_open(to, O_WRONLY | O_CREAT | O_EXCL, 0644);
+
+  if (wfd < 0) {
+    close(rfd);
+    return LDB_POSIX_ERROR(errno);
+  }
+
+  buf = malloc(buflen);
+
+  if (buf == NULL)
+    goto done;
+
+  for (;;) {
+    do {
+      nread = read(rfd, buf, buflen);
+    } while (nread < 0 && errno == EINTR);
+
+    if (nread <= 0)
+      break;
+
+    ptr = buf;
+    len = nread;
+
+    while (len > 0) {
+      do {
+        nwrite = write(wfd, ptr, len);
+      } while (nwrite < 0 && nwrite == EINTR);
+
+      if (nwrite < 0)
+        goto done;
+
+      ptr += nwrite;
+      len -= nwrite;
+    }
+  }
+
+done:
+  close(wfd);
+  close(rfd);
+
+  if (buf != NULL)
+    free(buf);
+
+  return nread ? LDB_IOERR : LDB_OK;
+}
+
+int
+ldb_link_file(const char *from, const char *to) {
+  if (link(from, to) != 0) {
+    if (errno == EXDEV)
+      return ldb_copy_file(from, to);
+
+    return LDB_POSIX_ERROR(errno);
+  }
+
+  return LDB_OK;
+}
+
+int
 ldb_lock_file(const char *filename, ldb_filelock_t **lock) {
   size_t len = strlen(filename);
   int fd;

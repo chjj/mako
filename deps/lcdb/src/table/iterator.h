@@ -105,6 +105,33 @@ struct ldb_itertbl_s {
   int (*status)(const void *iter);
 };
 
+#define LDB_ITERATOR_FUNCTIONS(name)                                  \
+                                                                      \
+static const ldb_itertbl_t name ## _table = {                         \
+  /* .clear = */ (void (*)(void *))name ## _clear,                    \
+  /* .valid = */ (int (*)(const void *))name ## _valid,               \
+  /* .first = */ (void (*)(void *))name ## _first,                    \
+  /* .last = */ (void (*)(void *))name ## _last,                      \
+  /* .seek = */ (void (*)(void *, const ldb_slice_t *))name ## _seek, \
+  /* .next = */ (void (*)(void *))name ## _next,                      \
+  /* .prev = */ (void (*)(void *))name ## _prev,                      \
+  /* .key = */ (ldb_slice_t (*)(const void *))name ## _key,           \
+  /* .value = */ (ldb_slice_t (*)(const void *))name ## _value,       \
+  /* .status = */ (int (*)(const void *))name ## _status              \
+}
+
+/* Casting function pointers is technically UB[1] but will
+ * work on a vast majority of platforms. Notable exceptions
+ * include a lot of old 16 bit platforms as well as wasm and
+ * emscripten[2].
+ *
+ * [1] https://stackoverflow.com/questions/559581
+ * [2] https://emscripten.org/docs/porting/guidelines/function_pointer_issues.html
+ */
+#if defined(__wasm__) || defined(__EMSCRIPTEN__)
+
+#undef LDB_ITERATOR_FUNCTIONS
+
 #define LDB_ITERATOR_FUNCTIONS(name)                           \
                                                                \
 static void                                                    \
@@ -170,6 +197,8 @@ static const ldb_itertbl_t name ## _table = {                  \
   /* .status = */ name ## _status_wrapped                      \
 }
 
+#endif /* __wasm__ || __EMSCRIPTEN__ */
+
 /*
  * Cleanup
  */
@@ -183,16 +212,6 @@ static const ldb_itertbl_t name ## _table = {                  \
  * Iterator
  */
 
-#define ldb_iter_valid(x) (x)->table->valid((x)->ptr)
-#define ldb_iter_first(x) (x)->table->first((x)->ptr)
-#define ldb_iter_last(x) (x)->table->last((x)->ptr)
-#define ldb_iter_seek(x, y) (x)->table->seek((x)->ptr, y)
-#define ldb_iter_next(x) (x)->table->next((x)->ptr)
-#define ldb_iter_prev(x) (x)->table->prev((x)->ptr)
-#define ldb_iter_key(x) (x)->table->key((x)->ptr)
-#define ldb_iter_value(x) (x)->table->value((x)->ptr)
-#define ldb_iter_status(x) (x)->table->status((x)->ptr)
-
 ldb_iter_t *
 ldb_iter_create(void *ptr, const ldb_itertbl_t *table);
 
@@ -204,6 +223,49 @@ ldb_iter_register_cleanup(ldb_iter_t *iter,
                           ldb_cleanup_f func,
                           void *arg1,
                           void *arg2);
+
+#ifdef LDB_ITERATOR_C
+
+LDB_EXTERN int
+ldb_iter_valid(const ldb_iter_t *iter);
+
+LDB_EXTERN void
+ldb_iter_first(ldb_iter_t *iter);
+
+LDB_EXTERN void
+ldb_iter_last(ldb_iter_t *iter);
+
+LDB_EXTERN void
+ldb_iter_seek(ldb_iter_t *iter, const ldb_slice_t *target);
+
+LDB_EXTERN void
+ldb_iter_next(ldb_iter_t *iter);
+
+LDB_EXTERN void
+ldb_iter_prev(ldb_iter_t *iter);
+
+LDB_EXTERN ldb_slice_t
+ldb_iter_key(const ldb_iter_t *iter);
+
+LDB_EXTERN ldb_slice_t
+ldb_iter_value(const ldb_iter_t *iter);
+
+LDB_EXTERN int
+ldb_iter_status(const ldb_iter_t *iter);
+
+#else /* !LDB_ITERATOR_C */
+
+#define ldb_iter_valid(x) (x)->table->valid((x)->ptr)
+#define ldb_iter_first(x) (x)->table->first((x)->ptr)
+#define ldb_iter_last(x) (x)->table->last((x)->ptr)
+#define ldb_iter_seek(x, y) (x)->table->seek((x)->ptr, y)
+#define ldb_iter_next(x) (x)->table->next((x)->ptr)
+#define ldb_iter_prev(x) (x)->table->prev((x)->ptr)
+#define ldb_iter_key(x) (x)->table->key((x)->ptr)
+#define ldb_iter_value(x) (x)->table->value((x)->ptr)
+#define ldb_iter_status(x) (x)->table->status((x)->ptr)
+
+#endif /* !LDB_ITERATOR_C */
 
 /*
  * Empty Iterator

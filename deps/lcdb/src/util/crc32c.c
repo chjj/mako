@@ -258,9 +258,14 @@ static const uint32_t crc32c_mask_delta = 0xa282ead8;
  * Helpers
  */
 
-#define CAST(x) ((uintptr_t)((const void *)(x)))
-#define UNCAST(x) ((const uint8_t *)((const void *)(x)))
-#define ROUND_UP(x) ((CAST(x) + 3) & ~((uintptr_t)3))
+/* Returns the smallest address >= the given address that is aligned to N bytes.
+ *
+ * N must be a power of two.
+ */
+static LDB_INLINE const void *
+round_up(const void *ptr) {
+  return (const void *)(((uintptr_t)(ptr) + (4 - 1)) & ~(uintptr_t)(4 - 1));
+}
 
 /*
  * CRC32C
@@ -308,11 +313,11 @@ ldb_crc32c_extend(uint32_t z, const uint8_t *xp, size_t xn) {
 
   /* Point x at first 4-byte aligned byte in the buffer.
      This might be past the end of the buffer. */
-  uintptr_t x = ROUND_UP(p);
+  const uint8_t *x = round_up(p);
 
-  if (x <= CAST(e)) {
+  if (x <= e) {
     /* Process bytes p is 4-byte aligned. */
-    while (p != UNCAST(x))
+    while (p != x)
       STEP1;
   }
 

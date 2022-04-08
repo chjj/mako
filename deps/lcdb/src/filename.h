@@ -35,52 +35,52 @@ typedef enum ldb_filetype {
  */
 
 /* Return the name of the log file with the specified number
-   in the db named by "prefix". The result will be prefixed with
-   "prefix". */
+   in the db named by "dbname". The result will be prefixed with
+   "dbname". */
 int
-ldb_log_filename(char *buf, size_t size, const char *prefix, uint64_t num);
+ldb_log_filename(char *buf, size_t size, const char *dbname, uint64_t num);
 
 /* Return the name of the sstable with the specified number
-   in the db named by "prefix". The result will be prefixed with
-   "prefix". */
+   in the db named by "dbname". The result will be prefixed with
+   "dbname". */
 int
-ldb_table_filename(char *buf, size_t size, const char *prefix, uint64_t num);
+ldb_table_filename(char *buf, size_t size, const char *dbname, uint64_t num);
 
 /* Return the legacy file name for an sstable with the specified number
-   in the db named by "prefix". The result will be prefixed with
-   "prefix". */
+   in the db named by "dbname". The result will be prefixed with
+   "dbname". */
 int
-ldb_sstable_filename(char *buf, size_t size, const char *prefix, uint64_t num);
+ldb_sstable_filename(char *buf, size_t size, const char *dbname, uint64_t num);
 
 /* Return the name of the descriptor file for the db named by
-   "prefix" and the specified incarnation number. The result will be
-   prefixed with "prefix". */
+   "dbname" and the specified incarnation number. The result will be
+   prefixed with "dbname". */
 int
-ldb_desc_filename(char *buf, size_t size, const char *prefix, uint64_t num);
+ldb_desc_filename(char *buf, size_t size, const char *dbname, uint64_t num);
 
 /* Return the name of the current file. This file contains the name
    of the current manifest file. The result will be prefixed with
-   "prefix". */
+   "dbname". */
 int
-ldb_current_filename(char *buf, size_t size, const char *prefix);
+ldb_current_filename(char *buf, size_t size, const char *dbname);
 
 /* Return the name of the lock file for the db named by
-   "prefix". The result will be prefixed with "prefix". */
+   "dbname". The result will be prefixed with "dbname". */
 int
-ldb_lock_filename(char *buf, size_t size, const char *prefix);
+ldb_lock_filename(char *buf, size_t size, const char *dbname);
 
-/* Return the name of a temporary file owned by the db named "prefix".
-   The result will be prefixed with "prefix". */
+/* Return the name of a temporary file owned by the db named "dbname".
+   The result will be prefixed with "dbname". */
 int
-ldb_temp_filename(char *buf, size_t size, const char *prefix, uint64_t num);
+ldb_temp_filename(char *buf, size_t size, const char *dbname, uint64_t num);
 
-/* Return the name of the info log file for "prefix". */
+/* Return the name of the info log file for "dbname". */
 int
-ldb_info_filename(char *buf, size_t size, const char *prefix);
+ldb_info_filename(char *buf, size_t size, const char *dbname);
 
-/* Return the name of the old info log file for "prefix". */
+/* Return the name of the old info log file for "dbname". */
 int
-ldb_oldinfo_filename(char *buf, size_t size, const char *prefix);
+ldb_oldinfo_filename(char *buf, size_t size, const char *dbname);
 
 /* If filename is a leveldb file, store the type of the file in *type.
    The number encoded in the filename is stored in *num. If the
@@ -91,6 +91,6 @@ ldb_parse_filename(ldb_filetype_t *type, uint64_t *num, const char *name);
 /* Make the CURRENT file point to the descriptor file with the
    specified number. */
 int
-ldb_set_current_file(const char *prefix, uint64_t desc_number);
+ldb_set_current_file(const char *dbname, uint64_t desc_number);
 
 #endif /* LDB_FILENAME_H */

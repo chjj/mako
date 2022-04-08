@@ -77,11 +77,14 @@ ldb_slice_hash(const ldb_slice_t *x);
 int
 ldb_slice_equal(const ldb_slice_t *x, const ldb_slice_t *y);
 
-LDB_EXTERN int
-ldb_slice_compare(const ldb_slice_t *x, const ldb_slice_t *y);
+/* remove_prefix */
+LDB_STATIC void
+ldb_slice_eat(ldb_slice_t *z, size_t xn) {
+  assert(z->size >= xn);
 
-void
-ldb_slice_eat(ldb_slice_t *z, size_t xn);
+  z->data += xn;
+  z->size -= xn;
+}
 
 size_t
 ldb_slice_size(const ldb_slice_t *x);
@@ -106,9 +109,9 @@ ldb_slice_import(ldb_slice_t *z, const ldb_slice_t *x);
 /* See GetLengthPrefixedSlice in memtable.cc. */
 LDB_UNUSED static ldb_slice_t
 ldb_slice_decode(const uint8_t *xp) {
-  uint32_t zn = 0;
-  size_t xn = 5;
   ldb_slice_t z;
+  size_t xn = 5;
+  uint32_t zn;
 
 #ifndef NDEBUG
   if (!ldb_varint32_read(&zn, &xp, &xn))
@@ -121,5 +124,8 @@ ldb_slice_decode(const uint8_t *xp) {
 
   return z;
 }
+
+LDB_EXTERN int
+ldb_equal(const ldb_slice_t *x, const ldb_slice_t *y);
 
 #endif /* LDB_SLICE_H */

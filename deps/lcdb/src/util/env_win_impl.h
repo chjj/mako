@@ -23,6 +23,10 @@
 #include "status.h"
 #include "strutil.h"
 
+#ifdef __GNUC__
+#  pragma GCC diagnostic ignored "-Wcast-function-type"
+#endif
+
 /*
  * Constants
  */
@@ -278,6 +282,38 @@ LDBGetTempPathW(ldb_wide_t *result) {
   }
 
   return 1;
+}
+
+static BOOL
+LDBCreateHardLinkW(LPCWSTR to, LPCWSTR from, LPSECURITY_ATTRIBUTES attr) {
+  typedef BOOL (WINAPI *P)(LPCWSTR, LPCWSTR, LPSECURITY_ATTRIBUTES);
+  static volatile long state = 0;
+  static P HardLinkW = NULL;
+  long value;
+
+  while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
+    Sleep(0);
+
+  if (value == 0) {
+    HMODULE h = GetModuleHandleA("kernel32.dll");
+
+    if (h == NULL)
+      abort(); /* LCOV_EXCL_LINE */
+
+    HardLinkW = (P)GetProcAddress(h, "CreateHardLinkW");
+
+    if (InterlockedExchange(&state, 2) != 1)
+      abort(); /* LCOV_EXCL_LINE */
+  } else {
+    assert(value == 2);
+  }
+
+  if (HardLinkW == NULL) {
+    SetLastError(ERROR_CALL_NOT_IMPLEMENTED);
+    return FALSE;
+  }
+
+  return HardLinkW(to, from, attr);
 }
 
 /*
@@ -834,6 +870,75 @@ ldb_rename_file(const char *from, const char *to) {
     if (!MoveFileA(from, to))
       return LDB_WIN32_ERROR(GetLastError());
   }
+
+  return LDB_OK;
+}
+
+int
+ldb_copy_file(const char *from, const char *to) {
+  if (LDBIsWindowsNT()) {
+    ldb_wide_t src, dst;
+    int rc = LDB_OK;
+
+    if (!ldb_wide_import(&src, from))
+      return LDB_INVALID;
+
+    if (!ldb_wide_import(&dst, to)) {
+      ldb_wide_clear(&src);
+      return LDB_INVALID;
+    }
+
+    if (!CopyFileW(src.data, dst.data, TRUE))
+      rc = LDB_WIN32_ERROR(GetLastError());
+
+    ldb_wide_clear(&src);
+    ldb_wide_clear(&dst);
+
+    return rc;
+  }
+
+  if (!CopyFileA(from, to, TRUE))
+    return LDB_WIN32_ERROR(GetLastError());
+
+  return LDB_OK;
+}
+
+int
+ldb_link_file(const char *from, const char *to) {
+  if (LDBIsWindowsNT()) {
+    ldb_wide_t src, dst;
+    int rc = LDB_OK;
+
+    if (!ldb_wide_import(&src, from))
+      return LDB_INVALID;
+
+    if (!ldb_wide_import(&dst, to)) {
+      ldb_wide_clear(&src);
+      return LDB_INVALID;
+    }
+
+    /* Windows 2000 and above (NTFS only). */
+    if (!LDBCreateHardLinkW(dst.data, src.data, NULL)) {
+      int code = GetLastError();
+
+      if (code == ERROR_INVALID_FUNCTION /* Not NTFS. */
+          || code == ERROR_NOT_SAME_DEVICE
+          || code == ERROR_CALL_NOT_IMPLEMENTED) {
+        if (!CopyFileW(src.data, dst.data, TRUE))
+          rc = LDB_WIN32_ERROR(GetLastError());
+      } else {
+        rc = LDB_WIN32_ERROR(code);
+      }
+    }
+
+    ldb_wide_clear(&src);
+    ldb_wide_clear(&dst);
+
+    return rc;
+  }
+
+  if (!CopyFileA(from, to, TRUE))
+    return LDB_WIN32_ERROR(GetLastError());
 
   return LDB_OK;
 }

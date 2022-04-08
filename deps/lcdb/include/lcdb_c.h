@@ -21,6 +21,42 @@ extern "C" {
 #include <stddef.h>
 
 /*
+ * Compat
+ */
+
+#ifndef LCDB_H
+#if defined(UINT64_MAX)
+typedef uint64_t ldb_uint64_t;
+#elif defined(_WIN32) && !defined(__GNUC__)
+typedef unsigned __int64 ldb_uint64_t;
+#elif ULONG_MAX >> 31 >> 31 >> 1 == 1
+typedef unsigned long ldb_uint64_t;
+#else
+#  ifdef __GNUC__
+__extension__
+#  endif
+typedef unsigned long long ldb_uint64_t;
+#endif
+#endif
+
+/*
+ * Macros
+ */
+
+#ifndef LDB_EXTERN
+#  define LDB_EXTERN
+#endif
+
+/*
+ * Constants
+ */
+
+enum {
+  leveldb_no_compression = 0,
+  leveldb_snappy_compression = 1
+};
+
+/*
  * Types
  */
 
@@ -36,32 +72,6 @@ typedef struct ldb_logger_s leveldb_logger_t;
 typedef struct leveldb_comparator_s leveldb_comparator_t;
 typedef struct leveldb_filterpolicy_s leveldb_filterpolicy_t;
 typedef struct leveldb_env_s leveldb_env_t;
-
-#if defined(UINT64_MAX)
-typedef uint64_t ldb_uint64_t;
-#elif defined(_WIN32) && !defined(__GNUC__)
-typedef unsigned __int64 ldb_uint64_t;
-#elif ULONG_MAX >> 31 >> 31 >> 1 == 1
-typedef unsigned long ldb_uint64_t;
-#else
-#  ifdef __GNUC__
-__extension__
-#  endif
-typedef unsigned long long ldb_uint64_t;
-#endif
-
-#ifndef LDB_EXTERN
-#  define LDB_EXTERN
-#endif
-
-/*
- * Constants
- */
-
-enum {
-  leveldb_no_compression = 0,
-  leveldb_snappy_compression = 1
-};
 
 /*
  * Symbol Aliases
@@ -102,16 +112,19 @@ enum {
 #define leveldb_options_destroy ldb_c_options_destroy
 #define leveldb_options_set_comparator ldb_c_options_set_comparator
 #define leveldb_options_set_filter_policy ldb_c_options_set_filter_policy
-#define leveldb_options_set_create_if_missing ldb_c_options_set_create_if_missing
+#define leveldb_options_set_create_if_missing \
+        ldb_c_options_set_create_if_missing
 #define leveldb_options_set_error_if_exists ldb_c_options_set_error_if_exists
 #define leveldb_options_set_paranoid_checks ldb_c_options_set_paranoid_checks
 #define leveldb_options_set_env ldb_c_options_set_env
 #define leveldb_options_set_info_log ldb_c_options_set_info_log
-#define leveldb_options_set_write_buffer_size ldb_c_options_set_write_buffer_size
+#define leveldb_options_set_write_buffer_size \
+        ldb_c_options_set_write_buffer_size
 #define leveldb_options_set_max_open_files ldb_c_options_set_max_open_files
 #define leveldb_options_set_cache ldb_c_options_set_cache
 #define leveldb_options_set_block_size ldb_c_options_set_block_size
-#define leveldb_options_set_block_restart_interval ldb_c_options_set_block_restart_interval
+#define leveldb_options_set_block_restart_interval \
+        ldb_c_options_set_block_restart_interval
 #define leveldb_options_set_max_file_size ldb_c_options_set_max_file_size
 #define leveldb_options_set_compression ldb_c_options_set_compression
 #define leveldb_comparator_create ldb_c_comparator_create
@@ -121,7 +134,8 @@ enum {
 #define leveldb_filterpolicy_create_bloom ldb_c_filterpolicy_create_bloom
 #define leveldb_readoptions_create ldb_c_readoptions_create
 #define leveldb_readoptions_destroy ldb_c_readoptions_destroy
-#define leveldb_readoptions_set_verify_checksums ldb_c_readoptions_set_verify_checksums
+#define leveldb_readoptions_set_verify_checksums \
+        ldb_c_readoptions_set_verify_checksums
 #define leveldb_readoptions_set_fill_cache ldb_c_readoptions_set_fill_cache
 #define leveldb_readoptions_set_snapshot ldb_c_readoptions_set_snapshot
 #define leveldb_writeoptions_create ldb_c_writeoptions_create

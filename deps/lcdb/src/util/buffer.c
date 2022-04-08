@@ -12,7 +12,6 @@
 #include "coding.h"
 #include "hash.h"
 #include "internal.h"
-#include "memcmp.h"
 #include "strutil.h"
 
 /*
@@ -138,11 +137,6 @@ ldb_buffer_equal(const ldb_buffer_t *x, const ldb_buffer_t *y) {
     return 1;
 
   return memcmp(x->data, y->data, y->size) == 0;
-}
-
-int
-ldb_buffer_compare(const ldb_buffer_t *x, const ldb_buffer_t *y) {
-  return ldb_memcmp4(x->data, x->size, y->data, y->size);
 }
 
 void

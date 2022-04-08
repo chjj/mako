@@ -1867,6 +1867,108 @@ ldb_make_room_for_write(ldb_t *db, int force) {
   return rc;
 }
 
+static int
+ldb_backup_inner(const char *dbname, const char *bakname, rb_set64_t *live) {
+  ldb_filelock_t *lock = NULL;
+  char lockname[LDB_PATH_MAX];
+  char **filenames = NULL;
+  char src[LDB_PATH_MAX];
+  char dst[LDB_PATH_MAX];
+  ldb_filetype_t type;
+  uint64_t number;
+  int rc = LDB_OK;
+  int len = -1;
+  int i;
+
+  if (!ldb_lock_filename(lockname, sizeof(lockname), bakname))
+    return LDB_INVALID;
+
+  rc = ldb_create_dir(bakname);
+
+  if (rc != LDB_OK)
+    return rc;
+
+  rc = ldb_lock_file(lockname, &lock);
+
+  if (rc == LDB_OK) {
+    len = ldb_get_children(dbname, &filenames);
+
+    if (len < 0)
+      rc = LDB_IOERR;
+  }
+
+  for (i = 0; i < len && rc == LDB_OK; i++) {
+    const char *filename = filenames[i];
+
+    if (!ldb_parse_filename(&type, &number, filename))
+      continue;
+
+    if (!ldb_join(src, sizeof(src), dbname, filename)) {
+      rc = LDB_INVALID;
+      break;
+    }
+
+    if (!ldb_join(dst, sizeof(dst), bakname, filename)) {
+      rc = LDB_INVALID;
+      break;
+    }
+
+    switch (type) {
+      case LDB_FILE_LOG:
+      case LDB_FILE_DESC:
+      case LDB_FILE_CURRENT:
+        rc = ldb_copy_file(src, dst);
+        break;
+      case LDB_FILE_TABLE:
+        if (live == NULL || rb_set64_has(live, number))
+          rc = ldb_link_file(src, dst);
+        break;
+      case LDB_FILE_TEMP:
+      case LDB_FILE_LOCK:
+        break;
+      case LDB_FILE_INFO:
+        if (live == NULL)
+          rc = ldb_copy_file(src, dst);
+        break;
+    }
+  }
+
+  if (len >= 0)
+    ldb_free_children(filenames, len);
+
+  if (rc != LDB_OK) {
+    len = ldb_get_children(bakname, &filenames);
+
+    for (i = 0; i < len; i++) {
+      const char *filename = filenames[i];
+
+      if (!ldb_parse_filename(&type, &number, filename))
+        continue;
+
+      if (type == LDB_FILE_LOCK)
+        continue; /* Lock file will be deleted at end. */
+
+      if (!ldb_join(dst, sizeof(dst), bakname, filename))
+        continue;
+
+      ldb_remove_file(dst);
+    }
+
+    if (len >= 0)
+      ldb_free_children(filenames, len);
+  }
+
+  if (lock != NULL) {
+    ldb_unlock_file(lock);
+    ldb_remove_file(lockname);
+  }
+
+  if (rc != LDB_OK)
+    ldb_remove_dir(bakname);
+
+  return rc;
+}
+
 /*
  * API
  */
@@ -2386,9 +2488,70 @@ ldb_compact(ldb_t *db, const ldb_slice_t *begin, const ldb_slice_t *end) {
     ldb_test_compact_range(db, level, begin, end);
 }
 
+int
+ldb_backup(ldb_t *db, const char *name) {
+  rb_set64_t live;
+  int rc;
+
+  ldb_mutex_lock(&db->mutex);
+
+  while (db->background_compaction_scheduled)
+    ldb_cond_wait(&db->background_work_finished_signal, &db->mutex);
+
+  rc = db->bg_error;
+
+  if (rc == LDB_OK) {
+    rb_set64_init(&live);
+
+    ldb_vset_add_live_files(db->versions, &live);
+
+    rc = ldb_backup_inner(db->dbname, name, &live);
+
+    rb_set64_clear(&live);
+  } else {
+    db->bg_error = LDB_OK;
+  }
+
+  ldb_mutex_unlock(&db->mutex);
+
+  return rc;
+}
+
+#undef ldb_compare
+
+int
+ldb_compare(const ldb_t *db, const ldb_slice_t *x, const ldb_slice_t *y) {
+  const ldb_comparator_t *cmp = ldb_user_comparator(db);
+  return cmp->compare(cmp, x, y);
+}
+
+#define ldb_compare ldb_compare_internal
+
 /*
  * Static
  */
+
+int
+ldb_copy(const char *from, const char *to, const ldb_dbopt_t *options) {
+  char lockname[LDB_PATH_MAX];
+  ldb_filelock_t *lock;
+  int rc;
+
+  (void)options;
+
+  if (!ldb_lock_filename(lockname, sizeof(lockname), from))
+    return LDB_INVALID;
+
+  rc = ldb_lock_file(lockname, &lock);
+
+  if (rc == LDB_OK) {
+    rc = ldb_backup_inner(from, to, NULL);
+
+    ldb_unlock_file(lock);
+  }
+
+  return rc;
+}
 
 int
 ldb_destroy(const char *dbname, const ldb_dbopt_t *options) {
