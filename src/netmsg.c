@@ -180,7 +180,7 @@ btc_version_read(btc_version_t *z, const uint8_t **xp, size_t *xn) {
   }
 
   if (*xn > 0) {
-    if (!btc_string_read(z->agent, xp, xn, sizeof(z->agent)))
+    if (!btc_string_read(z->agent, sizeof(z->agent), xp, xn))
       return 0;
   } else {
     memset(z->agent, 0, sizeof(z->agent));
@@ -713,13 +713,13 @@ btc_reject_write(uint8_t *zp, const btc_reject_t *x) {
 
 int
 btc_reject_read(btc_reject_t *z, const uint8_t **xp, size_t *xn) {
-  if (!btc_string_read(z->message, xp, xn, sizeof(z->message)))
+  if (!btc_string_read(z->message, sizeof(z->message), xp, xn))
     return 0;
 
   if (!btc_uint8_read(&z->code, xp, xn))
     return 0;
 
-  if (!btc_string_read(z->reason, xp, xn, sizeof(z->reason)))
+  if (!btc_string_read(z->reason, sizeof(z->reason), xp, xn))
     return 0;
 
   if (strcmp(z->message, "block") == 0 || strcmp(z->message, "tx") == 0) {

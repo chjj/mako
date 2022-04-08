@@ -666,7 +666,7 @@ btc_peer_send(btc_peer_t *peer, const btc_msg_t *msg) {
   zp = btc_uint32_write(zp, peer->network->magic);
 
   /* Command. */
-  zp = btc_nullstr_write(zp, 12, msg->cmd);
+  zp = btc_nullstr_write(zp, msg->cmd, 12);
 
   /* Payload length. */
   zp = btc_uint32_write(zp, bodylen);

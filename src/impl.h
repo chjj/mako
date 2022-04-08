@@ -941,32 +941,32 @@ btc_string_write(uint8_t *zp, const char *xp) {
 }
 
 BTC_UNUSED static int
-btc_string_read(char *zp, const uint8_t **xp, size_t *xn, size_t max) {
-  size_t i, zn;
+btc_string_read(char *zp, size_t zn, const uint8_t **xp, size_t *xn) {
+  size_t i, len;
 
-  if (!btc_size_read(&zn, xp, xn))
+  if (!btc_size_read(&len, xp, xn))
     return 0;
 
-  if (zn + 1 > max)
+  if (len + 1 > zn)
     return 0;
 
-  if (*xn < zn)
+  if (*xn < len)
     return 0;
 
-  for (i = 0; i < zn; i++) {
+  for (i = 0; i < len; i++) {
     int ch = (*xp)[i];
 
     if (ch < 32 || ch > 126)
       return 0;
   }
 
-  if (zn > 0)
-    memcpy(zp, *xp, zn);
+  if (len > 0)
+    memcpy(zp, *xp, len);
 
-  zp[zn] = '\0';
+  zp[len] = '\0';
 
-  *xp += zn;
-  *xn -= zn;
+  *xp += len;
+  *xn -= len;
 
   return 1;
 }
@@ -980,17 +980,17 @@ btc_string_update(btc_hash256_t *ctx, const char *xp) {
 }
 
 BTC_UNUSED static uint8_t *
-btc_nullstr_write(uint8_t *zp, size_t zn, const char *xp) {
-  size_t xn = strlen(xp);
+btc_nullstr_write(uint8_t *zp, const char *xp, size_t xn) {
+  size_t len = strlen(xp);
 
-  CHECK(xn + 1 <= zn);
+  CHECK(len + 1 <= xn);
 
-  memcpy(zp, xp, xn);
+  memcpy(zp, xp, len);
 
-  while (xn < zn)
-    zp[xn++] = 0;
+  while (len < xn)
+    zp[len++] = 0;
 
-  return zp + zn;
+  return zp + xn;
 }
 
 BTC_UNUSED static int
