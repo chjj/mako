@@ -166,7 +166,6 @@ btc_txdb_insert(btc_txdb_t *txdb,
 
     db_update_balance(db, &b, account, delta);
 
-    db_put_atx(&b, account, tx->hash, id);
     db_put_atxid(&b, account, id, tx->hash);
     db_put_aheight(&b, account, height, id, tx->hash);
   }
@@ -560,7 +559,6 @@ btc_txdb_erase(btc_txdb_t *txdb, const btc_tx_t *tx) {
 
     db_update_balance(db, &b, account, delta);
 
-    db_del_atx(&b, account, tx->hash);
     db_del_atxid(&b, account, meta.id);
     db_del_aheight(&b, account, meta.height, meta.id);
   }

@@ -55,14 +55,13 @@
  *   q[height] -> block meta
  *   q[height][idx] -> txid
  *
- *   m[id] -> txid (use .tx from balance for id)
+ *   m[id] -> txid
  *   h[height][id] -> txid (tx by height)
  *
  *   R[acct][addr] -> dummy (path by account)
  *   C[acct][hash][index] -> dummy (coin by account)
- *   T[acct][hash] -> id within account (tx by account) - maybe dont need anymore
  *
- *   M[acct][id] -> txid (use .tx from balance for id)
+ *   M[acct][id] -> txid
  *   H[acct][height][id] -> txid (tx by account/height)
  */
 
@@ -462,21 +461,6 @@ key_acoin(uint32_t account, const uint8_t *hash, uint32_t index, uint8_t *buf) {
   memcpy(buf + 5, hash, 32);
   btc_write32be(buf + 37, index);
   return ldb_slice(buf, KEY_ACOIN_LEN);
-}
-
-/*
- * Account Transaction Key (T[acct][hash])
- */
-
-#define KEY_ATX_CH 'T'
-#define KEY_ATX_LEN 37
-
-static ldb_slice_t
-key_atx(uint32_t account, const uint8_t *hash, uint8_t *buf) {
-  buf[0] = KEY_ATX_CH;
-  btc_write32be(buf + 1, account);
-  memcpy(buf + 5, hash, 32);
-  return ldb_slice(buf, KEY_ATX_LEN);
 }
 
 /*
@@ -1022,35 +1006,6 @@ db_del_acoin(ldb_batch_t *batch,
 }
 
 BTC_UNUSED static void
-db_put_atx(ldb_batch_t *batch,
-           uint32_t account,
-           const uint8_t *hash,
-           uint64_t id) {
-  uint8_t buf[KEY_ATX_LEN];
-  ldb_slice_t key, val;
-  uint8_t zp[8];
-
-  key = key_atx(account, hash, buf);
-
-  btc_uint64_write(zp, id);
-
-  val.data = zp;
-  val.size = sizeof(zp);
-
-  ldb_batch_put(batch, &key, &val);
-}
-
-BTC_UNUSED static void
-db_del_atx(ldb_batch_t *batch, uint32_t account, const uint8_t *hash) {
-  uint8_t buf[KEY_ATX_LEN];
-  ldb_slice_t key;
-
-  key = key_atx(account, hash, buf);
-
-  ldb_batch_del(batch, &key);
-}
-
-BTC_UNUSED static void
 db_put_atxid(ldb_batch_t *batch,
              uint32_t account,
              uint64_t id,
@@ -1529,23 +1484,6 @@ db_get_txid(ldb_t *db, uint64_t id, uint8_t *hash) {
     return 0;
 
   memcpy(hash, val.data, 32);
-
-  ldb_free(val.data);
-
-  return 1;
-}
-
-BTC_UNUSED static int
-db_get_atx(ldb_t *db, uint32_t account, const uint8_t *hash, uint64_t *id) {
-  uint8_t buf[KEY_ATX_LEN];
-  ldb_slice_t key, val;
-
-  key = key_atx(account, hash, buf);
-
-  if (!db_get_size(db, &key, &val, 8))
-    return 0;
-
-  *id = btc_read64le(val.data);
 
   ldb_free(val.data);
 
