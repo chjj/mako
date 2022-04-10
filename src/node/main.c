@@ -161,7 +161,7 @@ btc_main(const btc_conf_t *conf) {
   }
 
   {
-    int needed = conf->max_inbound + conf->max_outbound + 1000 + 200;
+    int needed = conf->max_inbound + conf->max_outbound + 1000 + 125 + 200;
 
     if (needed < 8192)
       needed = 8192;

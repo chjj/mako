@@ -151,14 +151,14 @@ btc_wallet_load_database(btc_wallet_t *wallet, const char *path) {
   ldb_dbopt_t options = *ldb_dbopt_default;
   int rc;
 
-  wallet->cache = ldb_lru_create(32 << 20);
+  wallet->cache = ldb_lru_create(8 << 20);
 
   options.create_if_missing = 1;
   options.block_cache = wallet->cache;
-  options.write_buffer_size = 16 << 20;
+  options.write_buffer_size = 4 << 20;
   options.compression = LDB_NO_COMPRESSION;
   options.filter_policy = ldb_bloom_default;
-  options.max_open_files = 64;
+  options.max_open_files = 125;
   options.use_mmap = 0;
 
   rc = ldb_open(path, &options, &wallet->db);
