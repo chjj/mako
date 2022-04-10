@@ -846,8 +846,7 @@ btc_wallet_create_watcher(btc_wallet_t *wallet,
 }
 
 int
-btc_wallet_fund(btc_view_t **view,
-                btc_wallet_t *wallet,
+btc_wallet_fund(btc_wallet_t *wallet,
                 uint32_t account,
                 const btc_selopt_t *options,
                 btc_tx_t *tx) {
@@ -856,64 +855,49 @@ btc_wallet_fund(btc_view_t **view,
   btc_selector_t sel;
   btc_address_t addr;
   btc_selopt_t opt;
-
-  if (options == NULL) {
-    btc_selopt_init(&opt);
-    options = &opt;
-  }
+  int ret = 0;
 
   if (tx->outputs.length == 0)
     return 0;
 
-  btc_selector_init(&sel, options, tx);
+  if (options == NULL)
+    btc_selopt_init(&opt);
+  else
+    opt = *options;
+
+  opt.height = height;
+
+  if (account != BTC_NO_ACCOUNT)
+    opt.watch = 1;
+
+  btc_selector_init(&sel, &opt, tx);
 
   it = btc_wallet_coins(wallet);
 
   if (account != BTC_NO_ACCOUNT)
     btc_coiniter_account(it, account);
 
-  *view = btc_view_create();
-
   btc_coiniter_each(it) {
     btc_outpoint_t *prevout = btc_coiniter_key(it);
     btc_coin_t *coin = btc_coiniter_value(it);
 
-    if (coin->spent)
-      continue;
-
-    if (options->smart && !coin->safe)
-      continue;
-
-    if (account == BTC_NO_ACCOUNT && coin->watch)
-      continue;
-
-    btc_view_put(*view, prevout, btc_coin_ref(coin));
     btc_selector_push(&sel, prevout, coin);
   }
-
-  btc_coiniter_destroy(it);
 
   if (account == BTC_NO_ACCOUNT)
     account = 0;
 
-  CHECK(btc_wallet_change(&addr, wallet, account));
+  if (!btc_wallet_change(&addr, wallet, account))
+    goto fail;
 
-  if (!btc_selector_fill(&sel, &addr)) {
-    btc_view_destroy(*view);
-    btc_selector_clear(&sel);
-    return 0;
-  }
+  if (!btc_selector_fill(&sel, &addr))
+    goto fail;
 
+  ret = 1;
+fail:
+  btc_coiniter_destroy(it);
   btc_selector_clear(&sel);
-
-  /* Consensus sanity checks. */
-  if (!btc_tx_check_sanity(0, tx) ||
-      !btc_tx_check_inputs(0, tx, *view, height)) {
-    btc_view_destroy(*view);
-    return 0;
-  }
-
-  return 1;
+  return ret;
 }
 
 static int
@@ -939,6 +923,7 @@ btc_wallet_send(btc_wallet_t *wallet,
                 btc_tx_t *tx) {
   const btc_wclient_t *client = &wallet->client;
   unsigned int flags = BTC_SCRIPT_STANDARD_VERIFY_FLAGS;
+  int32_t height = wallet->state.height + 1;
   btc_view_t *view;
   size_t i, total;
 
@@ -949,10 +934,19 @@ btc_wallet_send(btc_wallet_t *wallet,
       return 0;
   }
 
-  if (!btc_wallet_fund(&view, wallet, account, options, tx))
+  if (!btc_wallet_fund(wallet, account, options, tx))
     return 0;
 
+  view = btc_wallet_view(wallet, tx);
+
   btc_tx_sort(tx);
+
+  /* Consensus sanity checks. */
+  if (!btc_tx_check_sanity(0, tx) ||
+      !btc_tx_check_inputs(0, tx, view, height)) {
+    btc_view_destroy(view);
+    return 0;
+  }
 
   total = btc_wallet_sign(wallet, tx, view);
 
@@ -1235,18 +1229,16 @@ btc_wallet_tx(btc_tx_t **tx, btc_wallet_t *wallet, const uint8_t *hash) {
   return db_get_tx(wallet->db, hash, tx);
 }
 
-int
-btc_wallet_fill(btc_wallet_t *wallet,
-                btc_view_t *view,
-                const btc_tx_t *tx) {
-  return btc_txdb_fill(wallet, view, tx);
+btc_view_t *
+btc_wallet_view(btc_wallet_t *wallet, const btc_tx_t *tx) {
+  btc_view_t *view = btc_view_create();
+  btc_txdb_fill(wallet, view, tx);
+  return view;
 }
 
 int
-btc_wallet_view(btc_view_t **view,
-                btc_wallet_t *wallet,
-                const btc_tx_t *tx) {
-  return btc_txdb_view(view, wallet, tx);
+btc_wallet_undo(btc_view_t **view, btc_wallet_t *wallet, const btc_tx_t *tx) {
+  return btc_txdb_undo(view, wallet, tx);
 }
 
 btc_acctiter_t *

@@ -28,7 +28,6 @@
 
 typedef struct btc_utxo_s {
   btc_outpoint_t prevout;
-  int coinbase;
   int32_t height;
   int64_t value;
   size_t size;
@@ -228,6 +227,7 @@ btc_selopt_init(btc_selopt_t *opt) {
   opt->subpos = -1;
   opt->round = 0;
   opt->smart = 0;
+  opt->watch = 0;
 }
 
 /*
@@ -245,6 +245,9 @@ btc_selector_init(btc_selector_t *sel, const btc_selopt_t *opt, btc_tx_t *tx) {
   sel->inpval = 0;
   sel->outval = btc_tx_output_value(tx);
   sel->size = 12 + btc_outvec_size(&tx->outputs) + 34;
+  sel->resolved = 0;
+  sel->next = NULL;
+  sel->state = NULL;
 
   btc_outset_init(&sel->inputs);
   btc_vector_init(&sel->utxos);
@@ -268,7 +271,43 @@ btc_selector_clear(btc_selector_t *sel) {
   btc_vector_clear(&sel->utxos);
 }
 
-void
+static int
+btc_selector_spendable(const btc_selector_t *sel, const btc_coin_t *coin) {
+  const btc_selopt_t *opt = sel->opt;
+
+  if (coin->spent)
+    return 0;
+
+  if (opt->smart && coin->height == -1) {
+    if (!coin->safe)
+      return 0;
+  }
+
+  if (!opt->watch && coin->watch)
+    return 0;
+
+  if (opt->height >= 0 && coin->coinbase) {
+    if (coin->height == -1)
+      return 0; /* LCOV_EXCL_LINE */
+
+    if (opt->height + 1 < coin->height + BTC_COINBASE_MATURITY)
+      return 0;
+  }
+
+  if (opt->depth >= 0 && opt->height >= 0) {
+    int32_t depth = 0;
+
+    if (coin->height >= 0 && opt->height >= coin->height)
+      depth = opt->height - coin->height + 1;
+
+    if (depth < opt->depth)
+      return 0;
+  }
+
+  return 1;
+}
+
+int
 btc_selector_push(btc_selector_t *sel,
                   const btc_outpoint_t *prevout,
                   const btc_coin_t *coin) {
@@ -277,15 +316,16 @@ btc_selector_push(btc_selector_t *sel,
   if (btc_outset_has(&sel->inputs, prevout)) {
     sel->inpval += coin->output.value;
     sel->size += btc_estimate_input_size(&coin->output.script);
-    btc_outset_del(&sel->inputs, prevout);
-    return;
+    sel->resolved++;
+    return 1;
   }
+
+  if (!btc_selector_spendable(sel, coin))
+    return 0;
 
   utxo = btc_malloc(sizeof(btc_utxo_t));
 
-  btc_outpoint_copy(&utxo->prevout, prevout);
-
-  utxo->coinbase = coin->coinbase;
+  utxo->prevout = *prevout;
   utxo->height = coin->height;
   utxo->value = coin->output.value;
   utxo->size = btc_estimate_input_size(&coin->output.script);
@@ -326,6 +366,8 @@ btc_selector_push(btc_selector_t *sel,
       break;
     }
   }
+
+  return 1;
 }
 
 static btc_utxo_t *
@@ -369,31 +411,6 @@ btc_selector_fee(const btc_selector_t *sel, int64_t rate) {
 }
 
 static int
-btc_selector_spendable(const btc_selector_t *sel, const btc_utxo_t *utxo) {
-  const btc_selopt_t *opt = sel->opt;
-
-  if (opt->height >= 0 && utxo->coinbase) {
-    if (utxo->height == -1)
-      return 0; /* LCOV_EXCL_LINE */
-
-    if (opt->height + 1 < utxo->height + BTC_COINBASE_MATURITY)
-      return 0;
-  }
-
-  if (opt->depth >= 0 && opt->height >= 0) {
-    int32_t depth = 0;
-
-    if (utxo->height >= 0 && opt->height >= utxo->height)
-      depth = opt->height - utxo->height + 1;
-
-    if (depth < opt->depth)
-      return 0;
-  }
-
-  return 1;
-}
-
-static int
 btc_selector_should_fund(const btc_selector_t *sel, int64_t fee) {
   if (sel->utxos.length == 0)
     return 0;
@@ -408,18 +425,39 @@ btc_selector_should_fund(const btc_selector_t *sel, int64_t fee) {
 }
 
 static void
+btc_selector_next(btc_selector_t *sel) {
+  btc_outpoint_t prevout;
+  btc_coin_t *coin;
+  int ok = 0;
+
+  if (sel->next == NULL || sel->utxos.length > 0)
+    return;
+
+  while (ok == 0 && sel->next(sel, &prevout, &coin)) {
+    ok = !btc_outset_has(&sel->inputs, &prevout);
+
+    if (ok)
+      ok = btc_selector_push(sel, &prevout, coin);
+
+    btc_coin_destroy(coin);
+  }
+}
+
+static void
 btc_selector_fund(btc_selector_t *sel, int64_t fee) {
+  btc_selector_next(sel);
+
   while (btc_selector_should_fund(sel, fee)) {
     btc_utxo_t *utxo = btc_selector_shift(sel);
 
-    if (btc_selector_spendable(sel, utxo)) {
-      btc_tx_add_outpoint(sel->tx, &utxo->prevout);
+    btc_tx_add_outpoint(sel->tx, &utxo->prevout);
 
-      sel->inpval += utxo->value;
-      sel->size += utxo->size;
-    }
+    sel->inpval += utxo->value;
+    sel->size += utxo->size;
 
     btc_free(utxo);
+
+    btc_selector_next(sel);
   }
 }
 
@@ -431,6 +469,8 @@ btc_selector_by_rate(btc_selector_t *sel, int64_t rate) {
   if (sel->strategy == BTC_SELECT_ALL) {
     btc_selector_fund(sel, 0);
   } else {
+    btc_selector_next(sel);
+
     while (sel->utxos.length > 0) {
       fee = btc_selector_fee(sel, rate);
 
@@ -471,7 +511,7 @@ btc_selector_fill(btc_selector_t *sel, const btc_address_t *addr) {
   int64_t fee = 0;
 
   /* Ensure there are no unresolved inputs. */
-  if (sel->inputs.size != 0)
+  if (sel->resolved != sel->inputs.size)
     return 0;
 
   /* Select necessary coins. */

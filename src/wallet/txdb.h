@@ -32,6 +32,6 @@ int
 btc_txdb_fill(btc_txdb_t *txdb, btc_view_t *view, const btc_tx_t *tx);
 
 int
-btc_txdb_view(btc_view_t **result, btc_txdb_t *txdb, const btc_tx_t *tx);
+btc_txdb_undo(btc_view_t **result, btc_txdb_t *txdb, const btc_tx_t *tx);
 
 #endif /* BTC_WALLET_TXDB_H_ */

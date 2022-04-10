@@ -137,8 +137,7 @@ btc_wallet_create_watcher(btc_wallet_t *wallet,
                           const btc_hdnode_t *node);
 
 int
-btc_wallet_fund(btc_view_t **view,
-                btc_wallet_t *wallet,
+btc_wallet_fund(btc_wallet_t *wallet,
                 uint32_t account,
                 const btc_selopt_t *options,
                 btc_tx_t *tx);
@@ -181,15 +180,11 @@ btc_wallet_meta(btc_txmeta_t *meta, btc_wallet_t *wallet, const uint8_t *hash);
 int
 btc_wallet_tx(btc_tx_t **tx, btc_wallet_t *wallet, const uint8_t *hash);
 
-int
-btc_wallet_fill(btc_wallet_t *wallet,
-                btc_view_t *view,
-                const btc_tx_t *tx);
+btc_view_t *
+btc_wallet_view(btc_wallet_t *wallet, const btc_tx_t *tx);
 
 int
-btc_wallet_view(btc_view_t **view,
-                btc_wallet_t *wallet,
-                const btc_tx_t *tx);
+btc_wallet_undo(btc_view_t **view, btc_wallet_t *wallet, const btc_tx_t *tx);
 
 btc_acctiter_t *
 btc_wallet_accounts(btc_wallet_t *wallet);

@@ -39,6 +39,7 @@ typedef struct btc_selopt_s {
   int subpos;
   int round;
   int smart;
+  int watch;
 } btc_selopt_t;
 
 typedef struct btc_selector_s {
@@ -49,6 +50,10 @@ typedef struct btc_selector_s {
   int64_t inpval;
   int64_t outval;
   size_t size;
+  size_t resolved;
+  int (*next)(const struct btc_selector_s *,
+              btc_outpoint_t *, btc_coin_t **);
+  void *state;
   btc_outset_t inputs;
   btc_vector_t utxos;
 } btc_selector_t;
@@ -70,7 +75,7 @@ btc_selector_init(btc_selector_t *sel, const btc_selopt_t *opt, btc_tx_t *tx);
 BTC_EXTERN void
 btc_selector_clear(btc_selector_t *sel);
 
-BTC_EXTERN void
+BTC_EXTERN int
 btc_selector_push(btc_selector_t *sel,
                   const btc_outpoint_t *prevout,
                   const btc_coin_t *coin);
