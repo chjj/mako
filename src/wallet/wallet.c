@@ -602,12 +602,6 @@ btc_wallet_master(btc_mnemonic_t *mnemonic,
 }
 
 int
-btc_wallet_total(btc_balance_t *bal, btc_wallet_t *wallet) {
-  *bal = wallet->balance;
-  return 1;
-}
-
-int
 btc_wallet_path(btc_path_t *path,
                 btc_wallet_t *wallet,
                 const btc_address_t *addr) {
@@ -648,6 +642,10 @@ btc_wallet_name(char *name, size_t size,
 
 int
 btc_wallet_balance(btc_balance_t *bal, btc_wallet_t *wallet, uint32_t account) {
+  if (account == BTC_NO_ACCOUNT) {
+    *bal = wallet->balance;
+    return 1;
+  }
   return db_get_balance(wallet->db, account, bal);
 }
 
