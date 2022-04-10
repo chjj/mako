@@ -74,18 +74,6 @@
 #define KEY_INT64_MAX 0xff, 0xff, 0xff, 0xff, \
                       0xff, 0xff, 0xff, 0xff
 
-#define KEY_HASH160_MIN         \
-  0x00, 0x00, 0x00, 0x00, 0x00, \
-  0x00, 0x00, 0x00, 0x00, 0x00, \
-  0x00, 0x00, 0x00, 0x00, 0x00, \
-  0x00, 0x00, 0x00, 0x00, 0x00
-
-#define KEY_HASH160_MAX         \
-  0xff, 0xff, 0xff, 0xff, 0xff, \
-  0xff, 0xff, 0xff, 0xff, 0xff, \
-  0xff, 0xff, 0xff, 0xff, 0xff, \
-  0xff, 0xff, 0xff, 0xff, 0xff
-
 #define KEY_HASH256_MIN                           \
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
@@ -128,20 +116,8 @@ static const ldb_slice_t key_state = {key_state_, 1, 0};
  * Account Key (a[acct])
  */
 
-#define U BTC_UNUSED
-
 #define KEY_ACCOUNT_CH 'a'
 #define KEY_ACCOUNT_LEN 5
-
-static uint8_t key_account_min_[KEY_ACCOUNT_LEN] = {KEY_ACCOUNT_CH,
-                                                    KEY_INT32_MIN};
-static uint8_t key_account_max_[KEY_ACCOUNT_LEN] = {KEY_ACCOUNT_CH,
-                                                    KEY_INT32_MAX};
-
-U static const ldb_slice_t key_account_min = {key_account_min_,
-                                              KEY_ACCOUNT_LEN, 0};
-U static const ldb_slice_t key_account_max = {key_account_max_,
-                                              KEY_ACCOUNT_LEN, 0};
 
 static ldb_slice_t
 key_account(uint32_t account, uint8_t *buf) {
@@ -157,16 +133,6 @@ key_account(uint32_t account, uint8_t *buf) {
 #define KEY_BALANCE_CH 'b'
 #define KEY_BALANCE_LEN 5
 
-static uint8_t key_balance_min_[KEY_BALANCE_LEN] = {KEY_BALANCE_CH,
-                                                    KEY_INT32_MIN};
-static uint8_t key_balance_max_[KEY_BALANCE_LEN] = {KEY_BALANCE_CH,
-                                                    KEY_INT32_MAX};
-
-U static const ldb_slice_t key_balance_min = {key_balance_min_,
-                                              KEY_BALANCE_LEN, 0};
-U static const ldb_slice_t key_balance_max = {key_balance_max_,
-                                              KEY_BALANCE_LEN, 0};
-
 static ldb_slice_t
 key_balance(uint32_t account, uint8_t *buf) {
   buf[0] = KEY_BALANCE_CH;
@@ -180,12 +146,6 @@ key_balance(uint32_t account, uint8_t *buf) {
 
 #define KEY_INDEX_CH 'i'
 #define KEY_INDEX_LEN 64
-
-static uint8_t key_index_min_[2] = {KEY_INDEX_CH, 0x00};
-static uint8_t key_index_max_[65] = {KEY_INDEX_CH, KEY_HASH256_MAX};
-
-U static const ldb_slice_t key_index_min = {key_index_min_, 2, 0};
-U static const ldb_slice_t key_index_max = {key_index_max_, 64, 0};
 
 static ldb_slice_t
 key_index(const char *name, uint8_t *buf) {
@@ -211,8 +171,8 @@ key_index(const char *name, uint8_t *buf) {
 static uint8_t key_path_min_[4] = {KEY_PATH_CH, 0x00, 0x00, 0x00};
 static uint8_t key_path_max_[42] = {KEY_PATH_CH, 0xff, KEY_HASH320_MAX};
 
-U static const ldb_slice_t key_path_min = {key_path_min_, 4, 0};
-U static const ldb_slice_t key_path_max = {key_path_max_, 42, 0};
+BTC_UNUSED static const ldb_slice_t key_path_min = {key_path_min_, 4, 0};
+BTC_UNUSED static const ldb_slice_t key_path_max = {key_path_max_, 42, 0};
 
 static ldb_slice_t
 key_path(const btc_address_t *addr, uint8_t *buf) {
@@ -228,12 +188,6 @@ key_path(const btc_address_t *addr, uint8_t *buf) {
 
 #define KEY_BLOCK_CH 'e'
 #define KEY_BLOCK_LEN 5
-
-static uint8_t key_block_min_[KEY_BLOCK_LEN] = {KEY_BLOCK_CH, KEY_INT32_MIN};
-static uint8_t key_block_max_[KEY_BLOCK_LEN] = {KEY_BLOCK_CH, KEY_INT32_MAX};
-
-U static const ldb_slice_t key_block_min = {key_block_min_, KEY_BLOCK_LEN, 0};
-U static const ldb_slice_t key_block_max = {key_block_max_, KEY_BLOCK_LEN, 0};
 
 static ldb_slice_t
 key_block(int32_t height, uint8_t *buf) {
@@ -254,8 +208,10 @@ static uint8_t key_coin_min_[KEY_COIN_LEN] = {KEY_COIN_CH, KEY_HASH256_MIN,
 static uint8_t key_coin_max_[KEY_COIN_LEN] = {KEY_COIN_CH, KEY_HASH256_MAX,
                                                            KEY_INT32_MAX};
 
-U static const ldb_slice_t key_coin_min = {key_coin_min_, KEY_COIN_LEN, 0};
-U static const ldb_slice_t key_coin_max = {key_coin_max_, KEY_COIN_LEN, 0};
+BTC_UNUSED static const ldb_slice_t key_coin_min = {key_coin_min_,
+                                                    KEY_COIN_LEN, 0};
+BTC_UNUSED static const ldb_slice_t key_coin_max = {key_coin_max_,
+                                                    KEY_COIN_LEN, 0};
 
 static ldb_slice_t
 key_coin(const uint8_t *hash, uint32_t index, uint8_t *buf) {
@@ -272,14 +228,6 @@ key_coin(const uint8_t *hash, uint32_t index, uint8_t *buf) {
 #define KEY_UNDO_CH 'u'
 #define KEY_UNDO_LEN 37
 
-static uint8_t key_undo_min_[KEY_UNDO_LEN] = {KEY_UNDO_CH, KEY_HASH256_MIN,
-                                                           KEY_INT32_MIN};
-static uint8_t key_undo_max_[KEY_UNDO_LEN] = {KEY_UNDO_CH, KEY_HASH256_MAX,
-                                                           KEY_INT32_MAX};
-
-U static const ldb_slice_t key_undo_min = {key_undo_min_, KEY_UNDO_LEN, 0};
-U static const ldb_slice_t key_undo_max = {key_undo_max_, KEY_UNDO_LEN, 0};
-
 static ldb_slice_t
 key_undo(const uint8_t *hash, uint32_t index, uint8_t *buf) {
   buf[0] = KEY_UNDO_CH;
@@ -294,14 +242,6 @@ key_undo(const uint8_t *hash, uint32_t index, uint8_t *buf) {
 
 #define KEY_SPEND_CH 's'
 #define KEY_SPEND_LEN 37
-
-static uint8_t key_spend_min_[KEY_SPEND_LEN] = {KEY_SPEND_CH, KEY_HASH256_MIN,
-                                                              KEY_INT32_MIN};
-static uint8_t key_spend_max_[KEY_SPEND_LEN] = {KEY_SPEND_CH, KEY_HASH256_MAX,
-                                                              KEY_INT32_MAX};
-
-U static const ldb_slice_t key_spend_min = {key_spend_min_, KEY_SPEND_LEN, 0};
-U static const ldb_slice_t key_spend_max = {key_spend_max_, KEY_SPEND_LEN, 0};
 
 static ldb_slice_t
 key_spend(const uint8_t *hash, uint32_t index, uint8_t *buf) {
@@ -318,12 +258,6 @@ key_spend(const uint8_t *hash, uint32_t index, uint8_t *buf) {
 #define KEY_TX_CH 't'
 #define KEY_TX_LEN 33
 
-static uint8_t key_tx_min_[KEY_TX_LEN] = {KEY_TX_CH, KEY_HASH256_MIN};
-static uint8_t key_tx_max_[KEY_TX_LEN] = {KEY_TX_CH, KEY_HASH256_MAX};
-
-U static const ldb_slice_t key_tx_min = {key_tx_min_, KEY_TX_LEN, 0};
-U static const ldb_slice_t key_tx_max = {key_tx_max_, KEY_TX_LEN, 0};
-
 static ldb_slice_t
 key_tx(const uint8_t *hash, uint8_t *buf) {
   buf[0] = KEY_TX_CH;
@@ -338,16 +272,6 @@ key_tx(const uint8_t *hash, uint8_t *buf) {
 #define KEY_TXMETA_CH 'k'
 #define KEY_TXMETA_LEN 33
 
-static uint8_t key_txmeta_min_[KEY_TXMETA_LEN] = {KEY_TXMETA_CH,
-                                                  KEY_HASH256_MIN};
-static uint8_t key_txmeta_max_[KEY_TXMETA_LEN] = {KEY_TXMETA_CH,
-                                                  KEY_HASH256_MAX};
-
-U static const ldb_slice_t key_txmeta_min = {key_txmeta_min_,
-                                             KEY_TXMETA_LEN, 0};
-U static const ldb_slice_t key_txmeta_max = {key_txmeta_max_,
-                                             KEY_TXMETA_LEN, 0};
-
 static ldb_slice_t
 key_txmeta(const uint8_t *hash, uint8_t *buf) {
   buf[0] = KEY_TXMETA_CH;
@@ -361,16 +285,6 @@ key_txmeta(const uint8_t *hash, uint8_t *buf) {
 
 #define KEY_BLKMETA_CH 'q'
 #define KEY_BLKMETA_LEN 5
-
-static uint8_t key_blkmeta_min_[KEY_BLKMETA_LEN] = {KEY_BLKMETA_CH,
-                                                    KEY_INT32_MIN};
-static uint8_t key_blkmeta_max_[KEY_BLKMETA_LEN] = {KEY_BLKMETA_CH,
-                                                    KEY_INT32_MAX};
-
-U static const ldb_slice_t key_blkmeta_min = {key_blkmeta_min_,
-                                              KEY_BLKMETA_LEN, 0};
-U static const ldb_slice_t key_blkmeta_max = {key_blkmeta_max_,
-                                              KEY_BLKMETA_LEN, 0};
 
 static ldb_slice_t
 key_blkmeta(int32_t height, uint8_t *buf) {
@@ -401,20 +315,12 @@ key_blkidx(int32_t height, int32_t index, uint8_t *buf) {
 #define KEY_TXID_CH 'm'
 #define KEY_TXID_LEN 9
 
-static uint8_t key_txid_min_[KEY_TXID_LEN] = {KEY_TXID_CH, KEY_INT64_MIN};
-static uint8_t key_txid_max_[KEY_TXID_LEN] = {KEY_TXID_CH, KEY_INT64_MAX};
-
-U static const ldb_slice_t key_txid_min = {key_txid_min_, KEY_TXID_LEN, 0};
-U static const ldb_slice_t key_txid_max = {key_txid_max_, KEY_TXID_LEN, 0};
-
 static ldb_slice_t
 key_txid(uint64_t id, uint8_t *buf) {
   buf[0] = KEY_TXID_CH;
   btc_write64be(buf + 1, id);
   return ldb_slice(buf, KEY_TXID_LEN);
 }
-
-#undef U
 
 /*
  * Height Key (h[height][id])
@@ -1410,16 +1316,6 @@ db_get_tx(ldb_t *db, const uint8_t *hash, btc_tx_t **tx) {
 }
 
 BTC_UNUSED static int
-db_has_tx(ldb_t *db, const uint8_t *hash) {
-  uint8_t buf[KEY_TX_LEN];
-  ldb_slice_t key;
-
-  key = key_tx(hash, buf);
-
-  return db_has(db, &key);
-}
-
-BTC_UNUSED static int
 db_get_txmeta(ldb_t *db, const uint8_t *hash, btc_txmeta_t *meta) {
   uint8_t buf[KEY_TXMETA_LEN];
   ldb_slice_t key, val;
@@ -1479,23 +1375,6 @@ db_get_txid(ldb_t *db, uint64_t id, uint8_t *hash) {
   ldb_slice_t key, val;
 
   key = key_txid(id, buf);
-
-  if (!db_get_size(db, &key, &val, 32))
-    return 0;
-
-  memcpy(hash, val.data, 32);
-
-  ldb_free(val.data);
-
-  return 1;
-}
-
-BTC_UNUSED static int
-db_get_atxid(ldb_t *db, uint32_t account, uint64_t id, uint8_t *hash) {
-  uint8_t buf[KEY_ATXID_LEN];
-  ldb_slice_t key, val;
-
-  key = key_atxid(account, id, buf);
 
   if (!db_get_size(db, &key, &val, 32))
     return 0;
