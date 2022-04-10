@@ -275,6 +275,7 @@ prefix ## _barrier(type x) {      \
 #define BTC_MIN(x, y) ((x) < (y) ? (x) : (y))
 #define BTC_MAX(x, y) ((x) > (y) ? (x) : (y))
 #define BTC_ABS(x) ((x) < 0 ? -(x) : (x))
+#define BTC_CMP(x, y) (((x) > (y)) - ((x) < (y)))
 
 /*
  * Helpers

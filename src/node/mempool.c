@@ -869,7 +869,7 @@ use_desc(const btc_mpentry_t *a) {
   return y > x;
 }
 
-static int64_t
+static int
 cmp_rate(const void *ap, const void *bp) {
   const btc_mpentry_t *a = ap;
   const btc_mpentry_t *b = bp;
@@ -898,7 +898,7 @@ cmp_rate(const void *ap, const void *bp) {
     y = b->time;
   }
 
-  return x - y;
+  return BTC_CMP(x, y);
 }
 
 static int

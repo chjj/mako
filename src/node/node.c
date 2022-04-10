@@ -1,5 +1,5 @@
 /*!
- * main.c - main entry point for mako
+ * node.c - node for mako
  * Copyright (c) 2021, Christopher Jeffrey (MIT License).
  * https://github.com/chjj/mako
  */

@@ -190,27 +190,26 @@ btc_fee_range(int64_t fee) {
   return fee;
 }
 
-static int64_t
+static int
 cmp_age(const void *xp, const void *yp) {
   const btc_utxo_t *x = xp;
   const btc_utxo_t *y = yp;
-  int64_t a = (x->height == -1 ? 0x7fffffff : x->height);
-  int64_t b = (y->height == -1 ? 0x7fffffff : y->height);
-  return a - b;
+
+  return BTC_CMP((uint32_t)x->height,
+                 (uint32_t)y->height);
 }
 
-static int64_t
+static int
 cmp_value(const void *xp, const void *yp) {
   const btc_utxo_t *x = xp;
   const btc_utxo_t *y = yp;
+  int xh = (x->height < 0);
+  int yh = (y->height < 0);
 
-  if (x->height == -1 && y->height != -1)
-    return 1;
+  if (xh != yh)
+    return xh - yh;
 
-  if (x->height != -1 && y->height == -1)
-    return -1;
-
-  return y->value - x->value;
+  return BTC_CMP(y->value, x->value);
 }
 
 /*
