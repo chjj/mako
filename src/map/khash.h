@@ -202,8 +202,6 @@ static const double __ac_HASH_UPPER = 0.77;
 #define __KHASH_PROTOTYPES(name, khkey_t, khval_t)	 					\
 	extern kh_##name##_t *kh_init_##name(void);							\
 	extern void kh_destroy_##name(kh_##name##_t *h);					\
-	extern void kh_init2_##name(kh_##name##_t *h);							\
-	extern void kh_destroy2_##name(kh_##name##_t *h);					\
 	extern void kh_clear_##name(kh_##name##_t *h);						\
 	extern khint_t kh_get_##name(const kh_##name##_t *h, khkey_t key); 	\
 	extern int kh_resize_##name(kh_##name##_t *h, khint_t new_n_buckets); \
@@ -217,20 +215,10 @@ static const double __ac_HASH_UPPER = 0.77;
 	SCOPE void kh_destroy_##name(kh_##name##_t *h)						\
 	{																	\
 		if (h) {														\
-			if (h->flags) kfree(h->flags); \
-			if (h->keys) kfree((void *)h->keys); \
-			if (h->vals) kfree((void *)h->vals);										\
+			kfree((void *)h->keys); kfree(h->flags);					\
+			kfree((void *)h->vals);										\
 			kfree(h);													\
 		}																\
-	}																	\
-	SCOPE void kh_init2_##name(kh_##name##_t *h) {							\
-		memset(h, 0, sizeof(kh_##name##_t));		\
-	}																	\
-	SCOPE void kh_destroy2_##name(kh_##name##_t *h)						\
-	{																	\
-		if (h->flags) kfree(h->flags); \
-		if (h->keys) kfree((void *)h->keys); \
-		if (h->vals) kfree((void *)h->vals);										\
 	}																	\
 	SCOPE void kh_clear_##name(kh_##name##_t *h)						\
 	{																	\
@@ -370,9 +358,8 @@ static const double __ac_HASH_UPPER = 0.77;
 	__KHASH_TYPE(name, khkey_t, khval_t) 								\
 	__KHASH_PROTOTYPES(name, khkey_t, khval_t)
 
-#define KHASH_TYPE __KHASH_TYPE
-
 #define KHASH_INIT2(name, SCOPE, khkey_t, khval_t, kh_is_map, __hash_func, __hash_equal) \
+	__KHASH_TYPE(name, khkey_t, khval_t) 								\
 	__KHASH_IMPL(name, SCOPE, khkey_t, khval_t, kh_is_map, __hash_func, __hash_equal)
 
 #define KHASH_INIT(name, khkey_t, khval_t, kh_is_map, __hash_func, __hash_equal) \
@@ -450,7 +437,6 @@ static kh_inline khint_t __ac_Wang_hash(khint_t key)
   @return       Pointer to the hash table [khash_t(name)*]
  */
 #define kh_init(name) kh_init_##name()
-#define kh_init2(name, h) kh_init2_##name(h)
 
 /*! @function
   @abstract     Destroy a hash table.
@@ -458,7 +444,6 @@ static kh_inline khint_t __ac_Wang_hash(khint_t key)
   @param  h     Pointer to the hash table [khash_t(name)*]
  */
 #define kh_destroy(name, h) kh_destroy_##name(h)
-#define kh_destroy2(name, h) kh_destroy2_##name(h)
 
 /*! @function
   @abstract     Reset a hash table without deallocating memory.
