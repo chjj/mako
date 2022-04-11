@@ -18,6 +18,7 @@
 
 #define kh_inline BTC_INLINE
 #define kh_unused BTC_UNUSED
+#define kfree(x) do { if ((x) != NULL) free(x); } while (0)
 
 #include "khash.h"
 
@@ -52,12 +53,14 @@ name##_destroy(kh_##name##_t *map) {                                         \
                                                                              \
 scope void                                                                   \
 name##_init(kh_##name##_t *map) {                                            \
-  kh_init2_##name(map);                                                      \
+  memset(map, 0, sizeof(kh_##name##_t));                                     \
 }                                                                            \
                                                                              \
 scope void                                                                   \
 name##_clear(kh_##name##_t *map) {                                           \
-  kh_destroy2_##name(map);                                                   \
+  kfree((void *)map->keys);                                                  \
+  kfree(map->flags);                                                         \
+  kfree((void *)map->vals);                                                  \
 }                                                                            \
                                                                              \
 scope void                                                                   \
@@ -172,12 +175,14 @@ name##_destroy(kh_##name##_t *map) {                              \
                                                                   \
 scope void                                                        \
 name##_init(kh_##name##_t *map) {                                 \
-  kh_init2_##name(map);                                           \
+  memset(map, 0, sizeof(kh_##name##_t));                          \
 }                                                                 \
                                                                   \
 scope void                                                        \
 name##_clear(kh_##name##_t *map) {                                \
-  kh_destroy2_##name(map);                                        \
+  kfree((void *)map->keys);                                       \
+  kfree(map->flags);                                              \
+  kfree((void *)map->vals);                                       \
 }                                                                 \
                                                                   \
 scope void                                                        \
