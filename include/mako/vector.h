@@ -20,7 +20,7 @@ extern "C" {
  * Vector
  */
 
-BTC_DEFINE_OBJECT(btc_vector, BTC_EXTERN)
+BTC_DEFINE_OBJECT(btc_vector, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_vector_init(btc_vector_t *z);

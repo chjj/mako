@@ -231,7 +231,7 @@ struct btc_mempool_s {
   void *arg;
 };
 
-BTC_DEFINE_LOGGER(btc_log, btc_mempool_t, "mempool");
+BTC_DEFINE_LOGGER(btc_log, btc_mempool_t, "mempool")
 
 btc_mempool_t *
 btc_mempool_create(const btc_network_t *network, btc_chain_t *chain) {

@@ -21,7 +21,9 @@
 #endif
 
 #ifndef BTC_EXTERN
-#  define BTC_EXTERN struct btc_empty_struct;
+#  define BTC_EXTERN
 #endif
+
+#define BTC_SCOPE_EXTERN BTC_EXTERN extern
 
 #endif /* BTC_COMMON_H */

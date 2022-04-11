@@ -37,7 +37,7 @@ typedef btc_coin_t *btc_coin_read_cb(const btc_outpoint_t *prevout, void *arg);
  * Coin
  */
 
-BTC_DEFINE_SERIALIZABLE_REFOBJ(btc_coin, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_REFOBJ(btc_coin, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_coin_init(btc_coin_t *z);
@@ -64,7 +64,7 @@ btc_coin_inspect(const btc_coin_t *coin, const btc_network_t *network);
  * Undo Coins
  */
 
-BTC_DEFINE_SERIALIZABLE_VECTOR(btc_undo, btc_coin, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_VECTOR(btc_undo, btc_coin, BTC_SCOPE_EXTERN)
 
 /*
  * Coin View

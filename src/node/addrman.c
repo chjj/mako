@@ -311,7 +311,7 @@ struct btc_addrman_s {
   int needs_flush;
 };
 
-BTC_DEFINE_LOGGER(btc_log, btc_addrman_t, "addrman");
+BTC_DEFINE_LOGGER(btc_log, btc_addrman_t, "addrman")
 
 btc_addrman_t *
 btc_addrman_create(const btc_network_t *network) {

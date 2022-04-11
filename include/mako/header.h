@@ -17,7 +17,7 @@
  * Header
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_header, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_header, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_header_init(btc_header_t *z);

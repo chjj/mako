@@ -265,7 +265,7 @@ struct btc_rpc_s {
   uint8_t auth_hash[32];
 };
 
-BTC_DEFINE_LOGGER(btc_log, btc_rpc_t, "rpc");
+BTC_DEFINE_LOGGER(btc_log, btc_rpc_t, "rpc")
 
 static int
 on_request(http_server_t *server, http_req_t *req, http_res_t *res);

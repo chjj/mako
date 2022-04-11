@@ -239,7 +239,7 @@ struct btc_chain_s {
   void *arg;
 };
 
-BTC_DEFINE_LOGGER(btc_log, btc_chain_t, "chain");
+BTC_DEFINE_LOGGER(btc_log, btc_chain_t, "chain")
 
 btc_chain_t *
 btc_chain_create(const btc_network_t *network) {

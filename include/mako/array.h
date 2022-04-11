@@ -21,7 +21,7 @@ extern "C" {
  * Integer Vector
  */
 
-BTC_DEFINE_OBJECT(btc_array, BTC_EXTERN)
+BTC_DEFINE_OBJECT(btc_array, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_array_init(btc_array_t *z);

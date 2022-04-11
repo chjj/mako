@@ -74,7 +74,7 @@ enum btc_bloom_flag {
  * Bloom Filter
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_bloom, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_bloom, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_bloom_init(btc_bloom_t *bloom);
@@ -116,7 +116,7 @@ btc_bloom_read(btc_bloom_t *z, const uint8_t **xp, size_t *xn);
  * Rolling Filter
  */
 
-BTC_DEFINE_OBJECT(btc_filter, BTC_EXTERN)
+BTC_DEFINE_OBJECT(btc_filter, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_filter_init(btc_filter_t *filter);

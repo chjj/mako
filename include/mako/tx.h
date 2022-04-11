@@ -27,7 +27,7 @@ typedef int btc_derive_f(uint8_t *, const btc_address_t *, void *);
  * Outpoint
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_outpoint, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_outpoint, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_outpoint_init(btc_outpoint_t *z);
@@ -72,7 +72,7 @@ btc_outpoint_inspect(const btc_outpoint_t *outpoint);
  * Input
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_input, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_input, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_input_init(btc_input_t *z);
@@ -104,7 +104,7 @@ btc_input_inspect(const btc_input_t *input,
  * Output
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_output, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_output, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_output_init(btc_output_t *z);
@@ -155,19 +155,19 @@ btc_output_inspect(const btc_output_t *output, const btc_network_t *network);
  * Input Vector
  */
 
-BTC_DEFINE_HASHABLE_VECTOR(btc_inpvec, btc_input, BTC_EXTERN)
+BTC_DEFINE_HASHABLE_VECTOR(btc_inpvec, btc_input, BTC_SCOPE_EXTERN)
 
 /*
  * Output Vector
  */
 
-BTC_DEFINE_HASHABLE_VECTOR(btc_outvec, btc_output, BTC_EXTERN)
+BTC_DEFINE_HASHABLE_VECTOR(btc_outvec, btc_output, BTC_SCOPE_EXTERN)
 
 /*
  * Transaction
  */
 
-BTC_DEFINE_SERIALIZABLE_REFOBJ(btc_tx, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_REFOBJ(btc_tx, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_tx_init(btc_tx_t *tx);
@@ -344,7 +344,7 @@ btc_tx_inspect(const btc_tx_t *tx,
  * Transaction Vector
  */
 
-BTC_DEFINE_SERIALIZABLE_VECTOR(btc_txvec, btc_tx, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_VECTOR(btc_txvec, btc_tx, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN size_t
 btc_txvec_base_size(const btc_txvec_t *txs);

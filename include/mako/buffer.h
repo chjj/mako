@@ -21,7 +21,7 @@ extern "C" {
  * Buffer
  */
 
-BTC_DEFINE_SERIALIZABLE_REFOBJ(btc_buffer, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_REFOBJ(btc_buffer, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_buffer_init(btc_buffer_t *z);

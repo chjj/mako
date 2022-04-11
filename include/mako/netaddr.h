@@ -33,7 +33,7 @@ struct btc_sockaddr_s;
  * Net Address
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_netaddr, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_netaddr, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_netaddr_init(btc_netaddr_t *addr);

@@ -18,7 +18,7 @@
  */
 
 #define SCOPE_STATIC BTC_UNUSED static
-#define SCOPE_EXTERN struct btc_empty_struct;
+#define SCOPE_EXTERN extern
 
 /*
  * Object

@@ -27,7 +27,7 @@ extern "C" {
  * Chain Entry
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_entry, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_entry, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_entry_init(btc_entry_t *z);

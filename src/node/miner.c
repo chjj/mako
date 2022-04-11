@@ -97,7 +97,7 @@ struct btc_miner_s {
   btc_cpuminer_t cpu;
 };
 
-BTC_DEFINE_LOGGER(btc_log, btc_miner_t, "miner");
+BTC_DEFINE_LOGGER(btc_log, btc_miner_t, "miner")
 
 /*
  * Block Entry

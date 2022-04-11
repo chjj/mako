@@ -199,8 +199,8 @@ struct btc_pool_s {
   int synced;
 };
 
-BTC_DEFINE_LOGGER(btc_pool, btc_pool_t, "pool");
-BTC_DEFINE_LOGGER(btc_peer, btc_peer_t, "peer");
+BTC_DEFINE_LOGGER(btc_pool, btc_pool_t, "pool")
+BTC_DEFINE_LOGGER(btc_peer, btc_peer_t, "peer")
 
 /*
  * Nonce List

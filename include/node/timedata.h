@@ -21,7 +21,7 @@ extern "C" {
  * Time Data
  */
 
-BTC_DEFINE_OBJECT(btc_timedata, BTC_EXTERN)
+BTC_DEFINE_OBJECT(btc_timedata, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_timedata_init(btc_timedata_t *td);

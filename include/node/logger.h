@@ -21,12 +21,12 @@ extern "C" {
  */
 
 enum btc_loglevel {
-  BTC_LOG_NONE,
-  BTC_LOG_ERROR,
-  BTC_LOG_WARNING,
-  BTC_LOG_INFO,
-  BTC_LOG_DEBUG,
-  BTC_LOG_SPAM
+  BTC_LOG_NONE = 0,
+  BTC_LOG_ERROR = 1,
+  BTC_LOG_WARNING = 2,
+  BTC_LOG_INFO = 3,
+  BTC_LOG_DEBUG = 4,
+  BTC_LOG_SPAM = 5
 };
 
 /*
@@ -40,14 +40,13 @@ prefix##_##suffix (type *obj, const char *fmt, ...) {       \
   va_start(ap, fmt);                                        \
   btc_logger_write(obj->logger, level, name, fmt, ap);      \
   va_end(ap);                                               \
-}                                                           \
-struct btc_logger_struct
+}
 
-#define BTC_DEFINE_LOGGER(prefix, type, name)                  \
-  BTC_DEFINE_LOGFN(prefix, error, type, BTC_LOG_ERROR, name);  \
-  BTC_DEFINE_LOGFN(prefix, warn, type, BTC_LOG_WARNING, name); \
-  BTC_DEFINE_LOGFN(prefix, info, type, BTC_LOG_INFO, name);    \
-  BTC_DEFINE_LOGFN(prefix, debug, type, BTC_LOG_DEBUG, name);  \
+#define BTC_DEFINE_LOGGER(prefix, type, name)                 \
+  BTC_DEFINE_LOGFN(prefix, error, type, BTC_LOG_ERROR, name)  \
+  BTC_DEFINE_LOGFN(prefix, warn, type, BTC_LOG_WARNING, name) \
+  BTC_DEFINE_LOGFN(prefix, info, type, BTC_LOG_INFO, name)    \
+  BTC_DEFINE_LOGFN(prefix, debug, type, BTC_LOG_DEBUG, name)  \
   BTC_DEFINE_LOGFN(prefix, spam, type, BTC_LOG_SPAM, name)
 
 /*

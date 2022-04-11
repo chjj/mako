@@ -21,7 +21,7 @@ extern "C" {
  * Block
  */
 
-BTC_DEFINE_SERIALIZABLE_REFOBJ(btc_block, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_REFOBJ(btc_block, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_block_init(btc_block_t *z);

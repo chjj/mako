@@ -34,7 +34,7 @@ typedef struct btc_merkleblock_s {
  * Merkle Block
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_merkleblock, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_merkleblock, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_merkleblock_init(btc_merkleblock_t *z);

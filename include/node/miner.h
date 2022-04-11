@@ -71,7 +71,7 @@ typedef struct btc_tmpl_s {
  * Block Template
  */
 
-BTC_DEFINE_OBJECT(btc_tmpl, BTC_EXTERN)
+BTC_DEFINE_OBJECT(btc_tmpl, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_tmpl_init(btc_tmpl_t *bt);

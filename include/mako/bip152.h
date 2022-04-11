@@ -49,7 +49,7 @@ typedef struct btc_blocktxn_s {
  * Compact Block
  */
 
-BTC_DEFINE_SERIALIZABLE_REFOBJ(btc_cmpct, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_REFOBJ(btc_cmpct, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_cmpct_init(btc_cmpct_t *z);
@@ -97,7 +97,7 @@ btc_cmpct_read(btc_cmpct_t *z, const uint8_t **xp, size_t *xn);
  * TX Request
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_getblocktxn, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_getblocktxn, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_getblocktxn_init(btc_getblocktxn_t *z);
@@ -124,7 +124,7 @@ btc_getblocktxn_read(btc_getblocktxn_t *z, const uint8_t **xp, size_t *xn);
  * TX Response
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_blocktxn, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_blocktxn, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_blocktxn_init(btc_blocktxn_t *z);

@@ -74,7 +74,7 @@ on_bad_tx_orphan(const btc_verify_error_t *err, unsigned int id, void *arg);
  * Node
  */
 
-BTC_DEFINE_LOGGER(btc_log, btc_node_t, "node");
+BTC_DEFINE_LOGGER(btc_log, btc_node_t, "node")
 
 btc_node_t *
 btc_node_create(const btc_network_t *network) {

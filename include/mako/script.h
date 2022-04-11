@@ -291,7 +291,7 @@ btc_scriptnum_import(const uint8_t *xp, size_t xn);
  * Stack
  */
 
-BTC_DEFINE_HASHABLE_VECTOR(btc_stack, btc_buffer, BTC_EXTERN)
+BTC_DEFINE_HASHABLE_VECTOR(btc_stack, btc_buffer, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_stack_assign(btc_stack_t *z, const btc_stack_t *x);
@@ -332,7 +332,7 @@ btc_stack_inspect(const btc_stack_t *stack);
  * Opcode
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_opcode, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_opcode, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_opcode_init(btc_opcode_t *z);

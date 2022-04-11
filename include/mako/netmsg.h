@@ -187,7 +187,7 @@ typedef struct btc_msg_s {
  * Version
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_version, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_version, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_version_init(btc_version_t *msg);
@@ -217,7 +217,7 @@ btc_version_read(btc_version_t *z, const uint8_t **xp, size_t *xn);
  * Ping
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_ping, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_ping, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_ping_init(btc_ping_t *msg);
@@ -241,7 +241,7 @@ btc_ping_read(btc_ping_t *z, const uint8_t **xp, size_t *xn);
  * Pong
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_pong, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_pong, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_pong_init(btc_pong_t *msg);
@@ -271,13 +271,13 @@ btc_pong_read(btc_pong_t *z, const uint8_t **xp, size_t *xn);
  * Addr
  */
 
-BTC_DEFINE_SERIALIZABLE_VECTOR(btc_addrs, btc_netaddr, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_VECTOR(btc_addrs, btc_netaddr, BTC_SCOPE_EXTERN)
 
 /*
  * Inv Item
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_invitem, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_invitem, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_invitem_init(btc_invitem_t *item);
@@ -310,7 +310,7 @@ btc_invitem_read(btc_invitem_t *z, const uint8_t **xp, size_t *xn);
  * Inv
  */
 
-BTC_DEFINE_SERIALIZABLE_VECTOR(btc_inv, btc_invitem, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_VECTOR(btc_inv, btc_invitem, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_inv_push_item(btc_inv_t *inv, uint32_t type, const uint8_t *hash);
@@ -319,7 +319,7 @@ btc_inv_push_item(btc_inv_t *inv, uint32_t type, const uint8_t *hash);
  * Inv (zero copy)
  */
 
-BTC_DEFINE_OBJECT(btc_zinv, BTC_EXTERN)
+BTC_DEFINE_OBJECT(btc_zinv, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_zinv_init(btc_zinv_t *z);
@@ -358,7 +358,7 @@ btc_zinv_get(const btc_zinv_t *z, size_t index);
  * GetBlocks
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_getblocks, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_getblocks, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_getblocks_init(btc_getblocks_t *msg);
@@ -388,7 +388,7 @@ btc_getblocks_read(btc_getblocks_t *z, const uint8_t **xp, size_t *xn);
  * Headers
  */
 
-BTC_DEFINE_SERIALIZABLE_VECTOR(btc_headers, btc_header, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_VECTOR(btc_headers, btc_header, BTC_SCOPE_EXTERN)
 
 /*
  * SendHeaders
@@ -412,7 +412,7 @@ BTC_DEFINE_SERIALIZABLE_VECTOR(btc_headers, btc_header, BTC_EXTERN)
  * Reject
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_reject, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_reject, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_reject_init(btc_reject_t *msg);
@@ -451,7 +451,7 @@ btc_reject_code(unsigned int code);
  * FilterAdd
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_filteradd, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_filteradd, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_filteradd_init(btc_filteradd_t *msg);
@@ -487,7 +487,7 @@ btc_filteradd_read(btc_filteradd_t *z, const uint8_t **xp, size_t *xn);
  * FeeFilter
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_feefilter, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_feefilter, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_feefilter_init(btc_feefilter_t *msg);
@@ -511,7 +511,7 @@ btc_feefilter_read(btc_feefilter_t *z, const uint8_t **xp, size_t *xn);
  * SendCmpct
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_sendcmpct, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_sendcmpct, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_sendcmpct_init(btc_sendcmpct_t *msg);
@@ -553,7 +553,7 @@ btc_sendcmpct_read(btc_sendcmpct_t *z, const uint8_t **xp, size_t *xn);
  * Unknown
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_unknown, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_unknown, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_unknown_init(btc_unknown_t *msg);
@@ -577,7 +577,7 @@ btc_unknown_read(btc_unknown_t *z, const uint8_t **xp, size_t *xn);
  * Message
  */
 
-BTC_DEFINE_SERIALIZABLE_OBJECT(btc_msg, BTC_EXTERN)
+BTC_DEFINE_SERIALIZABLE_OBJECT(btc_msg, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_msg_init(btc_msg_t *msg);

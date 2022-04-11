@@ -33,7 +33,7 @@ enum btc_address_type {
  * Address
  */
 
-BTC_DEFINE_OBJECT(btc_address, BTC_EXTERN)
+BTC_DEFINE_OBJECT(btc_address, BTC_SCOPE_EXTERN)
 
 BTC_EXTERN void
 btc_address_init(btc_address_t *z);
