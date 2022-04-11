@@ -90,6 +90,11 @@ name##_insert(kh_##name##_t *map, const key_t key, int *exists) {            \
   return it;                                                                 \
 }                                                                            \
                                                                              \
+scope void                                                                   \
+name##_remove(kh_##name##_t *map, btc_mapiter_t it) {                        \
+  kh_del_##name(map, it);                                                    \
+}                                                                            \
+                                                                             \
 scope int                                                                    \
 name##_has(const kh_##name##_t *map, const key_t key) {                      \
   khiter_t it = kh_get_##name(map, (key_t)key);                              \
@@ -203,6 +208,11 @@ name##_insert(kh_##name##_t *map, const key_t key, int *exists) { \
   *exists = (ret == 0);                                           \
                                                                   \
   return it;                                                      \
+}                                                                 \
+                                                                  \
+scope void                                                        \
+name##_remove(kh_##name##_t *map, btc_mapiter_t it) {             \
+  kh_del_##name(map, it);                                         \
 }                                                                 \
                                                                   \
 scope int                                                         \

@@ -46,6 +46,9 @@ name##_lookup(const name##_t *map, const key_t key);         \
 scope btc_mapiter_t                                          \
 name##_insert(name##_t *map, const key_t key, int *exists);  \
                                                              \
+scope void                                                   \
+name##_remove(name##_t *map, btc_mapiter_t it);              \
+                                                             \
 scope int                                                    \
 name##_has(const name##_t *map, const key_t key);            \
                                                              \
@@ -87,6 +90,9 @@ name##_lookup(const name##_t *map, const key_t key);        \
                                                             \
 scope btc_mapiter_t                                         \
 name##_insert(name##_t *map, const key_t key, int *exists); \
+                                                            \
+scope void                                                  \
+name##_remove(name##_t *map, btc_mapiter_t it);             \
                                                             \
 scope int                                                   \
 name##_has(const name##_t *map, const key_t key);           \
