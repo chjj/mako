@@ -335,6 +335,15 @@ btc_tx_write(uint8_t *zp, const btc_tx_t *tx);
 BTC_EXTERN int
 btc_tx_read(btc_tx_t *z, const uint8_t **xp, size_t *xn);
 
+BTC_EXTERN int
+btc_tx_base_read(btc_tx_t *z, const uint8_t **xp, size_t *xn);
+
+BTC_EXTERN int
+btc_tx_base_import(btc_tx_t *z, const uint8_t *xp, size_t xn);
+
+BTC_EXTERN btc_tx_t *
+btc_tx_base_decode(const uint8_t *xp, size_t xn);
+
 BTC_EXTERN void
 btc_tx_inspect(const btc_tx_t *tx,
                const btc_view_t *view,

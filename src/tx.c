@@ -1331,6 +1331,45 @@ btc_tx_read(btc_tx_t *z, const uint8_t **xp, size_t *xn) {
   return 1;
 }
 
+int
+btc_tx_base_read(btc_tx_t *z, const uint8_t **xp, size_t *xn) {
+  const uint8_t *sp = *xp;
+
+  if (!btc_uint32_read(&z->version, xp, xn))
+    return 0;
+
+  if (!btc_inpvec_read(&z->inputs, xp, xn))
+    return 0;
+
+  if (!btc_outvec_read(&z->outputs, xp, xn))
+    return 0;
+
+  if (!btc_uint32_read(&z->locktime, xp, xn))
+    return 0;
+
+  btc_hash256(z->hash, sp, *xp - sp);
+  btc_hash_copy(z->whash, z->hash);
+
+  return 1;
+}
+
+int
+btc_tx_base_import(btc_tx_t *z, const uint8_t *xp, size_t xn) {
+  return btc_tx_base_read(z, &xp, &xn);
+}
+
+btc_tx_t *
+btc_tx_base_decode(const uint8_t *xp, size_t xn) {
+  btc_tx_t *tx = btc_tx_create();
+
+  if (!btc_tx_base_import(tx, xp, xn)) {
+    btc_tx_destroy(tx);
+    return NULL;
+  }
+
+  return tx;
+}
+
 /*
  * Transaction Vector
  */
