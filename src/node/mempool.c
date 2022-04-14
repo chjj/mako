@@ -610,7 +610,7 @@ btc_mempool_handle_orphans(btc_mempool_t *mp, const uint8_t *parent) {
  * UTXO Handling
  */
 
-static btc_view_t *
+btc_view_t *
 btc_mempool_view(btc_mempool_t *mp, const btc_tx_t *tx) {
   btc_view_t *view = btc_view_create();
   size_t i;
