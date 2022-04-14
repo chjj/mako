@@ -481,6 +481,9 @@ btc_peer_create(btc_pool_t *pool) {
   peer->loop = pool->loop;
   peer->socket = NULL;
 
+  if (pool->id == 0)
+    pool->id++;
+
   peer->state = BTC_PEER_DEAD;
   peer->id = pool->id++;
   peer->version = -1;
