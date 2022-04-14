@@ -134,6 +134,19 @@ btc_hdnode_fingerprint(const btc_hdnode_t *node) {
 }
 
 /*
+ * Globals
+ */
+
+const uint32_t btc_bip32_purpose[6] = {
+  44, /* standard */
+  49, /* nested p2wpkh */
+  84, /* p2wpkh */
+  48, /* nested p2wsh */
+  48, /* p2wsh */
+  86  /* p2tr */
+};
+
+/*
  * HD Private
  */
 

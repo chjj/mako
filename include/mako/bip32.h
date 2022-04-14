@@ -26,6 +26,12 @@ extern "C" {
 #define BTC_HDNODE_SIZE 82
 
 /*
+ * Globals
+ */
+
+BTC_EXTERN extern const uint32_t btc_bip32_purpose[6];
+
+/*
  * HD Private
  */
 
