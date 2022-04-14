@@ -104,7 +104,7 @@ client_get_block(void *state, const btc_entry_t *entry) {
 static void
 client_send(void *state, const btc_tx_t *tx) {
   btc_node_t *node = state;
-  btc_mempool_add(node->mempool, tx, -1);
+  btc_mempool_add(node->mempool, tx, 0);
 }
 
 static void
