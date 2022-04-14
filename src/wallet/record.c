@@ -454,11 +454,19 @@ void
 btc_txmeta_set_block(btc_txmeta_t *meta,
                      const btc_entry_t *entry,
                      int32_t index) {
-  meta->height = entry->height;
-  meta->time = entry->header.time;
-  meta->index = index;
+  if (entry != NULL) {
+    meta->height = entry->height;
+    meta->time = entry->header.time;
+    meta->index = index;
 
-  btc_hash_copy(meta->block, entry->hash);
+    btc_hash_copy(meta->block, entry->hash);
+  } else {
+    meta->height = -1;
+    meta->time = 0;
+    meta->index = -1;
+
+    btc_hash_init(meta->block);
+  }
 }
 
 size_t

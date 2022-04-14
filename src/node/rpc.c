@@ -1604,8 +1604,11 @@ btc_rpc_createaccount(btc_rpc_t *rpc,
 
   len = strlen(name);
 
-  if (len == 0 || len > 63 || strcmp(name, "*") == 0)
+  if (len == 0 || len > 63 ||
+      strcmp(name, "*") == 0 ||
+      strcmp(name, ".") == 0) {
     THROW(RPC_WALLET_INVALID_ACCOUNT_NAME, "Invalid account name");
+  }
 
   if (btc_wallet_locked(rpc->wallet))
     THROW(RPC_WALLET_UNLOCK_NEEDED, "Wallet is locked");
@@ -1753,16 +1756,18 @@ static void
 btc_rpc_getaccountaddress(btc_rpc_t *rpc,
                           const json_params *params,
                           rpc_res_t *res) {
+  uint32_t account = BTC_NO_ACCOUNT;
+  const char *name = NULL;
   btc_address_t addr;
-  const char *name;
-  uint32_t account;
 
-  if (params->help || params->length != 1)
-    THROW_MISC("getaccountaddress \"account\"");
+  if (params->help || params->length > 1)
+    THROW_MISC("getaccountaddress ( \"account\" )");
 
-  if (!json_string_get(&name, params->values[0]) ||
-      !btc_wallet_lookup(&account, rpc->wallet, name)) {
-    THROW(RPC_WALLET_INVALID_ACCOUNT_NAME, "Invalid account name");
+  if (params->length > 0) {
+    if (!json_string_get(&name, params->values[0]) ||
+        !btc_wallet_lookup(&account, rpc->wallet, name)) {
+      THROW(RPC_WALLET_INVALID_ACCOUNT_NAME, "Invalid account name");
+    }
   }
 
   if (!btc_wallet_receive(&addr, rpc->wallet, account))
@@ -1879,6 +1884,8 @@ btc_rpc_getaddressinfo(btc_rpc_t *rpc,
   json_object_push(obj, "scriptPubKey", json_buffer_new(&script));
   json_object_push(obj, "ismine", json_boolean_new(is_mine));
 
+  btc_script_clear(&script);
+
   if (is_mine) {
     json_object_push(obj, "iswatchonly", json_boolean_new(path.account >> 31));
     json_object_push(obj, "ischange", json_boolean_new(path.change != 0));
@@ -1912,8 +1919,6 @@ btc_rpc_getaddressinfo(btc_rpc_t *rpc,
     json_object_push(obj, "pubkey", json_raw_new(pub, sizeof(pub)));
     json_object_push(obj, "hdkeypath", json_string_new(str));
   }
-
-  btc_script_clear(&script);
 
   res->result = obj;
 }
@@ -2084,7 +2089,8 @@ btc_rpc_getwalletinfo(btc_rpc_t *rpc,
   rate = btc_wallet_rate(rpc->wallet, -1);
 
   json_object_push(obj, "balance", json_amount_new(bal.confirmed));
-  json_object_push(obj, "unconfirmed_balance", json_amount_new(bal.unconfirmed));
+  json_object_push(obj, "unconfirmed_balance",
+                        json_amount_new(bal.unconfirmed));
   json_object_push(obj, "txcount", json_integer_new(bal.tx));
   json_object_push(obj, "unlocked_until", json_integer_new(until));
   json_object_push(obj, "paytxfee", json_amount_new(rate));
@@ -2623,6 +2629,20 @@ btc_rpc_sendmany(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
   for (i = 0; i < outputs->u.object.length; i++) {
     entry = &outputs->u.object.values[i];
 
+    if (strcmp(entry->name, "data") == 0) {
+      uint8_t raw[80];
+      size_t len = 80;
+
+      if (!json_raw_get(raw, &len, entry->value)) {
+        btc_tx_destroy(tx);
+        THROW_TYPE(data, string);
+      }
+
+      btc_tx_add_nulldata(tx, raw, len);
+
+      continue;
+    }
+
     if (!btc_address_set_str(&addr, entry->name, rpc->network)) {
       btc_tx_destroy(tx);
       THROW_TYPE(key, address);
@@ -2876,8 +2896,11 @@ btc_rpc_watchaccount(btc_rpc_t *rpc,
 
   len = strlen(name);
 
-  if (len == 0 || len > 63 || strcmp(name, "*") == 0)
+  if (len == 0 || len > 63 ||
+      strcmp(name, "*") == 0 ||
+      strcmp(name, ".") == 0) {
     THROW(RPC_WALLET_INVALID_ACCOUNT_NAME, "Invalid account name");
+  }
 
   if (!btc_hdpub_set_str(&key, xpub, rpc->network))
     THROW(RPC_TYPE_ERROR, "Invalid xpubkey");

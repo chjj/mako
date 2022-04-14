@@ -53,7 +53,7 @@
  *   k[hash] -> tx meta
  *
  *   q[height] -> block meta
- *   q[height][idx] -> txid
+ *   Q[height][idx] -> txid
  *
  *   m[id] -> txid
  *   h[height][id] -> txid (tx by height)
@@ -294,10 +294,10 @@ key_blkmeta(int32_t height, uint8_t *buf) {
 }
 
 /*
- * Block Index Key (q[height][idx])
+ * Block Index Key (Q[height][idx])
  */
 
-#define KEY_BLKIDX_CH 'q'
+#define KEY_BLKIDX_CH 'Q'
 #define KEY_BLKIDX_LEN 9
 
 static ldb_slice_t
