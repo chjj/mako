@@ -25,6 +25,12 @@ extern "C" {
 #define BTC_MNEMONIC_SIZE (1 + 48 * 2)
 
 /*
+ * Globals
+ */
+
+BTC_EXTERN extern const btc_mnemonic_t btc_mnemonic_null;
+
+/*
  * Mnemonic
  */
 
@@ -39,6 +45,9 @@ btc_mnemonic_copy(btc_mnemonic_t *z, const btc_mnemonic_t *x);
 
 BTC_EXTERN int
 btc_mnemonic_equal(const btc_mnemonic_t *x, const btc_mnemonic_t *y);
+
+BTC_EXTERN int
+btc_mnemonic_is_null(const btc_mnemonic_t *mn);
 
 BTC_EXTERN void
 btc_mnemonic_set(btc_mnemonic_t *mn, const uint8_t *entropy, size_t length);

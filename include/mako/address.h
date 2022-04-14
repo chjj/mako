@@ -54,6 +54,9 @@ BTC_EXTERN int
 btc_address_compare(const btc_address_t *x, const btc_address_t *y);
 
 BTC_EXTERN int
+btc_address_is_null(const btc_address_t *x);
+
+BTC_EXTERN int
 btc_address_is_p2pkh(const btc_address_t *addr);
 
 BTC_EXTERN int

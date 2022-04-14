@@ -50,7 +50,7 @@ btc_address_hash(const btc_address_t *x) {
                 | ((uint32_t)x->version << 8)
                 | ((uint32_t)x->length << 0);
 
-  return btc_murmur3_sum(x->hash, 40, seed ^ 0xfba4c795);
+  return btc_murmur3_sum(x->hash, x->length, seed ^ 0xfba4c795);
 }
 
 int
@@ -76,6 +76,12 @@ btc_address_compare(const btc_address_t *x, const btc_address_t *y) {
     return (int)x->version - (int)y->version;
 
   return btc_memcmp4(x->hash, x->length, y->hash, y->length);
+}
+
+int
+btc_address_is_null(const btc_address_t *x) {
+  static const uint8_t zero[40] = {0};
+  return memcmp(x->hash, zero, x->length) == 0;
 }
 
 int

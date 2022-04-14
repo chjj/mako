@@ -36,18 +36,26 @@
 #define BIP39_MAX_WORDLEN 8
 
 /*
+ * Globals
+ */
+
+const btc_mnemonic_t btc_mnemonic_null = {
+  /* .words = */ {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+  },
+  /* .length = */ 12
+};
+
+/*
  * Mnemonic
  */
 
 void
 btc_mnemonic_init(btc_mnemonic_t *mn) {
-  int i;
-
-  for (i = 0; i < BIP39_MAX_WORDS; i++)
-    mn->words[i] = 0;
-
-  mn->words[11] = 3;
-  mn->length = 12;
+  memset(mn, 0, sizeof(*mn));
 }
 
 void
@@ -76,6 +84,11 @@ btc_mnemonic_equal(const btc_mnemonic_t *x, const btc_mnemonic_t *y) {
   z |= x->length ^ y->length;
 
   return (z - 1) >> 31;
+}
+
+int
+btc_mnemonic_is_null(const btc_mnemonic_t *mn) {
+  return mn->length == 0;
 }
 
 void

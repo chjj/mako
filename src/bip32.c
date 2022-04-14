@@ -102,28 +102,6 @@ find_prefix(const uint32_t *table, uint32_t prefix) {
  * HD Node
  */
 
-static void
-btc_hdnode_init(btc_hdnode_t *node) {
-  static const uint8_t g[33] = {
-    0x02,
-    0x79, 0xbe, 0x66, 0x7e, 0xf9, 0xdc, 0xbb, 0xac,
-    0x55, 0xa0, 0x62, 0x95, 0xce, 0x87, 0x0b, 0x07,
-    0x02, 0x9b, 0xfc, 0xdb, 0x2d, 0xce, 0x28, 0xd9,
-    0x59, 0xf2, 0x81, 0x5b, 0x16, 0xf8, 0x17, 0x98
-  };
-
-  node->type = BTC_BIP32_STANDARD;
-  node->depth = 0;
-  node->parent = 0;
-  node->index = 0;
-
-  memset(node->chain, 0, 32);
-  memset(node->seckey, 0, 32);
-  memcpy(node->pubkey, g, 33);
-
-  node->seckey[31] = 1;
-}
-
 static uint32_t
 btc_hdnode_fingerprint(const btc_hdnode_t *node) {
   uint8_t hash[20];
@@ -146,13 +124,50 @@ const uint32_t btc_bip32_purpose[6] = {
   86  /* p2tr */
 };
 
+const btc_hdnode_t btc_hdpriv_null = {
+  /* .type = */ BTC_BIP32_STANDARD,
+  /* .depth = */ 0,
+  /* .parent = */ 0,
+  /* .index = */ 0,
+  /* .chain = */ {0},
+  /* .seckey = */ {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01
+  },
+  /* .pubkey = */ {
+    0x02,
+    0x79, 0xbe, 0x66, 0x7e, 0xf9, 0xdc, 0xbb, 0xac,
+    0x55, 0xa0, 0x62, 0x95, 0xce, 0x87, 0x0b, 0x07,
+    0x02, 0x9b, 0xfc, 0xdb, 0x2d, 0xce, 0x28, 0xd9,
+    0x59, 0xf2, 0x81, 0x5b, 0x16, 0xf8, 0x17, 0x98
+  }
+};
+
+const btc_hdnode_t btc_hdpub_null = {
+  /* .type = */ BTC_BIP32_STANDARD,
+  /* .depth = */ 0,
+  /* .parent = */ 0,
+  /* .index = */ 0,
+  /* .chain = */ {0},
+  /* .seckey = */ {0},
+  /* .pubkey = */ {
+    0x02,
+    0x79, 0xbe, 0x66, 0x7e, 0xf9, 0xdc, 0xbb, 0xac,
+    0x55, 0xa0, 0x62, 0x95, 0xce, 0x87, 0x0b, 0x07,
+    0x02, 0x9b, 0xfc, 0xdb, 0x2d, 0xce, 0x28, 0xd9,
+    0x59, 0xf2, 0x81, 0x5b, 0x16, 0xf8, 0x17, 0x98
+  }
+};
+
 /*
  * HD Private
  */
 
 void
 btc_hdpriv_init(btc_hdnode_t *node) {
-  btc_hdnode_init(node);
+  memset(node, 0, sizeof(*node));
 }
 
 void
@@ -246,6 +261,17 @@ btc_hdpriv_equal(const btc_hdnode_t *x, const btc_hdnode_t *y) {
 }
 
 int
+btc_hdpriv_is_null(const btc_hdnode_t *node) {
+  uint32_t z = 0;
+  int i;
+
+  for (i = 0; i < 32; i++)
+    z |= node->seckey[i];
+
+  return (z - 1) >> 31;
+}
+
+int
 btc_hdpriv_derive(btc_hdnode_t *child,
                   const btc_hdnode_t *node,
                   uint32_t index,
@@ -279,7 +305,7 @@ retry:
 
   if (!btc_ecdsa_privkey_tweak_add(seckey, node->seckey, hash)) {
     if (!btc_ecdsa_privkey_verify(node->seckey))
-      btc_abort(); /* LCOV_EXCL_LINE */
+      return 0; /* LCOV_EXCL_LINE */
 
     if (index & BTC_BIP32_HARDEN) {
       if (++index == 0)
@@ -493,9 +519,7 @@ fail:
 
 void
 btc_hdpub_init(btc_hdnode_t *node) {
-  btc_hdnode_init(node);
-
-  node->seckey[31] = 0;
+  memset(node, 0, sizeof(*node));
 }
 
 void
@@ -559,6 +583,17 @@ btc_hdpub_equal(const btc_hdnode_t *x, const btc_hdnode_t *y) {
 }
 
 int
+btc_hdpub_is_null(const btc_hdnode_t *node) {
+  uint32_t z = 0;
+  int i;
+
+  for (i = 0; i < 33; i++)
+    z |= node->pubkey[i];
+
+  return (z - 1) >> 31;
+}
+
+int
 btc_hdpub_derive(btc_hdnode_t *child,
                  const btc_hdnode_t *node,
                  uint32_t index) {
@@ -583,7 +618,7 @@ retry:
 
   if (!btc_ecdsa_pubkey_tweak_add(pubkey, node->pubkey, 33, hash, 1)) {
     if (!btc_ecdsa_pubkey_verify(node->pubkey, 33))
-      btc_abort(); /* LCOV_EXCL_LINE */
+      return 0; /* LCOV_EXCL_LINE */
 
     if (++index & BTC_BIP32_HARDEN)
       return 0; /* LCOV_EXCL_LINE */

@@ -30,6 +30,8 @@ extern "C" {
  */
 
 BTC_EXTERN extern const uint32_t btc_bip32_purpose[6];
+BTC_EXTERN extern const btc_hdnode_t btc_hdpriv_null;
+BTC_EXTERN extern const btc_hdnode_t btc_hdpub_null;
 
 /*
  * HD Private
@@ -67,6 +69,9 @@ btc_hdpriv_generate(btc_hdnode_t *node, enum btc_bip32_type type);
 
 BTC_EXTERN int
 btc_hdpriv_equal(const btc_hdnode_t *x, const btc_hdnode_t *y);
+
+BTC_EXTERN int
+btc_hdpriv_is_null(const btc_hdnode_t *node);
 
 BTC_EXTERN int
 btc_hdpriv_derive(btc_hdnode_t *child,
@@ -147,6 +152,9 @@ btc_hdpub_set(btc_hdnode_t *node,
 
 BTC_EXTERN int
 btc_hdpub_equal(const btc_hdnode_t *x, const btc_hdnode_t *y);
+
+BTC_EXTERN int
+btc_hdpub_is_null(const btc_hdnode_t *node);
 
 BTC_EXTERN int
 btc_hdpub_derive(btc_hdnode_t *child,
