@@ -37,6 +37,28 @@ json_raw_new(const uint8_t *xp, size_t xn) {
   return json_string_new_nocopy(xn * 2, zp);
 }
 
+int
+json_raw_get(uint8_t *zp, size_t *zn, const json_value *obj) {
+  const char *ptr;
+  size_t len;
+
+  if (obj->type != json_string)
+    return 0;
+
+  ptr = obj->u.string.ptr;
+  len = obj->u.string.length;
+
+  if ((len & 1) || (len >> 1) > *zn)
+    return 0;
+
+  if (!btc_base16_decode(zp, ptr, len))
+    return 0;
+
+  *zn = len / 2;
+
+  return 1;
+}
+
 json_value *
 json_hash_new(const uint8_t *hash) {
   char str[64 + 1];

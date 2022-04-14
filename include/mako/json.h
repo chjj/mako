@@ -29,6 +29,7 @@
 #define json_print_ex btc_json_print_ex
 
 #define json_raw_new btc_json_raw_new
+#define json_raw_get btc_json_raw_get
 #define json_hash_new btc_json_hash_new
 #define json_hash_get btc_json_hash_get
 #define json_amount_get btc_json_amount_get
@@ -123,6 +124,9 @@ json_print_ex(json_value *value,
 
 BTC_EXTERN json_value *
 json_raw_new(const uint8_t *xp, size_t xn);
+
+BTC_EXTERN int
+json_raw_get(uint8_t *zp, size_t *zn, const json_value *obj);
 
 BTC_EXTERN json_value *
 json_hash_new(const uint8_t *hash);
