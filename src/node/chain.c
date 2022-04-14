@@ -2167,10 +2167,8 @@ btc_chain_compute_version(btc_chain_t *chain, const btc_entry_t *prev) {
     deploy = &network->deployments.items[i];
     state = btc_chain_get_state(chain, prev, deploy);
 
-    if (state == BTC_STATE_LOCKED_IN
-        || (state == BTC_STATE_STARTED && deploy->force)) {
+    if (state == BTC_STATE_LOCKED_IN || state == BTC_STATE_STARTED)
       version |= (UINT32_C(1) << deploy->bit);
-    }
   }
 
   version |= BTC_VERSION_TOP_BITS;
