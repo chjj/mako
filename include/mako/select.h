@@ -24,8 +24,10 @@ extern "C" {
 enum btc_selection {
   BTC_SELECT_ALL,
   BTC_SELECT_RANDOM,
-  BTC_SELECT_AGE,
-  BTC_SELECT_VALUE
+  BTC_SELECT_OLDEST,
+  BTC_SELECT_NEWEST,
+  BTC_SELECT_LOWEST,
+  BTC_SELECT_HIGHEST
 };
 
 typedef struct btc_selopt_s {

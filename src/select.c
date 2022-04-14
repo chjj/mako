@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+
 #include <mako/address.h>
 #include <mako/coins.h>
 #include <mako/consensus.h>
@@ -19,6 +20,7 @@
 #include <mako/tx.h>
 #include <mako/util.h>
 #include <mako/vector.h>
+
 #include "impl.h"
 #include "internal.h"
 
@@ -38,7 +40,7 @@ typedef struct btc_utxo_s {
  */
 
 static size_t
-btc_estimate_input_size(const btc_script_t *prev) {
+estimate_input_size(const btc_script_t *prev) {
   size_t base = 40;
   size_t wit = 0;
   unsigned int m;
@@ -111,7 +113,7 @@ dust_threshold(const btc_output_t *output) {
 }
 
 static int
-btc_tx_subtract_index(btc_tx_t *tx, size_t index, int64_t fee) {
+subtract_pos(btc_tx_t *tx, size_t index, int64_t fee) {
   btc_output_t *output;
 
   if (index >= tx->outputs.length)
@@ -128,7 +130,7 @@ btc_tx_subtract_index(btc_tx_t *tx, size_t index, int64_t fee) {
 }
 
 static int
-btc_tx_subtract_fee(btc_tx_t *tx, int64_t fee) {
+subtract_fee(btc_tx_t *tx, int64_t fee) {
   int64_t outputs = 0;
   int64_t share, left;
   size_t i;
@@ -179,7 +181,7 @@ btc_tx_subtract_fee(btc_tx_t *tx, int64_t fee) {
 }
 
 static int64_t
-btc_fee_range(int64_t fee) {
+clamp_fee(int64_t fee) {
   if (fee < 1000)
     return 1000;
 
@@ -190,7 +192,7 @@ btc_fee_range(int64_t fee) {
 }
 
 static int
-cmp_age(const void *xp, const void *yp) {
+cmp_oldest(const void *xp, const void *yp) {
   const btc_utxo_t *x = xp;
   const btc_utxo_t *y = yp;
 
@@ -199,7 +201,25 @@ cmp_age(const void *xp, const void *yp) {
 }
 
 static int
-cmp_value(const void *xp, const void *yp) {
+cmp_newest(const void *xp, const void *yp) {
+  return cmp_oldest(yp, xp);
+}
+
+static int
+cmp_lowest(const void *xp, const void *yp) {
+  const btc_utxo_t *x = xp;
+  const btc_utxo_t *y = yp;
+  int xh = (x->height < 0);
+  int yh = (y->height < 0);
+
+  if (xh != yh)
+    return xh - yh;
+
+  return BTC_CMP(x->value, y->value);
+}
+
+static int
+cmp_highest(const void *xp, const void *yp) {
   const btc_utxo_t *x = xp;
   const btc_utxo_t *y = yp;
   int xh = (x->height < 0);
@@ -217,7 +237,7 @@ cmp_value(const void *xp, const void *yp) {
 
 void
 btc_selopt_init(btc_selopt_t *opt) {
-  opt->strategy = BTC_SELECT_VALUE;
+  opt->strategy = BTC_SELECT_HIGHEST;
   opt->rate = 10000;
   opt->fee = -1;
   opt->maxfee = -1;
@@ -278,8 +298,8 @@ btc_selector_spendable(const btc_selector_t *sel, const btc_coin_t *coin) {
   if (coin->spent)
     return 0;
 
-  if (opt->smart && coin->height == -1) {
-    if (!coin->safe)
+  if (opt->smart && !coin->safe) {
+    if (coin->height == -1)
       return 0;
   }
 
@@ -290,7 +310,7 @@ btc_selector_spendable(const btc_selector_t *sel, const btc_coin_t *coin) {
     if (coin->height == -1)
       return 0; /* LCOV_EXCL_LINE */
 
-    if (opt->height + 1 < coin->height + BTC_COINBASE_MATURITY)
+    if (opt->height + 1 < coin->height + BTC_COINBASE_MATURITY + 20)
       return 0;
   }
 
@@ -315,7 +335,7 @@ btc_selector_push(btc_selector_t *sel,
 
   if (btc_outset_has(&sel->inputs, prevout)) {
     sel->inpval += coin->output.value;
-    sel->size += btc_estimate_input_size(&coin->output.script);
+    sel->size += estimate_input_size(&coin->output.script);
     sel->resolved++;
     return 1;
   }
@@ -328,7 +348,7 @@ btc_selector_push(btc_selector_t *sel,
   utxo->prevout = *prevout;
   utxo->height = coin->height;
   utxo->value = coin->output.value;
-  utxo->size = btc_estimate_input_size(&coin->output.script);
+  utxo->size = estimate_input_size(&coin->output.script);
 
   switch (sel->strategy) {
     case BTC_SELECT_ALL: {
@@ -351,13 +371,23 @@ btc_selector_push(btc_selector_t *sel,
       break;
     }
 
-    case BTC_SELECT_AGE: {
-      btc_heap_insert(&sel->utxos, utxo, cmp_age);
+    case BTC_SELECT_OLDEST: {
+      btc_heap_insert(&sel->utxos, utxo, cmp_oldest);
       break;
     }
 
-    case BTC_SELECT_VALUE: {
-      btc_heap_insert(&sel->utxos, utxo, cmp_value);
+    case BTC_SELECT_NEWEST: {
+      btc_heap_insert(&sel->utxos, utxo, cmp_newest);
+      break;
+    }
+
+    case BTC_SELECT_LOWEST: {
+      btc_heap_insert(&sel->utxos, utxo, cmp_lowest);
+      break;
+    }
+
+    case BTC_SELECT_HIGHEST: {
+      btc_heap_insert(&sel->utxos, utxo, cmp_highest);
       break;
     }
 
@@ -376,10 +406,14 @@ btc_selector_shift(btc_selector_t *sel) {
     case BTC_SELECT_ALL:
     case BTC_SELECT_RANDOM:
       return btc_vector_pop(&sel->utxos);
-    case BTC_SELECT_AGE:
-      return btc_heap_shift(&sel->utxos, cmp_age);
-    case BTC_SELECT_VALUE:
-      return btc_heap_shift(&sel->utxos, cmp_value);
+    case BTC_SELECT_OLDEST:
+      return btc_heap_shift(&sel->utxos, cmp_oldest);
+    case BTC_SELECT_NEWEST:
+      return btc_heap_shift(&sel->utxos, cmp_newest);
+    case BTC_SELECT_LOWEST:
+      return btc_heap_shift(&sel->utxos, cmp_lowest);
+    case BTC_SELECT_HIGHEST:
+      return btc_heap_shift(&sel->utxos, cmp_highest);
   }
   btc_abort(); /* LCOV_EXCL_LINE */
   return NULL; /* LCOV_EXCL_LINE */
@@ -407,7 +441,7 @@ btc_selector_fee(const btc_selector_t *sel, int64_t rate) {
   else
     fee = btc_get_fee(rate, sel->size);
 
-  return btc_fee_range(fee);
+  return clamp_fee(fee);
 }
 
 static int
@@ -516,7 +550,7 @@ btc_selector_fill(btc_selector_t *sel, const btc_address_t *addr) {
 
   /* Select necessary coins. */
   if (opt->fee >= 0) {
-    fee = btc_fee_range(opt->fee);
+    fee = clamp_fee(opt->fee);
     change = btc_selector_by_fee(sel, fee);
   } else if (opt->rate > 0) {
     change = btc_selector_by_rate(sel, opt->rate);
@@ -530,16 +564,17 @@ btc_selector_fill(btc_selector_t *sel, const btc_address_t *addr) {
 
   /* Attempt to subtract fee. */
   if (opt->subfee) {
-    if (!btc_tx_subtract_fee(tx, fee))
+    if (!subtract_fee(tx, fee))
       return 0;
   } else if (opt->subpos >= 0) {
-    if (!btc_tx_subtract_index(tx, opt->subpos, fee))
+    if (!subtract_pos(tx, opt->subpos, fee))
       return 0;
   }
 
   /* Add a change output. */
   output = btc_output_create();
   output->value = change;
+
   btc_address_get_script(&output->script, addr);
 
   if (btc_output_is_dust(output, BTC_MIN_RELAY)) {
