@@ -1299,6 +1299,7 @@ json_credit_new(const btc_output_t *output,
                 size_t index,
                 const char *name,
                 const btc_network_t *network) {
+  int64_t amount = -output->value;
   const char *category = "send";
   btc_address_t addr;
   size_t length = 3;
@@ -1306,6 +1307,7 @@ json_credit_new(const btc_output_t *output,
   json_value *obj;
 
   if (name != NULL) {
+    amount = output->value;
     category = "receive";
     length += 1;
   }
@@ -1324,7 +1326,7 @@ json_credit_new(const btc_output_t *output,
     json_object_push(obj, "address", json_address_new(&addr, network));
 
   json_object_push(obj, "category", json_string_new(category));
-  json_object_push(obj, "amount", json_amount_new(output->value));
+  json_object_push(obj, "amount", json_amount_new(amount));
   json_object_push(obj, "vout", json_integer_new(index));
 
   return obj;
@@ -1348,18 +1350,13 @@ json_wtx_new(btc_rpc_t *rpc, const btc_txmeta_t *meta, const btc_tx_t *tx) {
   for (i = 0; i < tx->outputs.length; i++) {
     const btc_output_t *output = tx->outputs.items[i];
     btc_path_t path;
+    int is_recv = 0;
 
     if (btc_wallet_output_path(&path, wallet, output)) {
       if (path.change)
         continue;
 
-      btc_wallet_name(name, sizeof(name), wallet, path.account);
-
-      json_array_push(details, json_credit_new(output, i, name, network));
-
-      recv += output->value;
-
-      continue;
+      is_recv = 1;
     }
 
     if (is_send) {
@@ -1367,11 +1364,19 @@ json_wtx_new(btc_rpc_t *rpc, const btc_txmeta_t *meta, const btc_tx_t *tx) {
 
       sent += output->value;
     }
+
+    if (is_recv) {
+      btc_wallet_name(name, sizeof(name), wallet, path.account);
+
+      json_array_push(details, json_credit_new(output, i, name, network));
+
+      recv += output->value;
+    }
   }
 
   wtx = json_object_new(9 + (meta->height >= 0 ? 4 : 0));
 
-  json_object_push(wtx, "amount", json_amount_new(is_send ? -sent : recv));
+  json_object_push(wtx, "amount", json_amount_new(recv - sent));
 
   if (meta->resolved == tx->inputs.length) {
     int64_t fee = meta->inpval - btc_tx_output_value(tx);
@@ -1436,11 +1441,10 @@ json_ltx_new(btc_rpc_t *rpc, const btc_txmeta_t *meta, const btc_tx_t *tx) {
       }
 
       recv += output->value;
-
-      continue;
     }
 
-    sent += output->value;
+    if (is_send)
+      sent += output->value;
   }
 
   wtx = json_object_new(8);
@@ -1453,12 +1457,15 @@ json_ltx_new(btc_rpc_t *rpc, const btc_txmeta_t *meta, const btc_tx_t *tx) {
   if (!btc_tx_is_coinbase(tx)) {
     const char *category = is_send ? "send" : "receive";
 
+    if (is_send && *name)
+      category = "both";
+
     json_object_push(wtx, "category", json_string_new(category));
   } else {
     json_object_push(wtx, "category", json_string_new("generate"));
   }
 
-  json_object_push(wtx, "amount", json_amount_new(is_send ? -sent : recv));
+  json_object_push(wtx, "amount", json_amount_new(recv - sent));
 
   if (meta->resolved == tx->inputs.length) {
     int64_t fee = meta->inpval - btc_tx_output_value(tx);
@@ -1848,8 +1855,6 @@ btc_rpc_getaddressinfo(btc_rpc_t *rpc,
     THROW_TYPE(address, address);
 
   if (btc_wallet_path(&path, wallet, &addr)) {
-    THROW(RPC_WALLET_ERROR, "Address not found");
-
     if (!btc_wallet_name(name, sizeof(name), wallet, path.account))
       THROW(RPC_WALLET_ERROR, "Account not found");
 
