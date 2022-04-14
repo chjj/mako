@@ -98,12 +98,16 @@ btc_wallet_create(const btc_network_t *network, const btc_walopt_t *options) {
 
   if (options->chain != NULL) {
     wallet->chain_tmp = *options->chain;
+    wallet->options.type = options->chain->type;
     wallet->options.chain = &wallet->chain_tmp;
   } else {
     btc_hdpriv_init(&wallet->chain_tmp);
     wallet->options.chain = NULL;
   }
 
+  btc_outset_init(&wallet->frozen);
+
+  wallet->rate = 10000;
   wallet->db = NULL;
   wallet->cache = NULL;
 
@@ -115,6 +119,7 @@ btc_wallet_create(const btc_network_t *network, const btc_walopt_t *options) {
   wallet->unique_id = 0;
 
   btc_balance_init(&wallet->balance);
+  btc_balance_init(&wallet->watched);
   btc_master_init(&wallet->master, network);
 
   return wallet;
@@ -122,10 +127,17 @@ btc_wallet_create(const btc_network_t *network, const btc_walopt_t *options) {
 
 void
 btc_wallet_destroy(btc_wallet_t *wallet) {
+  btc_mapiter_t it;
+
+  btc_map_each(&wallet->frozen, it)
+    btc_outpoint_destroy(wallet->frozen.keys[it]);
+
   btc_master_clear(&wallet->master);
   btc_bloom_clear(&wallet->filter);
+  btc_outset_clear(&wallet->frozen);
   btc_hdpriv_clear(&wallet->chain_tmp);
   btc_mnemonic_clear(&wallet->mnemonic_tmp);
+
   btc_free(wallet);
 }
 
@@ -272,13 +284,22 @@ btc_wallet_init_data(btc_wallet_t *wallet) {
       return 0;
   }
 
-  db_batch(&batch);
+  if (wallet->options.chain) {
+    const btc_hdnode_t *node = wallet->options.chain;
+
+    if (node->depth | node->parent | node->index)
+      return 0;
+
+    if (btc_hdpriv_is_null(node))
+      return 0;
+  }
 
   wallet->account_index = 0;
   wallet->watch_index = BTC_BIP32_HARDEN - 1;
   wallet->unique_id = 0;
 
   btc_balance_init(&wallet->balance);
+  btc_balance_init(&wallet->watched);
 
   if (wallet->options.mnemonic) {
     btc_master_import_mnemonic(&wallet->master,
@@ -293,6 +314,8 @@ btc_wallet_init_data(btc_wallet_t *wallet) {
   } else {
     btc_master_generate(&wallet->master, wallet->options.type);
   }
+
+  db_batch(&batch);
 
   btc_account_init(&acct, NULL);
   btc_account_generate(&acct, &batch, "default", &wallet->master, 0);
@@ -412,6 +435,28 @@ btc_wallet_sync_state(btc_wallet_t *wallet) {
   return btc_wallet_rescan(wallet, height);
 }
 
+static void
+btc_wallet_resend(btc_wallet_t *wallet) {
+  const btc_wclient_t *client = &wallet->client;
+  btc_txiter_t *it = btc_wallet_txs(wallet);
+  int total = 0;
+
+  btc_txiter_start(it, -1);
+  btc_txiter_first(it);
+
+  for (; btc_txiter_valid(it); btc_txiter_next(it)) {
+    const btc_tx_t *tx = btc_txiter_value(it);
+
+    btc_wclient_send(client, tx);
+
+    total++;
+  }
+
+  btc_log(wallet, LOG_INFO, "Rebroadcasted %d transactions.", total);
+
+  btc_txiter_destroy(it);
+}
+
 int
 btc_wallet_open(btc_wallet_t *wallet, const char *path) {
   const btc_wclient_t *client = &wallet->client;
@@ -443,6 +488,8 @@ btc_wallet_open(btc_wallet_t *wallet, const char *path) {
                             wallet->state.height,
                             wallet->state.start_height);
 
+  btc_wallet_resend(wallet);
+
   return 1;
 fail:
   btc_wallet_unload_database(wallet);
@@ -466,7 +513,11 @@ static int
 btc_wallet_account(btc_account_t *acct,
                    btc_wallet_t *wallet,
                    uint32_t account) {
+  if (account == BTC_NO_ACCOUNT)
+    account = 0;
+
   btc_account_init(acct, (btc_bloom_t *)&wallet->filter);
+
   return db_get_account(wallet->db, account, acct);
 }
 
@@ -522,6 +573,22 @@ btc_wallet_sync(btc_wallet_t *wallet, const btc_tx_t *tx) {
   btc_intmap_clear(&map);
 }
 
+int32_t
+btc_wallet_height(btc_wallet_t *wallet) {
+  return wallet->state.height;
+}
+
+int64_t
+btc_wallet_rate(btc_wallet_t *wallet, int64_t rate) {
+  if (rate == 0)
+    rate = 10000;
+
+  if (rate >= 0)
+    wallet->rate = rate;
+
+  return wallet->rate;
+}
+
 void
 btc_wallet_tick(void *ptr) {
   btc_wallet_t *wallet = ptr;
@@ -531,6 +598,16 @@ btc_wallet_tick(void *ptr) {
 int
 btc_wallet_locked(btc_wallet_t *wallet) {
   return wallet->master.locked;
+}
+
+int
+btc_wallet_encrypted(btc_wallet_t *wallet) {
+  return wallet->master.algorithm != BTC_KDF_NONE;
+}
+
+int64_t
+btc_wallet_until(btc_wallet_t *wallet) {
+  return wallet->master.deadline;
 }
 
 void
@@ -544,15 +621,10 @@ btc_wallet_unlock(btc_wallet_t *wallet, const char *pass, int64_t msec) {
 }
 
 int
-btc_wallet_encrypt(btc_wallet_t *wallet,
-                   const char *oldpass,
-                   const char *newpass) {
+btc_wallet_encrypt(btc_wallet_t *wallet, const char *pass) {
   ldb_batch_t batch;
 
-  if (!btc_master_unlock(&wallet->master, oldpass, -1))
-    return 0;
-
-  if (!btc_master_encrypt(&wallet->master, BTC_KDF_PBKDF2, newpass))
+  if (!btc_master_encrypt(&wallet->master, BTC_KDF_PBKDF2, pass))
     return 0;
 
   db_batch(&batch);
@@ -567,14 +639,11 @@ btc_wallet_encrypt(btc_wallet_t *wallet,
 }
 
 int
-btc_wallet_decrypt(btc_wallet_t *wallet, const char *pass) {
+btc_wallet_decrypt(btc_wallet_t *wallet) {
   ldb_batch_t batch;
 
   if (wallet->master.algorithm == BTC_KDF_NONE)
     return 1;
-
-  if (!btc_master_unlock(&wallet->master, pass, -1))
-    return 0;
 
   if (!btc_master_encrypt(&wallet->master, BTC_KDF_NONE, NULL))
     return 0;
@@ -597,6 +666,29 @@ btc_wallet_master(btc_mnemonic_t *mnemonic,
 
   *mnemonic = wallet->master.mnemonic;
   *master = wallet->master.chain;
+
+  return 1;
+}
+
+int
+btc_wallet_purpose(uint32_t *purpose,
+                   uint32_t *account,
+                   btc_wallet_t *wallet,
+                   uint32_t number) {
+  btc_account_t acct;
+
+  if (BTC_WATCH_ONLY(number)) {
+    if (!btc_wallet_account(&acct, wallet, number))
+      return 0;
+
+    *purpose = btc_bip32_purpose[acct.key.type];
+    *account = acct.key.index & ~BTC_BIP32_HARDEN;
+
+    return 1;
+  }
+
+  *purpose = btc_bip32_purpose[wallet->master.type];
+  *account = number;
 
   return 1;
 }
@@ -630,6 +722,9 @@ btc_wallet_lookup(uint32_t *account, btc_wallet_t *wallet, const char *name) {
   if (len == 0 || len > 63)
     return 0;
 
+  if (strcmp(name, "*") == 0)
+    return BTC_NO_ACCOUNT;
+
   return db_get_index(wallet->db, name, account);
 }
 
@@ -637,6 +732,9 @@ int
 btc_wallet_name(char *name, size_t size,
                 btc_wallet_t *wallet,
                 uint32_t account) {
+  if (account == BTC_NO_ACCOUNT)
+    return btc_strcpy(name, size, "*");
+
   return db_get_name(wallet->db, account, name, size);
 }
 
@@ -646,19 +744,35 @@ btc_wallet_balance(btc_balance_t *bal, btc_wallet_t *wallet, uint32_t account) {
     *bal = wallet->balance;
     return 1;
   }
+
+  return db_get_balance(wallet->db, account, bal);
+}
+
+int
+btc_wallet_watched(btc_balance_t *bal, btc_wallet_t *wallet, uint32_t account) {
+  if (account == BTC_NO_ACCOUNT) {
+    *bal = wallet->watched;
+    return 1;
+  }
+
+  if ((account & BTC_BIP32_HARDEN) == 0) {
+    btc_balance_init(bal);
+    return 1;
+  }
+
   return db_get_balance(wallet->db, account, bal);
 }
 
 int
 btc_wallet_privkey(uint8_t *privkey,
                    btc_wallet_t *wallet,
-                   const btc_path_t path) {
+                   const btc_path_t *path) {
   btc_hdnode_t node;
 
   if (wallet->master.locked)
     return 0;
 
-  if (!btc_master_leaf(&node, &wallet->master, &path))
+  if (!btc_master_leaf(&node, &wallet->master, path))
     return 0;
 
   memcpy(privkey, node.seckey, 32);
@@ -671,14 +785,14 @@ btc_wallet_privkey(uint8_t *privkey,
 int
 btc_wallet_pubkey(uint8_t *pubkey,
                   btc_wallet_t *wallet,
-                  const btc_path_t path) {
+                  const btc_path_t *path) {
   btc_account_t acct;
   btc_hdnode_t node;
 
-  if (!btc_wallet_account(&acct, wallet, path.account))
+  if (!btc_wallet_account(&acct, wallet, path->account))
     return 0;
 
-  btc_account_leaf(&node, &acct, path.change, path.index);
+  btc_account_leaf(&node, &acct, path->change, path->index);
 
   memcpy(pubkey, node.pubkey, 33);
 
@@ -690,13 +804,13 @@ btc_wallet_pubkey(uint8_t *pubkey,
 int
 btc_wallet_address(btc_address_t *addr,
                    btc_wallet_t *wallet,
-                   const btc_path_t path) {
+                   const btc_path_t *path) {
   btc_account_t acct;
 
-  if (!btc_wallet_account(&acct, wallet, path.account))
+  if (!btc_wallet_account(&acct, wallet, path->account))
     return 0;
 
-  btc_account_address(addr, &acct, path.change, path.index);
+  btc_account_address(addr, &acct, path->change, path->index);
 
   return 1;
 }
@@ -782,7 +896,7 @@ btc_wallet_create_account(btc_wallet_t *wallet,
   if (wallet->master.locked)
     return 0;
 
-  if (len == 0 || len > 63)
+  if (len == 0 || len > 63 || strcmp(name, "*") == 0)
     return 0;
 
   if (db_has_index(wallet->db, name))
@@ -825,7 +939,19 @@ btc_wallet_create_watcher(btc_wallet_t *wallet,
   btc_account_t acct;
   ldb_batch_t batch;
 
-  if (len == 0 || len > 63)
+  if (len == 0 || len > 63 || strcmp(name, "*") == 0)
+    return 0;
+
+  switch (node->type) {
+    case BTC_BIP32_STANDARD:
+    case BTC_BIP32_P2WPKH:
+    case BTC_BIP32_NESTED_P2WPKH:
+      break;
+    default:
+      return 0;
+  }
+
+  if (node->depth != 2 || !(node->index & BTC_BIP32_HARDEN))
     return 0;
 
   if (db_has_index(wallet->db, name))
@@ -841,6 +967,77 @@ btc_wallet_create_watcher(btc_wallet_t *wallet,
   db_write(wallet->db, &batch);
 
   return 1;
+}
+
+btc_outset_t *
+btc_wallet_frozen(btc_wallet_t *wallet) {
+  return &wallet->frozen;
+}
+
+void
+btc_wallet_freeze(btc_wallet_t *wallet, const btc_outpoint_t *outpoint) {
+  btc_outset_t *map = &wallet->frozen;
+  btc_mapiter_t it;
+  int exists;
+
+  it = btc_outset_insert(map, outpoint, &exists);
+
+  if (!exists)
+    map->keys[it] = btc_outpoint_clone(outpoint);
+}
+
+void
+btc_wallet_unfreeze(btc_wallet_t *wallet, const btc_outpoint_t *outpoint) {
+  btc_outset_t *map = &wallet->frozen;
+  btc_outpoint_t *key;
+  btc_mapiter_t it;
+
+  if (outpoint == NULL) {
+    btc_map_each(map, it)
+      btc_outpoint_destroy(map->keys[it]);
+
+    btc_outset_reset(map);
+
+    return;
+  }
+
+  key = btc_outset_del(map, outpoint);
+
+  if (key != NULL)
+    btc_outpoint_destroy(key);
+}
+
+int
+btc_wallet_is_frozen(btc_wallet_t *wallet, const btc_outpoint_t *outpoint) {
+  return btc_outset_has(&wallet->frozen, outpoint);
+}
+
+void
+btc_wallet_freezes(btc_wallet_t *wallet, const btc_tx_t *tx) {
+  size_t i;
+
+  if (btc_tx_is_coinbase(tx))
+    return;
+
+  for (i = 0; i < tx->inputs.length; i++) {
+    const btc_input_t *input = tx->inputs.items[i];
+
+    btc_wallet_freeze(wallet, &input->prevout);
+  }
+}
+
+void
+btc_wallet_unfreezes(btc_wallet_t *wallet, const btc_tx_t *tx) {
+  size_t i;
+
+  if (btc_tx_is_coinbase(tx))
+    return;
+
+  for (i = 0; i < tx->inputs.length; i++) {
+    const btc_input_t *input = tx->inputs.items[i];
+
+    btc_wallet_unfreeze(wallet, &input->prevout);
+  }
 }
 
 int
@@ -864,6 +1061,7 @@ btc_wallet_fund(btc_wallet_t *wallet,
     opt = *options;
 
   opt.height = height;
+  opt.rate = wallet->rate;
 
   if (account != BTC_NO_ACCOUNT)
     opt.watch = 1;
@@ -872,18 +1070,19 @@ btc_wallet_fund(btc_wallet_t *wallet,
 
   it = btc_wallet_coins(wallet);
 
-  if (account != BTC_NO_ACCOUNT)
-    btc_coiniter_account(it, account);
+  btc_coiniter_account(it, account);
 
   btc_coiniter_each(it) {
     btc_outpoint_t *prevout = btc_coiniter_key(it);
-    btc_coin_t *coin = btc_coiniter_value(it);
+    btc_coin_t *coin;
+
+    if (btc_wallet_is_frozen(wallet, prevout))
+      continue;
+
+    coin = btc_coiniter_value(it);
 
     btc_selector_push(&sel, prevout, coin);
   }
-
-  if (account == BTC_NO_ACCOUNT)
-    account = 0;
 
   if (!btc_wallet_change(&addr, wallet, account))
     goto fail;
@@ -906,7 +1105,7 @@ derive(uint8_t *priv, const btc_address_t *addr, void *arg) {
   if (!btc_wallet_path(&path, wallet, addr))
     return 0;
 
-  return btc_wallet_privkey(priv, wallet, path);
+  return btc_wallet_privkey(priv, wallet, &path);
 }
 
 int
@@ -1210,6 +1409,16 @@ btc_wallet_rescan(btc_wallet_t *wallet, int32_t height) {
 }
 
 int
+btc_wallet_abandon(btc_wallet_t *wallet, const uint8_t *hash) {
+  return btc_txdb_abandon(wallet, hash);
+}
+
+int
+btc_wallet_backup(btc_wallet_t *wallet, const char *path) {
+  return ldb_backup(wallet->db, path) == LDB_OK;
+}
+
+int
 btc_wallet_coin(btc_coin_t **coin,
                 btc_wallet_t *wallet,
                 const uint8_t *hash,
@@ -1271,7 +1480,8 @@ btc_wallet_watch(btc_wallet_t *wallet, const uint8_t *hash, uint32_t index) {
 
 size_t
 btc_wallet_size(const btc_wallet_t *wallet) {
-  return 16 + btc_balance_size(&wallet->balance);
+  return 16 + btc_balance_size(&wallet->balance)
+            + btc_balance_size(&wallet->watched);
 }
 
 uint8_t *
@@ -1280,6 +1490,7 @@ btc_wallet_write(uint8_t *zp, const btc_wallet_t *x) {
   zp = btc_uint32_write(zp, x->watch_index);
   zp = btc_uint64_write(zp, x->unique_id);
   zp = btc_balance_write(zp, &x->balance);
+  zp = btc_balance_write(zp, &x->watched);
   return zp;
 }
 
@@ -1295,6 +1506,9 @@ btc_wallet_read(btc_wallet_t *z, const uint8_t **xp, size_t *xn) {
     return 0;
 
   if (!btc_balance_read(&z->balance, xp, xn))
+    return 0;
+
+  if (!btc_balance_read(&z->watched, xp, xn))
     return 0;
 
   return 1;

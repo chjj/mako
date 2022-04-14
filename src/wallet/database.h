@@ -453,7 +453,7 @@ db_put_flags(ldb_batch_t *batch, uint32_t magic, uint32_t flags) {
 BTC_UNUSED static void
 db_put_wallet(ldb_batch_t *batch, const btc_wallet_t *wallet) {
   ldb_slice_t val;
-  uint8_t zp[48];
+  uint8_t zp[80];
 
   val.data = zp;
   val.size = btc_wallet_export(zp, wallet);
@@ -463,7 +463,7 @@ db_put_wallet(ldb_batch_t *batch, const btc_wallet_t *wallet) {
 
 BTC_UNUSED static void
 db_put_master(ldb_batch_t *batch, const btc_master_t *master) {
-  uint8_t zp[236];
+  uint8_t zp[237];
   ldb_slice_t val;
 
   val.data = zp;
@@ -738,7 +738,7 @@ db_put_txmeta(ldb_batch_t *batch,
               const btc_txmeta_t *meta) {
   uint8_t buf[KEY_TXMETA_LEN];
   ldb_slice_t key, val;
-  uint8_t zp[64];
+  uint8_t zp[76];
 
   key = key_txmeta(hash, buf);
 

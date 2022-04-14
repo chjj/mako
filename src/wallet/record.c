@@ -99,6 +99,7 @@ btc_balance_read(btc_balance_t *z, const uint8_t **xp, size_t *xn) {
 void
 btc_delta_init(btc_delta_t *delta) {
   btc_balance_init(&delta->balance);
+  btc_balance_init(&delta->watched);
   btc_intmap_init(&delta->map);
 
   delta->updated = 0;
@@ -133,6 +134,8 @@ btc_delta_tx(btc_delta_t *delta, const btc_path_t *path, int64_t value) {
 
   if (!(path->account & BTC_BIP32_HARDEN))
     delta->balance.tx = value;
+  else
+    delta->watched.tx = value;
 
   delta->updated = 1;
 }
@@ -143,6 +146,8 @@ btc_delta_coin(btc_delta_t *delta, const btc_path_t *path, int64_t value) {
 
   if (!(path->account & BTC_BIP32_HARDEN))
     delta->balance.coin += value;
+  else
+    delta->watched.coin += value;
 }
 
 void
@@ -151,6 +156,8 @@ btc_delta_unconf(btc_delta_t *delta, const btc_path_t *path, int64_t value) {
 
   if (!(path->account & BTC_BIP32_HARDEN))
     delta->balance.unconfirmed += value;
+  else
+    delta->watched.unconfirmed += value;
 }
 
 void
@@ -159,6 +166,8 @@ btc_delta_conf(btc_delta_t *delta, const btc_path_t *path, int64_t value) {
 
   if (!(path->account & BTC_BIP32_HARDEN))
     delta->balance.confirmed += value;
+  else
+    delta->watched.confirmed += value;
 }
 
 /*
@@ -412,7 +421,8 @@ btc_txmeta_init(btc_txmeta_t *meta) {
   meta->time = 0;
   meta->mtime = 0;
   meta->index = -1;
-  /* meta->refs = 0; */ /* XXX maybe add this */
+  meta->resolved = 0;
+  meta->inpval = 0;
 
   btc_hash_init(meta->block);
 }
@@ -428,6 +438,8 @@ btc_txmeta_set(btc_txmeta_t *meta,
     meta->time = entry->header.time;
     meta->mtime = btc_now();
     meta->index = index;
+    meta->resolved = 0;
+    meta->inpval = 0;
 
     btc_hash_copy(meta->block, entry->hash);
   } else {
@@ -452,7 +464,7 @@ btc_txmeta_set_block(btc_txmeta_t *meta,
 size_t
 btc_txmeta_size(const btc_txmeta_t *txmeta) {
   (void)txmeta;
-  return 64;
+  return 76;
 }
 
 uint8_t *
@@ -463,6 +475,8 @@ btc_txmeta_write(uint8_t *zp, const btc_txmeta_t *x) {
   zp = btc_int64_write(zp, x->mtime);
   zp = btc_int32_write(zp, x->index);
   zp = btc_raw_write(zp, x->block, 32);
+  zp = btc_uint32_write(zp, x->resolved);
+  zp = btc_int64_write(zp, x->inpval);
   return zp;
 }
 
@@ -484,6 +498,12 @@ btc_txmeta_read(btc_txmeta_t *z, const uint8_t **xp, size_t *xn) {
     return 0;
 
   if (!btc_raw_read(z->block, 32, xp, xn))
+    return 0;
+
+  if (!btc_uint32_read(&z->resolved, xp, xn))
+    return 0;
+
+  if (!btc_int64_read(&z->inpval, xp, xn))
     return 0;
 
   return 1;

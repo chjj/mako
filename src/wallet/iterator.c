@@ -219,7 +219,7 @@ btc_addriter_destroy(btc_addriter_t *iter) {
 void
 btc_addriter_account(btc_addriter_t *iter, uint32_t account) {
   iter->account = account;
-  iter->has_account = 1;
+  iter->has_account = (account != BTC_NO_ACCOUNT);
 }
 
 static void
@@ -396,7 +396,7 @@ btc_coiniter_destroy(btc_coiniter_t *iter) {
 void
 btc_coiniter_account(btc_coiniter_t *iter, uint32_t account) {
   iter->account = account;
-  iter->has_account = 1;
+  iter->has_account = (account != BTC_NO_ACCOUNT);
 }
 
 static void
@@ -580,7 +580,7 @@ btc_txiter_destroy(btc_txiter_t *iter) {
 void
 btc_txiter_account(btc_txiter_t *iter, uint32_t account) {
   iter->account = account;
-  iter->has_account = 1;
+  iter->has_account = (account != BTC_NO_ACCOUNT);
 }
 
 void
@@ -783,9 +783,6 @@ btc_txiter_meta(btc_txiter_t *iter) {
 
   if (!db_get_txmeta(iter->db, iter->hash, &iter->meta))
     db_abort("txiter_meta", LDB_CORRUPTION);
-
-  if (iter->has_account)
-    iter->meta.id = iter->id;
 
   return &iter->meta;
 }

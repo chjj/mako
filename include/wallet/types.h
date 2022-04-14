@@ -17,6 +17,12 @@ extern "C" {
 #include "../mako/types.h"
 
 /*
+ * Constants
+ */
+
+#define BTC_NO_ACCOUNT ((uint32_t)-1)
+
+/*
  * Types
  */
 
@@ -52,6 +58,8 @@ typedef struct btc_txmeta_s {
   int64_t mtime;
   int32_t index;
   uint8_t block[32];
+  uint32_t resolved;
+  int64_t inpval;
 } btc_txmeta_t;
 
 typedef struct btc_walopt_s {

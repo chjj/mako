@@ -39,6 +39,7 @@
 void
 btc_master_init(btc_master_t *key, const btc_network_t *network) {
   key->network = network;
+  key->type = BTC_BIP32_P2WPKH;
 
   btc_mnemonic_init(&key->mnemonic);
   btc_hdpriv_init(&key->chain);
@@ -108,11 +109,12 @@ btc_plaintext_set(btc_buffer_t *z, const btc_master_t *x) {
 
 size_t
 btc_master_size(const btc_master_t *key) {
-  return 41 + btc_buffer_size(&key->payload);
+  return 42 + btc_buffer_size(&key->payload);
 }
 
 uint8_t *
 btc_master_write(uint8_t *zp, const btc_master_t *x) {
+  zp = btc_uint8_write(zp, x->type);
   zp = btc_uint8_write(zp, x->algorithm);
   zp = btc_raw_write(zp, x->nonce, 24);
   zp = btc_uint64_write(zp, x->N);
@@ -124,7 +126,14 @@ btc_master_write(uint8_t *zp, const btc_master_t *x) {
 
 int
 btc_master_read(btc_master_t *z, const uint8_t **xp, size_t *xn) {
+  uint8_t type;
+
   btc_master_reset(z);
+
+  if (!btc_uint8_read(&type, xp, xn))
+    return 0;
+
+  z->type = (enum btc_bip32_type)type;
 
   if (!btc_uint8_read(&z->algorithm, xp, xn))
     return 0;
@@ -334,6 +343,8 @@ btc_master_generate(btc_master_t *key, enum btc_bip32_type type) {
 
   btc_master_reset(key);
 
+  key->type = type;
+
   do {
     btc_mnemonic_generate(&key->mnemonic, 256);
 
@@ -350,6 +361,8 @@ btc_master_import_mnemonic(btc_master_t *key,
                            const btc_mnemonic_t *mnemonic) {
   btc_master_reset(key);
 
+  key->type = type;
+
   if (!btc_hdpriv_set_mnemonic(&key->chain, type, mnemonic, 0))
     return 0;
 
@@ -363,6 +376,9 @@ btc_master_import_mnemonic(btc_master_t *key,
 void
 btc_master_import_chain(btc_master_t *key, const btc_hdnode_t *node) {
   btc_master_reset(key);
+
+  key->type = node->type;
+
   btc_hdpriv_copy(&key->chain, node);
   btc_plaintext_set(&key->payload, key);
 }
@@ -371,14 +387,13 @@ int
 btc_master_account(btc_hdnode_t *node,
                    const btc_master_t *key,
                    uint32_t account) {
-  static const uint32_t purposes[] = {44, 49, 84, 48, 48, 86};
   uint32_t type = key->network->key.coin_type;
   uint32_t purpose;
 
   if (key->locked)
     return 0;
 
-  purpose = purposes[key->chain.type];
+  purpose = btc_bip32_purpose[key->chain.type];
 
   return btc_hdpriv_account(node,
                             &key->chain,

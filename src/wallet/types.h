@@ -34,12 +34,14 @@ typedef struct btc_account_s {
 
 typedef struct btc_delta_s {
   btc_balance_t balance;
+  btc_balance_t watched;
   btc_intmap_t map;
   int updated;
 } btc_delta_t;
 
 typedef struct btc_master_s {
   const btc_network_t *network;
+  enum btc_bip32_type type;
   btc_mnemonic_t mnemonic;
   btc_hdnode_t chain;
   int locked;
@@ -67,6 +69,8 @@ struct btc_wallet_s {
   btc_wclient_t client;
   btc_mnemonic_t mnemonic_tmp;
   btc_hdnode_t chain_tmp;
+  btc_outset_t frozen;
+  int64_t rate;
   ldb_t *db;
   ldb_lru_t *cache;
   btc_state_t state;
@@ -75,6 +79,7 @@ struct btc_wallet_s {
   uint32_t watch_index;
   uint64_t unique_id;
   btc_balance_t balance;
+  btc_balance_t watched;
   btc_master_t master;
 };
 

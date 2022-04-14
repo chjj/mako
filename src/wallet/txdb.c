@@ -86,6 +86,9 @@ btc_txdb_insert(btc_txdb_t *txdb,
       btc_delta_coin(&state, &path, -1);
       btc_delta_unconf(&state, &path, -coin->output.value);
 
+      meta.resolved += 1;
+      meta.inpval += coin->output.value;
+
       if (!entry) {
         /* If the tx is not mined, we do not
            disconnect the coin, we simply mark
@@ -182,12 +185,13 @@ btc_txdb_insert(btc_txdb_t *txdb,
   txdb->unique_id++;
 
   btc_balance_apply(&txdb->balance, &state.balance);
+  btc_balance_apply(&txdb->watched, &state.watched);
 
   db_put_wallet(&b, txdb);
   db_write(db, &b);
 
   /* This transaction may unlock some coins now that we've seen it. */
-  /* btc_wallet_unlock_tx(txdb, tx); */
+  btc_wallet_unfreezes(txdb, tx);
 
   btc_delta_clear(&state);
 
@@ -244,6 +248,9 @@ btc_txdb_confirm(btc_txdb_t *txdb,
         btc_outpoint_set(&spend, tx->hash, i);
         db_put_spend(&b, op->hash, op->index, &spend);
         db_put_undo(&b, tx->hash, i, coin);
+
+        meta.resolved += 1;
+        meta.inpval += coin->output.value;
 
         resolved = 1;
       }
@@ -338,12 +345,13 @@ btc_txdb_confirm(btc_txdb_t *txdb,
 
   /* Commit the new state. The balance has updated. */
   btc_balance_apply(&txdb->balance, &state.balance);
+  btc_balance_apply(&txdb->watched, &state.watched);
 
   db_put_wallet(&b, txdb);
   db_write(db, &b);
 
   /* This transaction may unlock some coins now that we've seen it. */
-  /* btc_wallet_unlock_tx(txdb, tx); */
+  btc_wallet_unfreezes(txdb, tx);
 
   btc_delta_clear(&state);
 
@@ -459,6 +467,7 @@ btc_txdb_unconfirm(btc_txdb_t *txdb, const btc_tx_t *tx) {
 
   /* Commit state due to unconfirmed vs. confirmed balance change. */
   btc_balance_apply(&txdb->balance, &state.balance);
+  btc_balance_apply(&txdb->watched, &state.watched);
 
   db_put_wallet(&b, txdb);
   db_write(db, &b);
@@ -571,6 +580,7 @@ btc_txdb_erase(btc_txdb_t *txdb, const btc_tx_t *tx) {
 
   /* Update the transaction counter and commit new state. */
   btc_balance_apply(&txdb->balance, &state.balance);
+  btc_balance_apply(&txdb->watched, &state.watched);
 
   db_put_wallet(&b, txdb);
   db_write(db, &b);
