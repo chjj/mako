@@ -18,6 +18,7 @@
 #define json_signed_get btc_json_signed_get
 #define json_unsigned_get btc_json_unsigned_get
 #define json_double_get btc_json_double_get
+#define json_string_get btc_json_string_get
 #define json_object_get btc_json_object_get
 #define json_object_pluck btc_json_object_pluck
 #define json_encode btc_json_encode
@@ -27,6 +28,7 @@
 #define json_print btc_json_print
 #define json_print_ex btc_json_print_ex
 
+#define json_raw_new btc_json_raw_new
 #define json_hash_new btc_json_hash_new
 #define json_hash_get btc_json_hash_get
 #define json_amount_get btc_json_amount_get
@@ -41,6 +43,7 @@
 #define json_script_new btc_json_script_new
 #define json_coin_new btc_json_coin_new
 #define json_outpoint_new btc_json_outpoint_new
+#define json_outpoint_get btc_json_outpoint_get
 #define json_input_new btc_json_input_new
 #define json_output_new btc_json_output_new
 #define json_output_new_ex btc_json_output_new_ex
@@ -53,10 +56,14 @@
 #define json_block_new_ex btc_json_block_new_ex
 
 #define json_tx_base btc_json_tx_base
+#define json_tx_base_get btc_json_tx_base_get
 #define json_tx_raw btc_json_tx_raw
+#define json_tx_get btc_json_tx_get
 #define json_header_raw btc_json_header_raw
+#define json_header_get btc_json_header_get
 #define json_block_base btc_json_block_base
 #define json_block_raw btc_json_block_raw
+#define json_block_get btc_json_block_get
 
 #ifdef __cplusplus
 extern "C" {
@@ -77,6 +84,9 @@ json_unsigned_get(int *z, const json_value *obj);
 
 BTC_EXTERN int
 json_double_get(double *z, const json_value *obj);
+
+BTC_EXTERN int
+json_string_get(const char **z, const json_value *obj);
 
 BTC_EXTERN json_value *
 json_object_get(const json_value *obj, const char *name);
@@ -110,6 +120,9 @@ json_print_ex(json_value *value,
 /*
  * JSON Objects
  */
+
+BTC_EXTERN json_value *
+json_raw_new(const uint8_t *xp, size_t xn);
 
 BTC_EXTERN json_value *
 json_hash_new(const uint8_t *hash);
@@ -154,6 +167,9 @@ json_coin_new(const btc_coin_t *coin, const btc_network_t *network);
 
 BTC_EXTERN json_value *
 json_outpoint_new(const btc_outpoint_t *outpoint);
+
+BTC_EXTERN int
+json_outpoint_get(btc_outpoint_t *outpoint, const json_value *obj);
 
 BTC_EXTERN json_value *
 json_input_new(const btc_input_t *input,
@@ -213,17 +229,29 @@ json_block_new_ex(const btc_block_t *block,
 BTC_EXTERN json_value *
 json_tx_base(const btc_tx_t *tx);
 
+BTC_EXTERN int
+json_tx_base_get(btc_tx_t **tx, const json_value *obj);
+
 BTC_EXTERN json_value *
 json_tx_raw(const btc_tx_t *tx);
 
+BTC_EXTERN int
+json_tx_get(btc_tx_t **tx, const json_value *obj);
+
 BTC_EXTERN json_value *
 json_header_raw(const btc_header_t *hdr);
+
+BTC_EXTERN int
+json_header_get(btc_header_t *hdr, const json_value *obj);
 
 BTC_EXTERN json_value *
 json_block_base(const btc_block_t *block);
 
 BTC_EXTERN json_value *
 json_block_raw(const btc_block_t *block);
+
+BTC_EXTERN int
+json_block_get(btc_block_t **block, const json_value *obj);
 
 #ifdef __cplusplus
 }
