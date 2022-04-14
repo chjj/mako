@@ -197,7 +197,7 @@ int
 btc_node_open(btc_node_t *node, const char *prefix, unsigned int flags) {
   char file[BTC_PATH_MAX];
 
-  btc_fs_mkdir(prefix);
+  btc_fs_mkdirp(prefix);
 
   if (!btc_fs_exists(prefix)) {
     fprintf(stderr, "ERROR: Could not create prefix '%s'.\n", prefix);
@@ -245,6 +245,14 @@ btc_node_open(btc_node_t *node, const char *prefix, unsigned int flags) {
   if (!btc_rpc_open(node->rpc, flags)) {
     btc_log_error(node, "Failed to open RPC.");
     goto fail6;
+  }
+
+  {
+    btc_address_t addr;
+
+    CHECK(btc_wallet_receive(&addr, node->wallet, -1));
+
+    btc_miner_add_address(node->miner, &addr);
   }
 
   return 1;
