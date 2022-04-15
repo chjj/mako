@@ -1025,7 +1025,6 @@ btc_rpc_listbanned(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
     THROW_MISC("listbanned");
 }
 
-
 static void
 btc_rpc_ping(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
   (void)rpc;
@@ -1587,7 +1586,6 @@ btc_rpc_createaccount(btc_rpc_t *rpc,
   uint32_t account = BTC_NO_ACCOUNT;
   const char *name;
   size_t len;
-  int index;
 
   if (params->help || params->length < 1 || params->length > 2)
     THROW_MISC("createaccount \"name\" ( index )");
@@ -1596,10 +1594,10 @@ btc_rpc_createaccount(btc_rpc_t *rpc,
     THROW_TYPE(name, string);
 
   if (params->length > 1) {
-    if (!json_unsigned_get(&index, params->values[1]))
+    if (!json_uint32_get(&account, params->values[1]))
       THROW_TYPE(index, integer);
 
-    account = index;
+    account &= ~BTC_BIP32_HARDEN;
   }
 
   len = strlen(name);
@@ -1884,8 +1882,6 @@ btc_rpc_getaddressinfo(btc_rpc_t *rpc,
   json_object_push(obj, "scriptPubKey", json_buffer_new(&script));
   json_object_push(obj, "ismine", json_boolean_new(is_mine));
 
-  btc_script_clear(&script);
-
   if (is_mine) {
     json_object_push(obj, "iswatchonly", json_boolean_new(path.account >> 31));
     json_object_push(obj, "ischange", json_boolean_new(path.change != 0));
@@ -1901,6 +1897,8 @@ btc_rpc_getaddressinfo(btc_rpc_t *rpc,
     json_object_push(obj, "witness_program", json_raw_new(program.data,
                                                           program.length));
   }
+
+  btc_script_clear(&script);
 
   if (is_mine) {
     uint32_t coin_type = rpc->network->key.coin_type;
@@ -2224,7 +2222,7 @@ btc_rpc_listsinceblock(btc_rpc_t *rpc,
       THROW_TYPE(limit, integer);
   }
 
-  txs = json_array_new(limit);
+  txs = json_array_new(limit + 100);
 
   it = btc_wallet_txs(rpc->wallet);
 
@@ -2240,7 +2238,7 @@ btc_rpc_listsinceblock(btc_rpc_t *rpc,
       if (btc_txiter_height(it) == stop)
         break;
 
-      if (i >= limit)
+      if (i + 1 >= limit)
         stop = btc_txiter_height(it) + 1;
     }
 
@@ -2255,8 +2253,12 @@ btc_rpc_listsinceblock(btc_rpc_t *rpc,
   if (last >= 0) {
     entry = btc_chain_by_height(rpc->chain, last + 1);
 
-    if (entry != NULL)
+    if (entry != NULL) {
       next = entry->hash;
+      last += 1;
+    } else {
+      last = -1;
+    }
   }
 
   btc_txiter_destroy(it);
@@ -2265,6 +2267,7 @@ btc_rpc_listsinceblock(btc_rpc_t *rpc,
 
   json_object_push(obj, "transactions", txs);
   json_object_push(obj, "nextblock", json_hash_new(next));
+  json_object_push(obj, "nextheight", json_integer_new(last));
 
   res->result = obj;
 }
@@ -2275,11 +2278,11 @@ btc_rpc_listtransactions(btc_rpc_t *rpc,
                          rpc_res_t *res) {
   uint32_t account = BTC_NO_ACCOUNT;
   const char *name = NULL;
+  uint64_t after = 0;
   btc_txiter_t *it;
   json_value *txs;
   int limit = 100;
   int reverse = 0;
-  int after = -1;
   int i = 0;
 
   if (params->help || params->length > 3)
@@ -2306,7 +2309,7 @@ btc_rpc_listtransactions(btc_rpc_t *rpc,
   }
 
   if (params->length > 2) {
-    if (!json_unsigned_get(&after, params->values[2]))
+    if (!json_uint64_get(&after, params->values[2]))
       THROW_TYPE(after, integer);
   }
 
@@ -2316,7 +2319,7 @@ btc_rpc_listtransactions(btc_rpc_t *rpc,
 
   btc_txiter_account(it, account);
 
-  if (after >= 0) {
+  if (params->length > 2) {
     if (reverse)
       btc_txiter_seek_lt(it, after);
     else
