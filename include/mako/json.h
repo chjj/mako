@@ -84,6 +84,12 @@ BTC_EXTERN int
 json_unsigned_get(int *z, const json_value *obj);
 
 BTC_EXTERN int
+json_uint32_get(uint32_t *z, const json_value *obj);
+
+BTC_EXTERN int
+json_uint64_get(uint64_t *z, const json_value *obj);
+
+BTC_EXTERN int
 json_double_get(double *z, const json_value *obj);
 
 BTC_EXTERN int
