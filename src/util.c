@@ -173,6 +173,16 @@ btc_strdup(const char *xp) {
   return (char *)btc_memdup(xp, strlen(xp) + 1);
 }
 
+int
+btc_starts_with(const char *xp, const char *yp) {
+  while (*xp && *xp == *yp) {
+    xp++;
+    yp++;
+  }
+
+  return *yp == 0;
+}
+
 /*
  * Hash
  */

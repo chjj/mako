@@ -121,6 +121,9 @@ btc_strnlen(const char *xp, size_t max);
 BTC_EXTERN char *
 btc_strdup(const char *xp);
 
+BTC_EXTERN int
+btc_starts_with(const char *xp, const char *yp);
+
 /*
  * Hash
  */
