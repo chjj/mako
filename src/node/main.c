@@ -19,6 +19,53 @@
 
 #include <mako/config.h>
 #include <mako/netaddr.h>
+#include <mako/util.h>
+
+#include "../internal.h"
+
+/*
+ * Arguments
+ */
+
+static const char *node_args[] = {
+  "-?",
+  "-bantime=",
+  "-bind=",
+  "-blocksonly=",
+  "-chain=",
+  "-checkpoints=",
+  "-compactblocks=",
+  "-conf=",
+  "-connect=",
+  "-daemon=",
+  "-datadir=",
+  "-dbcache=",
+  "-disablewallet=",
+  "-discover=",
+  "-externalip=",
+  "-listen=",
+  "-loglevel=",
+  "-maxconnections=",
+  "-maxinbound=",
+  "-maxoutbound=",
+  "-networkactive=",
+  "-onion=",
+  "-onlynet=",
+  "-par=",
+  "-peerblockfilters=",
+  "-peerbloomfilters=",
+  "-port=",
+  "-proxy=",
+  "-prune=",
+  "-rpcbind=",
+  "-rpcconnect=",
+  "-rpcpassword=",
+  "-rpcport=",
+  "-rpcuser=",
+  "-testnet",
+  "-upnp=",
+  "-version"
+};
 
 /*
  * Config
@@ -195,8 +242,22 @@ btc_main(const btc_conf_t *conf) {
 
 int
 main(int argc, char **argv) {
-  btc_conf_t *conf = get_config(argc, argv);
+  btc_conf_t *conf;
   int ok;
+
+  if (argc > 1 && strcmp(argv[1], "_complete") == 0) {
+    const char *word = argc > 2 ? argv[argc - 1] : "";
+    size_t i;
+
+    for (i = 0; i < lengthof(node_args); i++) {
+      if (btc_starts_with(node_args[i], word))
+        puts(node_args[i]);
+    }
+
+    return EXIT_SUCCESS;
+  }
+
+  conf = get_config(argc, argv);
 
   if (conf == NULL)
     return EXIT_FAILURE;

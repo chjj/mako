@@ -15,6 +15,7 @@
 
 #include <mako/config.h>
 #include <mako/json.h>
+#include <mako/util.h>
 
 #include "../internal.h"
 
@@ -26,6 +27,23 @@ static const json_serialize_opts json_options = {
   json_serialize_mode_multiline,
   json_serialize_opt_pack_brackets,
   2
+};
+
+/*
+ * Arguments
+ */
+
+static const char *rpc_args[] = {
+  "-?",
+  "-chain=",
+  "-conf=",
+  "-datadir=",
+  "-rpcconnect=",
+  "-rpcpassword=",
+  "-rpcport=",
+  "-rpcuser=",
+  "-testnet",
+  "-version"
 };
 
 /*
@@ -321,8 +339,31 @@ fail:
 
 int
 main(int argc, char **argv) {
-  btc_conf_t *conf = get_config(argc, argv);
+  btc_conf_t *conf;
   int ok;
+
+  if (argc > 1 && strcmp(argv[1], "_complete") == 0) {
+    const char *word = argc > 2 ? argv[argc - 1] : "";
+    size_t i;
+
+    if (word[0] == '-') {
+      for (i = 0; i < lengthof(rpc_args); i++) {
+        if (btc_starts_with(rpc_args[i], word))
+          puts(rpc_args[i]);
+      }
+    } else {
+      for (i = 0; i < lengthof(rpc_methods); i++) {
+        const char *method = rpc_methods[i].method;
+
+        if (btc_starts_with(method, word))
+          puts(method);
+      }
+    }
+
+    return EXIT_SUCCESS;
+  }
+
+  conf = get_config(argc, argv);
 
   if (conf == NULL)
     return EXIT_FAILURE;
