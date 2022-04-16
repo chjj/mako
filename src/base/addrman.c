@@ -12,9 +12,9 @@
 
 #include <io/core.h>
 
-#include <node/addrman.h>
-#include <node/logger.h>
-#include <node/timedata.h>
+#include <base/addrman.h>
+#include <base/logger.h>
+#include <base/timedata.h>
 
 #include <mako/crypto/hash.h>
 #include <mako/crypto/rand.h>
@@ -324,7 +324,7 @@ btc_addrman_create(const btc_network_t *network) {
   man->logger = NULL;
   man->timedata = NULL;
   man->file[0] = '\0';
-  man->flags = BTC_POOL_DEFAULT_FLAGS;
+  man->flags = 0;
   btc_netaddr_set(&man->addr, "127.0.0.1", network->port);
   man->addr.services = BTC_NET_DEFAULT_SERVICES;
   man->addr.time = btc_now();

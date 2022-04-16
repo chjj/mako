@@ -404,10 +404,10 @@ list(APPEND io_sources src/io/http/http_client.c
                        src/io/sockaddr.c
                        src/io/workers.c)
 
-list(APPEND base_sources src/node/addrman.c
-                         src/config.c
-                         src/node/logger.c
-                         src/node/timedata.c)
+list(APPEND base_sources src/base/addrman.c
+                         src/base/config.c
+                         src/base/logger.c
+                         src/base/timedata.c)
 
 list(APPEND node_sources src/node/chain.c
                          src/node/chaindb.c

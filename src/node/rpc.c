@@ -13,15 +13,15 @@
 #include <io/http.h>
 #include <io/loop.h>
 
-#include <node/addrman.h>
+#include <base/addrman.h>
 #include <node/chain.h>
-#include <node/logger.h>
+#include <base/logger.h>
 #include <node/mempool.h>
 #include <node/miner.h>
 #include <node/node.h>
 #include <node/pool.h>
 #include <node/rpc.h>
-#include <node/timedata.h>
+#include <base/timedata.h>
 
 #include <mako/crypto/ecc.h>
 #include <mako/crypto/hash.h>

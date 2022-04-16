@@ -69,7 +69,6 @@ mako_HEADERS = include/mako/address.h   \
                include/mako/buffer.h    \
                include/mako/coins.h     \
                include/mako/common.h    \
-               include/mako/config.h    \
                include/mako/consensus.h \
                include/mako/encoding.h  \
                include/mako/entry.h     \
@@ -98,16 +97,18 @@ noinst_HEADERS = include/client/client.h           \
                  include/io/http.h                 \
                  include/io/loop.h                 \
                  include/io/workers.h              \
-                 include/node/addrman.h            \
+                 include/base/addrman.h            \
+                 include/base/config.h             \
                  include/node/chaindb.h            \
                  include/node/chain.h              \
-                 include/node/logger.h             \
+                 include/base/logger.h             \
                  include/node/mempool.h            \
                  include/node/miner.h              \
                  include/node/node.h               \
                  include/node/pool.h               \
                  include/node/rpc.h                \
-                 include/node/timedata.h           \
+                 include/base/timedata.h           \
+                 include/base/types.h              \
                  include/node/types.h              \
                  include/wallet/client.h           \
                  include/wallet/iterator.h         \
@@ -261,10 +262,10 @@ io_sources = src/io/http/http_client.c \
              src/io/sockaddr.c         \
              src/io/workers.c
 
-base_sources = src/node/addrman.c  \
-               src/config.c        \
-               src/node/logger.c   \
-               src/node/timedata.c
+base_sources = src/base/addrman.c  \
+               src/base/config.c   \
+               src/base/logger.c   \
+               src/base/timedata.c
 
 node_sources = src/node/chain.c    \
                src/node/chaindb.c  \

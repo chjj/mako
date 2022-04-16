@@ -14,8 +14,8 @@
 
 #include <node/chain.h>
 #include <node/chaindb.h>
-#include <node/logger.h>
-#include <node/timedata.h>
+#include <base/logger.h>
+#include <base/timedata.h>
 
 #include <mako/block.h>
 #include <mako/coins.h>

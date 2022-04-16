@@ -292,8 +292,6 @@ enum btc_ipnet {
   BTC_IPNET_TEREDO
 };
 
-typedef struct btc_conf_s btc_conf_t;
-
 typedef struct _json_value btc_json_t;
 
 /*

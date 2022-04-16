@@ -13,7 +13,7 @@
 
 #include <io/core.h>
 
-#include <mako/config.h>
+#include <base/config.h>
 #include <mako/json.h>
 #include <mako/util.h>
 

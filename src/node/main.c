@@ -12,12 +12,12 @@
 #include <io/core.h>
 
 #include <node/chain.h>
-#include <node/logger.h>
+#include <base/logger.h>
 #include <node/node.h>
 #include <node/pool.h>
 #include <node/rpc.h>
 
-#include <mako/config.h>
+#include <base/config.h>
 #include <mako/netaddr.h>
 #include <mako/util.h>
 

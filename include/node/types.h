@@ -13,6 +13,7 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdint.h>
+#include "../base/types.h"
 
 /*
  * Flags
@@ -71,8 +72,6 @@ enum btc_node_flags {
 struct btc_network_s;
 struct btc_loop_s;
 
-typedef struct btc_addrman_s btc_addrman_t;
-
 typedef struct btc_deployment_state_s {
   unsigned int flags;
   unsigned int lock_flags;
@@ -83,15 +82,6 @@ typedef struct btc_deployment_state_s {
 
 typedef struct btc_chaindb_s btc_chaindb_t;
 typedef struct btc_chain_s btc_chain_t;
-
-typedef struct btc_logger_s btc_logger_t;
-
-typedef struct btc_timedata_s {
-  int64_t samples[200];
-  size_t length;
-  int64_t offset;
-  int checked;
-} btc_timedata_t;
 
 typedef struct btc_pool_s btc_pool_t;
 

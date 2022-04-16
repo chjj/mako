@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 #include <stddef.h>
-#include "common.h"
+#include "../mako/common.h"
 #include "types.h"
 
 /*

@@ -11,12 +11,12 @@
 #include <io/core.h>
 #include <io/loop.h>
 
-#include <node/addrman.h>
+#include <base/addrman.h>
 #include <node/chain.h>
-#include <node/logger.h>
+#include <base/logger.h>
 #include <node/mempool.h>
 #include <node/pool.h>
-#include <node/timedata.h>
+#include <base/timedata.h>
 
 #include <mako/bip37.h>
 #include <mako/bip152.h>

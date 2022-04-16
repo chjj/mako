@@ -11,7 +11,7 @@
 #include <unistd.h>
 #endif
 #include <io/core.h>
-#include <node/logger.h>
+#include <base/logger.h>
 #include <mako/printf.h>
 #include <mako/util.h>
 #include "../internal.h"

@@ -12,10 +12,10 @@
 #include <io/loop.h>
 
 #include <node/chain.h>
-#include <node/logger.h>
+#include <base/logger.h>
 #include <node/mempool.h>
 #include <node/miner.h>
-#include <node/timedata.h>
+#include <base/timedata.h>
 
 #include <mako/address.h>
 #include <mako/block.h>

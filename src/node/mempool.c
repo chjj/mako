@@ -11,9 +11,9 @@
 #include <io/core.h>
 
 #include <node/chain.h>
-#include <node/logger.h>
+#include <base/logger.h>
 #include <node/mempool.h>
-#include <node/timedata.h>
+#include <base/timedata.h>
 
 #include <mako/block.h>
 #include <mako/bloom.h>
