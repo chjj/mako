@@ -248,8 +248,6 @@ btc_wallet_init_state(btc_wallet_t *wallet) {
     wallet->state.marked = 1;
   }
 
-  btc_state_init(&wallet->state, wallet->network);
-
   db_put_state(&batch, &wallet->state);
 
   db_write(wallet->db, &batch);
