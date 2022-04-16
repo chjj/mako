@@ -296,7 +296,10 @@ btc_master_lock(btc_master_t *key) {
 
 void
 btc_master_maybe_lock(btc_master_t *key) {
-  if (!key->locked || key->deadline == 0)
+  if (key->algorithm == BTC_KDF_NONE)
+    return;
+
+  if (key->locked || key->deadline == 0)
     return;
 
   if (btc_time_msec() >= key->deadline)
