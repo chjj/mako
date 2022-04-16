@@ -255,6 +255,8 @@ btc_node_open(btc_node_t *node, const char *prefix, unsigned int flags) {
     btc_miner_add_address(node->miner, &addr);
   }
 
+  btc_loop_on_tick(node->loop, btc_wallet_tick, node->wallet);
+
   return 1;
 fail6:
   btc_wallet_close(node->wallet);
@@ -275,6 +277,8 @@ fail1:
 void
 btc_node_close(btc_node_t *node) {
   btc_log_info(node, "Closing node.");
+
+  btc_loop_off_tick(node->loop, btc_wallet_tick, node->wallet);
 
   btc_rpc_close(node->rpc);
   btc_wallet_close(node->wallet);
