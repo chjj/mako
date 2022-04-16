@@ -1051,7 +1051,6 @@ btc_wallet_fund(btc_wallet_t *wallet,
                 uint32_t account,
                 const btc_selopt_t *options,
                 btc_tx_t *tx) {
-  int32_t height = wallet->state.height + 1;
   btc_coiniter_t *it;
   btc_selector_t sel;
   btc_address_t addr;
@@ -1066,7 +1065,7 @@ btc_wallet_fund(btc_wallet_t *wallet,
   else
     opt = *options;
 
-  opt.height = height;
+  opt.height = wallet->state.height;
   opt.rate = wallet->rate;
 
   if (account != BTC_NO_ACCOUNT)
@@ -1116,6 +1115,9 @@ derive(uint8_t *priv, const btc_address_t *addr, void *arg) {
 
 int
 btc_wallet_sign(btc_wallet_t *wallet, btc_tx_t *tx, const btc_view_t *view) {
+  if (wallet->master.locked)
+    return 0;
+
   return btc_tx_sign(tx, view, derive, wallet);
 }
 
@@ -1129,6 +1131,9 @@ btc_wallet_send(btc_wallet_t *wallet,
   int32_t height = wallet->state.height + 1;
   btc_view_t *view;
   size_t i, total;
+
+  if (wallet->master.locked)
+    return 0;
 
   for (i = 0; i < tx->outputs.length; i++) {
     const btc_output_t *output = tx->outputs.items[i];
