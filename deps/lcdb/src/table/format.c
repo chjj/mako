@@ -157,12 +157,6 @@ ldb_blockcontents_init(ldb_blockcontents_t *x) {
  * Block Read
  */
 
-static void
-ldb_safe_free(void *ptr) {
-  if (ptr != NULL)
-    ldb_free(ptr);
-}
-
 int
 ldb_read_block(ldb_blockcontents_t *result,
                ldb_rfile_t *file,
@@ -187,12 +181,12 @@ ldb_read_block(ldb_blockcontents_t *result,
   rc = ldb_rfile_pread(file, &contents, buf, len, handle->offset);
 
   if (rc != LDB_OK) {
-    ldb_safe_free(buf);
+    ldb_free(buf);
     return rc;
   }
 
   if (contents.size != len) {
-    ldb_safe_free(buf);
+    ldb_free(buf);
     return LDB_IOERR; /* "truncated block read" */
   }
 
@@ -204,7 +198,7 @@ ldb_read_block(ldb_blockcontents_t *result,
     uint32_t actual = ldb_crc32c_value(data, n + 1);
 
     if (crc != actual) {
-      ldb_safe_free(buf);
+      ldb_free(buf);
       return LDB_CORRUPTION; /* "block checksum mismatch" */
     }
   }
@@ -215,7 +209,7 @@ ldb_read_block(ldb_blockcontents_t *result,
         /* File implementation gave us pointer to some other data.
            Use it directly under the assumption that it will be live
            while the file is open. */
-        ldb_safe_free(buf);
+        ldb_free(buf);
         ldb_slice_set(&result->data, data, n);
         result->heap_allocated = 0;
         result->cachable = 0; /* Do not double-cache. */
@@ -234,19 +228,19 @@ ldb_read_block(ldb_blockcontents_t *result,
       uint8_t *ubuf;
 
       if (!snappy_decode_size(&ulength, data, n)) {
-        ldb_safe_free(buf);
+        ldb_free(buf);
         return LDB_CORRUPTION; /* "corrupted compressed block contents" */
       }
 
       ubuf = ldb_malloc(ulength);
 
       if (!snappy_decode(ubuf, data, n)) {
-        ldb_safe_free(buf);
+        ldb_free(buf);
         ldb_free(ubuf);
         return LDB_CORRUPTION; /* "corrupted compressed block contents" */
       }
 
-      ldb_safe_free(buf);
+      ldb_free(buf);
 
       ldb_slice_set(&result->data, ubuf, ulength);
 
@@ -257,7 +251,7 @@ ldb_read_block(ldb_blockcontents_t *result,
     }
 
     default: {
-      ldb_safe_free(buf);
+      ldb_free(buf);
       return LDB_CORRUPTION; /* "bad block type" */
     }
   }

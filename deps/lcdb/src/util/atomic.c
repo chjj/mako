@@ -75,8 +75,8 @@ ldb_atomic__store_ptr(void *volatile *object, void *desired) {
   /* Windows XP and above. */
   (void)InterlockedExchangePointer(object, desired);
 #else
-  /* Windows 98 and above. */
-  (void)InterlockedExchange((volatile long *)object, desired);
+  /* Windows 95 and above. */
+  (void)InterlockedExchange((volatile long *)object, (long)desired);
 #endif
 }
 

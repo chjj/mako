@@ -120,11 +120,11 @@ struct ldb_handler_s {
   void *state;
   ldb_uint64_t number;
 
-  void (*put)(struct ldb_handler_s *handler,
+  void (*put)(ldb_handler_t *handler,
               const ldb_slice_t *key,
               const ldb_slice_t *value);
 
-  void (*del)(struct ldb_handler_s *handler,
+  void (*del)(ldb_handler_t *handler,
               const ldb_slice_t *key);
 };
 
@@ -220,7 +220,7 @@ ldb_lru_destroy(ldb_lru_t *lru);
   (cmp)->shortest_separator = NULL;                            \
   (cmp)->short_successor = NULL;                               \
   (cmp)->user_comparator = NULL;                               \
-  (cmp)->state = (state_);                                     \
+  (cmp)->state = (void *)(state_);                             \
 } while (0)
 
 /**

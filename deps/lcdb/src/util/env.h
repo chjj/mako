@@ -62,6 +62,9 @@ int
 ldb_remove_dir(const char *dirname);
 
 int
+ldb_sync_dir(const char *dirname);
+
+int
 ldb_file_size(const char *filename, uint64_t *size);
 
 int

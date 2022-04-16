@@ -27,6 +27,7 @@
 #include "util/cache.h"
 #include "util/coding.h"
 #include "util/comparator.h"
+#include "util/crc32c.h"
 #include "util/env.h"
 #include "util/internal.h"
 #include "util/options.h"
@@ -963,10 +964,7 @@ ldb_recover_log_file(ldb_t *db, uint64_t log_number,
 
 static int
 compare_ascending(int64_t x, int64_t y) {
-  if (x == y)
-    return 0;
-
-  return x < y ? -1 : 1;
+  return LDB_CMP(x, y);
 }
 
 static int
@@ -1963,7 +1961,9 @@ ldb_backup_inner(const char *dbname, const char *bakname, rb_set64_t *live) {
     ldb_remove_file(lockname);
   }
 
-  if (rc != LDB_OK)
+  if (rc == LDB_OK)
+    rc = ldb_sync_dir(bakname);
+  else
     ldb_remove_dir(bakname);
 
   return rc;
@@ -1980,6 +1980,8 @@ ldb_open(const char *dbname, const ldb_dbopt_t *options, ldb_t **dbptr) {
   ldb_vedit_t edit;
   int rc = LDB_OK;
   ldb_t *db;
+
+  ldb_crc32c_init();
 
   *dbptr = NULL;
 

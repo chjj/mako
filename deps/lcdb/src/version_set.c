@@ -573,10 +573,7 @@ newest_first(void *x, void *y) {
   const ldb_filemeta_t *a = x;
   const ldb_filemeta_t *b = y;
 
-  if (a->number == b->number)
-    return 0;
-
-  return a->number < b->number ? 1 : -1;
+  return LDB_CMP(b->number, a->number);
 }
 
 static void
@@ -915,10 +912,7 @@ by_smallest_key(const ldb_comparator_t *cmp,
     return r;
 
   /* Break ties by file number. */
-  if (f1->number == f2->number)
-    return 0;
-
-  return f1->number < f2->number ? -1 : 1;
+  return LDB_CMP(f1->number, f2->number);
 }
 
 static int

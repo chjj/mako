@@ -92,10 +92,7 @@ file_entry_compare(rb_val_t x, rb_val_t y, void *arg) {
   if (xp->level != yp->level)
     return xp->level - yp->level;
 
-  if (xp->number == yp->number)
-    return 0;
-
-  return xp->number < yp->number ? -1 : 1;
+  return LDB_CMP(xp->number, yp->number);
 }
 
 static void

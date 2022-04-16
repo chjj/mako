@@ -151,6 +151,10 @@ Parts of this software are based on [google/leveldb][ldb]:
 
 - Copyright (c) 2011, The LevelDB Authors. All rights reserved.
 
+Parts of this software are based on [google/crc32c][crc32c]:
+
+- Copyright (c) 2017, The CRC32C Authors.
+
 Parts of this software are based on [golang/snappy][snappy]:
 
 - Copyright (c) 2011 The Snappy-Go Authors. All rights reserved.
@@ -160,6 +164,7 @@ See [LICENSE] for more info.
 [cad]: https://github.com/Level/community/issues/66
 [ldb]: https://github.com/google/leveldb
 [h]: https://github.com/chjj/lcdb/blob/master/include/lcdb.h
+[crc32c]: https://github.com/google/crc32c
 [snappy]: https://github.com/golang/snappy
 [mako]: https://github.com/chjj/mako
 [LICENSE]: https://github.com/chjj/lcdb/blob/master/LICENSE

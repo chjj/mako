@@ -186,7 +186,7 @@ ldb_tablebuilder_write_block(ldb_tablebuilder_t *tb,
    *    type: uint8
    *    crc: uint32
    */
-  ldb_slice_t raw, block_contents;
+  ldb_slice_t raw, *block_contents;
   enum ldb_compression type;
 
   assert(ldb_tablebuilder_ok(tb));
@@ -196,7 +196,7 @@ ldb_tablebuilder_write_block(ldb_tablebuilder_t *tb,
 
   switch (type) {
     case LDB_NO_COMPRESSION: {
-      block_contents = raw;
+      block_contents = &raw;
       break;
     }
 
@@ -213,11 +213,11 @@ ldb_tablebuilder_write_block(ldb_tablebuilder_t *tb,
                                        raw.data, raw.size);
 
       if (compressed->size < raw.size - (raw.size / 8)) {
-        block_contents = *compressed;
+        block_contents = compressed;
       } else {
         /* Snappy not supported, or compressed less than
            12.5%, so just store uncompressed form. */
-        block_contents = raw;
+        block_contents = &raw;
         type = LDB_NO_COMPRESSION;
       }
 
@@ -230,7 +230,7 @@ ldb_tablebuilder_write_block(ldb_tablebuilder_t *tb,
     }
   }
 
-  ldb_tablebuilder_write_raw_block(tb, &block_contents, type, handle);
+  ldb_tablebuilder_write_raw_block(tb, block_contents, type, handle);
 
   /* ldb_buffer_reset(&tb->compressed_output); */
 

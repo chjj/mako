@@ -151,6 +151,7 @@
 #define lengthof(x) (sizeof(x) / sizeof((x)[0]))
 #define LDB_MIN(x, y) ((x) < (y) ? (x) : (y))
 #define LDB_MAX(x, y) ((x) > (y) ? (x) : (y))
+#define LDB_CMP(x, y) (((x) > (y)) - ((x) < (y)))
 
 /*
  * Helpers

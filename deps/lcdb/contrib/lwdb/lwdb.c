@@ -968,6 +968,7 @@ ldb_compact(ldb_t *db, const ldb_slice_t *begin, const ldb_slice_t *end) {
 
 int
 ldb_backup(ldb_t *db, const char *name) {
+  ldb_readopt_t iopt = *ldb_iteropt_default;
   ldb_dbopt_t opt = db->dbopt;
   ldb_batch_t batch;
   size_t size = 0;
@@ -985,7 +986,9 @@ ldb_backup(ldb_t *db, const char *name) {
   if (rc != LDB_OK)
     return rc;
 
-  it = ldb_iterator(db, 0);
+  iopt.snapshot = ldb_snapshot(db);
+
+  it = ldb_iterator(db, &iopt);
 
   ldb_batch_init(&batch);
 
@@ -1015,6 +1018,7 @@ ldb_backup(ldb_t *db, const char *name) {
     rc = ldb_iter_status(it);
 
   ldb_iter_destroy(it);
+  ldb_release(db, iopt.snapshot);
 
   if (rc == LDB_OK && size > 0)
     rc = ldb_write(bak, &batch, 0);
@@ -1336,12 +1340,10 @@ void
 ldb_iter_seek_lt(ldb_iter_t *iter, const ldb_slice_t *target) {
   ldb_iter_seek(iter, target);
 
-  if (ldb_iter_valid(iter)) {
-    if (ldb_iter_compare(iter, target) >= 0)
-      ldb_iter_prev(iter);
-  } else {
+  if (ldb_iter_valid(iter))
+    ldb_iter_prev(iter);
+  else
     ldb_iter_last(iter);
-  }
 }
 
 /*

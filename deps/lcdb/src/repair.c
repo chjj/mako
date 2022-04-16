@@ -24,6 +24,7 @@
 #include "util/buffer.h"
 #include "util/cache.h"
 #include "util/comparator.h"
+#include "util/crc32c.h"
 #include "util/env.h"
 #include "util/internal.h"
 #include "util/options.h"
@@ -706,6 +707,8 @@ int
 ldb_repair(const char *dbname, const ldb_dbopt_t *options) {
   ldb_repair_t rep;
   int rc;
+
+  ldb_crc32c_init();
 
   if (!repair_init(&rep, dbname, options))
     return LDB_INVALID;

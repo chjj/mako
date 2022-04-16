@@ -563,6 +563,25 @@ ldb_remove_dir(const char *dirname) {
 }
 
 int
+ldb_sync_dir(const char *dirname) {
+  int fd = ldb_open(dirname, O_RDONLY, 0);
+  int rc;
+
+  if (fd < 0) {
+    rc = LDB_POSIX_ERROR(errno);
+  } else {
+    rc = ldb_fsync(fd);
+
+    if (rc == LDB_IOERR && errno == EINVAL)
+      rc = LDB_OK;
+
+    close(fd);
+  }
+
+  return rc;
+}
+
+int
 ldb_file_size(const char *filename, uint64_t *size) {
   struct stat st;
 
@@ -584,9 +603,11 @@ ldb_rename_file(const char *from, const char *to) {
 
 int
 ldb_copy_file(const char *from, const char *to) {
-  static const size_t buflen = 512 << 10;
+  static const size_t buflen = 1 << 20;
   unsigned char *buf, *ptr;
+  int rc = LDB_IOERR;
   int len, nwrite;
+  struct stat st;
   int nread = -1;
   int rfd = -1;
   int wfd = -1;
@@ -595,6 +616,11 @@ ldb_copy_file(const char *from, const char *to) {
 
   if (rfd < 0)
     return LDB_POSIX_ERROR(errno);
+
+  if (fstat(rfd, &st) != 0 || !S_ISREG(st.st_mode)) {
+    close(rfd);
+    return LDB_IOERR;
+  }
 
   wfd = ldb_open(to, O_WRONLY | O_CREAT | O_EXCL, 0644);
 
@@ -606,14 +632,17 @@ ldb_copy_file(const char *from, const char *to) {
   buf = malloc(buflen);
 
   if (buf == NULL)
-    goto done;
+    goto fail;
 
   for (;;) {
     do {
       nread = read(rfd, buf, buflen);
     } while (nread < 0 && errno == EINTR);
 
-    if (nread <= 0)
+    if (nread < 0)
+      goto fail;
+
+    if (nread == 0)
       break;
 
     ptr = buf;
@@ -625,28 +654,47 @@ ldb_copy_file(const char *from, const char *to) {
       } while (nwrite < 0 && nwrite == EINTR);
 
       if (nwrite < 0)
-        goto done;
+        goto fail;
 
       ptr += nwrite;
       len -= nwrite;
     }
   }
 
-done:
+  rc = ldb_fsync(wfd);
+fail:
   close(wfd);
   close(rfd);
 
   if (buf != NULL)
     free(buf);
 
-  return nread ? LDB_IOERR : LDB_OK;
+  return rc;
 }
 
 int
 ldb_link_file(const char *from, const char *to) {
   if (link(from, to) != 0) {
-    if (errno == EXDEV)
+    if (errno == EXDEV /* The link and file are on different file systems. */
+#if defined(__linux__) || defined(__CYGWIN__)
+     || errno == EPERM /* Filesystem does not support creation of hard links. */
+#endif
+#if defined(__FreeBSD__) \
+ || defined(__OpenBSD__) \
+ || defined(__NetBSD__)  \
+ || defined(__DragonFly__)
+     || errno == EOPNOTSUPP /* The file system does not support links. */
+#endif
+#ifdef __PASE__
+     || errno == ENOSYS /* Function not implemented. */
+     || errno == ENOTSUP /* Operation is not supported. */
+#endif
+#ifdef __QNX__
+     || errno == ENOSYS /* link() isn't implemented for the filesystem. */
+#endif
+    ) {
       return ldb_copy_file(from, to);
+    }
 
     return LDB_POSIX_ERROR(errno);
   }
@@ -1071,25 +1119,10 @@ ldb_wfile_write(ldb_wfile_t *file, const unsigned char *data, size_t size) {
 
 static int
 ldb_wfile_sync_dir(ldb_wfile_t *file) {
-  int fd, rc;
-
   if (!file->manifest)
     return LDB_OK;
 
-  fd = ldb_open(file->dirname, O_RDONLY, 0);
-
-  if (fd < 0) {
-    rc = LDB_POSIX_ERROR(errno);
-  } else {
-    rc = ldb_fsync(fd);
-
-    if (rc == LDB_IOERR && errno == EINVAL)
-      rc = LDB_OK;
-
-    close(fd);
-  }
-
-  return rc;
+  return ldb_sync_dir(file->dirname);
 }
 
 int

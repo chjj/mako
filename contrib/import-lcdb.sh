@@ -42,10 +42,7 @@ rsync -av --exclude '*.o'         \
           --exclude '.dirstamp'   \
           --exclude '.libs'       \
           --exclude '*.md'        \
-          --exclude '*_test.c'    \
-          --exclude '*_data.h'    \
           --exclude 'dbutil.c'    \
-          --exclude 'histogram.*' \
           --exclude 'testutil.*'  \
           "$prefix/src/"          \
           deps/lcdb/src/
