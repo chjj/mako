@@ -92,198 +92,182 @@ mako_HEADERS = include/mako/address.h   \
                include/mako/util.h      \
                include/mako/vector.h
 
-noinst_HEADERS = include/client/client.h           \
-                 include/io/core.h                 \
-                 include/io/http.h                 \
-                 include/io/loop.h                 \
-                 include/io/workers.h              \
-                 include/base/addrman.h            \
-                 include/base/config.h             \
-                 include/node/chaindb.h            \
-                 include/node/chain.h              \
-                 include/base/logger.h             \
-                 include/node/mempool.h            \
-                 include/node/miner.h              \
-                 include/node/node.h               \
-                 include/node/pool.h               \
-                 include/node/rpc.h                \
-                 include/base/timedata.h           \
-                 include/base/types.h              \
-                 include/node/types.h              \
-                 include/wallet/client.h           \
-                 include/wallet/iterator.h         \
-                 include/wallet/types.h            \
-                 include/wallet/wallet.h           \
-                                                   \
-                 src/crypto/fields/secp256k1_32.h  \
-                 src/crypto/fields/secp256k1_64.h  \
-                 src/crypto/asn1.h                 \
-                 src/crypto/rand.h                 \
-                 src/crypto/rand_unix_impl.h       \
-                 src/crypto/rand_win_impl.h        \
-                 src/crypto/secp256k1.h            \
-                 src/io/http/http_common.h         \
-                 src/io/http/http_parser.h         \
-                 src/io/core_unix_impl.h           \
-                 src/io/core_win_impl.h            \
-                 src/io/watcom_dns.h               \
-                 src/map/khash.h                   \
-                 src/map/map.h                     \
-                 src/wallet/account.h              \
-                 src/wallet/client.h               \
-                 src/wallet/database.h             \
-                 src/wallet/iterator.h             \
-                 src/wallet/master.h               \
-                 src/wallet/record.h               \
-                 src/wallet/txdb.h                 \
-                 src/wallet/types.h                \
-                 src/wallet/wallet.h               \
-                 src/bio.h                         \
-                 src/impl.h                        \
-                 src/internal.h                    \
-                 src/math.h                        \
-                 src/printf_core.h                 \
-                 src/words.h                       \
-                                                   \
-                 test/data/bip32_vectors.h         \
-                 test/data/bip340_vectors.h        \
-                 test/data/bip39_vectors.h         \
-                 test/data/chain_vectors_main.h    \
-                 test/data/chain_vectors_testnet.h \
-                 test/data/ecdsa_vectors.h         \
-                 test/data/script_vectors.h        \
-                 test/data/sighash_vectors.h       \
-                 test/data/tx_invalid_vectors.h    \
-                 test/data/tx_valid_vectors.h      \
-                 test/lib/rimraf_unix_impl.h       \
-                 test/lib/rimraf_win_impl.h        \
-                 test/lib/tests.h
-
 #
 # Sources
 #
 
-mako_sources = src/crypto/chacha20.c   \
-               src/crypto/drbg.c       \
-               src/crypto/ecc.c        \
-               src/crypto/hash160.c    \
-               src/crypto/hash256.c    \
-               src/crypto/hmac256.c    \
-               src/crypto/hmac512.c    \
-               src/crypto/merkle.c     \
-               src/crypto/poly1305.c   \
-               src/crypto/pbkdf256.c   \
-               src/crypto/pbkdf512.c   \
-               src/crypto/rand.c       \
-               src/crypto/rand_env.c   \
-               src/crypto/rand_sys.c   \
-               src/crypto/ripemd160.c  \
-               src/crypto/salsa20.c    \
-               src/crypto/secretbox.c  \
-               src/crypto/sha1.c       \
-               src/crypto/sha256.c     \
-               src/crypto/sha512.c     \
-               src/crypto/siphash.c    \
-               src/json/json_builder.c \
-               src/json/json_extra.c   \
-               src/json/json_parser.c  \
-               src/map/addrmap.c       \
-               src/map/addrset.c       \
-               src/map/hashmap.c       \
-               src/map/hashset.c       \
-               src/map/hashtab.c       \
-               src/map/intmap.c        \
-               src/map/longmap.c       \
-               src/map/longset.c       \
-               src/map/longtab.c       \
-               src/map/netmap.c        \
-               src/map/outmap.c        \
-               src/map/outset.c        \
-               src/address.c           \
-               src/amount.c            \
-               src/array.c             \
-               src/base16.c            \
-               src/base58.c            \
-               src/bech32.c            \
-               src/bip32.c             \
-               src/bip37.c             \
-               src/bip39.c             \
-               src/bip152.c            \
-               src/block.c             \
-               src/bloom.c             \
-               src/buffer.c            \
-               src/coin.c              \
-               src/compact.c           \
-               src/compress.c          \
-               src/consensus.c         \
-               src/entry.c             \
-               src/header.c            \
-               src/heap.c              \
-               src/input.c             \
-               src/inpvec.c            \
-               src/inspect.c           \
-               src/internal.c          \
-               src/json.c              \
-               src/mainnet.c           \
-               src/math.c              \
-               src/mpi.c               \
-               src/murmur3.c           \
-               src/netaddr.c           \
-               src/netmsg.c            \
-               src/network.c           \
-               src/outpoint.c          \
-               src/output.c            \
-               src/outvec.c            \
-               src/policy.c            \
-               src/printf.c            \
-               src/printf_core.c       \
-               src/regtest.c           \
-               src/script.c            \
-               src/select.c            \
-               src/sign.c              \
-               src/signet.c            \
-               src/simnet.c            \
-               src/sprintf.c           \
-               src/testnet.c           \
-               src/tx.c                \
-               src/undo.c              \
-               src/util.c              \
-               src/vector.c            \
-               src/view.c
+mako_sources = src/crypto/fields/secp256k1_32.h \
+               src/crypto/fields/secp256k1_64.h \
+               src/crypto/asn1.h                \
+               src/crypto/chacha20.c            \
+               src/crypto/drbg.c                \
+               src/crypto/ecc.c                 \
+               src/crypto/hash160.c             \
+               src/crypto/hash256.c             \
+               src/crypto/hmac256.c             \
+               src/crypto/hmac512.c             \
+               src/crypto/merkle.c              \
+               src/crypto/poly1305.c            \
+               src/crypto/pbkdf256.c            \
+               src/crypto/pbkdf512.c            \
+               src/crypto/rand.c                \
+               src/crypto/rand.h                \
+               src/crypto/rand_env.c            \
+               src/crypto/rand_sys.c            \
+               src/crypto/rand_unix_impl.h      \
+               src/crypto/rand_win_impl.h       \
+               src/crypto/ripemd160.c           \
+               src/crypto/salsa20.c             \
+               src/crypto/secp256k1.h           \
+               src/crypto/secretbox.c           \
+               src/crypto/sha1.c                \
+               src/crypto/sha256.c              \
+               src/crypto/sha512.c              \
+               src/crypto/siphash.c             \
+               src/json/json_builder.c          \
+               src/json/json_extra.c            \
+               src/json/json_parser.c           \
+               src/map/addrmap.c                \
+               src/map/addrset.c                \
+               src/map/hashmap.c                \
+               src/map/hashset.c                \
+               src/map/hashtab.c                \
+               src/map/intmap.c                 \
+               src/map/khash.h                  \
+               src/map/longmap.c                \
+               src/map/longset.c                \
+               src/map/longtab.c                \
+               src/map/map.h                    \
+               src/map/netmap.c                 \
+               src/map/outmap.c                 \
+               src/map/outset.c                 \
+               src/address.c                    \
+               src/amount.c                     \
+               src/array.c                      \
+               src/base16.c                     \
+               src/base58.c                     \
+               src/bech32.c                     \
+               src/bio.h                        \
+               src/bip32.c                      \
+               src/bip37.c                      \
+               src/bip39.c                      \
+               src/bip152.c                     \
+               src/block.c                      \
+               src/bloom.c                      \
+               src/buffer.c                     \
+               src/coin.c                       \
+               src/compact.c                    \
+               src/compress.c                   \
+               src/consensus.c                  \
+               src/entry.c                      \
+               src/header.c                     \
+               src/heap.c                       \
+               src/impl.h                       \
+               src/input.c                      \
+               src/inpvec.c                     \
+               src/inspect.c                    \
+               src/internal.c                   \
+               src/internal.h                   \
+               src/json.c                       \
+               src/mainnet.c                    \
+               src/math.c                       \
+               src/math.h                       \
+               src/mpi.c                        \
+               src/murmur3.c                    \
+               src/netaddr.c                    \
+               src/netmsg.c                     \
+               src/network.c                    \
+               src/outpoint.c                   \
+               src/output.c                     \
+               src/outvec.c                     \
+               src/policy.c                     \
+               src/printf.c                     \
+               src/printf_core.c                \
+               src/printf_core.h                \
+               src/regtest.c                    \
+               src/script.c                     \
+               src/select.c                     \
+               src/sign.c                       \
+               src/signet.c                     \
+               src/simnet.c                     \
+               src/sprintf.c                    \
+               src/testnet.c                    \
+               src/tx.c                         \
+               src/undo.c                       \
+               src/util.c                       \
+               src/vector.c                     \
+               src/view.c                       \
+               src/words.h
 
-io_sources = src/io/http/http_client.c \
+io_sources = include/io/core.h         \
+             include/io/http.h         \
+             include/io/loop.h         \
+             include/io/workers.h      \
+             src/io/http/http_client.c \
              src/io/http/http_common.c \
+             src/io/http/http_common.h \
              src/io/http/http_parser.c \
+             src/io/http/http_parser.h \
              src/io/http/http_server.c \
              src/io/addrinfo.c         \
              src/io/core.c             \
+             src/io/core_unix_impl.h   \
+             src/io/core_win_impl.h    \
              src/io/loop.c             \
              src/io/net.c              \
              src/io/sockaddr.c         \
+             src/io/watcom_dns.h       \
              src/io/workers.c
 
-base_sources = src/base/addrman.c  \
-               src/base/config.c   \
-               src/base/logger.c   \
+base_sources = include/base/addrman.h  \
+               include/base/config.h   \
+               include/base/logger.h   \
+               include/base/timedata.h \
+               include/base/types.h    \
+               src/base/addrman.c      \
+               src/base/config.c       \
+               src/base/logger.c       \
                src/base/timedata.c
 
-node_sources = src/node/chain.c    \
-               src/node/chaindb.c  \
-               src/node/mempool.c  \
-               src/node/miner.c    \
-               src/node/node.c     \
-               src/node/pool.c     \
+node_sources = include/node/chaindb.h \
+               include/node/chain.h   \
+               include/node/mempool.h \
+               include/node/miner.h   \
+               include/node/node.h    \
+               include/node/pool.h    \
+               include/node/rpc.h     \
+               include/node/types.h   \
+               src/node/chain.c       \
+               src/node/chaindb.c     \
+               src/node/mempool.c     \
+               src/node/miner.c       \
+               src/node/node.c        \
+               src/node/pool.c        \
                src/node/rpc.c
 
-wallet_sources = src/wallet/account.c  \
-                 src/wallet/client.c   \
-                 src/wallet/iterator.c \
-                 src/wallet/master.c   \
-                 src/wallet/record.c   \
-                 src/wallet/txdb.c     \
-                 src/wallet/wallet.c
+wallet_sources = include/wallet/client.h   \
+                 include/wallet/iterator.h \
+                 include/wallet/types.h    \
+                 include/wallet/wallet.h   \
+                 src/wallet/account.c      \
+                 src/wallet/account.h      \
+                 src/wallet/client.c       \
+                 src/wallet/client.h       \
+                 src/wallet/database.h     \
+                 src/wallet/iterator.c     \
+                 src/wallet/iterator.h     \
+                 src/wallet/master.c       \
+                 src/wallet/master.h       \
+                 src/wallet/record.c       \
+                 src/wallet/record.h       \
+                 src/wallet/txdb.c         \
+                 src/wallet/txdb.h         \
+                 src/wallet/types.h        \
+                 src/wallet/wallet.c       \
+                 src/wallet/wallet.h
 
-client_sources = src/client/client.c
+client_sources = include/client/client.h \
+                 src/client/client.c
 
 #
 # Targets

@@ -16,7 +16,22 @@ LDADD = $(top_builddir)/libmako.la \
         @ZLIB@
 endif
 
-libtests_la_SOURCES = lib/tests.h lib/tests.c lib/rimraf.c
+SOURCES = data/bip32_vectors.h         \
+          data/bip340_vectors.h        \
+          data/bip39_vectors.h         \
+          data/chain_vectors_main.h    \
+          data/chain_vectors_testnet.h \
+          data/ecdsa_vectors.h         \
+          data/script_vectors.h        \
+          data/sighash_vectors.h       \
+          data/tx_invalid_vectors.h    \
+          data/tx_valid_vectors.h
+
+libtests_la_SOURCES = lib/tests.c            \
+                      lib/tests.h            \
+                      lib/rimraf.c           \
+                      lib/rimraf_unix_impl.h \
+                      lib/rimraf_win_impl.h
 
 tests_crypto = t-bip340    \
                t-chacha20  \
@@ -81,10 +96,10 @@ tests_base = t-addrman  \
              t-config   \
              t-timedata
 
-tests_node = t-chaindb  \
-             t-chain    \
-             t-mempool  \
-             t-miner    \
+tests_node = t-chaindb \
+             t-chain   \
+             t-mempool \
+             t-miner   \
              t-rpc
 
 tests_wallet = t-wallet
