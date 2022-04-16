@@ -214,7 +214,6 @@ mako_sources = src/crypto/chacha20.c   \
                src/coin.c              \
                src/compact.c           \
                src/compress.c          \
-               src/config.c            \
                src/consensus.c         \
                src/entry.c             \
                src/header.c            \
@@ -262,16 +261,18 @@ io_sources = src/io/http/http_client.c \
              src/io/sockaddr.c         \
              src/io/workers.c
 
-node_sources = src/node/addrman.c  \
-               src/node/chain.c    \
-               src/node/chaindb.c  \
+base_sources = src/node/addrman.c  \
+               src/config.c        \
                src/node/logger.c   \
+               src/node/timedata.c
+
+node_sources = src/node/chain.c    \
+               src/node/chaindb.c  \
                src/node/mempool.c  \
                src/node/miner.c    \
                src/node/node.c     \
                src/node/pool.c     \
-               src/node/rpc.c      \
-               src/node/timedata.c
+               src/node/rpc.c
 
 wallet_sources = src/wallet/account.c  \
                  src/wallet/client.c   \
@@ -307,20 +308,25 @@ libio_la_SOURCES = $(io_sources)
 libio_la_CFLAGS = $(WARN_FLAGS)
 libio_la_LDFLAGS = -static
 
+libbase_la_SOURCES = $(base_sources)
+libbase_la_CFLAGS = $(WARN_FLAGS)
+libbase_la_LDFLAGS = -static
+libbase_la_LIBADD = libio.la libmako.la
+
 libnode_la_SOURCES = $(node_sources)
 libnode_la_CFLAGS = $(WARN_FLAGS) -I$(top_srcdir)/deps/lcdb/include
 libnode_la_LDFLAGS = -static
-libnode_la_LIBADD = libio.la libmako.la $(mako_dbdir)/liblcdb.la
+libnode_la_LIBADD = libbase.la $(mako_dbdir)/liblcdb.la
 
 libwallet_la_SOURCES = $(wallet_sources)
 libwallet_la_CFLAGS = $(WARN_FLAGS) -I$(top_srcdir)/deps/lcdb/include
 libwallet_la_LDFLAGS = -static
-libwallet_la_LIBADD = libio.la libmako.la $(mako_dbdir)/liblcdb.la
+libwallet_la_LIBADD = libbase.la $(mako_dbdir)/liblcdb.la
 
 libclient_la_SOURCES = $(client_sources)
 libclient_la_CFLAGS = $(WARN_FLAGS)
 libclient_la_LDFLAGS = -static
-libclient_la_LIBADD = libio.la libmako.la
+libclient_la_LIBADD = libbase.la
 
 makod_SOURCES = src/node/main.c
 makod_CFLAGS = $(WARN_FLAGS)
@@ -332,6 +338,6 @@ mako_CFLAGS = $(WARN_FLAGS)
 mako_LDFLAGS = -static
 mako_LDADD = libclient.la
 
-noinst_LTLIBRARIES = libio.la libnode.la libwallet.la libclient.la
+noinst_LTLIBRARIES = libio.la libbase.la libnode.la libwallet.la libclient.la
 bin_PROGRAMS = makod mako
 endif

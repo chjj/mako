@@ -49,7 +49,6 @@ tests_lib = t-address  \
             t-block    \
             t-bloom    \
             t-coin     \
-            t-config   \
             t-entry    \
             t-header   \
             t-heap     \
@@ -78,13 +77,15 @@ tests_io = t-addrinfo \
            t-http     \
            t-workers
 
-tests_node = t-addrman  \
-             t-chaindb  \
+tests_base = t-addrman  \
+             t-config   \
+             t-timedata
+
+tests_node = t-chaindb  \
              t-chain    \
              t-mempool  \
              t-miner    \
-             t-rpc      \
-             t-timedata
+             t-rpc
 
 tests_wallet = t-wallet
 
@@ -92,7 +93,7 @@ check_LTLIBRARIES = libtests.la
 check_PROGRAMS = $(tests_crypto) $(tests_lib)
 
 if ENABLE_NODE
-check_PROGRAMS += $(tests_io) $(tests_node) $(tests_wallet)
+check_PROGRAMS += $(tests_io) $(tests_base) $(tests_node) $(tests_wallet)
 endif
 
 TESTS = $(check_PROGRAMS)

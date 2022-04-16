@@ -70,6 +70,7 @@ set(mako_ldflags)
 set(mako_libs)
 
 set(io_sources)
+set(base_sources)
 set(node_sources)
 set(wallet_sources)
 set(client_sources)
@@ -356,7 +357,6 @@ list(APPEND mako_sources src/crypto/chacha20.c
                          src/coin.c
                          src/compact.c
                          src/compress.c
-                         src/config.c
                          src/consensus.c
                          src/entry.c
                          src/header.c
@@ -404,16 +404,18 @@ list(APPEND io_sources src/io/http/http_client.c
                        src/io/sockaddr.c
                        src/io/workers.c)
 
-list(APPEND node_sources src/node/addrman.c
-                         src/node/chain.c
-                         src/node/chaindb.c
+list(APPEND base_sources src/node/addrman.c
+                         src/config.c
                          src/node/logger.c
+                         src/node/timedata.c)
+
+list(APPEND node_sources src/node/chain.c
+                         src/node/chaindb.c
                          src/node/mempool.c
                          src/node/miner.c
                          src/node/node.c
                          src/node/pool.c
-                         src/node/rpc.c
-                         src/node/timedata.c)
+                         src/node/rpc.c)
 
 list(APPEND wallet_sources src/wallet/account.c
                            src/wallet/client.c
@@ -656,16 +658,20 @@ function(mako_build_full)
   target_link_libraries(mako_io PRIVATE mako)
   set_property(TARGET mako_io PROPERTY OUTPUT_NAME io)
 
+  add_library(mako_base STATIC ${base_sources})
+  target_link_libraries(mako_base PRIVATE mako mako_io mako_static)
+  set_property(TARGET mako_base PROPERTY OUTPUT_NAME base)
+
   add_library(mako_node STATIC ${node_sources})
-  target_link_libraries(mako_node PRIVATE mako mako_io mako_static lcdb)
+  target_link_libraries(mako_node PRIVATE mako mako_base lcdb)
   set_property(TARGET mako_node PROPERTY OUTPUT_NAME node)
 
   add_library(mako_wallet STATIC ${wallet_sources})
-  target_link_libraries(mako_wallet PRIVATE mako mako_io mako_static lcdb)
+  target_link_libraries(mako_wallet PRIVATE mako mako_base lcdb)
   set_property(TARGET mako_wallet PROPERTY OUTPUT_NAME wallet)
 
   add_library(mako_client STATIC ${client_sources})
-  target_link_libraries(mako_client PRIVATE mako mako_io mako_static)
+  target_link_libraries(mako_client PRIVATE mako mako_base)
   set_property(TARGET mako_client PROPERTY OUTPUT_NAME client)
 
   add_executable(mako_daemon src/node/main.c)
@@ -742,7 +748,6 @@ function(mako_tests_lib)
                 block
                 bloom
                 coin
-                config
                 entry
                 header
                 heap
@@ -781,13 +786,15 @@ function(mako_tests_node)
                http
                workers)
 
-  set(tests_node addrman
-                 chaindb
+  set(tests_base addrman
+                 config
+                 timedata)
+
+  set(tests_node chaindb
                  chain
                  mempool
                  miner
-                 rpc
-                 timedata)
+                 rpc)
 
   set(tests_wallet wallet)
 
@@ -795,6 +802,12 @@ function(mako_tests_node)
     foreach(name ${tests_io})
       add_executable(t-${name} test/t-${name}.c)
       target_link_libraries(t-${name} PRIVATE mako mako_test mako_io)
+      add_test(NAME ${name} COMMAND t-${name})
+    endforeach()
+
+    foreach(name ${tests_base})
+      add_executable(t-${name} test/t-${name}.c)
+      target_link_libraries(t-${name} PRIVATE mako mako_test mako_base)
       add_test(NAME ${name} COMMAND t-${name})
     endforeach()
 
