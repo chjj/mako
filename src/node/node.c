@@ -197,7 +197,7 @@ int
 btc_node_open(btc_node_t *node, const char *prefix, unsigned int flags) {
   char file[BTC_PATH_MAX];
 
-  btc_fs_mkdirp(prefix);
+  btc_fs_mkdir(prefix);
 
   if (!btc_fs_exists(prefix)) {
     fprintf(stderr, "ERROR: Could not create prefix '%s'.\n", prefix);

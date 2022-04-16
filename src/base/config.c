@@ -14,6 +14,9 @@
 #endif
 
 #include <base/config.h>
+
+#include <io/core.h>
+
 #include <mako/net.h>
 #include <mako/netaddr.h>
 #include <mako/network.h>
@@ -873,6 +876,8 @@ conf_finalize(btc_conf_t *conf, const char *prefix) {
     btc_str_set(conf->prefix, prefix);
 
   if (network->type != BTC_NETWORK_MAINNET) {
+    btc_fs_mkdir(path);
+
     if (!btc_join(path, size, path, network->name, NULL)) {
       btc_die("Invalid datadir: %s", path);
       return;
