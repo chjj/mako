@@ -2815,6 +2815,7 @@ static void
 btc_rpc_walletpassphrase(btc_rpc_t *rpc,
                          const json_params *params,
                          rpc_res_t *res) {
+  int64_t msec = -1;
   const char *pass;
   int timeout;
 
@@ -2830,10 +2831,10 @@ btc_rpc_walletpassphrase(btc_rpc_t *rpc,
   if (!json_signed_get(&timeout, params->values[1]))
     THROW_TYPE(timeout, integer);
 
-  if (timeout < 0)
-    timeout = -1;
+  if (timeout >= 0)
+    msec = (int64_t)timeout * 1000;
 
-  if (!btc_wallet_unlock(rpc->wallet, pass, timeout))
+  if (!btc_wallet_unlock(rpc->wallet, pass, msec))
     THROW(RPC_WALLET_PASSPHRASE_INCORRECT, "Could not unlock wallet");
 
   res->result = json_null_new();
