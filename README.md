@@ -1,4 +1,4 @@
-# mako - full bitcoin implementation in C
+# mako
 
 __mako__ is a from-scratch bitcoin reimplementation, written in "almost-C89"
 (i.e. it can be compiled by a C89 compiler if `<stdint.h>` is available -- no
@@ -40,7 +40,7 @@ $ make
 The above will produce two binaries: `mako and makod`. The arguments mimic
 `bitcoin-cli` and `bitcoind` respectively.
 
-## Why?
+## Background
 
 There are a few reasons mako needed to exist:
 
