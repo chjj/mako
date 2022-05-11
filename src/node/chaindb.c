@@ -36,8 +36,6 @@
  * Constants
  */
 
-#define WRITE_FLAGS (BTC_O_WRONLY | BTC_O_CREAT | BTC_O_APPEND)
-#define READ_FLAGS (BTC_O_RDONLY | BTC_O_RANDOM)
 #define MAX_FILE_SIZE (128 << 20)
 #define BLOCK_FILE 0
 #define UNDO_FILE 1
