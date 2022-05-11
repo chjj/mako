@@ -188,6 +188,9 @@ btc_chain_is_main(btc_chain_t *chain, const btc_entry_t *entry);
 BTC_EXTERN int
 btc_chain_has_coins(btc_chain_t *chain, const btc_tx_t *tx);
 
+BTC_EXTERN btc_coin_t *
+btc_chain_coin(btc_chain_t *chain, const uint8_t *hash, size_t index);
+
 BTC_EXTERN int
 btc_chain_get_coins(btc_chain_t *chain,
                     btc_view_t *view,
@@ -201,6 +204,11 @@ btc_chain_get_raw_block(btc_chain_t *chain,
                         uint8_t **data,
                         size_t *length,
                         const btc_entry_t *entry);
+
+BTC_EXTERN btc_view_t *
+btc_chain_get_undo(btc_chain_t *chain,
+                   const btc_entry_t *entry,
+                   const btc_block_t *block);
 
 BTC_EXTERN const uint8_t *
 btc_chain_get_orphan_root(btc_chain_t *chain, const uint8_t *hash);

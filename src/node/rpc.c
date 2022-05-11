@@ -464,7 +464,6 @@ btc_rpc_getblock(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
   const btc_entry_t *entry;
   int32_t confirmations;
   const uint8_t *next;
-  btc_block_t *block;
   int verbosity = 1;
   uint8_t hash[32];
   int height;
@@ -495,26 +494,41 @@ btc_rpc_getblock(btc_rpc_t *rpc, const json_params *params, rpc_res_t *res) {
       THROW_TYPE(verbosity, integer);
   }
 
-  block = btc_chain_get_block(rpc->chain, entry);
-
-  if (block == NULL)
-    THROW_MISC("Can't read block from disk");
-
   if (verbosity > 0) {
+    btc_block_t *block = btc_chain_get_block(rpc->chain, entry);
+    btc_view_t *view = NULL;
+
+    if (block == NULL)
+      THROW_MISC("Can't read block from disk");
+
     confirmations = btc_rpc_get_depth(rpc, entry, &next);
+
+    if (verbosity > 2)
+      view = btc_chain_get_undo(rpc->chain, entry, block);
 
     res->result = json_block_new_ex(block,
                                     entry,
-                                    NULL,
+                                    view,
                                     confirmations,
                                     next,
                                     verbosity > 1,
                                     rpc->network);
-  } else {
-    res->result = json_block_raw(block);
-  }
 
-  btc_block_destroy(block);
+    btc_block_destroy(block);
+
+    if (view != NULL)
+      btc_view_destroy(view);
+  } else {
+    uint8_t *data;
+    size_t length;
+
+    if (!btc_chain_get_raw_block(rpc->chain, &data, &length, entry))
+      THROW_MISC("Can't read block from disk");
+
+    res->result = json_raw_new(data, length);
+
+    btc_free(data);
+  }
 }
 
 static void
@@ -685,10 +699,57 @@ static void
 btc_rpc_gettxout(btc_rpc_t *rpc,
                  const json_params *params,
                  rpc_res_t *res) {
+  const btc_entry_t *tip = btc_chain_tip(rpc->chain);
+  btc_coin_t *coin = NULL;
+  int32_t depth = 0;
+  uint8_t hash[32];
+  int mempool = 1;
+  json_value *obj;
+  int index;
+
   (void)rpc;
 
   if (params->help || params->length < 2 || params->length > 3)
     THROW_MISC("gettxout \"txid\" n ( include_mempool )");
+
+  if (!json_hash_get(hash, params->values[0]))
+    THROW_TYPE(txid, hash);
+
+  if (!json_unsigned_get(&index, params->values[1]))
+    THROW_TYPE(n, integer);
+
+  if (params->length > 2) {
+    if (!json_boolean_get(&mempool, params->values[2]))
+      THROW_TYPE(include_mempool, boolean);
+  }
+
+  if (mempool)
+    coin = btc_mempool_coin(rpc->mempool, hash, index);
+
+  if (coin == NULL)
+    coin = btc_chain_coin(rpc->chain, hash, index);
+
+  if (coin == NULL) {
+    res->result = json_null_new();
+    return;
+  }
+
+  if (coin->height >= 0)
+    depth = tip->height - coin->height + 1;
+
+  obj = json_object_new(6);
+
+  json_object_push(obj, "bestblock", json_hash_new(tip->hash));
+  json_object_push(obj, "confirmations", json_integer_new(depth));
+  json_object_push(obj, "value", json_amount_new(coin->output.value));
+  json_object_push(obj, "scriptPubKey", json_script_new(&coin->output.script,
+                                                        rpc->network));
+  json_object_push(obj, "version", json_integer_new(coin->version));
+  json_object_push(obj, "coinbase", json_boolean_new(coin->coinbase));
+
+  res->result = obj;
+
+  btc_coin_destroy(coin);
 }
 
 static void
@@ -1191,7 +1252,7 @@ btc_rpc_getrawtransaction(btc_rpc_t *rpc,
       THROW_MISC("Transaction not found");
 
     if (verbosity > 1)
-      btc_wallet_undo(&view, rpc->wallet, tx);
+      view = btc_wallet_undo(rpc->wallet, tx);
   }
 
   if (verbosity == 0)

@@ -95,6 +95,9 @@ btc_mempool_has(btc_mempool_t *mp, const uint8_t *hash);
 BTC_EXTERN const btc_mpentry_t *
 btc_mempool_get(btc_mempool_t *mp, const uint8_t *hash);
 
+BTC_EXTERN btc_coin_t *
+btc_mempool_coin(btc_mempool_t *mp, const uint8_t *hash, size_t index);
+
 BTC_EXTERN int
 btc_mempool_has_orphan(btc_mempool_t *mp, const uint8_t *hash);
 

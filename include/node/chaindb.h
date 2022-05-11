@@ -35,6 +35,9 @@ btc_chaindb_open(btc_chaindb_t *db, const char *prefix, unsigned int flags);
 BTC_EXTERN void
 btc_chaindb_close(btc_chaindb_t *db);
 
+BTC_EXTERN btc_coin_t *
+btc_chaindb_coin(btc_chaindb_t *db, const uint8_t *hash, size_t index);
+
 BTC_EXTERN int
 btc_chaindb_spend(btc_chaindb_t *db,
                   btc_view_t *view,
@@ -91,6 +94,11 @@ btc_chaindb_get_raw_block(btc_chaindb_t *db,
                           uint8_t **data,
                           size_t *length,
                           const btc_entry_t *entry);
+
+BTC_EXTERN btc_view_t *
+btc_chaindb_get_undo(btc_chaindb_t *db,
+                     const btc_entry_t *entry,
+                     const btc_block_t *block);
 
 #ifdef __cplusplus
 }

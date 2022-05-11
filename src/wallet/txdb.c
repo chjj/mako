@@ -856,8 +856,8 @@ btc_txdb_fill(btc_txdb_t *txdb, btc_view_t *view, const btc_tx_t *tx) {
   return btc_view_fill(view, tx, read_coin, txdb->db);
 }
 
-int
-btc_txdb_undo(btc_view_t **result, btc_txdb_t *txdb, const btc_tx_t *tx) {
+btc_view_t *
+btc_txdb_undo(btc_txdb_t *txdb, const btc_tx_t *tx) {
   ldb_iter_t *it = ldb_iterator(txdb->db, 0);
   btc_view_t *view = btc_view_create();
   uint8_t buf1[KEY_UNDO_LEN];
@@ -878,24 +878,18 @@ btc_txdb_undo(btc_view_t **result, btc_txdb_t *txdb, const btc_tx_t *tx) {
     index = btc_read32be(kp + 33);
 
     if (index >= tx->inputs.length)
-      goto fail;
+      break;
 
     input = tx->inputs.items[index];
     coin = btc_coin_decode(val.data, val.size);
 
     if (coin == NULL)
-      goto fail;
+      db_abort("txdb_undo", LDB_CORRUPTION);
 
     btc_view_put(view, &input->prevout, coin);
   }
 
-  *result = view;
-
   ldb_iter_destroy(it);
 
-  return 1;
-fail:
-  ldb_iter_destroy(it);
-  btc_view_destroy(view);
-  return 0;
+  return view;
 }

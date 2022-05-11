@@ -1454,9 +1454,9 @@ btc_wallet_view(btc_wallet_t *wallet, const btc_tx_t *tx) {
   return view;
 }
 
-int
-btc_wallet_undo(btc_view_t **view, btc_wallet_t *wallet, const btc_tx_t *tx) {
-  return btc_txdb_undo(view, wallet, tx);
+btc_view_t *
+btc_wallet_undo(btc_wallet_t *wallet, const btc_tx_t *tx) {
+  return btc_txdb_undo(wallet, tx);
 }
 
 btc_acctiter_t *

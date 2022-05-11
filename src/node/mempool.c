@@ -1435,6 +1435,23 @@ btc_mempool_get(btc_mempool_t *mp, const uint8_t *hash) {
   return btc_hashmap_get(&mp->map, hash);
 }
 
+btc_coin_t *
+btc_mempool_coin(btc_mempool_t *mp, const uint8_t *hash, size_t index) {
+  const btc_mpentry_t *entry = btc_mempool_get(mp, hash);
+  btc_outpoint_t spend;
+  btc_coin_t *coin;
+
+  if (entry == NULL || index >= entry->tx->outputs.length)
+    return NULL;
+
+  btc_outpoint_set(&spend, hash, index);
+
+  coin = btc_tx_coin(entry->tx, index, -1);
+  coin->spent = btc_outmap_has(&mp->spents, &spend);
+
+  return coin;
+}
+
 int
 btc_mempool_has_orphan(btc_mempool_t *mp, const uint8_t *hash) {
   return btc_hashmap_has(&mp->orphans, hash);

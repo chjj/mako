@@ -223,8 +223,8 @@ btc_wallet_tx(btc_tx_t **tx, btc_wallet_t *wallet, const uint8_t *hash);
 btc_view_t *
 btc_wallet_view(btc_wallet_t *wallet, const btc_tx_t *tx);
 
-int
-btc_wallet_undo(btc_view_t **view, btc_wallet_t *wallet, const btc_tx_t *tx);
+btc_view_t *
+btc_wallet_undo(btc_wallet_t *wallet, const btc_tx_t *tx);
 
 btc_acctiter_t *
 btc_wallet_accounts(btc_wallet_t *wallet);

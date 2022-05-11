@@ -2062,6 +2062,11 @@ btc_chain_has_coins(btc_chain_t *chain, const btc_tx_t *tx) {
   return btc_chaindb_has_coins(chain->db, tx);
 }
 
+btc_coin_t *
+btc_chain_coin(btc_chain_t *chain, const uint8_t *hash, size_t index) {
+  return btc_chaindb_coin(chain->db, hash, index);
+}
+
 int
 btc_chain_get_coins(btc_chain_t *chain,
                     btc_view_t *view,
@@ -2080,6 +2085,13 @@ btc_chain_get_raw_block(btc_chain_t *chain,
                         size_t *length,
                         const btc_entry_t *entry) {
   return btc_chaindb_get_raw_block(chain->db, data, length, entry);
+}
+
+btc_view_t *
+btc_chain_get_undo(btc_chain_t *chain,
+                   const btc_entry_t *entry,
+                   const btc_block_t *block) {
+  return btc_chaindb_get_undo(chain->db, entry, block);
 }
 
 const uint8_t *

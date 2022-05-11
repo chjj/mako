@@ -683,16 +683,15 @@ btc_chaindb_close(btc_chaindb_t *db) {
   btc_chaindb_unload_database(db);
 }
 
-static btc_coin_t *
-read_coin(const btc_outpoint_t *prevout, void *arg) {
-  btc_chaindb_t *db = (btc_chaindb_t *)arg;
+btc_coin_t *
+btc_chaindb_coin(btc_chaindb_t *db, const uint8_t *hash, size_t index) {
   uint8_t kbuf[COIN_KEYLEN];
   ldb_slice_t key, val;
   btc_coin_t *coin;
   int rc;
 
   key.data = kbuf;
-  key.size = coin_key(kbuf, prevout->hash, prevout->index);
+  key.size = coin_key(kbuf, hash, index);
 
   rc = ldb_get(db->lsm, &key, &val, 0);
 
@@ -711,6 +710,11 @@ read_coin(const btc_outpoint_t *prevout, void *arg) {
   ldb_free(val.data);
 
   return coin;
+}
+
+static btc_coin_t *
+read_coin(const btc_outpoint_t *prevout, void *arg) {
+  return btc_chaindb_coin(arg, prevout->hash, prevout->index);
 }
 
 int
@@ -1451,4 +1455,40 @@ btc_chaindb_get_raw_block(btc_chaindb_t *db,
   return btc_chaindb_read(db, data, length, BLOCK_FILE, entry->block_file,
                                                         entry->block_pos);
 
+}
+
+btc_view_t *
+btc_chaindb_get_undo(btc_chaindb_t *db,
+                     const btc_entry_t *entry,
+                     const btc_block_t *block) {
+  btc_undo_t *undo = btc_chaindb_read_undo(db, entry);
+  const btc_input_t *input;
+  const btc_tx_t *tx;
+  btc_coin_t *coin;
+  btc_view_t *view;
+  size_t i, j;
+
+  if (undo == NULL)
+    return NULL;
+
+  view = btc_view_create();
+
+  for (i = block->txs.length - 1; i != (size_t)-1; i--) {
+    tx = block->txs.items[i];
+
+    if (i > 0) {
+      for (j = tx->inputs.length - 1; j != (size_t)-1; j--) {
+        input = tx->inputs.items[j];
+        coin = btc_undo_pop(undo);
+
+        btc_view_put(view, &input->prevout, coin);
+      }
+    }
+  }
+
+  CHECK(undo->length == 0);
+
+  btc_undo_destroy(undo);
+
+  return view;
 }
