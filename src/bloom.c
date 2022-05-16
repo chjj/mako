@@ -6,6 +6,7 @@
  * Based on the bcoin code (which was based on bitcoin core).
  */
 
+#include <math.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -15,7 +16,6 @@
 #include <mako/util.h>
 #include "impl.h"
 #include "internal.h"
-#include "math.h"
 
 /*
  * Constants
@@ -81,7 +81,7 @@ btc_bloom_set(btc_bloom_t *bloom,
 
   CHECK(rate >= 0.0 && rate <= 1.0);
 
-  bits = (uint32_t)(-1.0 / BTC_LN2SQUARED * (double)items * btc_ln(rate));
+  bits = (uint32_t)(-1.0 / BTC_LN2SQUARED * (double)items * log(rate));
 
   bits -= (bits & 7);
 
@@ -257,14 +257,14 @@ btc_filter_reset(btc_filter_t *filter) {
 
 void
 btc_filter_set(btc_filter_t *filter, uint32_t items, double rate) {
-  double lnrate = btc_ln(rate);
+  double lograte = log(rate);
   uint32_t max, bits;
   size_t length;
   int n, limit;
 
   CHECK(rate >= 0.0 && rate <= 1.0);
 
-  n = (int)((lnrate / btc_ln(0.5)) + 0.5);
+  n = (int)((lograte / log(0.5)) + 0.5);
 
   if (n > 50)
     n = 50;
@@ -275,7 +275,7 @@ btc_filter_set(btc_filter_t *filter, uint32_t items, double rate) {
   limit = (items + 1) / 2;
   max = limit * 3;
 
-  bits = (uint32_t)btc_ceil(-1.0 * n * max / btc_ln(1.0 - btc_exp(lnrate / n)));
+  bits = (uint32_t)ceil(-1.0 * n * max / log(1.0 - exp(lograte / n)));
   length = ((bits + 63) / 64) * 2;
 
   if (length == 0)

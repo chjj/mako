@@ -170,8 +170,6 @@ mako_sources = src/crypto/fields/secp256k1_32.h \
                src/internal.h                   \
                src/json.c                       \
                src/mainnet.c                    \
-               src/math.c                       \
-               src/math.h                       \
                src/mpi.c                        \
                src/murmur3.c                    \
                src/netaddr.c                    \
