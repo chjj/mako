@@ -14,15 +14,10 @@
  * Language Standard
  */
 
-#if defined(__cplusplus)
-#  define BTC_STDC_VERSION 0L
-#  define BTC_CPP_VERSION (__cplusplus + 0L)
-#elif defined(__STDC_VERSION__)
+#ifdef __STDC_VERSION__
 #  define BTC_STDC_VERSION __STDC_VERSION__
-#  define BTC_CPP_VERSION 0L
 #else
 #  define BTC_STDC_VERSION 0L
-#  define BTC_CPP_VERSION 0L
 #endif
 
 /*
@@ -147,74 +142,43 @@
 
 #if BTC_STDC_VERSION >= 201112L && !defined(__chibicc__)
 #  define STATIC_ASSERT(expr) _Static_assert(expr, "check failed")
-#elif BTC_CPP_VERSION >= 201703L
-#  define STATIC_ASSERT(expr) static_assert(expr)
-#elif BTC_CPP_VERSION >= 201103L
-#  define STATIC_ASSERT(expr) static_assert(expr, "check failed")
-#elif BTC_GNUC_PREREQ(2, 7) || defined(__clang__) || defined(__TINYC__)
+#elif BTC_GNUC_PREREQ(2, 7) || defined(__clang__)
 #  define STATIC_ASSERT_2(x, y) \
-     typedef char btc__assert_ ## y[(x) ? 1 : -1] __attribute__((unused))
+     typedef char btc_assert_ ## y[(x) ? 1 : -1] __attribute__((__unused__))
 #  define STATIC_ASSERT_1(x, y) STATIC_ASSERT_2(x, y)
 #  define STATIC_ASSERT(expr) STATIC_ASSERT_1(expr, __LINE__)
 #else
-#  define STATIC_ASSERT(expr) struct btc__assert_empty
+#  define STATIC_ASSERT(expr) struct btc_assert_empty
 #endif
 
 /*
  * Keywords/Attributes
  */
 
-#undef noreturn
-#undef unused
-
 #if BTC_STDC_VERSION >= 199901L
-#  define BTC_INLINE inline
-#elif BTC_CPP_VERSION >= 199711L
 #  define BTC_INLINE inline
 #elif BTC_GNUC_PREREQ(2, 7)
 #  define BTC_INLINE __inline__
 #elif defined(_MSC_VER) && _MSC_VER >= 900
 #  define BTC_INLINE __inline
-#elif (defined(__SUNPRO_C) && __SUNPRO_C >= 0x560) \
-   || (defined(__SUNPRO_CC) && __SUNPRO_CC >= 0x560)
-#  define BTC_INLINE inline
 #else
 #  define BTC_INLINE
 #endif
 
-#if BTC_STDC_VERSION >= 199901L
-#  define BTC_RESTRICT restrict
-#elif BTC_GNUC_PREREQ(3, 0)
-#  define BTC_RESTRICT __restrict__
-#elif defined(_MSC_VER) && _MSC_VER >= 1400
-#  define BTC_RESTRICT __restrict
-#elif defined(__SUNPRO_C) && __SUNPRO_C >= 0x530
-#  define BTC_RESTRICT _Restrict
-#else
-#  define BTC_RESTRICT
-#endif
-
 #if BTC_STDC_VERSION >= 201112L
 #  define BTC_NORETURN _Noreturn
-#elif BTC_CPP_VERSION >= 201103L
-#  define BTC_NORETURN [[noreturn]]
 #elif BTC_GNUC_PREREQ(2, 7)
-#  define BTC_NORETURN __attribute__((noreturn))
+#  define BTC_NORETURN __attribute__((__noreturn__))
 #elif defined(_MSC_VER) && _MSC_VER >= 1200
 #  define BTC_NORETURN __declspec(noreturn)
-#elif (defined(__SUNPRO_C) && __SUNPRO_C >= 0x590) \
-   || (defined(__SUNPRO_CC) && __SUNPRO_CC >= 0x590)
-#  define BTC_NORETURN __attribute__((noreturn))
 #else
 #  define BTC_NORETURN
 #endif
 
 #if BTC_STDC_VERSION > 201710L
 #  define BTC_UNUSED [[maybe_unused]]
-#elif BTC_CPP_VERSION >= 201703L
-#  define BTC_UNUSED [[maybe_unused]]
-#elif BTC_GNUC_PREREQ(2, 7) || defined(__clang__) || defined(__TINYC__)
-#  define BTC_UNUSED __attribute__((unused))
+#elif BTC_GNUC_PREREQ(2, 7) || defined(__clang__)
+#  define BTC_UNUSED __attribute__((__unused__))
 #else
 #  define BTC_UNUSED
 #endif
