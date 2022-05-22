@@ -272,7 +272,7 @@ client_sources = include/client/client.h \
 #
 
 libmako_la_SOURCES = $(mako_sources)
-libmako_la_CFLAGS = $(WARN_FLAGS)
+libmako_la_CFLAGS =
 
 if ENABLE_SHARED
 libmako_la_CFLAGS += -DBTC_EXPORT
@@ -288,36 +288,31 @@ lib_LTLIBRARIES = libmako.la
 
 if ENABLE_NODE
 libio_la_SOURCES = $(io_sources)
-libio_la_CFLAGS = $(WARN_FLAGS)
 libio_la_LDFLAGS = -static
 
 libbase_la_SOURCES = $(base_sources)
-libbase_la_CFLAGS = $(WARN_FLAGS)
 libbase_la_LDFLAGS = -static
 libbase_la_LIBADD = libio.la libmako.la
 
 libnode_la_SOURCES = $(node_sources)
-libnode_la_CFLAGS = $(WARN_FLAGS) -I$(top_srcdir)/deps/lcdb/include
+libnode_la_CFLAGS = -I$(top_srcdir)/deps/lcdb/include
 libnode_la_LDFLAGS = -static
 libnode_la_LIBADD = libbase.la $(mako_dbdir)/liblcdb.la
 
 libwallet_la_SOURCES = $(wallet_sources)
-libwallet_la_CFLAGS = $(WARN_FLAGS) -I$(top_srcdir)/deps/lcdb/include
+libwallet_la_CFLAGS = -I$(top_srcdir)/deps/lcdb/include
 libwallet_la_LDFLAGS = -static
 libwallet_la_LIBADD = libbase.la $(mako_dbdir)/liblcdb.la
 
 libclient_la_SOURCES = $(client_sources)
-libclient_la_CFLAGS = $(WARN_FLAGS)
 libclient_la_LDFLAGS = -static
 libclient_la_LIBADD = libbase.la
 
 makod_SOURCES = src/node/main.c
-makod_CFLAGS = $(WARN_FLAGS)
 makod_LDFLAGS = -static
 makod_LDADD = libnode.la libwallet.la
 
 mako_SOURCES = src/client/main.c
-mako_CFLAGS = $(WARN_FLAGS)
 mako_LDFLAGS = -static
 mako_LDADD = libclient.la
 

@@ -2,7 +2,7 @@
 # Copyright (c) 2021-2022, Christopher Jeffrey (MIT License).
 # https://github.com/chjj/mako
 
-AM_CPPFLAGS = $(WARN_FLAGS) -I$(top_srcdir)/include
+AM_CPPFLAGS = -I$(top_srcdir)/include
 AM_LDFLAGS = -static
 
 if ENABLE_NODE

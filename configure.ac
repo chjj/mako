@@ -414,34 +414,27 @@ AS_IF([test x"$enable_tests" = x'yes'], [
 # Flags
 #
 
-mako_save_CFLAGS="$CFLAGS"
-
 AX_CHECK_COMPILE_FLAG([-Werror=unknown-warning-option],
                       [CFLAGS="$CFLAGS -Werror=unknown-warning-option"])
-AX_CHECK_COMPILE_FLAG([-pedantic], [WARN_FLAGS="$WARN_FLAGS -pedantic"])
-AX_CHECK_COMPILE_FLAG([-Wall], [WARN_FLAGS="$WARN_FLAGS -Wall"])
-AX_CHECK_COMPILE_FLAG([-Wextra], [WARN_FLAGS="$WARN_FLAGS -Wextra"])
-AX_CHECK_COMPILE_FLAG([-Wcast-align], [WARN_FLAGS="$WARN_FLAGS -Wcast-align"])
+AX_CHECK_COMPILE_FLAG([-pedantic], [CFLAGS="$CFLAGS -pedantic"])
+AX_CHECK_COMPILE_FLAG([-Wall], [CFLAGS="$CFLAGS -Wall"])
+AX_CHECK_COMPILE_FLAG([-Wextra], [CFLAGS="$CFLAGS -Wextra"])
+AX_CHECK_COMPILE_FLAG([-Wcast-align], [CFLAGS="$CFLAGS -Wcast-align"])
 AX_CHECK_COMPILE_FLAG([-Wcast-align=strict],
-                      [WARN_FLAGS="$WARN_FLAGS -Wcast-align=strict"])
+                      [CFLAGS="$CFLAGS -Wcast-align=strict"])
 AX_CHECK_COMPILE_FLAG([-Wconditional-uninitialized],
-                      [WARN_FLAGS="$WARN_FLAGS -Wconditional-uninitialized"])
+                      [CFLAGS="$CFLAGS -Wconditional-uninitialized"])
 AX_CHECK_COMPILE_FLAG([-Wmissing-prototypes],
-                      [WARN_FLAGS="$WARN_FLAGS -Wmissing-prototypes"])
+                      [CFLAGS="$CFLAGS -Wmissing-prototypes"])
 AX_CHECK_COMPILE_FLAG([-Wno-implicit-fallthrough],
-                      [WARN_FLAGS="$WARN_FLAGS -Wno-implicit-fallthrough"])
-AX_CHECK_COMPILE_FLAG([-Wno-long-long],
-                      [WARN_FLAGS="$WARN_FLAGS -Wno-long-long"])
+                      [CFLAGS="$CFLAGS -Wno-implicit-fallthrough"])
+AX_CHECK_COMPILE_FLAG([-Wno-long-long], [CFLAGS="$CFLAGS -Wno-long-long"])
 AX_CHECK_COMPILE_FLAG([-Wno-overlength-strings],
-                      [WARN_FLAGS="$WARN_FLAGS -Wno-overlength-strings"])
-AX_CHECK_COMPILE_FLAG([-Wshadow], [WARN_FLAGS="$WARN_FLAGS -Wshadow"])
+                      [CFLAGS="$CFLAGS -Wno-overlength-strings"])
+AX_CHECK_COMPILE_FLAG([-Wshadow], [CFLAGS="$CFLAGS -Wshadow"])
 AX_CHECK_COMPILE_FLAG([-Wstrict-prototypes],
-                      [WARN_FLAGS="$WARN_FLAGS -Wstrict-prototypes"])
-AX_CHECK_COMPILE_FLAG([-Wundef], [WARN_FLAGS="$WARN_FLAGS -Wundef"])
-
-CFLAGS="$mako_save_CFLAGS"
-
-AC_SUBST([WARN_FLAGS])
+                      [CFLAGS="$CFLAGS -Wstrict-prototypes"])
+AX_CHECK_COMPILE_FLAG([-Wundef], [CFLAGS="$CFLAGS -Wundef"])
 
 AS_IF([test x"$WATCOM" != x''], [
   AX_CHECK_COMPILE_FLAG([-Wno-n201], [CFLAGS="$CFLAGS -Wno-n201"])
@@ -586,7 +579,6 @@ AC_MSG_NOTICE([Build Options:
   CC         = $CC
   CPPFLAGS   = $CPPFLAGS
   CFLAGS     = $CFLAGS
-  WARN_FLAGS = $WARN_FLAGS
   LDFLAGS    = $LDFLAGS
   DEFS       = $DEFS
   LIBS       = $LIBS
