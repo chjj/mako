@@ -16,14 +16,14 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/stat.h>
-#include <sys/resource.h>
 
 #include <dirent.h>
 #include <fcntl.h>
-#ifdef BTC_PTHREAD
-#include <pthread.h>
-#endif
 #include <unistd.h>
+
+#if !defined(__Fuchsia__) && !defined(__wasi__) && !defined(__EMSCRIPTEN__)
+#  include <sys/resource.h>
+#endif
 
 #if !defined(FD_SETSIZE) && !defined(FD_SET)
 #  include <sys/select.h>
@@ -31,6 +31,10 @@
 
 #ifdef __APPLE__
 #  include <mach/mach.h>
+#endif
+
+#ifdef BTC_PTHREAD
+#  include <pthread.h>
 #endif
 
 #include <io/core.h>
