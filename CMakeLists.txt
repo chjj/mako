@@ -477,12 +477,12 @@ endif()
 # Defines
 #
 
-if(MAKO_BIGENDIAN)
-  list(APPEND mako_defines BTC_BIGENDIAN)
-endif()
-
 if(MAKO_HAVE_ASM)
   list(APPEND mako_defines BTC_HAVE_ASM)
+endif()
+
+if(MAKO_BIGENDIAN)
+  list(APPEND mako_defines BTC_BIGENDIAN)
 endif()
 
 if(MAKO_HAVE_CLOCK)
