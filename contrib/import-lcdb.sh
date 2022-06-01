@@ -48,5 +48,6 @@ rsync -av --exclude '*.o'         \
           deps/lcdb/src/
 
 rm -f deps/lcdb/contrib/Makefile.am
+rm -f deps/lcdb/contrib/fuzzer.c
 
 sed -i 's;include(cmake/;include(../../cmake/;g' deps/lcdb/CMakeLists.txt
