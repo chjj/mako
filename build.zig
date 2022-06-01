@@ -86,8 +86,6 @@ pub fn build(b: *Builder) void {
                           "System install prefix (/usr/local)");
   const enable_asm = b.option(bool, "asm",
                               "Use inline assembly (true)") orelse true;
-  const enable_coverage = b.option(bool, "coverage",
-                                   "Enable coverage (false)") orelse false;
   const enable_int128 = b.option(bool, "int128",
                           "Use __int128 if available (true)") orelse true;
   const enable_node = b.option(bool, "node",
@@ -128,7 +126,7 @@ pub fn build(b: *Builder) void {
     flags.append("-mmacosx-version-min=10.7") catch unreachable;
   }
 
-  if (b.is_release and mode == .ReleaseFast) {
+  if (mode == .ReleaseFast) {
     flags.append("-O3") catch unreachable;
   }
 
@@ -395,13 +393,6 @@ pub fn build(b: *Builder) void {
     flags.append(flag) catch unreachable;
   }
 
-  if (enable_coverage) {
-    flags.append("-O0") catch unreachable;
-    flags.append("--coverage") catch unreachable;
-    defines.append("NDEBUG") catch unreachable;
-    libs.append("gcov") catch unreachable;
-  }
-
   if (!target.isNative()) {
     // Ensure we are redistributable on other OSes.
     flags.append("-static-libgcc") catch unreachable;
@@ -430,12 +421,7 @@ pub fn build(b: *Builder) void {
     defines.append("BTC_HAVE_CLOCK") catch unreachable;
   }
 
-  if (enable_coverage) {
-    defines.append("BTC_COVERAGE") catch unreachable;
-    defines.append("LDB_COVERAGE") catch unreachable;
-  }
-
-  if (!b.is_release) {
+  if (mode == .Debug) {
     defines.append("BTC_DEBUG") catch unreachable;
     defines.append("LDB_DEBUG") catch unreachable;
   }
