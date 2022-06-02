@@ -56,7 +56,7 @@ enum ldb_valtype {
 };
 
 /* LDB_VALTYPE_SEEK defines the ldb_valtype that should be passed when
- * constructing a ldb_pkey_t object for seeking to a particular
+ * constructing a parsed key object for seeking to a particular
  * sequence number (since we sort sequence numbers in decreasing order
  * and the value type is embedded as the low 8 bits in the sequence
  * number in internal keys, we need to use the highest-numbered
@@ -99,7 +99,7 @@ typedef struct ldb_lkey_s {
    *                                    <-- end
    *
    * The array is a suitable MemTable key.
-   * The suffix starting with "userkey" can be used as an ldb_ikey_t.
+   * The suffix starting with "userkey" can be used as an InternalKey.
    */
   const uint8_t *start;
   const uint8_t *kstart;

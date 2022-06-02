@@ -43,7 +43,7 @@ ldb_pkey_init(ldb_pkey_t *key,
               const ldb_slice_t *user_key,
               ldb_seqnum_t sequence,
               ldb_valtype_t type) {
-  /* This function is called by DBIter::Seek,
+  /* This function is called by dbiter_seek,
    * so we try to avoid this in case the user
    * passed a partially initialized struct.
    *

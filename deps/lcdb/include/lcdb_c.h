@@ -13,12 +13,12 @@
 #ifndef LCDB_C_H
 #define LCDB_C_H
 
+#include <limits.h>
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <limits.h>
-#include <stddef.h>
 
 /*
  * Compat
@@ -32,7 +32,7 @@ typedef unsigned __int64 ldb_uint64_t;
 #elif ULONG_MAX >> 31 >> 31 >> 1 == 1
 typedef unsigned long ldb_uint64_t;
 #else
-#  ifdef __GNUC__
+#  if defined(__GNUC__) && __GNUC__ >= 2
 __extension__
 #  endif
 typedef unsigned long long ldb_uint64_t;

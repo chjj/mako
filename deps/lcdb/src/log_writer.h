@@ -24,7 +24,7 @@
 
 struct ldb_wfile_s;
 
-typedef struct ldb_logwriter_s {
+typedef struct ldb_writer_s {
   struct ldb_wfile_s *file;
   ldb_buffer_t *dst; /* For testing. */
   int block_offset; /* Current offset in block. */
@@ -33,7 +33,7 @@ typedef struct ldb_logwriter_s {
      pre-computed to reduce the overhead of computing the crc of the
      record type stored in the header. */
   uint32_t type_crc[LDB_MAX_RECTYPE + 1];
-} ldb_logwriter_t;
+} ldb_writer_t;
 
 /*
  * LogWriter
@@ -43,18 +43,18 @@ typedef struct ldb_logwriter_s {
  * "*file" must have initial length "dest_length".
  * "*file" must remain live while this Writer is in use.
  */
-ldb_logwriter_t *
-ldb_logwriter_create(struct ldb_wfile_s *file, uint64_t length);
+ldb_writer_t *
+ldb_writer_create(struct ldb_wfile_s *file, uint64_t length);
 
 void
-ldb_logwriter_destroy(ldb_logwriter_t *lw);
+ldb_writer_destroy(ldb_writer_t *lw);
 
 void
-ldb_logwriter_init(ldb_logwriter_t *lw,
-                   struct ldb_wfile_s *file,
-                   uint64_t length);
+ldb_writer_init(ldb_writer_t *lw,
+                struct ldb_wfile_s *file,
+                uint64_t length);
 
 int
-ldb_logwriter_add_record(ldb_logwriter_t *lw, const ldb_slice_t *slice);
+ldb_writer_add_record(ldb_writer_t *lw, const ldb_slice_t *slice);
 
 #endif /* LDB_LOG_WRITER_H */

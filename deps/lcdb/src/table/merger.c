@@ -38,7 +38,7 @@ enum ldb_direction {
 typedef struct ldb_mergeiter_s {
   /* We might want to use a heap in case there are lots of children.
      For now we use a simple array since we expect a very small number
-     of children in leveldb. */
+     of children in the current implementation. */
   const ldb_comparator_t *comparator;
   ldb_wrapiter_t *children;
   int n;
@@ -191,10 +191,10 @@ static void
 ldb_mergeiter_next(ldb_mergeiter_t *mi) {
   assert(ldb_mergeiter_valid(mi));
 
-  /* Ensure that all children are positioned after key().
+  /* Ensure that all children are positioned after key(mi).
      If we are moving in the forward direction, it is already
      true for all of the non-current children since current is
-     the smallest child and key() == current->key(). Otherwise,
+     the smallest child and key(mi) == key(current). Otherwise,
      we explicitly position the non-current children. */
   if (mi->direction != LDB_FORWARD) {
     int i;
@@ -227,10 +227,10 @@ static void
 ldb_mergeiter_prev(ldb_mergeiter_t *mi) {
   assert(ldb_mergeiter_valid(mi));
 
-  /* Ensure that all children are positioned before key().
+  /* Ensure that all children are positioned before key(mi).
      If we are moving in the reverse direction, it is already
      true for all of the non-current children since current is
-     the largest child and key() == current->key(). Otherwise,
+     the largest child and key(mi) == key(current). Otherwise,
      we explicitly position the non-current children. */
   if (mi->direction != LDB_REVERSE) {
     int i;

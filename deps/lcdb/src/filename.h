@@ -82,7 +82,7 @@ ldb_info_filename(char *buf, size_t size, const char *dbname);
 int
 ldb_oldinfo_filename(char *buf, size_t size, const char *dbname);
 
-/* If filename is a leveldb file, store the type of the file in *type.
+/* If filename is a database file, store the type of the file in *type.
    The number encoded in the filename is stored in *num. If the
    filename was successfully parsed, returns true. Else return false. */
 int

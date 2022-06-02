@@ -13,6 +13,10 @@
 #include "internal.h"
 #include "status.h"
 
+/*
+ * Constants
+ */
+
 static const char *ldb_errmsg[] = {
   /* .LDB_OK = */ "OK",
   /* .LDB_NOTFOUND = */ "NotFound",
@@ -21,6 +25,10 @@ static const char *ldb_errmsg[] = {
   /* .LDB_INVALID = */ "Invalid argument",
   /* .LDB_IOERR = */ "IO error"
 };
+
+/*
+ * Status
+ */
 
 const char *
 ldb_strerror(int code) {

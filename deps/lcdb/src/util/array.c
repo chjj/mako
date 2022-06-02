@@ -89,7 +89,7 @@ ldb_array_swap(ldb_array_t *x, ldb_array_t *y) {
 }
 
 /**
- * Quicksort (faster than libc's qsort -- no memcpy necessary)
+ * Quicksort
  * https://en.wikipedia.org/wiki/Quicksort#Hoare_partition_scheme
  */
 

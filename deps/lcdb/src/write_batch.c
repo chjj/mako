@@ -25,7 +25,7 @@
 #include "memtable.h"
 #include "write_batch.h"
 
-/* ldb_batch_t::rep :=
+/* WriteBatch::rep :=
  *    sequence: fixed64
  *    count: fixed32
  *    data: record[count]
@@ -45,7 +45,7 @@
 #define LDB_HEADER 12
 
 /*
- * Batch
+ * WriteBatch
  */
 
 ldb_batch_t *

@@ -21,7 +21,7 @@
  * the newline-terminated text corresponding to a single item found
  * in the file.
  *
- * Returns a non-OK result if fname does not name a leveldb storage
+ * Returns a non-OK result if fname does not name a database storage
  * file, or if the file cannot be read.
  */
 LDB_EXTERN int

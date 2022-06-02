@@ -227,7 +227,8 @@ leveldb_compact_range(leveldb_t *db,
   ldb_slice_set(&start, (const uint8_t *)start_key, start_key_len);
   ldb_slice_set(&limit, (const uint8_t *)limit_key, limit_key_len);
 
-  ldb_compact(db, &start, &limit);
+  ldb_compact(db, start_key != NULL ? &start : NULL,
+                  limit_key != NULL ? &limit : NULL);
 }
 
 void

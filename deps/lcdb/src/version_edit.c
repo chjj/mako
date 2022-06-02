@@ -162,7 +162,7 @@ ldb_filemeta_ref(ldb_filemeta_t *z) {
 
 void
 ldb_filemeta_unref(ldb_filemeta_t *z) {
-  /* assert(z->refs > 0); */
+  assert(z->refs > 0);
 
   z->refs--;
 
@@ -203,7 +203,7 @@ ldb_filemeta_copy(ldb_filemeta_t *z, const ldb_filemeta_t *x) {
  */
 
 void
-ldb_vedit_init(ldb_vedit_t *edit) {
+ldb_edit_init(ldb_edit_t *edit) {
   ldb_buffer_init(&edit->comparator);
 
   edit->log_number = 0;
@@ -222,7 +222,7 @@ ldb_vedit_init(ldb_vedit_t *edit) {
 }
 
 void
-ldb_vedit_clear(ldb_vedit_t *edit) {
+ldb_edit_clear(ldb_edit_t *edit) {
   size_t i;
 
   for (i = 0; i < edit->compact_pointers.length; i++)
@@ -238,57 +238,57 @@ ldb_vedit_clear(ldb_vedit_t *edit) {
 }
 
 void
-ldb_vedit_reset(ldb_vedit_t *edit) {
-  ldb_vedit_clear(edit);
-  ldb_vedit_init(edit);
+ldb_edit_reset(ldb_edit_t *edit) {
+  ldb_edit_clear(edit);
+  ldb_edit_init(edit);
 }
 
 void
-ldb_vedit_set_comparator_name(ldb_vedit_t *edit, const char *name) {
+ldb_edit_set_comparator_name(ldb_edit_t *edit, const char *name) {
   edit->has_comparator = 1;
   ldb_buffer_set_str(&edit->comparator, name);
 }
 
 void
-ldb_vedit_set_log_number(ldb_vedit_t *edit, uint64_t num) {
+ldb_edit_set_log_number(ldb_edit_t *edit, uint64_t num) {
   edit->has_log_number = 1;
   edit->log_number = num;
 }
 
 void
-ldb_vedit_set_prev_log_number(ldb_vedit_t *edit, uint64_t num) {
+ldb_edit_set_prev_log_number(ldb_edit_t *edit, uint64_t num) {
   edit->has_prev_log_number = 1;
   edit->prev_log_number = num;
 }
 
 void
-ldb_vedit_set_next_file(ldb_vedit_t *edit, uint64_t num) {
+ldb_edit_set_next_file(ldb_edit_t *edit, uint64_t num) {
   edit->has_next_file_number = 1;
   edit->next_file_number = num;
 }
 
 void
-ldb_vedit_set_last_sequence(ldb_vedit_t *edit, ldb_seqnum_t seq) {
+ldb_edit_set_last_sequence(ldb_edit_t *edit, ldb_seqnum_t seq) {
   edit->has_last_sequence = 1;
   edit->last_sequence = seq;
 }
 
 void
-ldb_vedit_set_compact_pointer(ldb_vedit_t *edit,
-                              int level,
-                              const ldb_ikey_t *key) {
+ldb_edit_set_compact_pointer(ldb_edit_t *edit,
+                             int level,
+                             const ldb_ikey_t *key) {
   ikey_entry_t *entry = ikey_entry_create(level, key);
 
   ldb_vector_push(&edit->compact_pointers, entry);
 }
 
 void
-ldb_vedit_add_file(ldb_vedit_t *edit,
-                   int level,
-                   uint64_t number,
-                   uint64_t file_size,
-                   const ldb_ikey_t *smallest,
-                   const ldb_ikey_t *largest) {
+ldb_edit_add_file(ldb_edit_t *edit,
+                  int level,
+                  uint64_t number,
+                  uint64_t file_size,
+                  const ldb_ikey_t *smallest,
+                  const ldb_ikey_t *largest) {
   meta_entry_t *entry = meta_entry_create(level,
                                           number,
                                           file_size,
@@ -299,7 +299,7 @@ ldb_vedit_add_file(ldb_vedit_t *edit,
 }
 
 void
-ldb_vedit_remove_file(ldb_vedit_t *edit, int level, uint64_t number) {
+ldb_edit_remove_file(ldb_edit_t *edit, int level, uint64_t number) {
   file_entry_t *entry = file_entry_create(level, number);
 
   if (!rb_set_put(&edit->deleted_files, entry))
@@ -307,7 +307,7 @@ ldb_vedit_remove_file(ldb_vedit_t *edit, int level, uint64_t number) {
 }
 
 void
-ldb_vedit_export(ldb_buffer_t *dst, const ldb_vedit_t *edit) {
+ldb_edit_export(ldb_buffer_t *dst, const ldb_edit_t *edit) {
   void *item;
   size_t i;
 
@@ -382,7 +382,7 @@ ldb_level_slurp(int *level, ldb_slice_t *input) {
 }
 
 int
-ldb_vedit_import(ldb_vedit_t *edit, const ldb_slice_t *src) {
+ldb_edit_import(ldb_edit_t *edit, const ldb_slice_t *src) {
   ldb_slice_t smallest, largest;
   uint64_t number, file_size;
   ldb_slice_t input = *src;
@@ -390,7 +390,7 @@ ldb_vedit_import(ldb_vedit_t *edit, const ldb_slice_t *src) {
   uint32_t tag;
   int level;
 
-  ldb_vedit_reset(edit);
+  ldb_edit_reset(edit);
 
   while (input.size > 0) {
     if (!ldb_varint32_slurp(&tag, &input))
@@ -452,7 +452,7 @@ ldb_vedit_import(ldb_vedit_t *edit, const ldb_slice_t *src) {
         if (key.size < 8)
           return 0;
 
-        ldb_vedit_set_compact_pointer(edit, level, &key);
+        ldb_edit_set_compact_pointer(edit, level, &key);
 
         break;
       }
@@ -464,7 +464,7 @@ ldb_vedit_import(ldb_vedit_t *edit, const ldb_slice_t *src) {
         if (!ldb_varint64_slurp(&number, &input))
           return 0;
 
-        ldb_vedit_remove_file(edit, level, number);
+        ldb_edit_remove_file(edit, level, number);
 
         break;
       }
@@ -488,7 +488,7 @@ ldb_vedit_import(ldb_vedit_t *edit, const ldb_slice_t *src) {
         if (smallest.size < 8 || largest.size < 8)
           return 0;
 
-        ldb_vedit_add_file(edit, level, number, file_size, &smallest, &largest);
+        ldb_edit_add_file(edit, level, number, file_size, &smallest, &largest);
 
         break;
       }
@@ -503,7 +503,7 @@ ldb_vedit_import(ldb_vedit_t *edit, const ldb_slice_t *src) {
 }
 
 void
-ldb_vedit_debug(ldb_buffer_t *z, const ldb_vedit_t *edit) {
+ldb_edit_debug(ldb_buffer_t *z, const ldb_edit_t *edit) {
   void *item;
   size_t i;
 

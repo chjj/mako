@@ -15,7 +15,7 @@
 
 #include <stdint.h>
 
-/* A very simple random number generator.  Not especially good at
+/* A very simple random number generator. Not especially good at
    generating truly random bits, but good enough for our needs in this
    package. */
 

@@ -25,10 +25,10 @@
  * to the batch. For example, the value of "key" will be "v3"
  * after the following batch is written:
  *
- *    batch.Put("key", "v1");
- *    batch.Delete("key");
- *    batch.Put("key", "v2");
- *    batch.Put("key", "v3");
+ *    ldb_batch_put(batch, "key", "v1");
+ *    ldb_batch_del(batch, "key");
+ *    ldb_batch_put(batch, "key", "v2");
+ *    ldb_batch_put(batch, "key", "v3");
  *
  * Multiple threads can invoke const methods on a batch without
  * external synchronization, but if any of the threads may call a
@@ -61,7 +61,7 @@ typedef struct ldb_batch_s {
 } ldb_batch_t;
 
 /*
- * Batch
+ * WriteBatch
  */
 
 LDB_EXTERN ldb_batch_t *
@@ -85,7 +85,7 @@ ldb_batch_reset(ldb_batch_t *batch);
  * This number is tied to implementation details, and may change across
  * releases. It is intended for usage metrics.
  */
-LDB_EXTERN size_t
+size_t
 ldb_batch_approximate_size(const ldb_batch_t *batch);
 
 /* Support for iterating over the contents of a batch. */

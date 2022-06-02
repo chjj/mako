@@ -23,12 +23,12 @@
 
 /* A comparator object provides a total order across slices that are
  * used as keys in an sstable or a database. A comparator implementation
- * must be thread-safe since leveldb may invoke its methods concurrently
- * from multiple threads.
+ * must be thread-safe since the implementation may invoke its methods
+ * concurrently from multiple threads.
  */
 typedef struct ldb_comparator_s {
   /* The name of the comparator. Used to check for comparator
-   * mismatches (i.e., a DB created with one comparator is
+   * mismatches (i.e., a database created with one comparator is
    * accessed using a different comparator.
    *
    * The client of this package should switch to a new name whenever

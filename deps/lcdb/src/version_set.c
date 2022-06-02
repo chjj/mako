@@ -328,14 +328,14 @@ static ldb_iter_t *
 get_file_iterator(void *arg,
                   const ldb_readopt_t *options,
                   const ldb_slice_t *file_value) {
-  ldb_tcache_t *cache = (ldb_tcache_t *)arg;
+  ldb_tables_t *cache = (ldb_tables_t *)arg;
 
   if (file_value->size != 16) {
     /* "FileReader invoked with unexpected value" */
     return ldb_emptyiter_create(LDB_CORRUPTION);
   }
 
-  return ldb_tcache_iterate(cache, options,
+  return ldb_tables_iterate(cache, options,
                             ldb_fixed64_decode(file_value->data + 0),
                             ldb_fixed64_decode(file_value->data + 8),
                             NULL);
@@ -398,7 +398,7 @@ typedef struct getstate_s {
   ldb_slice_t ikey;
   ldb_filemeta_t *last_file_read;
   int last_file_read_level;
-  ldb_vset_t *vset;
+  ldb_versions_t *vset;
   int status;
   int found;
 } getstate_t;
@@ -406,7 +406,7 @@ typedef struct getstate_s {
 static int
 getstate_match(void *arg, int level, ldb_filemeta_t *f) {
   getstate_t *state = (getstate_t *)arg;
-  ldb_tcache_t *cache = state->vset->table_cache;
+  ldb_tables_t *cache = state->vset->table_cache;
 
   if (state->stats->seek_file == NULL &&
       state->last_file_read != NULL) {
@@ -418,7 +418,7 @@ getstate_match(void *arg, int level, ldb_filemeta_t *f) {
   state->last_file_read = f;
   state->last_file_read_level = level;
 
-  state->status = ldb_tcache_get(cache,
+  state->status = ldb_tables_get(cache,
                                  state->options,
                                  f->number,
                                  f->file_size,
@@ -480,7 +480,7 @@ samplestate_match(void *arg, int level, ldb_filemeta_t *f) {
  */
 
 static void
-ldb_version_init(ldb_version_t *ver, ldb_vset_t *vset) {
+ldb_version_init(ldb_version_t *ver, ldb_versions_t *vset) {
   int level;
 
   ver->vset = vset;
@@ -519,7 +519,7 @@ ldb_version_clear(ldb_version_t *ver) {
 }
 
 ldb_version_t *
-ldb_version_create(ldb_vset_t *vset) {
+ldb_version_create(ldb_versions_t *vset) {
   ldb_version_t *ver = ldb_malloc(sizeof(ldb_version_t));
   ldb_version_init(ver, vset);
   return ver;
@@ -531,23 +531,18 @@ ldb_version_destroy(ldb_version_t *ver) {
   ldb_free(ver);
 }
 
-int
-ldb_version_num_files(const ldb_version_t *ver, int level) {
-  return ver->files[level].length;
-}
-
 void
 ldb_version_add_iterators(ldb_version_t *ver,
                           const ldb_readopt_t *options,
                           ldb_vector_t *iters) {
-  ldb_tcache_t *table_cache = ver->vset->table_cache;
+  ldb_tables_t *table_cache = ver->vset->table_cache;
   int level;
   size_t i;
 
   /* Merge all level zero files together since they may overlap. */
   for (i = 0; i < ver->files[0].length; i++) {
     ldb_filemeta_t *item = ver->files[0].items[i];
-    ldb_iter_t *iter = ldb_tcache_iterate(table_cache,
+    ldb_iter_t *iter = ldb_tables_iterate(table_cache,
                                           options,
                                           item->number,
                                           item->file_size,
@@ -897,7 +892,7 @@ typedef struct level_state_s {
 } level_state_t;
 
 typedef struct builder_s {
-  ldb_vset_t *vset;
+  ldb_versions_t *vset;
   ldb_version_t *base;
   level_state_t levels[LDB_NUM_LEVELS];
 } builder_t;
@@ -927,7 +922,7 @@ file_set_destruct(rb_node_t *node) {
 
 /* Initialize a builder with the files from *base and other info from *vset. */
 static void
-builder_init(builder_t *b, ldb_vset_t *vset, ldb_version_t *base) {
+builder_init(builder_t *b, ldb_versions_t *vset, ldb_version_t *base) {
   int level;
 
   b->vset = vset;
@@ -959,8 +954,8 @@ builder_clear(builder_t *b) {
 
 /* Apply all of the edits in *edit to the current state. */
 static void
-builder_apply(builder_t *b, const ldb_vedit_t *edit) {
-  ldb_vset_t *v = b->vset;
+builder_apply(builder_t *b, const ldb_edit_t *edit) {
+  ldb_versions_t *v = b->vset;
   void *item;
   size_t i;
 
@@ -1105,7 +1100,7 @@ builder_save_to(builder_t *b, ldb_version_t *v) {
  */
 
 static void
-ldb_vset_append_version(ldb_vset_t *vset, ldb_version_t *v) {
+ldb_versions_append_version(ldb_versions_t *vset, ldb_version_t *v) {
   /* Make "v" current. */
   assert(v->refs == 0);
   assert(v != vset->current);
@@ -1125,11 +1120,11 @@ ldb_vset_append_version(ldb_vset_t *vset, ldb_version_t *v) {
 }
 
 static void
-ldb_vset_init(ldb_vset_t *vset,
-              const char *dbname,
-              const ldb_dbopt_t *options,
-              ldb_tcache_t *table_cache,
-              const ldb_comparator_t *cmp) {
+ldb_versions_init(ldb_versions_t *vset,
+                  const char *dbname,
+                  const ldb_dbopt_t *options,
+                  ldb_tables_t *table_cache,
+                  const ldb_comparator_t *cmp) {
   int level;
 
   vset->dbname = dbname;
@@ -1150,19 +1145,20 @@ ldb_vset_init(ldb_vset_t *vset,
   for (level = 0; level < LDB_NUM_LEVELS; level++)
     ldb_buffer_init(&vset->compact_pointer[level]);
 
-  ldb_vset_append_version(vset, ldb_version_create(vset));
+  ldb_versions_append_version(vset, ldb_version_create(vset));
 }
 
 static void
-ldb_vset_clear(ldb_vset_t *vset) {
+ldb_versions_clear(ldb_versions_t *vset) {
   int level;
 
   ldb_version_unref(vset->current);
 
-  assert(vset->dummy_versions.next == &vset->dummy_versions); /* List must be empty. */
+  /* List must be empty. */
+  assert(vset->dummy_versions.next == &vset->dummy_versions);
 
   if (vset->descriptor_log != NULL)
-    ldb_logwriter_destroy(vset->descriptor_log);
+    ldb_writer_destroy(vset->descriptor_log);
 
   if (vset->descriptor_file != NULL)
     ldb_wfile_destroy(vset->descriptor_file);
@@ -1171,72 +1167,41 @@ ldb_vset_clear(ldb_vset_t *vset) {
     ldb_buffer_clear(&vset->compact_pointer[level]);
 }
 
-ldb_vset_t *
-ldb_vset_create(const char *dbname,
-                const ldb_dbopt_t *options,
-                ldb_tcache_t *table_cache,
-                const ldb_comparator_t *cmp) {
-  ldb_vset_t *vset = ldb_malloc(sizeof(ldb_vset_t));
-  ldb_vset_init(vset, dbname, options, table_cache, cmp);
+ldb_versions_t *
+ldb_versions_create(const char *dbname,
+                    const ldb_dbopt_t *options,
+                    ldb_tables_t *table_cache,
+                    const ldb_comparator_t *cmp) {
+  ldb_versions_t *vset = ldb_malloc(sizeof(ldb_versions_t));
+  ldb_versions_init(vset, dbname, options, table_cache, cmp);
   return vset;
 }
 
 void
-ldb_vset_destroy(ldb_vset_t *vset) {
-  ldb_vset_clear(vset);
+ldb_versions_destroy(ldb_versions_t *vset) {
+  ldb_versions_clear(vset);
   ldb_free(vset);
 }
 
-ldb_version_t *
-ldb_vset_current(const ldb_vset_t *vset) {
-  return vset->current;
-}
-
 uint64_t
-ldb_vset_manifest_file_number(const ldb_vset_t *vset) {
-  return vset->manifest_file_number;
-}
-
-uint64_t
-ldb_vset_new_file_number(ldb_vset_t *vset) {
+ldb_versions_new_file_number(ldb_versions_t *vset) {
   return vset->next_file_number++;
 }
 
 void
-ldb_vset_reuse_file_number(ldb_vset_t *vset, uint64_t file_number) {
+ldb_versions_reuse_file_number(ldb_versions_t *vset, uint64_t file_number) {
   if (vset->next_file_number == file_number + 1)
     vset->next_file_number = file_number;
 }
 
-uint64_t
-ldb_vset_last_sequence(const ldb_vset_t *vset) {
-  return vset->last_sequence;
-}
-
-void
-ldb_vset_set_last_sequence(ldb_vset_t *vset, uint64_t s) {
-  assert(s >= vset->last_sequence);
-  vset->last_sequence = s;
-}
-
-uint64_t
-ldb_vset_log_number(const ldb_vset_t *vset) {
-  return vset->log_number;
-}
-
-uint64_t
-ldb_vset_prev_log_number(const ldb_vset_t *vset) {
-  return vset->prev_log_number;
-}
-
 int
-ldb_vset_needs_compaction(const ldb_vset_t *vset) {
+ldb_versions_needs_compaction(const ldb_versions_t *vset) {
   ldb_version_t *v = vset->current;
   return (v->compaction_score >= 1) || (v->file_to_compact != NULL);
 }
 
 static void
-ldb_vset_finalize(ldb_vset_t *vset, ldb_version_t *v) {
+ldb_versions_finalize(ldb_versions_t *vset, ldb_version_t *v) {
   /* Precomputed best level for next compaction. */
   int best_level = -1;
   double best_score = -1;
@@ -1277,20 +1242,21 @@ ldb_vset_finalize(ldb_vset_t *vset, ldb_version_t *v) {
 }
 
 static int
-ldb_vset_write_snapshot(ldb_vset_t *vset, ldb_logwriter_t *log) {
+ldb_versions_write_snapshot(ldb_versions_t *vset, ldb_writer_t *log) {
   ldb_buffer_t record;
-  ldb_vedit_t edit;
+  ldb_edit_t edit;
   int level, rc;
 
   /* Save metadata. */
-  ldb_vedit_init(&edit);
-  ldb_vedit_set_comparator_name(&edit, vset->icmp.user_comparator->name);
+  ldb_edit_init(&edit);
+  ldb_edit_set_comparator_name(&edit, vset->icmp.user_comparator->name);
 
   /* Save compaction pointers. */
   for (level = 0; level < LDB_NUM_LEVELS; level++) {
-    if (vset->compact_pointer[level].size > 0)
-      ldb_vedit_set_compact_pointer(&edit, level,
-                                    &vset->compact_pointer[level]);
+    if (vset->compact_pointer[level].size > 0) {
+      ldb_edit_set_compact_pointer(&edit, level,
+                                   &vset->compact_pointer[level]);
+    }
   }
 
   /* Save files. */
@@ -1301,19 +1267,19 @@ ldb_vset_write_snapshot(ldb_vset_t *vset, ldb_logwriter_t *log) {
     for (i = 0; i < files->length; i++) {
       const ldb_filemeta_t *f = files->items[i];
 
-      ldb_vedit_add_file(&edit, level,
-                         f->number,
-                         f->file_size,
-                         &f->smallest,
-                         &f->largest);
+      ldb_edit_add_file(&edit, level,
+                               f->number,
+                               f->file_size,
+                               &f->smallest,
+                               &f->largest);
     }
   }
 
   ldb_buffer_init(&record);
-  ldb_vedit_export(&record, &edit);
-  ldb_vedit_clear(&edit);
+  ldb_edit_export(&record, &edit);
+  ldb_edit_clear(&edit);
 
-  rc = ldb_logwriter_add_record(log, &record);
+  rc = ldb_writer_add_record(log, &record);
 
   ldb_buffer_clear(&record);
 
@@ -1321,7 +1287,7 @@ ldb_vset_write_snapshot(ldb_vset_t *vset, ldb_logwriter_t *log) {
 }
 
 int
-ldb_vset_log_and_apply(ldb_vset_t *vset, ldb_vedit_t *edit, ldb_mutex_t *mu) {
+ldb_versions_apply(ldb_versions_t *vset, ldb_edit_t *edit, ldb_mutex_t *mu) {
   char fname[LDB_PATH_MAX];
   ldb_version_t *v;
   int rc = LDB_OK;
@@ -1332,14 +1298,14 @@ ldb_vset_log_and_apply(ldb_vset_t *vset, ldb_vedit_t *edit, ldb_mutex_t *mu) {
     assert(edit->log_number >= vset->log_number);
     assert(edit->log_number < vset->next_file_number);
   } else {
-    ldb_vedit_set_log_number(edit, vset->log_number);
+    ldb_edit_set_log_number(edit, vset->log_number);
   }
 
   if (!edit->has_prev_log_number)
-    ldb_vedit_set_prev_log_number(edit, vset->prev_log_number);
+    ldb_edit_set_prev_log_number(edit, vset->prev_log_number);
 
-  ldb_vedit_set_next_file(edit, vset->next_file_number);
-  ldb_vedit_set_last_sequence(edit, vset->last_sequence);
+  ldb_edit_set_next_file(edit, vset->next_file_number);
+  ldb_edit_set_last_sequence(edit, vset->last_sequence);
 
   v = ldb_version_create(vset);
 
@@ -1352,13 +1318,13 @@ ldb_vset_log_and_apply(ldb_vset_t *vset, ldb_vedit_t *edit, ldb_mutex_t *mu) {
     builder_clear(&b);
   }
 
-  ldb_vset_finalize(vset, v);
+  ldb_versions_finalize(vset, v);
 
   /* Initialize new descriptor log file if necessary by creating
      a temporary file that contains a snapshot of the current version. */
   if (vset->descriptor_log == NULL) {
     /* No reason to unlock *mu here since we only hit this path in the
-       first call to log_and_apply (when opening the database). */
+       first call to apply (when opening the database). */
     assert(vset->descriptor_file == NULL);
 
     if (ldb_desc_filename(fname, sizeof(fname), vset->dbname,
@@ -1369,9 +1335,9 @@ ldb_vset_log_and_apply(ldb_vset_t *vset, ldb_vedit_t *edit, ldb_mutex_t *mu) {
     }
 
     if (rc == LDB_OK) {
-      vset->descriptor_log = ldb_logwriter_create(vset->descriptor_file, 0);
+      vset->descriptor_log = ldb_writer_create(vset->descriptor_file, 0);
 
-      rc = ldb_vset_write_snapshot(vset, vset->descriptor_log);
+      rc = ldb_versions_write_snapshot(vset, vset->descriptor_log);
     }
   }
 
@@ -1384,9 +1350,9 @@ ldb_vset_log_and_apply(ldb_vset_t *vset, ldb_vedit_t *edit, ldb_mutex_t *mu) {
       ldb_buffer_t record;
 
       ldb_buffer_init(&record);
-      ldb_vedit_export(&record, edit);
+      ldb_edit_export(&record, edit);
 
-      rc = ldb_logwriter_add_record(vset->descriptor_log, &record);
+      rc = ldb_writer_add_record(vset->descriptor_log, &record);
 
       if (rc == LDB_OK)
         rc = ldb_wfile_sync(vset->descriptor_file);
@@ -1409,7 +1375,7 @@ ldb_vset_log_and_apply(ldb_vset_t *vset, ldb_vedit_t *edit, ldb_mutex_t *mu) {
 
   /* Install the new version. */
   if (rc == LDB_OK) {
-    ldb_vset_append_version(vset, v);
+    ldb_versions_append_version(vset, v);
 
     vset->log_number = edit->log_number;
     vset->prev_log_number = edit->prev_log_number;
@@ -1417,7 +1383,7 @@ ldb_vset_log_and_apply(ldb_vset_t *vset, ldb_vedit_t *edit, ldb_mutex_t *mu) {
     ldb_version_destroy(v);
 
     if (fname[0]) {
-      ldb_logwriter_destroy(vset->descriptor_log);
+      ldb_writer_destroy(vset->descriptor_log);
       ldb_wfile_destroy(vset->descriptor_file);
 
       vset->descriptor_log = NULL;
@@ -1431,7 +1397,7 @@ ldb_vset_log_and_apply(ldb_vset_t *vset, ldb_vedit_t *edit, ldb_mutex_t *mu) {
 }
 
 static int
-ldb_vset_reuse_manifest(ldb_vset_t *vset, const char *dscname) {
+ldb_versions_reuse_manifest(ldb_versions_t *vset, const char *dscname) {
   ldb_filetype_t manifest_type;
   uint64_t manifest_number;
   uint64_t manifest_size;
@@ -1443,11 +1409,11 @@ ldb_vset_reuse_manifest(ldb_vset_t *vset, const char *dscname) {
 
   dscbase = ldb_basename(dscname);
 
-  if (!ldb_parse_filename(&manifest_type, &manifest_number, dscbase)
-      || manifest_type != LDB_FILE_DESC
-      || ldb_file_size(dscname, &manifest_size) != LDB_OK
+  if (!ldb_parse_filename(&manifest_type, &manifest_number, dscbase) ||
+      manifest_type != LDB_FILE_DESC ||
+      ldb_file_size(dscname, &manifest_size) != LDB_OK ||
       /* Make new compacted MANIFEST if old one is too big. */
-      || manifest_size >= target_file_size(vset->options)) {
+      manifest_size >= target_file_size(vset->options)) {
     return 0;
   }
 
@@ -1467,8 +1433,8 @@ ldb_vset_reuse_manifest(ldb_vset_t *vset, const char *dscname) {
 
   ldb_log(vset->options->info_log, "Reusing MANIFEST %s", dscname);
 
-  vset->descriptor_log = ldb_logwriter_create(vset->descriptor_file,
-                                              manifest_size);
+  vset->descriptor_log = ldb_writer_create(vset->descriptor_file,
+                                           manifest_size);
 
   vset->manifest_file_number = manifest_number;
 
@@ -1521,7 +1487,7 @@ fail:
 }
 
 int
-ldb_vset_recover(ldb_vset_t *vset, int *save_manifest) {
+ldb_versions_recover(ldb_versions_t *vset, int *save_manifest) {
   const ldb_comparator_t *ucmp = vset->icmp.user_comparator;
   char fname[LDB_PATH_MAX];
   int have_log_number = 0;
@@ -1558,24 +1524,24 @@ ldb_vset_recover(ldb_vset_t *vset, int *save_manifest) {
   {
     ldb_slice_t name = ldb_string(ucmp->name);
     ldb_reporter_t reporter;
-    ldb_logreader_t reader;
+    ldb_reader_t reader;
     ldb_slice_t record;
     ldb_buffer_t buf;
-    ldb_vedit_t edit;
+    ldb_edit_t edit;
 
     reporter.status = &rc;
     reporter.corruption = report_corruption;
 
-    ldb_logreader_init(&reader, file, &reporter, 1, 0);
+    ldb_reader_init(&reader, file, &reporter, 1, 0);
     ldb_slice_init(&record);
     ldb_buffer_init(&buf);
-    ldb_vedit_init(&edit);
+    ldb_edit_init(&edit);
 
-    while (ldb_logreader_read_record(&reader, &record, &buf) && rc == LDB_OK) {
+    while (ldb_reader_read_record(&reader, &record, &buf) && rc == LDB_OK) {
       ++read_records;
 
-      /* Calls ldb_vedit_reset() internally. */
-      if (!ldb_vedit_import(&edit, &record))
+      /* Calls ldb_edit_reset() internally. */
+      if (!ldb_edit_import(&edit, &record))
         rc = LDB_CORRUPTION;
 
       if (rc == LDB_OK) {
@@ -1609,9 +1575,9 @@ ldb_vset_recover(ldb_vset_t *vset, int *save_manifest) {
       }
     }
 
-    ldb_vedit_clear(&edit);
+    ldb_edit_clear(&edit);
     ldb_buffer_clear(&buf);
-    ldb_logreader_clear(&reader);
+    ldb_reader_clear(&reader);
   }
 
   ldb_rfile_destroy(file);
@@ -1628,8 +1594,8 @@ ldb_vset_recover(ldb_vset_t *vset, int *save_manifest) {
     if (!have_prev_log_number)
       prev_log_number = 0;
 
-    ldb_vset_mark_file_number_used(vset, prev_log_number);
-    ldb_vset_mark_file_number_used(vset, log_number);
+    ldb_versions_mark_file_number(vset, prev_log_number);
+    ldb_versions_mark_file_number(vset, log_number);
   }
 
   if (rc == LDB_OK) {
@@ -1638,8 +1604,8 @@ ldb_vset_recover(ldb_vset_t *vset, int *save_manifest) {
     builder_save_to(&builder, v);
 
     /* Install recovered version. */
-    ldb_vset_finalize(vset, v);
-    ldb_vset_append_version(vset, v);
+    ldb_versions_finalize(vset, v);
+    ldb_versions_append_version(vset, v);
 
     vset->manifest_file_number = next_file;
     vset->next_file_number = next_file + 1;
@@ -1648,7 +1614,7 @@ ldb_vset_recover(ldb_vset_t *vset, int *save_manifest) {
     vset->prev_log_number = prev_log_number;
 
     /* See if we can reuse the existing MANIFEST file. */
-    if (ldb_vset_reuse_manifest(vset, fname)) {
+    if (ldb_versions_reuse_manifest(vset, fname)) {
       /* No need to save new manifest. */
     } else {
       *save_manifest = 1;
@@ -1665,23 +1631,23 @@ ldb_vset_recover(ldb_vset_t *vset, int *save_manifest) {
 }
 
 void
-ldb_vset_mark_file_number_used(ldb_vset_t *vset, uint64_t number) {
+ldb_versions_mark_file_number(ldb_versions_t *vset, uint64_t number) {
   if (vset->next_file_number <= number)
     vset->next_file_number = number + 1;
 }
 
 int
-ldb_vset_num_level_files(const ldb_vset_t *vset, int level) {
+ldb_versions_files(const ldb_versions_t *vset, int level) {
   assert(level >= 0);
   assert(level < LDB_NUM_LEVELS);
   return vset->current->files[level].length;
 }
 
 const char *
-ldb_vset_level_summary(const ldb_vset_t *vset, char *scratch) {
+ldb_versions_summary(const ldb_versions_t *vset, char *scratch) {
   const ldb_version_t *c = vset->current;
 
-  /* Update code if kNumLevels changes. */
+  /* Update code if LDB_NUM_LEVELS changes. */
   STATIC_ASSERT(LDB_NUM_LEVELS == 7);
 
   sprintf(scratch, "files[ %d %d %d %d %d %d %d ]",
@@ -1697,9 +1663,9 @@ ldb_vset_level_summary(const ldb_vset_t *vset, char *scratch) {
 }
 
 uint64_t
-ldb_vset_approximate_offset_of(ldb_vset_t *vset,
-                               ldb_version_t *v,
-                               const ldb_ikey_t *ikey) {
+ldb_versions_approximate_offset(ldb_versions_t *vset,
+                                ldb_version_t *v,
+                                const ldb_ikey_t *ikey) {
   uint64_t result = 0;
   int level;
 
@@ -1727,14 +1693,14 @@ ldb_vset_approximate_offset_of(ldb_vset_t *vset,
         ldb_table_t *tableptr;
         ldb_iter_t *iter;
 
-        iter = ldb_tcache_iterate(vset->table_cache,
+        iter = ldb_tables_iterate(vset->table_cache,
                                   ldb_readopt_default,
                                   file->number,
                                   file->file_size,
                                   &tableptr);
 
         if (tableptr != NULL)
-          result += ldb_table_approximate_offsetof(tableptr, ikey);
+          result += ldb_table_approximate_offset(tableptr, ikey);
 
         ldb_iter_destroy(iter);
       }
@@ -1745,7 +1711,7 @@ ldb_vset_approximate_offset_of(ldb_vset_t *vset,
 }
 
 void
-ldb_vset_add_live_files(ldb_vset_t *vset, rb_set64_t *live) {
+ldb_versions_add_files(ldb_versions_t *vset, rb_set64_t *live) {
   ldb_version_t *list = &vset->dummy_versions;
   ldb_version_t *v;
   int level;
@@ -1765,14 +1731,14 @@ ldb_vset_add_live_files(ldb_vset_t *vset, rb_set64_t *live) {
 }
 
 int64_t
-ldb_vset_num_level_bytes(const ldb_vset_t *vset, int level) {
+ldb_versions_bytes(const ldb_versions_t *vset, int level) {
   assert(level >= 0);
   assert(level < LDB_NUM_LEVELS);
   return total_file_size(&vset->current->files[level]);
 }
 
 int64_t
-ldb_vset_max_next_level_overlapping_bytes(ldb_vset_t *vset) {
+ldb_versions_max_next_level_overlapping_bytes(ldb_versions_t *vset) {
   ldb_vector_t overlaps;
   int64_t result = 0;
   int level;
@@ -1807,10 +1773,10 @@ ldb_vset_max_next_level_overlapping_bytes(ldb_vset_t *vset) {
    *smallest, *largest. */
 /* REQUIRES: inputs is not empty */
 static void
-ldb_vset_get_range(ldb_vset_t *vset,
-                   const ldb_vector_t *inputs,
-                   ldb_slice_t *smallest,
-                   ldb_slice_t *largest) {
+ldb_versions_get_range(ldb_versions_t *vset,
+                       const ldb_vector_t *inputs,
+                       ldb_slice_t *smallest,
+                       ldb_slice_t *largest) {
   ldb_ikey_t *small = NULL;
   ldb_ikey_t *large = NULL;
   size_t i;
@@ -1840,11 +1806,11 @@ ldb_vset_get_range(ldb_vset_t *vset,
    in *smallest, *largest. */
 /* REQUIRES: inputs is not empty */
 static void
-ldb_vset_get_range2(ldb_vset_t *vset,
-                    const ldb_vector_t *inputs1,
-                    const ldb_vector_t *inputs2,
-                    ldb_slice_t *smallest,
-                    ldb_slice_t *largest) {
+ldb_versions_get_range2(ldb_versions_t *vset,
+                        const ldb_vector_t *inputs1,
+                        const ldb_vector_t *inputs2,
+                        ldb_slice_t *smallest,
+                        ldb_slice_t *largest) {
   ldb_vector_t all;
   size_t i;
 
@@ -1857,7 +1823,7 @@ ldb_vset_get_range2(ldb_vset_t *vset,
   for (i = 0; i < inputs2->length; i++)
     all.items[all.length++] = inputs2->items[i];
 
-  ldb_vset_get_range(vset, &all, smallest, largest);
+  ldb_versions_get_range(vset, &all, smallest, largest);
 
   ldb_vector_clear(&all);
 }
@@ -1962,16 +1928,16 @@ add_boundary_inputs(const ldb_comparator_t *icmp,
 }
 
 static void
-ldb_vset_setup_other_inputs(ldb_vset_t *vset, ldb_compaction_t *c) {
-  int level = ldb_compaction_level(c);
+ldb_versions_setup_other_inputs(ldb_versions_t *vset, ldb_compaction_t *c) {
   ldb_slice_t smallest, largest;
   ldb_slice_t all_start, all_limit;
+  const int level = c->level;
 
   add_boundary_inputs(&vset->icmp,
                       &vset->current->files[level],
                       &c->inputs[0]);
 
-  ldb_vset_get_range(vset, &c->inputs[0], &smallest, &largest);
+  ldb_versions_get_range(vset, &c->inputs[0], &smallest, &largest);
 
   ldb_version_get_overlapping_inputs(vset->current, level + 1,
                                      &smallest, &largest,
@@ -1982,8 +1948,8 @@ ldb_vset_setup_other_inputs(ldb_vset_t *vset, ldb_compaction_t *c) {
                       &c->inputs[1]);
 
   /* Get entire range covered by compaction. */
-  ldb_vset_get_range2(vset, &c->inputs[0], &c->inputs[1],
-                            &all_start, &all_limit);
+  ldb_versions_get_range2(vset, &c->inputs[0], &c->inputs[1],
+                                &all_start, &all_limit);
 
   /* See if we can grow the number of inputs in "level" without
      changing the number of "level+1" files we pick up. */
@@ -2013,7 +1979,7 @@ ldb_vset_setup_other_inputs(ldb_vset_t *vset, ldb_compaction_t *c) {
 
       ldb_vector_init(&expanded1);
 
-      ldb_vset_get_range(vset, &expanded0, &new_start, &new_limit);
+      ldb_versions_get_range(vset, &expanded0, &new_start, &new_limit);
 
       ldb_version_get_overlapping_inputs(vset->current,
                                          level + 1,
@@ -2044,8 +2010,8 @@ ldb_vset_setup_other_inputs(ldb_vset_t *vset, ldb_compaction_t *c) {
         ldb_vector_swap(&c->inputs[0], &expanded0);
         ldb_vector_swap(&c->inputs[1], &expanded1);
 
-        ldb_vset_get_range2(vset, &c->inputs[0], &c->inputs[1],
-                                  &all_start, &all_limit);
+        ldb_versions_get_range2(vset, &c->inputs[0], &c->inputs[1],
+                                      &all_start, &all_limit);
       }
 
       ldb_vector_clear(&expanded1);
@@ -2068,11 +2034,11 @@ ldb_vset_setup_other_inputs(ldb_vset_t *vset, ldb_compaction_t *c) {
      key range next time. */
   ldb_buffer_copy(&vset->compact_pointer[level], &largest);
 
-  ldb_vedit_set_compact_pointer(&c->edit, level, &largest);
+  ldb_edit_set_compact_pointer(&c->edit, level, &largest);
 }
 
 ldb_compaction_t *
-ldb_vset_pick_compaction(ldb_vset_t *vset) {
+ldb_versions_pick_compaction(ldb_versions_t *vset) {
   ldb_compaction_t *c;
   int level;
   size_t i;
@@ -2123,7 +2089,7 @@ ldb_vset_pick_compaction(ldb_vset_t *vset) {
   if (level == 0) {
     ldb_slice_t smallest, largest;
 
-    ldb_vset_get_range(vset, &c->inputs[0], &smallest, &largest);
+    ldb_versions_get_range(vset, &c->inputs[0], &smallest, &largest);
 
     /* Note that the next call will discard the file we placed in
        c->inputs[0] earlier and replace it with an overlapping set
@@ -2135,16 +2101,16 @@ ldb_vset_pick_compaction(ldb_vset_t *vset) {
     assert(c->inputs[0].length > 0);
   }
 
-  ldb_vset_setup_other_inputs(vset, c);
+  ldb_versions_setup_other_inputs(vset, c);
 
   return c;
 }
 
 ldb_compaction_t *
-ldb_vset_compact_range(ldb_vset_t *vset,
-                       int level,
-                       const ldb_ikey_t *begin,
-                       const ldb_ikey_t *end) {
+ldb_versions_compact_range(ldb_versions_t *vset,
+                           int level,
+                           const ldb_ikey_t *begin,
+                           const ldb_ikey_t *end) {
   ldb_vector_t inputs;
   ldb_compaction_t *c;
 
@@ -2152,8 +2118,10 @@ ldb_vset_compact_range(ldb_vset_t *vset,
 
   ldb_version_get_overlapping_inputs(vset->current, level, begin, end, &inputs);
 
-  if (inputs.length == 0)
+  if (inputs.length == 0) {
+    ldb_vector_clear(&inputs);
     return NULL;
+  }
 
   /* Avoid compacting too much in one shot in case the range is large.
      But we cannot do this for level-0 since level-0 files can overlap
@@ -2184,7 +2152,7 @@ ldb_vset_compact_range(ldb_vset_t *vset,
 
   ldb_vector_swap(&c->inputs[0], &inputs);
 
-  ldb_vset_setup_other_inputs(vset, c);
+  ldb_versions_setup_other_inputs(vset, c);
 
   ldb_vector_clear(&inputs);
 
@@ -2196,7 +2164,7 @@ ldb_vset_compact_range(ldb_vset_t *vset,
  */
 
 ldb_iter_t *
-ldb_inputiter_create(ldb_vset_t *vset, ldb_compaction_t *c) {
+ldb_inputiter_create(ldb_versions_t *vset, ldb_compaction_t *c) {
   ldb_readopt_t options = *ldb_readopt_default;
   ldb_iter_t *result;
   ldb_iter_t **list;
@@ -2209,18 +2177,18 @@ ldb_inputiter_create(ldb_vset_t *vset, ldb_compaction_t *c) {
 
   /* Level-0 files have to be merged together. For other levels,
      we will make a concatenating iterator per level. */
-  space = (ldb_compaction_level(c) == 0 ? c->inputs[0].length + 1 : 2);
+  space = (c->level == 0 ? c->inputs[0].length + 1 : 2);
   list = ldb_malloc(space * sizeof(ldb_iter_t *));
 
   for (which = 0; which < 2; which++) {
     if (c->inputs[which].length > 0) {
-      if (ldb_compaction_level(c) + which == 0) {
+      if (c->level + which == 0) {
         const ldb_vector_t *files = &c->inputs[which];
 
         for (i = 0; i < files->length; i++) {
           const ldb_filemeta_t *file = files->items[i];
 
-          list[num++] = ldb_tcache_iterate(vset->table_cache,
+          list[num++] = ldb_tables_iterate(vset->table_cache,
                                            &options,
                                            file->number,
                                            file->file_size,
@@ -2266,7 +2234,7 @@ ldb_compaction_init(ldb_compaction_t *c,
   for (i = 0; i < LDB_NUM_LEVELS; i++)
     c->level_ptrs[i] = 0;
 
-  ldb_vedit_init(&c->edit);
+  ldb_edit_init(&c->edit);
   ldb_vector_init(&c->inputs[0]);
   ldb_vector_init(&c->inputs[1]);
   ldb_vector_init(&c->grandparents);
@@ -2277,7 +2245,7 @@ ldb_compaction_clear(ldb_compaction_t *c) {
   if (c->input_version != NULL)
     ldb_version_unref(c->input_version);
 
-  ldb_vedit_clear(&c->edit);
+  ldb_edit_clear(&c->edit);
   ldb_vector_clear(&c->inputs[0]);
   ldb_vector_clear(&c->inputs[1]);
   ldb_vector_clear(&c->grandparents);
@@ -2297,45 +2265,20 @@ ldb_compaction_destroy(ldb_compaction_t *c) {
 }
 
 int
-ldb_compaction_level(const ldb_compaction_t *c) {
-  return c->level;
-}
-
-ldb_vedit_t *
-ldb_compaction_edit(ldb_compaction_t *c) {
-  return &c->edit;
-}
-
-int
-ldb_compaction_num_input_files(const ldb_compaction_t *c, int which) {
-  return c->inputs[which].length;
-}
-
-ldb_filemeta_t *
-ldb_compaction_input(const ldb_compaction_t *c, int which, int i) {
-  return c->inputs[which].items[i];
-}
-
-uint64_t
-ldb_compaction_max_output_file_size(const ldb_compaction_t *c) {
-  return c->max_output_file_size;
-}
-
-int
 ldb_compaction_is_trivial_move(const ldb_compaction_t *c) {
-  const ldb_vset_t *vset = c->input_version->vset;
+  const ldb_versions_t *vset = c->input_version->vset;
 
   /* Avoid a move if there is lots of overlapping grandparent data.
      Otherwise, the move could create a parent file that will require
      a very expensive merge later on. */
-  return ldb_compaction_num_input_files(c, 0) == 1
-      && ldb_compaction_num_input_files(c, 1) == 0
-      && total_file_size(&c->grandparents) <=
+  return c->inputs[0].length == 1 &&
+         c->inputs[1].length == 0 &&
+         total_file_size(&c->grandparents) <=
            max_grandparent_overlap_bytes(vset->options);
 }
 
 void
-ldb_compaction_add_input_deletions(ldb_compaction_t *c, ldb_vedit_t *edit) {
+ldb_compaction_add_input_deletions(ldb_compaction_t *c, ldb_edit_t *edit) {
   int which;
   size_t i;
 
@@ -2343,7 +2286,7 @@ ldb_compaction_add_input_deletions(ldb_compaction_t *c, ldb_vedit_t *edit) {
     for (i = 0; i < c->inputs[which].length; i++) {
       const ldb_filemeta_t *file = c->inputs[which].items[i];
 
-      ldb_vedit_remove_file(edit, c->level + which, file->number);
+      ldb_edit_remove_file(edit, c->level + which, file->number);
     }
   }
 }
@@ -2352,8 +2295,8 @@ int
 ldb_compaction_is_base_level_for_key(ldb_compaction_t *c,
                                      const ldb_slice_t *user_key) {
   /* Maybe use binary search to find right entry instead of linear search? */
-  const ldb_comparator_t *user_cmp =
-    c->input_version->vset->icmp.user_comparator;
+  const ldb_versions_t *vset = c->input_version->vset;
+  const ldb_comparator_t *user_cmp = vset->icmp.user_comparator;
   int lvl;
 
   for (lvl = c->level + 2; lvl < LDB_NUM_LEVELS; lvl++) {
@@ -2385,7 +2328,7 @@ ldb_compaction_is_base_level_for_key(ldb_compaction_t *c,
 int
 ldb_compaction_should_stop_before(ldb_compaction_t *c,
                                   const ldb_slice_t *ikey) {
-  const ldb_vset_t *vset = c->input_version->vset;
+  const ldb_versions_t *vset = c->input_version->vset;
   const ldb_comparator_t *icmp = &vset->icmp;
 
   /* Scan to find earliest grandparent file that contains key. */

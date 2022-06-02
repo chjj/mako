@@ -51,7 +51,7 @@
 #define LDB_SHARDS (1 << LDB_SHARD_BITS)
 
 /*
- * LRU Handle
+ * LRUHandle
  */
 
 /* An entry is a variable length heap-allocated structure. Entries
@@ -89,7 +89,7 @@ handle_equal(const ldb_lruhandle_t *x, const ldb_slice_t *y) {
 }
 
 /*
- * LRU Table
+ * HandleTable
  */
 
 typedef struct ldb_lrutable_s {
@@ -450,7 +450,7 @@ ldb_shard_insert(ldb_shard_t *lru,
 }
 
 /*
- * LRU Cache
+ * Cache
  */
 
 struct ldb_lru_s {

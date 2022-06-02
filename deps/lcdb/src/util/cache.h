@@ -28,7 +28,7 @@ typedef struct ldb_lru_s ldb_lru_t;
 typedef struct ldb_lruhandle_s ldb_lruhandle_t;
 
 /*
- * LRU Cache
+ * Cache
  */
 
 /* Create a new cache with a fixed size capacity. This implementation

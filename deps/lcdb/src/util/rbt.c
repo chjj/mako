@@ -744,11 +744,7 @@ rb_set_k(const rb_iter_t *iter, void **key) {
 int
 rb_set64_compare(rb_val_t x, rb_val_t y, void *arg) {
   (void)arg;
-
-  if (x.ui == y.ui)
-    return 0;
-
-  return x.ui < y.ui ? -1 : 1;
+  return (x.ui > y.ui) - (x.ui < y.ui);
 }
 
 int

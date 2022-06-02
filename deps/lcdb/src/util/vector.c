@@ -88,7 +88,7 @@ ldb_vector_swap(ldb_vector_t *x, ldb_vector_t *y) {
 }
 
 /**
- * Quicksort (faster than libc's qsort -- no memcpy necessary)
+ * Quicksort
  * https://en.wikipedia.org/wiki/Quicksort#Hoare_partition_scheme
  */
 

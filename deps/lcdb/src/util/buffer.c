@@ -10,7 +10,6 @@
 
 #include "buffer.h"
 #include "coding.h"
-#include "hash.h"
 #include "internal.h"
 #include "strutil.h"
 
@@ -121,11 +120,6 @@ ldb_buffer_rwset(ldb_buffer_t *z, uint8_t *zp, size_t zn) {
   z->data = zp;
   z->size = 0;
   z->alloc = zn;
-}
-
-uint32_t
-ldb_buffer_hash(const ldb_buffer_t *x) {
-  return ldb_hash(x->data, x->size, 0);
 }
 
 int

@@ -54,9 +54,6 @@ ldb_buffer_rocopy(ldb_buffer_t *z, const ldb_buffer_t *x);
 void
 ldb_buffer_rwset(ldb_buffer_t *z, uint8_t *zp, size_t zn);
 
-uint32_t
-ldb_buffer_hash(const ldb_buffer_t *x);
-
 int
 ldb_buffer_equal(const ldb_buffer_t *x, const ldb_buffer_t *y);
 

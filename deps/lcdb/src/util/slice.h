@@ -71,9 +71,6 @@ ldb_slice_set_str(ldb_slice_t *z, const char *xp);
 void
 ldb_slice_copy(ldb_slice_t *z, const ldb_slice_t *x);
 
-uint32_t
-ldb_slice_hash(const ldb_slice_t *x);
-
 int
 ldb_slice_equal(const ldb_slice_t *x, const ldb_slice_t *y);
 
@@ -124,8 +121,5 @@ ldb_slice_decode(const uint8_t *xp) {
 
   return z;
 }
-
-LDB_EXTERN int
-ldb_equal(const ldb_slice_t *x, const ldb_slice_t *y);
 
 #endif /* LDB_SLICE_H */

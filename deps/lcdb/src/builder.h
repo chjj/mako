@@ -20,13 +20,13 @@
 struct ldb_dbopt_s;
 struct ldb_filemeta_s;
 struct ldb_iter_s;
-struct ldb_tcache_s;
+struct ldb_tables_s;
 
 /*
  * BuildTable
  */
 
-/* Build a Table file from the contents of *iter.  The generated file
+/* Build a Table file from the contents of *iter. The generated file
    will be named according to meta->number. On success, the rest of
    *meta will be filled with metadata about the generated table.
    If no data is present in *iter, meta->file_size will be set to
@@ -34,7 +34,7 @@ struct ldb_tcache_s;
 int
 ldb_build_table(const char *dbname,
                 const struct ldb_dbopt_s *options,
-                struct ldb_tcache_s *table_cache,
+                struct ldb_tables_s *table_cache,
                 struct ldb_iter_s *iter,
                 struct ldb_filemeta_s *meta);
 

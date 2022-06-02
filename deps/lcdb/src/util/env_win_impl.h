@@ -508,6 +508,7 @@ ldb_get_children_wide(const char *path, char ***out) {
   size_t size = 8;
   ldb_wide_t buf;
   size_t i = 0;
+  DWORD attrs;
   size_t j;
 
   if (len == 0) {
@@ -520,7 +521,9 @@ ldb_get_children_wide(const char *path, char ***out) {
   if (!ldb_utf16_write(buf.data, len, path))
     goto fail;
 
-  if (!(GetFileAttributesW(buf.data) & FILE_ATTRIBUTE_DIRECTORY))
+  attrs = GetFileAttributesW(buf.data);
+
+  if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY))
     goto fail;
 
   list = (char **)malloc(size * sizeof(char *));
@@ -626,12 +629,15 @@ ldb_get_children_ansi(const char *path, char ***out) {
   const char *base;
   size_t size = 8;
   size_t i = 0;
+  DWORD attrs;
   size_t j;
 
   if (len + 4 > sizeof(buf))
     goto fail;
 
-  if (!(GetFileAttributesA(path) & FILE_ATTRIBUTE_DIRECTORY))
+  attrs = GetFileAttributesA(path);
+
+  if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY))
     goto fail;
 
   list = (char **)malloc(size * sizeof(char *));
@@ -927,9 +933,9 @@ ldb_link_file(const char *from, const char *to) {
     if (!LDBCreateHardLinkW(dst.data, src.data, NULL)) {
       int code = GetLastError();
 
-      if (code == ERROR_INVALID_FUNCTION /* Not NTFS. */
-          || code == ERROR_NOT_SAME_DEVICE
-          || code == ERROR_CALL_NOT_IMPLEMENTED) {
+      if (code == ERROR_INVALID_FUNCTION || /* Not NTFS. */
+          code == ERROR_NOT_SAME_DEVICE ||
+          code == ERROR_CALL_NOT_IMPLEMENTED) {
         if (!CopyFileW(src.data, dst.data, TRUE))
           rc = LDB_WIN32_ERROR(GetLastError());
       } else {
@@ -1251,9 +1257,6 @@ ldb_randfile_create(const char *filename, ldb_rfile_t **file, int use_mmap) {
 
   if (!LDBGetFileSizeEx(handle, &size))
     rc = LDB_WIN32_ERROR(GetLastError());
-
-  if (rc == LDB_OK && (uint64_t)size.QuadPart > (((size_t)-1) / 2))
-    rc = LDB_IOERR;
 
   if (rc == LDB_OK) {
     mapping = CreateFileMappingA(handle, NULL, PAGE_READONLY, 0, 0, NULL);

@@ -31,8 +31,8 @@ struct ldb_snapshot_s;
  */
 
 /* DB contents are stored in a set of blocks, each of which holds a
- * sequence of key,value pairs.  Each block may be compressed before
- * being stored in a file.  The following enum describes which
+ * sequence of key,value pairs. Each block may be compressed before
+ * being stored in a file. The following enum describes which
  * compression method (if any) is used to compress a block.
  */
 enum ldb_compression {
@@ -46,7 +46,7 @@ enum ldb_compression {
  * DB Options
  */
 
-/* Options to control the behavior of a database (passed to DB::Open) */
+/* Options to control the behavior of a database (passed to ldb_open) */
 typedef struct ldb_dbopt_s {
   /* Parameters that affect behavior */
 
@@ -67,7 +67,7 @@ typedef struct ldb_dbopt_s {
 
   /* If true, the implementation will do aggressive checking of the
    * data it is processing and will stop early if it detects any
-   * errors.  This may have unforeseen ramifications: for example, a
+   * errors. This may have unforeseen ramifications: for example, a
    * corruption of one DB entry may cause a large number of entries to
    * become unreadable or for the entire DB to become unopenable.
    */
@@ -92,7 +92,7 @@ typedef struct ldb_dbopt_s {
    */
   size_t write_buffer_size; /* 4 * 1024 * 1024 */
 
-  /* Number of open files that can be used by the DB.  You may need to
+  /* Number of open files that can be used by the DB. You may need to
    * increase this if your database has a large working set (budget
    * one open file per 2MB of working set).
    */
@@ -102,51 +102,52 @@ typedef struct ldb_dbopt_s {
      a block is the unit of reading from disk). */
 
   /* If non-null, use the specified cache for blocks. */
-  /* If null, leveldb will automatically create and use an 8MB internal cache. */
+  /* If null, automatically create and use an 8MB internal cache. */
   struct ldb_lru_s *block_cache; /* NULL */
 
-  /* Approximate size of user data packed per block.  Note that the
-   * block size specified here corresponds to uncompressed data.  The
+  /* Approximate size of user data packed per block. Note that the
+   * block size specified here corresponds to uncompressed data. The
    * actual size of the unit read from disk may be smaller if
-   * compression is enabled.  This parameter can be changed dynamically.
+   * compression is enabled. This parameter can be changed dynamically.
    */
   size_t block_size; /* 4 * 1024 */
 
   /* Number of keys between restart points for delta encoding of keys.
-   * This parameter can be changed dynamically.  Most clients should
+   * This parameter can be changed dynamically. Most clients should
    * leave this parameter alone.
    */
   int block_restart_interval; /* 16 */
 
-  /* Leveldb will write up to this amount of bytes to a file before
+  /* The database will write up to this amount of bytes to a file before
    * switching to a new one.
-   * Most clients should leave this parameter alone.  However if your
+   * Most clients should leave this parameter alone. However if your
    * filesystem is more efficient with larger files, you could
-   * consider increasing the value.  The downside will be longer
+   * consider increasing the value. The downside will be longer
    * compactions and hence longer latency/performance hiccups.
    * Another reason to increase this parameter might be when you are
    * initially populating a large database.
    */
   size_t max_file_size; /* 2 * 1024 * 1024 */
 
-  /* Compress blocks using the specified compression algorithm.  This
+  /* Compress blocks using the specified compression algorithm. This
    * parameter can be changed dynamically.
    *
-   * Default: LDB_NO_COMPRESSION, which gives no compression.
+   * Default: LDB_SNAPPY_COMPRESSION, which gives lightweight but fast
+   * compression.
    *
    * Typical speeds of LDB_SNAPPY_COMPRESSION on an Intel(R) Core(TM)2 2.4GHz:
    *    ~200-500MB/s compression
    *    ~400-800MB/s decompression
    * Note that these speeds are significantly faster than most
    * persistent storage speeds, and therefore it is typically never
-   * worth switching to kNoCompression.  Even if the input data is
-   * incompressible, the LDB_NO_COMPRESSION implementation will
+   * worth switching to LDB_NO_COMPRESSION. Even if the input data is
+   * incompressible, the LDB_SNAPPY_COMPRESSION implementation will
    * efficiently detect that and will switch to uncompressed mode.
    */
-  enum ldb_compression compression; /* LDB_NO_COMPRESSION */
+  enum ldb_compression compression; /* LDB_SNAPPY_COMPRESSION */
 
   /* EXPERIMENTAL: If true, append to existing MANIFEST and log files
-   * when a database is opened.  This can significantly speed up open.
+   * when a database is opened. This can significantly speed up open.
    *
    * Default: currently false, but may become true later.
    */
@@ -154,7 +155,7 @@ typedef struct ldb_dbopt_s {
 
   /* If non-null, use the specified filter policy to reduce disk reads.
    * Many applications will benefit from passing the result of
-   * NewBloomFilterPolicy() here.
+   * ldb_bloom_create() here.
    */
   const struct ldb_bloom_s *filter_policy; /* NULL */
 
@@ -180,7 +181,7 @@ typedef struct ldb_readopt_s {
 
   /* If "snapshot" is non-null, read as of the supplied snapshot
    * (which must belong to the DB that is being read and which must
-   * not have been released).  If "snapshot" is null, use an implicit
+   * not have been released). If "snapshot" is null, use an implicit
    * snapshot of the state at the beginning of this read operation.
    */
   const struct ldb_snapshot_s *snapshot; /* NULL */
@@ -193,17 +194,17 @@ typedef struct ldb_readopt_s {
 /* Options that control write operations */
 typedef struct ldb_writeopt_s {
   /* If true, the write will be flushed from the operating system
-   * buffer cache (by calling WritableFile::Sync()) before the write
-   * is considered complete.  If this flag is true, writes will be
+   * buffer cache (by calling ldb_wfile_sync()) before the write
+   * is considered complete. If this flag is true, writes will be
    * slower.
    *
    * If this flag is false, and the machine crashes, some recent
-   * writes may be lost.  Note that if it is just the process that
+   * writes may be lost. Note that if it is just the process that
    * crashes (i.e., the machine does not reboot), no writes will be
    * lost even if sync==0.
    *
    * In other words, a DB write with sync==0 has similar
-   * crash semantics as the "write()" system call.  A DB write
+   * crash semantics as the "write()" system call. A DB write
    * with sync==1 has similar crash semantics to a "write()"
    * system call followed by "fsync()".
    */

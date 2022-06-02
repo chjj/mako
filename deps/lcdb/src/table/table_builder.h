@@ -24,26 +24,23 @@
 struct ldb_dbopt_s;
 struct ldb_wfile_s;
 
-typedef struct ldb_tablebuilder_s ldb_tablebuilder_t;
+typedef struct ldb_tablegen_s ldb_tablegen_t;
 
 /*
- * Table Builder
+ * TableBuilder
  */
 
 /* Create a builder that will store the contents of the table it is
  * building in *file. Does not close the file. It is up to the
  * caller to close the file after calling finish().
  */
-ldb_tablebuilder_t *
-ldb_tablebuilder_create(const struct ldb_dbopt_s *options,
-                        struct ldb_wfile_s *file);
+ldb_tablegen_t *
+ldb_tablegen_create(const struct ldb_dbopt_s *options,
+                    struct ldb_wfile_s *file);
 
 /* REQUIRES: Either finish() or abandon() has been called. */
 void
-ldb_tablebuilder_destroy(ldb_tablebuilder_t *tb);
-
-int
-ldb_tablebuilder_ok(const ldb_tablebuilder_t *tb);
+ldb_tablegen_destroy(ldb_tablegen_t *tb);
 
 /* Change the options used by this builder. Note: only some of the
  * option fields can be changed after construction. If a field is
@@ -53,16 +50,16 @@ ldb_tablebuilder_ok(const ldb_tablebuilder_t *tb);
  * without changing any fields.
  */
 int
-ldb_tablebuilder_change_options(ldb_tablebuilder_t *tb,
-                                const struct ldb_dbopt_s *options);
+ldb_tablegen_change_options(ldb_tablegen_t *tb,
+                            const struct ldb_dbopt_s *options);
 
 /* Add key,value to the table being constructed. */
 /* REQUIRES: key is after any previously added key according to comparator. */
 /* REQUIRES: finish(), abandon() have not been called */
 void
-ldb_tablebuilder_add(ldb_tablebuilder_t *tb,
-                     const ldb_slice_t *key,
-                     const ldb_slice_t *value);
+ldb_tablegen_add(ldb_tablegen_t *tb,
+                 const ldb_slice_t *key,
+                 const ldb_slice_t *value);
 
 /* Advanced operation: flush any buffered key/value pairs to file.
  * Can be used to ensure that two adjacent entries never live in
@@ -70,18 +67,18 @@ ldb_tablebuilder_add(ldb_tablebuilder_t *tb,
  * REQUIRES: finish(), abandon() have not been called
  */
 void
-ldb_tablebuilder_flush(ldb_tablebuilder_t *tb);
+ldb_tablegen_flush(ldb_tablegen_t *tb);
 
 /* Return non-ok iff some error has been detected. */
 int
-ldb_tablebuilder_status(const ldb_tablebuilder_t *tb);
+ldb_tablegen_status(const ldb_tablegen_t *tb);
 
 /* Finish building the table. Stops using the file passed to the
  * constructor after this function returns.
  * REQUIRES: finish(), abandon() have not been called
  */
 int
-ldb_tablebuilder_finish(ldb_tablebuilder_t *tb);
+ldb_tablegen_finish(ldb_tablegen_t *tb);
 
 /* Indicate that the contents of this builder should be abandoned. Stops
  * using the file passed to the constructor after this function returns.
@@ -90,15 +87,15 @@ ldb_tablebuilder_finish(ldb_tablebuilder_t *tb);
  * REQUIRES: finish(), abandon() have not been called
  */
 void
-ldb_tablebuilder_abandon(ldb_tablebuilder_t *tb);
+ldb_tablegen_abandon(ldb_tablegen_t *tb);
 
 /* Number of calls to add() so far. */
 uint64_t
-ldb_tablebuilder_num_entries(const ldb_tablebuilder_t *tb);
+ldb_tablegen_entries(const ldb_tablegen_t *tb);
 
 /* Size of the file generated so far. If invoked after a successful
    finish() call, returns the size of the final generated file. */
 uint64_t
-ldb_tablebuilder_file_size(const ldb_tablebuilder_t *tb);
+ldb_tablegen_size(const ldb_tablegen_t *tb);
 
 #endif /* LDB_TABLE_BUILDER_H */

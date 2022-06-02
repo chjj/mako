@@ -14,6 +14,10 @@
 #include "internal.h"
 #include "random.h"
 
+/*
+ * Random
+ */
+
 void
 ldb_rand_init(ldb_rand_t *rnd, uint32_t seed) {
   rnd->seed = seed & 0x7fffffff;

@@ -34,7 +34,7 @@ typedef struct ldb_twoiter_s {
   int status;
   ldb_wrapiter_t index_iter;
   ldb_wrapiter_t data_iter; /* May be NULL. */
-  /* If data_iter is non-null, then "data_block_handle_" holds the
+  /* If data_iter is non-null, then "data_block_handle" holds the
     "index_value" passed to block_function to create the data_iter. */
   ldb_buffer_t data_block_handle;
 } ldb_twoiter_t;
@@ -115,8 +115,8 @@ ldb_twoiter_init_data_block(ldb_twoiter_t *iter) {
   } else {
     ldb_slice_t handle = ldb_wrapiter_value(&iter->index_iter);
 
-    if (iter->data_iter.iter != NULL
-        && ldb_slice_equal(&handle, &iter->data_block_handle)) {
+    if (iter->data_iter.iter != NULL &&
+        ldb_slice_equal(&handle, &iter->data_block_handle)) {
       /* data_iter is already constructed with this iterator, so
          no need to change anything. */
     } else {
@@ -133,7 +133,8 @@ ldb_twoiter_init_data_block(ldb_twoiter_t *iter) {
 
 static void
 ldb_twoiter_skip_forward(ldb_twoiter_t *iter) {
-  while (iter->data_iter.iter == NULL || !ldb_wrapiter_valid(&iter->data_iter)) {
+  while (iter->data_iter.iter == NULL ||
+         !ldb_wrapiter_valid(&iter->data_iter)) {
     /* Move to next block. */
     if (!ldb_wrapiter_valid(&iter->index_iter)) {
       ldb_twoiter_set_data_iter(iter, NULL);
@@ -150,7 +151,8 @@ ldb_twoiter_skip_forward(ldb_twoiter_t *iter) {
 
 static void
 ldb_twoiter_skip_backward(ldb_twoiter_t *iter) {
-  while (iter->data_iter.iter == NULL || !ldb_wrapiter_valid(&iter->data_iter)) {
+  while (iter->data_iter.iter == NULL ||
+         !ldb_wrapiter_valid(&iter->data_iter)) {
     /* Move to next block. */
     if (!ldb_wrapiter_valid(&iter->index_iter)) {
       ldb_twoiter_set_data_iter(iter, NULL);

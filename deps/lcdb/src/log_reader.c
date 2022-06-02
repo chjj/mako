@@ -50,11 +50,11 @@ enum {
  */
 
 void
-ldb_logreader_init(ldb_logreader_t *lr,
-                   ldb_rfile_t *file,
-                   ldb_reporter_t *reporter,
-                   int checksum,
-                   uint64_t initial_offset) {
+ldb_reader_init(ldb_reader_t *lr,
+                ldb_rfile_t *file,
+                ldb_reporter_t *reporter,
+                int checksum,
+                uint64_t initial_offset) {
   lr->file = file;
   lr->src = NULL; /* For testing. */
   lr->error = LDB_OK; /* For testing. */
@@ -70,14 +70,14 @@ ldb_logreader_init(ldb_logreader_t *lr,
 }
 
 void
-ldb_logreader_clear(ldb_logreader_t *lr) {
+ldb_reader_clear(ldb_reader_t *lr) {
   ldb_free(lr->backing_store);
 }
 
 /* Reports dropped bytes to the reporter. */
 /* buffer must be updated to remove the dropped bytes prior to invocation. */
 static void
-report_drop(ldb_logreader_t *lr, int64_t bytes, int reason) {
+report_drop(ldb_reader_t *lr, int64_t bytes, int reason) {
   if (lr->reporter != NULL &&
       lr->end_offset - lr->buffer.size - bytes >= lr->initial_offset) {
     lr->reporter->corruption(lr->reporter, bytes, reason);
@@ -85,14 +85,14 @@ report_drop(ldb_logreader_t *lr, int64_t bytes, int reason) {
 }
 
 static void
-report_corruption(ldb_logreader_t *lr, uint64_t bytes, const char *reason) {
+report_corruption(ldb_reader_t *lr, uint64_t bytes, const char *reason) {
   report_drop(lr, bytes, LDB_CORRUPTION /* reason */);
   (void)reason;
 }
 
 /* Return type, or one of the preceding special values. */
 static unsigned int
-read_physical_record(ldb_logreader_t *lr, ldb_slice_t *result) {
+read_physical_record(ldb_reader_t *lr, ldb_slice_t *result) {
   const uint8_t *header;
   uint32_t a, b, length;
   unsigned int type;
@@ -111,8 +111,11 @@ read_physical_record(ldb_logreader_t *lr, ldb_slice_t *result) {
 
           lr->buffer.data = lr->src->data;
           lr->buffer.size = nread;
-          lr->src->data += nread;
-          lr->src->size -= nread;
+
+          if (nread > 0) {
+            lr->src->data += nread;
+            lr->src->size -= nread;
+          }
 
           rc = LDB_OK;
         } else {
@@ -213,12 +216,12 @@ read_physical_record(ldb_logreader_t *lr, ldb_slice_t *result) {
   }
 }
 
-/* Skips all blocks that are completely before "initial_offset_".
+/* Skips all blocks that are completely before "initial_offset".
  *
  * Returns true on success. Handles reporting.
  */
 static int
-skip_to_initial_block(ldb_logreader_t *lr) {
+skip_to_initial_block(ldb_reader_t *lr) {
   size_t offset_in_block = lr->initial_offset % LDB_BLOCK_SIZE;
   uint64_t block_start = lr->initial_offset - offset_in_block;
 
@@ -251,9 +254,9 @@ skip_to_initial_block(ldb_logreader_t *lr) {
 }
 
 int
-ldb_logreader_read_record(ldb_logreader_t *lr,
-                          ldb_slice_t *record,
-                          ldb_buffer_t *scratch) {
+ldb_reader_read_record(ldb_reader_t *lr,
+                       ldb_slice_t *record,
+                       ldb_buffer_t *scratch) {
   /* Record offset of the logical record that we're reading
      0 is a dummy value to make compilers happy. */
   uint64_t prospective_offset = 0;
@@ -294,7 +297,7 @@ ldb_logreader_read_record(ldb_logreader_t *lr,
     switch (record_type) {
       case LDB_TYPE_FULL: {
         if (in_fragmented_record) {
-          /* Handle bug in earlier versions of log::Writer where
+          /* Handle bug in earlier versions of LogWriter where
             it could emit an empty LDB_TYPE_FIRST record at the tail end
             of a block followed by a LDB_TYPE_FULL or LDB_TYPE_FIRST record
             at the beginning of the next block. */
@@ -317,7 +320,7 @@ ldb_logreader_read_record(ldb_logreader_t *lr,
 
       case LDB_TYPE_FIRST: {
         if (in_fragmented_record) {
-          /* Handle bug in earlier versions of log::Writer where
+          /* Handle bug in earlier versions of LogWriter where
              it could emit an empty LDB_TYPE_FIRST record at the tail end
              of a block followed by a LDB_TYPE_FULL or LDB_TYPE_FIRST record
              at the beginning of the next block. */
@@ -403,9 +406,4 @@ ldb_logreader_read_record(ldb_logreader_t *lr,
       }
     }
   }
-}
-
-uint64_t
-ldb_logreader_last_offset(const ldb_logreader_t *lr) {
-  return lr->last_offset;
 }

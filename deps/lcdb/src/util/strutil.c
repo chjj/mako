@@ -55,16 +55,12 @@ ldb_decode_int(uint64_t *z, const char **xp) {
   const uint64_t limit = UINT64_MAX / 10;
   const char *sp = *xp;
   uint64_t x = 0;
-  int n = 0;
 
   while (*sp) {
     int ch = *sp;
 
     if (ch < '0' || ch > '9')
       break;
-
-    if (++n > 20)
-      return 0;
 
     if (x > limit || (x == limit && ch > last))
       return 0;
@@ -75,7 +71,7 @@ ldb_decode_int(uint64_t *z, const char **xp) {
     sp++;
   }
 
-  if (n == 0)
+  if (sp == *xp)
     return 0;
 
   *xp = sp;
@@ -122,7 +118,7 @@ ldb_basename(const char *fname) {
 int
 ldb_dirname(char *buf, size_t size, const char *fname) {
   const char *base = ldb_basename(fname);
-  size_t pos;
+  size_t len;
 
   if (base == fname) {
     if (size < 2)
@@ -131,26 +127,26 @@ ldb_dirname(char *buf, size_t size, const char *fname) {
     *buf++ = '.';
     *buf++ = '\0';
   } else {
-    pos = (base - 1) - fname;
+    len = base - fname;
 
-    if (pos == 0)
-      pos = 1;
+#if defined(_WIN32)
+    while (len > 0 && (fname[len - 1] == '/' || fname[len - 1] == '\\'))
+      len -= 1;
+#else
+    while (len > 0 && fname[len - 1] == '/')
+      len -= 1;
+#endif
 
-    if (pos + 1 > size)
+    if (len == 0)
+      len = 1;
+
+    if (len + 1 > size)
       return 0;
 
     if (buf != fname)
-      memcpy(buf, fname, pos + 1);
+      memcpy(buf, fname, len);
 
-#if defined(_WIN32)
-    while (pos > 1 && (buf[pos - 1] == '/' || buf[pos - 1] == '\\'))
-      pos -= 1;
-#else
-    while (pos > 1 && buf[pos - 1] == '/')
-      pos -= 1;
-#endif
-
-    buf[pos] = '\0';
+    buf[len] = '\0';
   }
 
   return 1;

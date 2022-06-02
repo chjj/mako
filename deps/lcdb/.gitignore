@@ -40,10 +40,13 @@ Testing/
 aclocal.m4
 autom4te.cache/
 build-aux/
+db_bench
+db_bench.js
 config.log
 config.status
 configure
 i686-w64-mingw32/
+lcdb.js
 lcdb.pc
 lcdb-*.asc
 lcdb-*.tar.gz
@@ -67,3 +70,5 @@ wasm32-wasi/
 wasm64-wasi/
 x64/
 x86_64-w64-mingw32/
+zig-cache/
+zig-out/

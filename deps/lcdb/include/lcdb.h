@@ -13,13 +13,13 @@
 #ifndef LCDB_H
 #define LCDB_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <limits.h>
 #include <stdarg.h>
 #include <stddef.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * Compat
@@ -33,7 +33,7 @@ typedef unsigned __int64 ldb_uint64_t;
 #elif ULONG_MAX >> 31 >> 31 >> 1 == 1
 typedef unsigned long ldb_uint64_t;
 #else
-#  ifdef __GNUC__
+#  if defined(__GNUC__) && __GNUC__ >= 2
 __extension__
 #  endif
 typedef unsigned long long ldb_uint64_t;
@@ -78,11 +78,11 @@ typedef struct ldb_writeopt_s ldb_writeopt_t;
 struct ldb_slice_s {
   void *data;
   size_t size;
-  size_t _alloc;
+  size_t dummy;
 };
 
 struct ldb_batch_s {
-  ldb_slice_t _rep;
+  ldb_slice_t dummy;
 };
 
 struct ldb_comparator_s {
@@ -172,9 +172,6 @@ ldb_batch_clear(ldb_batch_t *batch);
 
 void
 ldb_batch_reset(ldb_batch_t *batch);
-
-size_t
-ldb_batch_approximate_size(const ldb_batch_t *batch);
 
 void
 ldb_batch_put(ldb_batch_t *batch,
@@ -476,9 +473,6 @@ ldb_slice(const void *xp, size_t xn);
 ldb_slice_t
 ldb_string(const char *xp);
 
-int
-ldb_equal(const ldb_slice_t *x, const ldb_slice_t *y);
-
 #if (defined(__GNUC__) && __GNUC__ >= 3) && !defined(__PCC__) \
                                          && !defined(__NWCC__)
 #define ldb_slice(xp, xn) __extension__ ({ \
@@ -486,11 +480,10 @@ ldb_equal(const ldb_slice_t *x, const ldb_slice_t *y);
                                            \
   _z.data = (void *)(xp);                  \
   _z.size = (xn);                          \
-  _z._alloc = 0;                           \
+  _z.dummy = 0;                            \
                                            \
   _z;                                      \
 })
-#define ldb_string(xp) ldb_slice(xp, strlen(xp))
 #endif
 
 /*

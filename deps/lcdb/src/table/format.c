@@ -27,22 +27,22 @@
 #include "format.h"
 
 /*
- * Block Handle
+ * BlockHandle
  */
 
 void
-ldb_blockhandle_init(ldb_blockhandle_t *x) {
+ldb_handle_init(ldb_handle_t *x) {
   x->offset = ~UINT64_C(0);
   x->size = ~UINT64_C(0);
 }
 
 size_t
-ldb_blockhandle_size(const ldb_blockhandle_t *x) {
+ldb_handle_size(const ldb_handle_t *x) {
   return ldb_varint64_size(x->offset) + ldb_varint64_size(x->size);
 }
 
 uint8_t *
-ldb_blockhandle_write(uint8_t *zp, const ldb_blockhandle_t *x) {
+ldb_handle_write(uint8_t *zp, const ldb_handle_t *x) {
   /* Sanity check that all fields have been set. */
   assert(x->offset != ~UINT64_C(0));
   assert(x->size != ~UINT64_C(0));
@@ -54,15 +54,15 @@ ldb_blockhandle_write(uint8_t *zp, const ldb_blockhandle_t *x) {
 }
 
 void
-ldb_blockhandle_export(ldb_buffer_t *z, const ldb_blockhandle_t *x) {
+ldb_handle_export(ldb_buffer_t *z, const ldb_handle_t *x) {
   uint8_t *zp = ldb_buffer_expand(z, LDB_BLOCKHANDLE_MAX);
-  size_t xn = ldb_blockhandle_write(zp, x) - zp;
+  size_t xn = ldb_handle_write(zp, x) - zp;
 
   z->size += xn;
 }
 
 int
-ldb_blockhandle_read(ldb_blockhandle_t *z, const uint8_t **xp, size_t *xn) {
+ldb_handle_read(ldb_handle_t *z, const uint8_t **xp, size_t *xn) {
   if (!ldb_varint64_read(&z->offset, xp, xn))
     return 0;
 
@@ -73,9 +73,9 @@ ldb_blockhandle_read(ldb_blockhandle_t *z, const uint8_t **xp, size_t *xn) {
 }
 
 int
-ldb_blockhandle_import(ldb_blockhandle_t *z, const ldb_slice_t *x) {
+ldb_handle_import(ldb_handle_t *z, const ldb_slice_t *x) {
   ldb_slice_t tmp = *x;
-  return ldb_blockhandle_read(z, (const uint8_t **)&tmp.data, &tmp.size);
+  return ldb_handle_read(z, (const uint8_t **)&tmp.data, &tmp.size);
 }
 
 /*
@@ -84,8 +84,8 @@ ldb_blockhandle_import(ldb_blockhandle_t *z, const ldb_slice_t *x) {
 
 void
 ldb_footer_init(ldb_footer_t *x) {
-  ldb_blockhandle_init(&x->metaindex_handle);
-  ldb_blockhandle_init(&x->index_handle);
+  ldb_handle_init(&x->metaindex_handle);
+  ldb_handle_init(&x->index_handle);
 }
 
 uint8_t *
@@ -93,8 +93,8 @@ ldb_footer_write(uint8_t *zp, const ldb_footer_t *x) {
   uint8_t *tp = zp;
   size_t pad;
 
-  zp = ldb_blockhandle_write(zp, &x->metaindex_handle);
-  zp = ldb_blockhandle_write(zp, &x->index_handle);
+  zp = ldb_handle_write(zp, &x->metaindex_handle);
+  zp = ldb_handle_write(zp, &x->index_handle);
 
   pad = (2 * LDB_BLOCKHANDLE_MAX) - (zp - tp);
 
@@ -123,10 +123,10 @@ ldb_footer_read(ldb_footer_t *z, const uint8_t **xp, size_t *xn) {
   if (ldb_fixed64_decode(*xp + LDB_FOOTER_SIZE - 8) != LDB_TABLE_MAGIC)
     return 0;
 
-  if (!ldb_blockhandle_read(&z->metaindex_handle, xp, xn))
+  if (!ldb_handle_read(&z->metaindex_handle, xp, xn))
     return 0;
 
-  if (!ldb_blockhandle_read(&z->index_handle, xp, xn))
+  if (!ldb_handle_read(&z->index_handle, xp, xn))
     return 0;
 
   *xp = tp + LDB_FOOTER_SIZE;
@@ -142,11 +142,11 @@ ldb_footer_import(ldb_footer_t *z, const ldb_slice_t *x) {
 }
 
 /*
- * Block Contents
+ * BlockContents
  */
 
 void
-ldb_blockcontents_init(ldb_blockcontents_t *x) {
+ldb_contents_init(ldb_contents_t *x) {
   ldb_slice_init(&x->data);
 
   x->cachable = 0;
@@ -158,17 +158,17 @@ ldb_blockcontents_init(ldb_blockcontents_t *x) {
  */
 
 int
-ldb_read_block(ldb_blockcontents_t *result,
+ldb_read_block(ldb_contents_t *result,
                ldb_rfile_t *file,
                const ldb_readopt_t *options,
-               const ldb_blockhandle_t *handle) {
+               const ldb_handle_t *handle) {
   ldb_slice_t contents;
   const uint8_t *data;
   uint8_t *buf = NULL;
   size_t n, len;
   int rc;
 
-  ldb_blockcontents_init(result);
+  ldb_contents_init(result);
 
   /* Read the block contents as well as the type/crc footer. */
   /* See table_builder.c for the code that built this structure. */

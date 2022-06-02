@@ -15,6 +15,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "util/types.h"
 
@@ -27,18 +28,18 @@ struct ldb_rfile_s;
 
 /* Interface for reporting errors. */
 typedef struct ldb_reporter_s {
+  const char *fname; /* db_impl.c */
+  int *status; /* db_impl.c, version_set.c, t-log.c */
+  struct ldb_logger_s *info_log; /* db_impl.c, repair.c */
+  uint64_t lognum; /* repair.c */
+  FILE *dst; /* dumpfile.c */
+  size_t dropped_bytes; /* t-log.c */
   /* Some corruption was detected. "bytes" is the approximate number
      of bytes dropped due to the corruption. */
-  const char *fname;
-  int *status;
-  struct ldb_logger_s *info_log;
-  uint64_t lognum;
-  void *dst; /* FILE */
-  size_t dropped_bytes;
   void (*corruption)(struct ldb_reporter_s *reporter, size_t bytes, int status);
 } ldb_reporter_t;
 
-typedef struct ldb_logreader_s {
+typedef struct ldb_reader_s {
   struct ldb_rfile_s *file; /* SequentialFile */
   ldb_slice_t *src; /* For testing. */
   int error; /* For testing. */
@@ -61,10 +62,10 @@ typedef struct ldb_logreader_s {
      particular, a run of LDB_TYPE_MIDDLE and LDB_TYPE_LAST records can
      be silently skipped in this mode. */
   int resyncing;
-} ldb_logreader_t;
+} ldb_reader_t;
 
 /*
- * LogWriter
+ * LogReader
  */
 
 /* Create a reader that will return log records from "*file".
@@ -80,14 +81,14 @@ typedef struct ldb_logreader_s {
  * position >= initial_offset within the file.
  */
 void
-ldb_logreader_init(ldb_logreader_t *lr,
-                   struct ldb_rfile_s *file,
-                   ldb_reporter_t *reporter,
-                   int checksum,
-                   uint64_t initial_offset);
+ldb_reader_init(ldb_reader_t *lr,
+                struct ldb_rfile_s *file,
+                ldb_reporter_t *reporter,
+                int checksum,
+                uint64_t initial_offset);
 
 void
-ldb_logreader_clear(ldb_logreader_t *lr);
+ldb_reader_clear(ldb_reader_t *lr);
 
 /* Read the next record into *record. Returns true if read
  * successfully, false if we hit end of the input. May use
@@ -96,15 +97,8 @@ ldb_logreader_clear(ldb_logreader_t *lr);
  * reader or the next mutation to *scratch.
  */
 int
-ldb_logreader_read_record(ldb_logreader_t *lr,
-                          ldb_slice_t *record,
-                          ldb_buffer_t *scratch);
-
-/* Returns the physical offset of the last record returned by read_record.
- *
- * Undefined before the first call to ReadRecord.
- */
-uint64_t
-ldb_logreader_last_offset(const ldb_logreader_t *lr);
+ldb_reader_read_record(ldb_reader_t *lr,
+                       ldb_slice_t *record,
+                       ldb_buffer_t *scratch);
 
 #endif /* LDB_LOG_READER_H */

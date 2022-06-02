@@ -99,11 +99,11 @@ ldb_memtable_add(ldb_memtable_t *mt,
                  const ldb_slice_t *value) {
   /* Format of an entry is concatenation of:
    *
-   *  key_size     : varint32 of internal_key.size()
-   *  key bytes    : char[internal_key.size()]
+   *  key_size     : varint32 of internal_key.size
+   *  key bytes    : char[internal_key.size]
    *  tag          : uint64((sequence << 8) | type)
-   *  value_size   : varint32 of value.size()
-   *  value bytes  : char[value.size()]
+   *  value_size   : varint32 of value.size
+   *  value bytes  : char[value.size]
    */
   size_t val_size = value->size;
   size_t ikey_size = key->size + 8;

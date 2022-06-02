@@ -46,6 +46,7 @@
 #include "write_batch.h"
 
 /* We recover the contents of the descriptor from the other files we find.
+ *
  * (1) Any log files are first converted to tables
  *
  * (2) We scan every table to compute
@@ -108,8 +109,8 @@ typedef struct ldb_repair_s {
   ldb_dbopt_t options;
   int owns_info_log;
   int owns_cache;
-  ldb_tcache_t *table_cache;
-  ldb_vedit_t edit;
+  ldb_tables_t *table_cache;
+  ldb_edit_t edit;
   ldb_array_t manifests;
   ldb_array_t table_numbers;
   ldb_array_t logs;
@@ -146,9 +147,9 @@ repair_init(ldb_repair_t *rep, const char *dbname, const ldb_dbopt_t *options) {
   rep->owns_cache = rep->options.block_cache != options->block_cache;
 
   /* table_cache can be small since we expect each table to be opened once. */
-  rep->table_cache = ldb_tcache_create(rep->dbname, &rep->options, 10);
+  rep->table_cache = ldb_tables_create(rep->dbname, &rep->options, 10);
 
-  ldb_vedit_init(&rep->edit);
+  ldb_edit_init(&rep->edit);
   ldb_array_init(&rep->manifests);
   ldb_array_init(&rep->table_numbers);
   ldb_array_init(&rep->logs);
@@ -163,7 +164,7 @@ static void
 repair_clear(ldb_repair_t *rep) {
   size_t i;
 
-  ldb_tcache_destroy(rep->table_cache);
+  ldb_tables_destroy(rep->table_cache);
 
   if (rep->owns_info_log)
     ldb_logger_destroy(rep->options.info_log);
@@ -174,7 +175,7 @@ repair_clear(ldb_repair_t *rep) {
   for (i = 0; i < rep->tables.length; i++)
     tabinfo_destroy(rep->tables.items[i]);
 
-  ldb_vedit_clear(&rep->edit);
+  ldb_edit_clear(&rep->edit);
   ldb_array_clear(&rep->manifests);
   ldb_array_clear(&rep->table_numbers);
   ldb_array_clear(&rep->logs);
@@ -267,7 +268,7 @@ convert_log_to_table(ldb_repair_t *rep, uint64_t log) {
   /* Open the log file. */
   char logname[LDB_PATH_MAX];
   ldb_reporter_t reporter;
-  ldb_logreader_t reader;
+  ldb_reader_t reader;
   ldb_rfile_t *lfile;
   ldb_buffer_t scratch;
   ldb_slice_t record;
@@ -290,11 +291,11 @@ convert_log_to_table(ldb_repair_t *rep, uint64_t log) {
   reporter.lognum = log;
   reporter.corruption = report_corruption;
 
-  /* We intentionally make log::Reader do checksumming so that
+  /* We intentionally make LogReader do checksumming so that
      corruptions cause entire commits to be skipped instead of
      propagating bad information (like overly large sequence
      numbers). */
-  ldb_logreader_init(&reader, lfile, &reporter, 0, 0);
+  ldb_reader_init(&reader, lfile, &reporter, 0, 0);
   ldb_buffer_init(&scratch);
   ldb_slice_init(&record);
   ldb_batch_init(&batch);
@@ -305,7 +306,7 @@ convert_log_to_table(ldb_repair_t *rep, uint64_t log) {
 
   ldb_memtable_ref(mem);
 
-  while (ldb_logreader_read_record(&reader, &record, &scratch)) {
+  while (ldb_reader_read_record(&reader, &record, &scratch)) {
     if (record.size < 12) {
       reporter.corruption(&reporter, record.size, LDB_CORRUPTION);
       continue;
@@ -328,7 +329,7 @@ convert_log_to_table(ldb_repair_t *rep, uint64_t log) {
 
   ldb_batch_clear(&batch);
   ldb_buffer_clear(&scratch);
-  ldb_logreader_clear(&reader);
+  ldb_reader_clear(&reader);
   ldb_rfile_destroy(lfile);
 
   /* Do not record a version edit for this conversion to a Table
@@ -397,7 +398,7 @@ tableiter_create(ldb_repair_t *rep, const ldb_filemeta_t *meta) {
 
   options.verify_checksums = rep->options.paranoid_checks;
 
-  return ldb_tcache_iterate(rep->table_cache,
+  return ldb_tables_iterate(rep->table_cache,
                             &options,
                             meta->number,
                             meta->file_size,
@@ -408,7 +409,7 @@ static void
 repair_table(ldb_repair_t *rep, const char *src, ldb_tabinfo_t *t) {
   /* We will copy src contents to a new table and then rename the
      new table over the source. */
-  ldb_tablebuilder_t *builder;
+  ldb_tablegen_t *builder;
   char copy[LDB_PATH_MAX];
   char orig[LDB_PATH_MAX];
   ldb_wfile_t *file;
@@ -429,7 +430,7 @@ repair_table(ldb_repair_t *rep, const char *src, ldb_tabinfo_t *t) {
     return;
   }
 
-  builder = ldb_tablebuilder_create(&rep->options, file);
+  builder = ldb_tablegen_create(&rep->options, file);
 
   /* Copy data. */
   iter = tableiter_create(rep, &t->meta);
@@ -439,7 +440,7 @@ repair_table(ldb_repair_t *rep, const char *src, ldb_tabinfo_t *t) {
     ldb_slice_t key = ldb_iter_key(iter);
     ldb_slice_t val = ldb_iter_value(iter);
 
-    ldb_tablebuilder_add(builder, &key, &val);
+    ldb_tablegen_add(builder, &key, &val);
 
     counter++;
   }
@@ -449,15 +450,15 @@ repair_table(ldb_repair_t *rep, const char *src, ldb_tabinfo_t *t) {
   archive_file(rep, src);
 
   if (counter == 0) {
-    ldb_tablebuilder_abandon(builder); /* Nothing to save. */
+    ldb_tablegen_abandon(builder); /* Nothing to save. */
   } else {
-    rc = ldb_tablebuilder_finish(builder);
+    rc = ldb_tablegen_finish(builder);
 
     if (rc == LDB_OK)
-      t->meta.file_size = ldb_tablebuilder_file_size(builder);
+      t->meta.file_size = ldb_tablegen_size(builder);
   }
 
-  ldb_tablebuilder_destroy(builder);
+  ldb_tablegen_destroy(builder);
   builder = NULL;
 
   if (rc == LDB_OK)
@@ -609,30 +610,30 @@ write_descriptor(ldb_repair_t *rep) {
       max_sequence = t->max_sequence;
   }
 
-  ldb_vedit_set_comparator_name(&rep->edit, rep->icmp.user_comparator->name);
-  ldb_vedit_set_log_number(&rep->edit, 0);
-  ldb_vedit_set_next_file(&rep->edit, rep->next_file_number);
-  ldb_vedit_set_last_sequence(&rep->edit, max_sequence);
+  ldb_edit_set_comparator_name(&rep->edit, rep->icmp.user_comparator->name);
+  ldb_edit_set_log_number(&rep->edit, 0);
+  ldb_edit_set_next_file(&rep->edit, rep->next_file_number);
+  ldb_edit_set_last_sequence(&rep->edit, max_sequence);
 
   for (i = 0; i < rep->tables.length; i++) {
     const ldb_tabinfo_t *t = rep->tables.items[i];
 
-    ldb_vedit_add_file(&rep->edit, 0, t->meta.number,
-                                      t->meta.file_size,
-                                      &t->meta.smallest,
-                                      &t->meta.largest);
+    ldb_edit_add_file(&rep->edit, 0, t->meta.number,
+                                     t->meta.file_size,
+                                     &t->meta.smallest,
+                                     &t->meta.largest);
   }
 
   {
-    ldb_logwriter_t log;
+    ldb_writer_t log;
     ldb_buffer_t record;
 
-    ldb_logwriter_init(&log, file, 0);
+    ldb_writer_init(&log, file, 0);
     ldb_buffer_init(&record);
 
-    ldb_vedit_export(&record, &rep->edit);
+    ldb_edit_export(&record, &rep->edit);
 
-    rc = ldb_logwriter_add_record(&log, &record);
+    rc = ldb_writer_add_record(&log, &record);
 
     ldb_buffer_clear(&record);
   }
@@ -692,7 +693,7 @@ repair_run(ldb_repair_t *rep) {
     }
 
     ldb_log(rep->options.info_log,
-            "**** Repaired leveldb %s; "
+            "**** Repaired database %s; "
             "recovered %d files; %.0f bytes. "
             "Some data may have been lost. "
             "****", rep->dbname,
@@ -709,6 +710,9 @@ ldb_repair(const char *dbname, const ldb_dbopt_t *options) {
   int rc;
 
   ldb_crc32c_init();
+
+  if (options == NULL)
+    return LDB_INVALID;
 
   if (!repair_init(&rep, dbname, options))
     return LDB_INVALID;

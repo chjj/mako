@@ -34,10 +34,10 @@
 /* Which direction is the iterator currently moving?
  *
  * (1) When moving forward, the internal iterator is positioned at
- *     the exact entry that yields this->key(), this->value()
+ *     the exact entry that yields key(iter), value(iter).
  *
  * (2) When moving backwards, the internal iterator is positioned
- *     just before all entries whose user key == this->key().
+ *     just before all entries whose user key == key(iter).
  */
 enum ldb_direction { LDB_FORWARD, LDB_REVERSE };
 
@@ -56,8 +56,8 @@ typedef struct ldb_dbiter_s {
   ldb_iter_t *iter;
   ldb_seqnum_t sequence;
   int status;
-  ldb_buffer_t saved_key;   /* == current key when direction==LDB_REVERSE */
-  ldb_buffer_t saved_value; /* == current value when direction==LDB_REVERSE */
+  ldb_buffer_t saved_key;   /* == current key when direction==REVERSE */
+  ldb_buffer_t saved_value; /* == current value when direction==REVERSE */
   enum ldb_direction direction;
   int valid;
   ldb_rand_t rnd;
@@ -273,6 +273,7 @@ ldb_dbiter_next(ldb_dbiter_t *iter) {
 
   if (iter->direction == LDB_REVERSE) { /* Switch directions? */
     iter->direction = LDB_FORWARD;
+
     /* iter->iter is pointing just before the entries for key(),
        so advance into the range of entries for key() and then
        use the normal skipping code below. */

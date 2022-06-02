@@ -29,8 +29,8 @@ struct ldb_snaplist_s;
 /* Snapshots are kept in a doubly-linked list in the DB. */
 /* Each snapshot corresponds to a particular sequence number. */
 typedef struct ldb_snapshot_s {
-  /* ldb_snapshot_t is kept in a doubly-linked circular list. The
-     ldb_snaplist_t implementation operates on the next/previous
+  /* Snapshot is kept in a doubly-linked circular list. The
+     SnapshotList implementation operates on the next/previous
      fields directly. */
   ldb_seqnum_t sequence;
   struct ldb_snapshot_s *prev;
@@ -81,8 +81,8 @@ LDB_UNUSED static ldb_snapshot_t *
 ldb_snaplist_new(ldb_snaplist_t *list, ldb_seqnum_t sequence) {
   ldb_snapshot_t *snap;
 
-  assert(ldb_snaplist_empty(list)
-      || ldb_snaplist_newest(list)->sequence <= sequence);
+  assert(ldb_snaplist_empty(list) ||
+         ldb_snaplist_newest(list)->sequence <= sequence);
 
   snap = ldb_malloc(sizeof(ldb_snapshot_t));
 
@@ -101,11 +101,10 @@ ldb_snaplist_new(ldb_snaplist_t *list, ldb_seqnum_t sequence) {
 
 /* Removes a snapshot from this list.
  *
- * The snapshot must have been created by calling ldb_snaplist_new
- * on this list.
+ * The snapshot must have been created by calling new() on this list.
  *
  * The snapshot pointer should not be const, because its memory is
- * deallocated. However, that would force us to change release_snapshot(),
+ * deallocated. However, that would force us to change ldb_release(),
  * which is in the API, and currently takes a const snapshot.
  */
 LDB_UNUSED static void

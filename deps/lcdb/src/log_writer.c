@@ -37,20 +37,20 @@ init_type_crc(uint32_t *type_crc) {
     type_crc[i] = ldb_crc32c_value(&i, 1);
 }
 
-ldb_logwriter_t *
-ldb_logwriter_create(ldb_wfile_t *file, uint64_t length) {
-  ldb_logwriter_t *lw = ldb_malloc(sizeof(ldb_logwriter_t));
-  ldb_logwriter_init(lw, file, length);
+ldb_writer_t *
+ldb_writer_create(ldb_wfile_t *file, uint64_t length) {
+  ldb_writer_t *lw = ldb_malloc(sizeof(ldb_writer_t));
+  ldb_writer_init(lw, file, length);
   return lw;
 }
 
 void
-ldb_logwriter_destroy(ldb_logwriter_t *lw) {
+ldb_writer_destroy(ldb_writer_t *lw) {
   ldb_free(lw);
 }
 
 void
-ldb_logwriter_init(ldb_logwriter_t *lw, ldb_wfile_t *file, uint64_t length) {
+ldb_writer_init(ldb_writer_t *lw, ldb_wfile_t *file, uint64_t length) {
   lw->file = file;
   lw->dst = NULL; /* For testing. */
   lw->block_offset = length % LDB_BLOCK_SIZE;
@@ -58,7 +58,7 @@ ldb_logwriter_init(ldb_logwriter_t *lw, ldb_wfile_t *file, uint64_t length) {
 }
 
 static int
-emit_physical_record(ldb_logwriter_t *lw,
+emit_physical_record(ldb_writer_t *lw,
                      ldb_rectype_t type,
                      const uint8_t *ptr,
                      size_t length) {
@@ -106,14 +106,14 @@ emit_physical_record(ldb_logwriter_t *lw,
 }
 
 int
-ldb_logwriter_add_record(ldb_logwriter_t *lw, const ldb_slice_t *slice) {
+ldb_writer_add_record(ldb_writer_t *lw, const ldb_slice_t *slice) {
   static const uint8_t zeroes[LDB_HEADER_SIZE] = {0};
   const uint8_t *ptr = slice->data;
   size_t left = slice->size;
   int rc = LDB_OK;
   int begin = 1;
 
-  /* Fragment the record if necessary and emit it.  Note that if slice
+  /* Fragment the record if necessary and emit it. Note that if slice
      is empty, we still want to iterate once to emit a single
      zero-length record. */
   do {

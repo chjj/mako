@@ -20,7 +20,7 @@
  * Types
  */
 
-struct ldb_blockcontents_s;
+struct ldb_contents_s;
 struct ldb_comparator_s;
 struct ldb_iter_s;
 
@@ -36,13 +36,13 @@ typedef struct ldb_block_s {
  */
 
 ldb_block_t *
-ldb_block_create(const struct ldb_blockcontents_s *contents);
+ldb_block_create(const struct ldb_contents_s *contents);
 
 void
 ldb_block_destroy(ldb_block_t *block);
 
 void
-ldb_block_init(ldb_block_t *block, const struct ldb_blockcontents_s *contents);
+ldb_block_init(ldb_block_t *block, const struct ldb_contents_s *contents);
 
 void
 ldb_block_clear(ldb_block_t *block);

@@ -47,45 +47,45 @@ struct ldb_readopt_s;
 
 /* BlockHandle is a pointer to the extent of a file that stores a data
    block or a meta block. */
-typedef struct ldb_blockhandle_s {
+typedef struct ldb_handle_s {
   uint64_t offset;
   uint64_t size;
-} ldb_blockhandle_t;
+} ldb_handle_t;
 
 /* Footer encapsulates the fixed information stored at the tail
    end of every table file. */
 typedef struct ldb_footer_s {
-  ldb_blockhandle_t metaindex_handle;
-  ldb_blockhandle_t index_handle;
+  ldb_handle_t metaindex_handle;
+  ldb_handle_t index_handle;
 } ldb_footer_t;
 
-typedef struct ldb_blockcontents_s {
+typedef struct ldb_contents_s {
   ldb_slice_t data;    /* Actual contents of data. */
   int cachable;        /* True iff data can be cached. */
   int heap_allocated;  /* True iff caller should free() data.data. */
-} ldb_blockcontents_t;
+} ldb_contents_t;
 
 /*
- * Block Handle
+ * BlockHandle
  */
 
 void
-ldb_blockhandle_init(ldb_blockhandle_t *x);
+ldb_handle_init(ldb_handle_t *x);
 
 size_t
-ldb_blockhandle_size(const ldb_blockhandle_t *x);
+ldb_handle_size(const ldb_handle_t *x);
 
 uint8_t *
-ldb_blockhandle_write(uint8_t *zp, const ldb_blockhandle_t *x);
+ldb_handle_write(uint8_t *zp, const ldb_handle_t *x);
 
 void
-ldb_blockhandle_export(ldb_buffer_t *z, const ldb_blockhandle_t *x);
+ldb_handle_export(ldb_buffer_t *z, const ldb_handle_t *x);
 
 int
-ldb_blockhandle_read(ldb_blockhandle_t *z, const uint8_t **xp, size_t *xn);
+ldb_handle_read(ldb_handle_t *z, const uint8_t **xp, size_t *xn);
 
 int
-ldb_blockhandle_import(ldb_blockhandle_t *z, const ldb_slice_t *x);
+ldb_handle_import(ldb_handle_t *z, const ldb_slice_t *x);
 
 /*
  * Footer
@@ -107,20 +107,20 @@ int
 ldb_footer_import(ldb_footer_t *z, const ldb_slice_t *x);
 
 /*
- * Block Contents
+ * BlockContents
  */
 
 void
-ldb_blockcontents_init(ldb_blockcontents_t *x);
+ldb_contents_init(ldb_contents_t *x);
 
 /*
  * Block Read
  */
 
 int
-ldb_read_block(ldb_blockcontents_t *result,
+ldb_read_block(ldb_contents_t *result,
                struct ldb_rfile_s *file,
                const struct ldb_readopt_s *options,
-               const ldb_blockhandle_t *handle);
+               const ldb_handle_t *handle);
 
 #endif /* LDB_TABLE_FORMAT_H */

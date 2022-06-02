@@ -125,7 +125,7 @@ ldb_arena_alloc_aligned(ldb_arena_t *arena, size_t size) {
 
     assert(((uintptr_t)result & (align - 1)) == 0);
   } else {
-    /* ldb_arena_alloc_fallback always returns aligned memory. */
+    /* alloc_fallback always returns aligned memory. */
     result = ldb_arena_alloc_fallback(arena, size);
   }
 

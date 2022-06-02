@@ -25,28 +25,28 @@
 
 struct ldb_iter_s;
 
-typedef struct ldb_tcache_s ldb_tcache_t;
+typedef struct ldb_tables_s ldb_tables_t;
 
 /*
  * TableCache
  */
 
-ldb_tcache_t *
-ldb_tcache_create(const char *dbname, const ldb_dbopt_t *options, int entries);
+ldb_tables_t *
+ldb_tables_create(const char *dbname, const ldb_dbopt_t *options, int entries);
 
 void
-ldb_tcache_destroy(ldb_tcache_t *cache);
+ldb_tables_destroy(ldb_tables_t *cache);
 
 /* Return an iterator for the specified file number (the corresponding
- * file length must be exactly "file_size" bytes).  If "tableptr" is
+ * file length must be exactly "file_size" bytes). If "tableptr" is
  * non-null, also sets "*tableptr" to point to the Table object
- * underlying the returned iterator, or to nullptr if no Table object
- * underlies the returned iterator.  The returned "*tableptr" object is owned
+ * underlying the returned iterator, or to NULL if no Table object
+ * underlies the returned iterator. The returned "*tableptr" object is owned
  * by the cache and should not be deleted, and is valid for as long as the
  * returned iterator is live.
  */
 struct ldb_iter_s *
-ldb_tcache_iterate(ldb_tcache_t *cache,
+ldb_tables_iterate(ldb_tables_t *cache,
                    const ldb_readopt_t *options,
                    uint64_t file_number,
                    uint64_t file_size,
@@ -55,7 +55,7 @@ ldb_tcache_iterate(ldb_tcache_t *cache,
 /* If a seek to internal key "k" in specified file finds an entry,
    call (*handle_result)(arg, found_key, found_value). */
 int
-ldb_tcache_get(ldb_tcache_t *cache,
+ldb_tables_get(ldb_tables_t *cache,
                const ldb_readopt_t *options,
                uint64_t file_number,
                uint64_t file_size,
@@ -67,6 +67,6 @@ ldb_tcache_get(ldb_tcache_t *cache,
 
 /* Evict any entry for the specified file number. */
 void
-ldb_tcache_evict(ldb_tcache_t *cache, uint64_t file_number);
+ldb_tables_evict(ldb_tables_t *cache, uint64_t file_number);
 
 #endif /* LDB_TABLE_CACHE_H */

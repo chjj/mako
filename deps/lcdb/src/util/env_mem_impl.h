@@ -36,13 +36,19 @@
 #include "vector.h"
 
 /*
+ * Constants
+ */
+
+#define BLOCK_SIZE (8 * 1024)
+
+/*
  * Types
  */
 
 typedef struct ldb_fstate_s ldb_fstate_t;
 
 struct ldb_filelock_s {
-  char path[LDB_PATH_MAX];
+  char *path;
 };
 
 /*
@@ -67,10 +73,8 @@ ldb_strdup(const char *xp) {
  * File State
  */
 
-static const int k_block_size = 8 * 1024;
-
 struct ldb_fstate_s {
-  char path[LDB_PATH_MAX];
+  char *path;
   ldb_mutex_t refs_mutex;
   ldb_mutex_t blocks_mutex;
   ldb_vector_t blocks;
@@ -82,7 +86,7 @@ static ldb_fstate_t *
 ldb_fstate_create(const char *path) {
   ldb_fstate_t *state = ldb_malloc(sizeof(ldb_fstate_t));
 
-  strcpy(state->path, path);
+  state->path = ldb_strdup(path);
 
   ldb_mutex_init(&state->refs_mutex);
   ldb_mutex_init(&state->blocks_mutex);
@@ -92,6 +96,38 @@ ldb_fstate_create(const char *path) {
   state->refs = 0;
 
   return state;
+}
+
+static ldb_fstate_t *
+ldb_fstate_clone(const char *path, const ldb_fstate_t *x) {
+  ldb_fstate_t *z = ldb_fstate_create(path);
+  size_t remain = x->size % BLOCK_SIZE;
+  size_t i;
+
+  ldb_vector_grow(&z->blocks, x->blocks.length);
+
+  for (i = 0; i < x->blocks.length; i++) {
+    uint8_t *block = ldb_malloc(BLOCK_SIZE);
+    size_t size = BLOCK_SIZE;
+
+    if (i == x->blocks.length - 1 && remain != 0)
+      size = remain;
+
+    memcpy(block, x->blocks.items[i], size);
+
+    ldb_vector_push(&z->blocks, block);
+  }
+
+  z->size = x->size;
+
+  return z;
+}
+
+static void
+ldb_fstate_rename(ldb_fstate_t *state, const char *path) {
+  ldb_free(state->path);
+
+  state->path = ldb_strdup(path);
 }
 
 static void
@@ -115,6 +151,7 @@ ldb_fstate_destroy(ldb_fstate_t *state) {
   ldb_mutex_destroy(&state->refs_mutex);
   ldb_mutex_destroy(&state->blocks_mutex);
   ldb_vector_clear(&state->blocks);
+  ldb_free(state->path);
   ldb_free(state);
 }
 
@@ -188,15 +225,15 @@ ldb_fstate_pread(const ldb_fstate_t *state,
     return LDB_OK;
   }
 
-  assert(offset / k_block_size <= (size_t)-1);
+  assert(offset / BLOCK_SIZE <= (size_t)-1);
 
-  block = (size_t)(offset / k_block_size);
-  block_offset = offset % k_block_size;
+  block = (size_t)(offset / BLOCK_SIZE);
+  block_offset = offset % BLOCK_SIZE;
   bytes_to_copy = count;
   dst = buf;
 
   while (bytes_to_copy > 0) {
-    size_t avail = k_block_size - block_offset;
+    size_t avail = BLOCK_SIZE - block_offset;
 
     if (avail > bytes_to_copy)
       avail = bytes_to_copy;
@@ -224,16 +261,16 @@ ldb_fstate_append(ldb_fstate_t *state, const ldb_slice_t *data) {
   ldb_mutex_lock(&state->blocks_mutex);
 
   while (src_len > 0) {
-    size_t offset = state->size % k_block_size;
+    size_t offset = state->size % BLOCK_SIZE;
     size_t avail;
 
     if (offset != 0) {
       /* There is some room in the last block. */
-      avail = k_block_size - offset;
+      avail = BLOCK_SIZE - offset;
     } else {
       /* No room in the last block; push new one. */
-      ldb_vector_push(&state->blocks, ldb_malloc(k_block_size));
-      avail = k_block_size;
+      ldb_vector_push(&state->blocks, ldb_malloc(BLOCK_SIZE));
+      avail = BLOCK_SIZE;
     }
 
     if (avail > src_len)
@@ -397,6 +434,12 @@ ldb_remove_dir(const char *dirname) {
 }
 
 int
+ldb_sync_dir(const char *dirname) {
+  (void)dirname;
+  return LDB_OK;
+}
+
+int
 ldb_file_size(const char *filename, uint64_t *size) {
   ldb_fstate_t *state;
 
@@ -414,11 +457,7 @@ ldb_file_size(const char *filename, uint64_t *size) {
 
 int
 ldb_rename_file(const char *from, const char *to) {
-  size_t len = strlen(to);
   rb_node_t *node;
-
-  if (len + 1 > LDB_PATH_MAX)
-    return LDB_INVALID;
 
   ldb_mutex_lock(&file_mutex);
 
@@ -427,7 +466,7 @@ ldb_rename_file(const char *from, const char *to) {
   if (node != NULL) {
     ldb_fstate_t *state = node->value.p;
 
-    memcpy(state->path, to, len + 1);
+    ldb_fstate_rename(state, to);
 
     ldb_delete_file(to);
     rb_map_put(&file_map, state->path, state);
@@ -440,12 +479,36 @@ ldb_rename_file(const char *from, const char *to) {
 }
 
 int
+ldb_copy_file(const char *from, const char *to) {
+  rb_node_t *node;
+
+  ldb_mutex_lock(&file_mutex);
+
+  if (rb_map_has(&file_map, to)) {
+    ldb_mutex_unlock(&file_mutex);
+    return LDB_IOERR;
+  }
+
+  node = rb_map_get(&file_map, from);
+
+  if (node != NULL) {
+    ldb_fstate_t *state = ldb_fstate_clone(to, node->value.p);
+
+    rb_map_put(&file_map, state->path, ldb_fstate_ref(state));
+  }
+
+  ldb_mutex_unlock(&file_mutex);
+
+  return node ? LDB_OK : LDB_NOTFOUND; /* "File not found" */
+}
+
+int
+ldb_link_file(const char *from, const char *to) {
+  return ldb_copy_file(from, to);
+}
+
+int
 ldb_lock_file(const char *filename, ldb_filelock_t **lock) {
-  size_t len = strlen(filename);
-
-  if (len + 1 > LDB_PATH_MAX)
-    return LDB_INVALID;
-
   ldb_mutex_lock(&file_mutex);
 
   if (file_set.root == NULL)
@@ -458,7 +521,7 @@ ldb_lock_file(const char *filename, ldb_filelock_t **lock) {
 
   *lock = ldb_malloc(sizeof(ldb_filelock_t));
 
-  memcpy((*lock)->path, filename, len + 1);
+  (*lock)->path = ldb_strdup(filename);
 
   rb_set_put(&file_set, (*lock)->path);
 
@@ -469,20 +532,16 @@ ldb_lock_file(const char *filename, ldb_filelock_t **lock) {
 
 int
 ldb_unlock_file(ldb_filelock_t *lock) {
-  int rc = LDB_IOERR;
-
   ldb_mutex_lock(&file_mutex);
 
-  if (file_set.root && rb_set_has(&file_set, lock->path)) {
-    rb_set_del(&file_set, lock->path);
-    rc = LDB_OK;
-  }
+  rb_set_del(&file_set, lock->path);
 
+  ldb_free(lock->path);
   ldb_free(lock);
 
   ldb_mutex_unlock(&file_mutex);
 
-  return rc;
+  return LDB_OK;
 }
 
 int
@@ -641,9 +700,6 @@ int
 ldb_truncfile_create(const char *filename, ldb_wfile_t **file) {
   ldb_fstate_t *state;
 
-  if (strlen(filename) + 1 > LDB_PATH_MAX)
-    return LDB_INVALID;
-
   ldb_mutex_lock(&file_mutex);
 
   state = rb_map_get(&file_map, filename);
@@ -667,9 +723,6 @@ ldb_truncfile_create(const char *filename, ldb_wfile_t **file) {
 int
 ldb_appendfile_create(const char *filename, ldb_wfile_t **file) {
   ldb_fstate_t *state;
-
-  if (strlen(filename) + 1 > LDB_PATH_MAX)
-    return LDB_INVALID;
 
   ldb_mutex_lock(&file_mutex);
 

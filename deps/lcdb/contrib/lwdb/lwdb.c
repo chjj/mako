@@ -161,8 +161,8 @@ struct ldb_writeopt_s {
 };
 
 struct ldb_s {
-  ldb_dbopt_t dbopt;
   ldb_comparator_t ucmp;
+  ldb_dbopt_t dbopt;
   leveldb_comparator_t *cmp;
   leveldb_filterpolicy_t *policy;
   leveldb_options_t *options;
@@ -202,9 +202,6 @@ ldb_batch_clear(ldb_batch_t *batch);
 
 LDB_EXTERN void
 ldb_batch_reset(ldb_batch_t *batch);
-
-LDB_EXTERN size_t
-ldb_batch_approximate_size(const ldb_batch_t *batch);
 
 LDB_EXTERN void
 ldb_batch_put(ldb_batch_t *batch,
@@ -370,9 +367,6 @@ ldb_slice(const void *xp, size_t xn);
 LDB_EXTERN ldb_slice_t
 ldb_string(const char *xp);
 
-LDB_EXTERN int
-ldb_equal(const ldb_slice_t *x, const ldb_slice_t *y);
-
 /* Status */
 LDB_EXTERN const char *
 ldb_strerror(int code);
@@ -393,12 +387,8 @@ safe_malloc(size_t size) {
 
 static void
 safe_free(void *ptr) {
-  if (ptr == NULL) {
-    abort(); /* LCOV_EXCL_LINE */
-    return;
-  }
-
-  free(ptr);
+  if (ptr != NULL)
+    free(ptr);
 }
 
 static int
@@ -415,8 +405,7 @@ convert_error(char *err) {
   if (p != NULL)
     *p = '\0';
 
-  if (strcmp(err, "OK") == 0)
-    return LDB_OK;
+  assert(strcmp(err, "OK") != 0);
 
   if (strcmp(err, "NotFound") == 0)
     return LDB_NOTFOUND;
@@ -496,8 +485,8 @@ convert_comparator(ldb_comparator_t *cmp) {
   if (cmp == NULL)
     return NULL;
 
-  if (cmp->name == ldb_bytewise_comparator->name
-      && cmp->compare == ldb_bytewise_comparator->compare) {
+  if (cmp->name == ldb_bytewise_comparator->name &&
+      cmp->compare == ldb_bytewise_comparator->compare) {
     return NULL;
   }
 
@@ -603,30 +592,6 @@ ldb_batch_reset(ldb_batch_t *batch) {
   leveldb_writebatch_destroy(batch->rep);
 
   batch->rep = leveldb_writebatch_create();
-}
-
-static void
-size_put(void *state, const char *k, size_t klen,
-                      const char *v, size_t vlen) {
-  (void)k;
-  (void)v;
-
-  *((size_t *)state) += klen;
-  *((size_t *)state) += vlen;
-}
-
-static void
-size_del(void *state, const char *k, size_t klen) {
-  (void)k;
-
-  *((size_t *)state) += klen;
-}
-
-size_t
-ldb_batch_approximate_size(const ldb_batch_t *batch) {
-  size_t result = 0;
-  leveldb_writebatch_iterate(batch->rep, &result, size_put, size_del);
-  return result;
 }
 
 void
@@ -755,16 +720,23 @@ const ldb_comparator_t *ldb_bytewise_comparator = &bytewise_comparator;
 
 int
 ldb_open(const char *dbname, const ldb_dbopt_t *options, ldb_t **dbptr) {
-  ldb_t *db = safe_malloc(sizeof(ldb_t));
   char *err = NULL;
+  ldb_t *db;
   int rc;
 
+  *dbptr = NULL;
+
   if (options == NULL)
-    options = ldb_dbopt_default;
+    return LDB_INVALID;
+
+  db = safe_malloc(sizeof(ldb_t));
+
+  if (options->comparator != NULL)
+    db->ucmp = *options->comparator;
+  else
+    db->ucmp = bytewise_comparator;
 
   db->dbopt = *options;
-  db->ucmp = options->comparator != NULL ? *options->comparator
-                                         : bytewise_comparator;
   db->dbopt.comparator = &db->ucmp;
   db->cmp = convert_comparator(&db->ucmp);
   db->policy = NULL;
@@ -776,12 +748,10 @@ ldb_open(const char *dbname, const ldb_dbopt_t *options, ldb_t **dbptr) {
 
   rc = handle_error(err);
 
-  if (rc == LDB_OK) {
+  if (rc == LDB_OK)
     *dbptr = db;
-  } else {
+  else
     ldb_close(db);
-    *dbptr = NULL;
-  }
 
   return rc;
 }
@@ -810,29 +780,25 @@ ldb_get(ldb_t *db, const ldb_slice_t *key,
                    ldb_slice_t *value,
                    const ldb_readopt_t *options) {
   leveldb_readoptions_t *opt = db->read_options;
-  int rc = LDB_OK;
   char *err = NULL;
-  char *vp = NULL;
-  size_t vn = 0;
+  int rc;
 
   if (options != NULL)
     opt = convert_readopt(options);
 
-  vp = leveldb_get(db->level, opt, key->data, key->size, &vn, &err);
-
-  if (err != NULL) {
-    rc = handle_error(err);
-    goto done;
-  }
-
-  if (vp == NULL)
-    rc = LDB_NOTFOUND;
-
-  value->data = (void *)vp;
-  value->size = vn;
+  value->data = leveldb_get(db->level,
+                            opt,
+                            key->data,
+                            key->size,
+                            &value->size,
+                            &err);
   value->dummy = 0;
 
-done:
+  rc = handle_error(err);
+
+  if (rc == LDB_OK && value->data == NULL)
+    rc = LDB_NOTFOUND;
+
   if (options != NULL)
     leveldb_readoptions_destroy(opt);
 
@@ -896,6 +862,9 @@ int
 ldb_write(ldb_t *db, ldb_batch_t *updates, const ldb_writeopt_t *options) {
   leveldb_writeoptions_t *opt = db->write_options;
   char *err = NULL;
+
+  if (updates == NULL)
+    return LDB_INVALID;
 
   if (options != NULL)
     opt = convert_writeopt(options);
@@ -981,6 +950,9 @@ ldb_backup(ldb_t *db, const char *name) {
   opt.info_log = NULL;
   opt.block_cache = NULL;
 
+  if (opt.write_buffer_size < (64 << 10))
+    opt.write_buffer_size = 64 << 10;
+
   rc = ldb_open(name, &opt, &bak);
 
   if (rc != LDB_OK)
@@ -997,7 +969,7 @@ ldb_backup(ldb_t *db, const char *name) {
     ldb_slice_t val = ldb_iter_value(it);
 
     if (size >= opt.write_buffer_size) {
-      rc = ldb_write(bak, &batch, 0);
+      rc = ldb_write(bak, &batch, NULL);
 
       if (rc != LDB_OK)
         break;
@@ -1021,12 +993,12 @@ ldb_backup(ldb_t *db, const char *name) {
   ldb_release(db, iopt.snapshot);
 
   if (rc == LDB_OK && size > 0)
-    rc = ldb_write(bak, &batch, 0);
+    rc = ldb_write(bak, &batch, NULL);
 
   ldb_batch_clear(&batch);
 
   if (rc == LDB_OK && size > 0)
-    ldb_compact(bak, 0, 0);
+    ldb_compact(bak, NULL, NULL);
 
   ldb_close(bak);
 
@@ -1053,7 +1025,7 @@ ldb_repair(const char *dbname, const ldb_dbopt_t *options) {
   char *err = NULL;
 
   if (options == NULL)
-    options = ldb_dbopt_default;
+    return LDB_INVALID;
 
   cmp = convert_comparator(options->comparator);
   opt = convert_dbopt(options, cmp, &policy);
@@ -1078,10 +1050,9 @@ ldb_copy(const char *from, const char *to, const ldb_dbopt_t *options) {
   int rc;
 
   if (options == NULL)
-    opt = *ldb_dbopt_default;
-  else
-    opt = *options;
+    return LDB_INVALID;
 
+  opt = *options;
   opt.create_if_missing = 0;
   opt.error_if_exists = 0;
 
@@ -1281,15 +1252,17 @@ ldb_iter_prev(ldb_iter_t *iter) {
 
 ldb_slice_t
 ldb_iter_key(const ldb_iter_t *iter) {
-  ldb_slice_t key = {NULL, 0, 0};
+  ldb_slice_t key;
   key.data = (void *)leveldb_iter_key(iter->rep, &key.size);
+  key.dummy = 0;
   return key;
 }
 
 ldb_slice_t
 ldb_iter_value(const ldb_iter_t *iter) {
-  ldb_slice_t value = {NULL, 0, 0};
+  ldb_slice_t value;
   value.data = (void *)leveldb_iter_value(iter->rep, &value.size);
+  value.dummy = 0;
   return value;
 }
 
@@ -1384,7 +1357,7 @@ static const ldb_dbopt_t db_options = {
   /* .block_size = */ 4 * 1024,
   /* .block_restart_interval = */ 16,
   /* .max_file_size = */ 2 * 1024 * 1024,
-  /* .compression = */ LDB_NO_COMPRESSION,
+  /* .compression = */ LDB_SNAPPY_COMPRESSION,
   /* .reuse_logs = */ 0,
   /* .filter_policy = */ NULL,
   /* .use_mmap = */ 1
@@ -1431,17 +1404,6 @@ ldb_string(const char *xp) {
   ret.size = strlen(xp);
   ret.dummy = 0;
   return ret;
-}
-
-int
-ldb_equal(const ldb_slice_t *x, const ldb_slice_t *y) {
-  if (x->size != y->size)
-    return 0;
-
-  if (x->size == 0)
-    return 1;
-
-  return memcmp(x->data, y->data, y->size) == 0;
 }
 
 /*

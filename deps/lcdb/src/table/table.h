@@ -59,15 +59,15 @@ ldb_table_destroy(ldb_table_t *table);
 
 
 /* Returns a new iterator over the table contents.
- * The result of NewIterator() is initially invalid (caller must
- * call one of the Seek methods on the iterator before using it).
+ * The result of create() is initially invalid (caller must
+ * call one of the seek methods on the iterator before using it).
  */
 struct ldb_iter_s *
 ldb_tableiter_create(const ldb_table_t *table,
                      const struct ldb_readopt_s *options);
 
 /* Calls (*handle_result)(arg, ...) with the entry found after a call
- * to Seek(key). May not make such a call if filter policy says
+ * to seek(key). May not make such a call if filter policy says
  * that key is not present.
  */
 int
@@ -87,7 +87,7 @@ ldb_table_internal_get(ldb_table_t *table,
  * be close to the file length.
  */
 uint64_t
-ldb_table_approximate_offsetof(const ldb_table_t *table,
-                               const ldb_slice_t *key);
+ldb_table_approximate_offset(const ldb_table_t *table,
+                             const ldb_slice_t *key);
 
 #endif /* LDB_TABLE_H */

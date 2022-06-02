@@ -21,6 +21,7 @@
 
 #include "util/buffer.h"
 #include "util/comparator.h"
+#include "util/crc32c.h"
 #include "util/env.h"
 #include "util/internal.h"
 #include "util/options.h"
@@ -79,7 +80,7 @@ print_log_contents(const char *fname,
                    void (*func)(uint64_t, const ldb_slice_t *, FILE *),
                    FILE *dst) {
   ldb_reporter_t reporter;
-  ldb_logreader_t reader;
+  ldb_reader_t reader;
   ldb_buffer_t scratch;
   ldb_slice_t record;
   ldb_rfile_t *file;
@@ -93,14 +94,14 @@ print_log_contents(const char *fname,
   reporter.dst = dst;
   reporter.corruption = report_corruption;
 
-  ldb_logreader_init(&reader, file, &reporter, 1, 0);
+  ldb_reader_init(&reader, file, &reporter, 1, 0);
   ldb_buffer_init(&scratch);
 
-  while (ldb_logreader_read_record(&reader, &record, &scratch))
+  while (ldb_reader_read_record(&reader, &record, &scratch))
     func(reader.last_offset, &record, dst);
 
   ldb_buffer_clear(&scratch);
-  ldb_logreader_clear(&reader);
+  ldb_reader_clear(&reader);
   ldb_rfile_destroy(file);
 
   return LDB_OK;
@@ -196,27 +197,27 @@ dump_log(const char *fname, FILE *dst) {
    found in a LDB_FILE_DESC. */
 static void
 edit_printer(uint64_t pos, const ldb_slice_t *record, FILE *dst) {
-  ldb_vedit_t edit;
+  ldb_edit_t edit;
   ldb_buffer_t r;
 
-  ldb_vedit_init(&edit);
+  ldb_edit_init(&edit);
 
   ldb_buffer_init(&r);
   ldb_buffer_string(&r, "--- offset ");
   ldb_buffer_number(&r, pos);
   ldb_buffer_string(&r, "; ");
 
-  if (!ldb_vedit_import(&edit, record)) {
+  if (!ldb_edit_import(&edit, record)) {
     ldb_buffer_string(&r, ldb_strerror(LDB_CORRUPTION));
     ldb_buffer_push(&r, '\n');
   } else {
-    ldb_vedit_debug(&r, &edit);
+    ldb_edit_debug(&r, &edit);
   }
 
   stream_append(dst, &r);
 
   ldb_buffer_clear(&r);
-  ldb_vedit_clear(&edit);
+  ldb_edit_clear(&edit);
 }
 
 static int
@@ -243,7 +244,7 @@ dump_table(const char *fname, FILE *dst) {
     /* We use the default comparator, which may or may not match the
        comparator used in this database. However this should not cause
        problems since we only use Table operations that do not require
-       any comparisons. In particular, we do not call Seek or Prev. */
+       any comparisons. In particular, we do not call seek() or prev(). */
     ldb_dbopt_t options = *ldb_dbopt_default;
 
     options.comparator = ldb_bytewise_comparator;
@@ -326,6 +327,8 @@ dump_table(const char *fname, FILE *dst) {
 int
 ldb_dump_file(const char *fname, FILE *dst) {
   ldb_filetype_t type;
+
+  ldb_crc32c_init();
 
   if (!guess_type(fname, &type))
     return LDB_INVALID; /* "[fname]: unknown file type" */

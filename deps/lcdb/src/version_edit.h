@@ -34,7 +34,7 @@ typedef struct ldb_filemeta_s {
   ldb_ikey_t largest;  /* Largest internal key served by table. */
 } ldb_filemeta_t;
 
-typedef struct ldb_vedit_s {
+typedef struct ldb_edit_s {
   ldb_buffer_t comparator;
   uint64_t log_number;
   uint64_t prev_log_number;
@@ -48,7 +48,7 @@ typedef struct ldb_vedit_s {
   ldb_vector_t compact_pointers; /* ikey_entry_t */
   rb_set_t deleted_files;        /* file_entry_t */
   ldb_vector_t new_files;        /* meta_entry_t */
-} ldb_vedit_t;
+} ldb_edit_t;
 
 typedef struct ikey_entry_s {
   int level;
@@ -98,56 +98,56 @@ ldb_filemeta_copy(ldb_filemeta_t *z, const ldb_filemeta_t *x);
  */
 
 void
-ldb_vedit_init(ldb_vedit_t *edit);
+ldb_edit_init(ldb_edit_t *edit);
 
 void
-ldb_vedit_clear(ldb_vedit_t *edit);
+ldb_edit_clear(ldb_edit_t *edit);
 
 void
-ldb_vedit_reset(ldb_vedit_t *edit);
+ldb_edit_reset(ldb_edit_t *edit);
 
 void
-ldb_vedit_set_comparator_name(ldb_vedit_t *edit, const char *name);
+ldb_edit_set_comparator_name(ldb_edit_t *edit, const char *name);
 
 void
-ldb_vedit_set_log_number(ldb_vedit_t *edit, uint64_t num);
+ldb_edit_set_log_number(ldb_edit_t *edit, uint64_t num);
 
 void
-ldb_vedit_set_prev_log_number(ldb_vedit_t *edit, uint64_t num);
+ldb_edit_set_prev_log_number(ldb_edit_t *edit, uint64_t num);
 
 void
-ldb_vedit_set_next_file(ldb_vedit_t *edit, uint64_t num);
+ldb_edit_set_next_file(ldb_edit_t *edit, uint64_t num);
 
 void
-ldb_vedit_set_last_sequence(ldb_vedit_t *edit, ldb_seqnum_t seq);
+ldb_edit_set_last_sequence(ldb_edit_t *edit, ldb_seqnum_t seq);
 
 void
-ldb_vedit_set_compact_pointer(ldb_vedit_t *edit,
-                              int level,
-                              const ldb_ikey_t *key);
+ldb_edit_set_compact_pointer(ldb_edit_t *edit,
+                             int level,
+                             const ldb_ikey_t *key);
 
 /* Add the specified file at the specified number. */
 /* REQUIRES: This version has not been saved (see vset_save_to). */
 /* REQUIRES: "smallest" and "largest" are smallest and largest keys in file. */
 void
-ldb_vedit_add_file(ldb_vedit_t *edit,
-                   int level,
-                   uint64_t number,
-                   uint64_t file_size,
-                   const ldb_ikey_t *smallest,
-                   const ldb_ikey_t *largest);
+ldb_edit_add_file(ldb_edit_t *edit,
+                  int level,
+                  uint64_t number,
+                  uint64_t file_size,
+                  const ldb_ikey_t *smallest,
+                  const ldb_ikey_t *largest);
 
 /* Delete the specified "file" from the specified "level". */
 void
-ldb_vedit_remove_file(ldb_vedit_t *edit, int level, uint64_t number);
+ldb_edit_remove_file(ldb_edit_t *edit, int level, uint64_t number);
 
 void
-ldb_vedit_export(ldb_buffer_t *dst, const ldb_vedit_t *edit);
+ldb_edit_export(ldb_buffer_t *dst, const ldb_edit_t *edit);
 
 int
-ldb_vedit_import(ldb_vedit_t *edit, const ldb_slice_t *src);
+ldb_edit_import(ldb_edit_t *edit, const ldb_slice_t *src);
 
 void
-ldb_vedit_debug(ldb_buffer_t *z, const ldb_vedit_t *edit);
+ldb_edit_debug(ldb_buffer_t *z, const ldb_edit_t *edit);
 
 #endif /* LDB_VERSION_EDIT_H */

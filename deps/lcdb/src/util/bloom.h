@@ -18,6 +18,18 @@
 #include "extern.h"
 #include "types.h"
 
+/* A database can be configured with a custom filter policy object.
+ * This object is responsible for creating a small filter from a set
+ * of keys. These filters are stored in leveldb and are consulted
+ * automatically by the database to decide whether or not to read some
+ * information from disk. In many cases, a filter can cut down the
+ * number of disk seeks form a handful to a single disk seek per
+ * ldb_get() call.
+ *
+ * Most people will want to use the builtin bloom filter support (see
+ * ldb_bloom_create() below).
+ */
+
 /*
  * Types
  */
@@ -34,7 +46,7 @@ typedef struct ldb_bloom_s {
    * that are ordered according to the user supplied comparator.
    * Append a filter that summarizes keys[0,n-1] to *dst.
    *
-   * Warning: do not change the initial contents of *dst.  Instead,
+   * Warning: do not change the initial contents of *dst. Instead,
    * append the newly constructed filter to *dst.
    */
   void (*build)(const struct ldb_bloom_s *bloom,
@@ -43,8 +55,8 @@ typedef struct ldb_bloom_s {
                 size_t length);
 
   /* "filter" contains the data appended by a preceding call to
-   * bloom_add() on this class. This method must return true if
-   * the key was in the list of keys passed to bloom_add().
+   * build() on this struct. This method must return true if
+   * the key was in the list of keys passed to build().
    *
    * This method may return true or false if the key was not on the
    * list, but it should aim to return false with a high probability.

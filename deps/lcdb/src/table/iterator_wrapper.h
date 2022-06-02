@@ -62,7 +62,7 @@ ldb_wrapiter_clear(ldb_wrapiter_t *wrap) {
 }
 
 /* Takes ownership of "iter" and will delete it when destroyed, or
-   when Set() is invoked again. */
+   when set() is invoked again. */
 LDB_UNUSED static void
 ldb_wrapiter_set(ldb_wrapiter_t *wrap, ldb_iter_t *iter) {
   if (wrap->iter != NULL)

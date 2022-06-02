@@ -36,6 +36,8 @@ typedef struct ldb_s ldb_t;
  * Helpers
  */
 
+/* Sanitize db options. The caller should delete result.info_log if
+   it is not equal to src.info_log. */
 ldb_dbopt_t
 ldb_sanitize_options(const char *dbname,
                      const struct ldb_comparator_s *icmp,
@@ -69,7 +71,8 @@ LDB_EXTERN int
 ldb_del(ldb_t *db, const ldb_slice_t *key, const ldb_writeopt_t *options);
 
 LDB_EXTERN int
-ldb_write(ldb_t *db, struct ldb_batch_s *updates, const ldb_writeopt_t *options);
+ldb_write(ldb_t *db, struct ldb_batch_s *updates,
+                     const ldb_writeopt_t *options);
 
 LDB_EXTERN const struct ldb_snapshot_s *
 ldb_snapshot(ldb_t *db);
@@ -120,17 +123,24 @@ ldb_destroy(const char *dbname, const ldb_dbopt_t *options);
  * Testing
  */
 
+/* Force current memtable contents to be compacted. */
 int
 ldb_test_compact_memtable(ldb_t *db);
 
+/* Compact any files in the named level that overlap [*begin,*end]. */
 void
 ldb_test_compact_range(ldb_t *db, int level,
                                   const ldb_slice_t *begin,
                                   const ldb_slice_t *end);
 
+/* Return an internal iterator over the current state of the database.
+   The keys of this iterator are internal keys (see format.h).
+   The returned iterator should be deleted when no longer needed. */
 struct ldb_iter_s *
 ldb_test_internal_iterator(ldb_t *db);
 
+/* Return the maximum overlapping data (in bytes) at next level for any
+   file at a level >= 1. */
 int64_t
 ldb_test_max_next_level_overlapping_bytes(ldb_t *db);
 
@@ -138,6 +148,9 @@ ldb_test_max_next_level_overlapping_bytes(ldb_t *db);
  * Internal
  */
 
+/* Record a sample of bytes read at the specified internal key.
+   Samples are taken approximately once every LDB_READ_BYTES_PERIOD
+   bytes. */
 void
 ldb_record_read_sample(ldb_t *db, const ldb_slice_t *key);
 

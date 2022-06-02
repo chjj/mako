@@ -14,15 +14,10 @@
  * Language Standard
  */
 
-#if defined(__cplusplus)
-#  define LDB_STDC_VERSION 0L
-#  define LDB_CPP_VERSION (__cplusplus + 0L)
-#elif defined(__STDC_VERSION__)
+#ifdef __STDC_VERSION__
 #  define LDB_STDC_VERSION __STDC_VERSION__
-#  define LDB_CPP_VERSION 0L
 #else
 #  define LDB_STDC_VERSION 0L
-#  define LDB_CPP_VERSION 0L
 #endif
 
 /*
@@ -70,62 +65,43 @@
 
 #if LDB_STDC_VERSION >= 201112L && !defined(__chibicc__)
 #  define STATIC_ASSERT(expr) _Static_assert(expr, "check failed")
-#elif LDB_CPP_VERSION >= 201703L
-#  define STATIC_ASSERT(expr) static_assert(expr)
-#elif LDB_CPP_VERSION >= 201103L
-#  define STATIC_ASSERT(expr) static_assert(expr, "check failed")
-#elif LDB_GNUC_PREREQ(2, 7) || defined(__clang__) || defined(__TINYC__)
+#elif LDB_GNUC_PREREQ(2, 7) || defined(__clang__)
 #  define STATIC_ASSERT_2(x, y) \
-     typedef char ldb__assert_ ## y[(x) ? 1 : -1] __attribute__((unused))
+     typedef char ldb_assert_ ## y[(x) ? 1 : -1] __attribute__((__unused__))
 #  define STATIC_ASSERT_1(x, y) STATIC_ASSERT_2(x, y)
 #  define STATIC_ASSERT(expr) STATIC_ASSERT_1(expr, __LINE__)
 #else
-#  define STATIC_ASSERT(expr) struct ldb__assert_empty
+#  define STATIC_ASSERT(expr) struct ldb_assert_empty
 #endif
 
 /*
  * Keywords/Attributes
  */
 
-#undef noreturn
-#undef unused
-
 #if LDB_STDC_VERSION >= 199901L
-#  define LDB_INLINE inline
-#elif LDB_CPP_VERSION >= 199711L
 #  define LDB_INLINE inline
 #elif LDB_GNUC_PREREQ(2, 7)
 #  define LDB_INLINE __inline__
 #elif defined(_MSC_VER) && _MSC_VER >= 900
 #  define LDB_INLINE __inline
-#elif (defined(__SUNPRO_C) && __SUNPRO_C >= 0x560) \
-   || (defined(__SUNPRO_CC) && __SUNPRO_CC >= 0x560)
-#  define LDB_INLINE inline
 #else
 #  define LDB_INLINE
 #endif
 
 #if LDB_STDC_VERSION >= 201112L
 #  define LDB_NORETURN _Noreturn
-#elif LDB_CPP_VERSION >= 201103L
-#  define LDB_NORETURN [[noreturn]]
 #elif LDB_GNUC_PREREQ(2, 7)
-#  define LDB_NORETURN __attribute__((noreturn))
+#  define LDB_NORETURN __attribute__((__noreturn__))
 #elif defined(_MSC_VER) && _MSC_VER >= 1200
 #  define LDB_NORETURN __declspec(noreturn)
-#elif (defined(__SUNPRO_C) && __SUNPRO_C >= 0x590) \
-   || (defined(__SUNPRO_CC) && __SUNPRO_CC >= 0x590)
-#  define LDB_NORETURN __attribute__((noreturn))
 #else
 #  define LDB_NORETURN
 #endif
 
 #if LDB_STDC_VERSION > 201710L
 #  define LDB_UNUSED [[maybe_unused]]
-#elif LDB_CPP_VERSION >= 201703L
-#  define LDB_UNUSED [[maybe_unused]]
-#elif LDB_GNUC_PREREQ(2, 7) || defined(__clang__) || defined(__TINYC__)
-#  define LDB_UNUSED __attribute__((unused))
+#elif LDB_GNUC_PREREQ(2, 7) || defined(__clang__)
+#  define LDB_UNUSED __attribute__((__unused__))
 #else
 #  define LDB_UNUSED
 #endif
@@ -134,12 +110,6 @@
 #  define LDB_MALLOC __attribute__((__malloc__))
 #else
 #  define LDB_MALLOC
-#endif
-
-#if defined(__GNUC__) && __GNUC__ >= 2
-#  define LDB_EXTENSION __extension__
-#else
-#  define LDB_EXTENSION
 #endif
 
 #define LDB_STATIC LDB_UNUSED static LDB_INLINE
