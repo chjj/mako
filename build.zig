@@ -393,19 +393,6 @@ pub fn build(b: *Builder) void {
     flags.append(flag) catch unreachable;
   }
 
-  if (!target.isNative()) {
-    // Ensure we are redistributable on other OSes.
-    flags.append("-static-libgcc") catch unreachable;
-  }
-
-  if (target.isWindows() and target.cpu_arch != null) {
-    // Much compatibility.
-    if (enable_portable and target.cpu_arch.? == .i386) {
-      flags.append("-march=i486") catch unreachable;
-      flags.append("-mtune=i686") catch unreachable;
-    }
-  }
-
   //
   // Defines
   //

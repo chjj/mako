@@ -468,8 +468,8 @@ if(MINGW)
   list(APPEND mako_ldflags -static-libgcc)
   # Much compatibility.
   if(MAKO_PORTABLE AND MINGW_ARCH STREQUAL "i686")
-    list(APPEND mako_cflags -march=i486 -mtune=i686)
-    list(APPEND mako_ldflags -march=i486 -mtune=i686)
+    list(APPEND mako_cflags -march=i586 -mtune=i686)
+    list(APPEND mako_ldflags -march=i586 -mtune=i686)
   endif()
 endif()
 

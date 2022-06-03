@@ -454,7 +454,7 @@ AS_IF([test x"$MINGW" != x''], [
   LDFLAGS="$LDFLAGS -static-libgcc"
   # Much compatibility.
   AS_IF([test x"$enable_portable $MINGW_ARCH" = x'yes i686'], [
-    CFLAGS="$CFLAGS -march=i486 -mtune=i686"
+    CFLAGS="$CFLAGS -march=i586 -mtune=i686"
   ])
 ])
 
