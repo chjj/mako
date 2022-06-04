@@ -4,6 +4,7 @@
  * https://github.com/chjj/mako
  */
 
+#include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <signal.h>
@@ -352,7 +353,7 @@ btc_flock(int fd, int lock) {
 
   return fcntl(fd, F_SETLK, &info) == 0;
 #elif defined(HAVE_FLOCK)
-  return flock(fd, lock ? LOCK_EX : LOCK_UN) == 0;
+  return flock(fd, lock ? (LOCK_EX | LOCK_NB) : LOCK_UN) == 0;
 #else
   (void)fd;
   (void)lock;
@@ -860,35 +861,30 @@ typedef struct btc_args_s {
   void *arg;
 } btc_args_t;
 
-/* Set a sane stack size for thread (from libuv). */
-#if defined(__APPLE__) || defined(__linux__)
 static size_t
-thread_stack_size(void) {
-  struct rlimit lim;
-
-  if (getrlimit(RLIMIT_STACK, &lim) != 0)
-    abort(); /* LCOV_EXCL_LINE */
-
-  if (lim.rlim_cur != RLIM_INFINITY) {
-    lim.rlim_cur -= (lim.rlim_cur % (rlim_t)getpagesize());
-
-#if defined(PTHREAD_STACK_MIN)
-    if (lim.rlim_cur >= (rlim_t)PTHREAD_STACK_MIN)
+btc_thread_stack_size(void) {
+#ifdef _SC_PAGESIZE
+  long page_size = sysconf(_SC_PAGESIZE);
 #else
-    if (lim.rlim_cur >= (16 << 10))
+  long page_size = getpagesize();
 #endif
-      return lim.rlim_cur;
+  long stack_size = (1 << 20);
+
+#ifdef PTHREAD_STACK_MIN
+  long stack_min = PTHREAD_STACK_MIN;
+
+  if (stack_min > 0 && stack_size < stack_min)
+    stack_size = stack_min;
+#endif
+
+  if (page_size > 0 && (stack_size % page_size) != 0) {
+    stack_size += (page_size - (stack_size % page_size));
+
+    assert((stack_size % page_size) == 0);
   }
 
-#if !defined(__linux__)
-  return 0;
-#elif defined(__PPC__) || defined(__ppc__) || defined(__powerpc__)
-  return 4 << 20;
-#else
-  return 2 << 20;
-#endif
+  return stack_size;
 }
-#endif
 
 static void *
 btc_thread_run(void *ptr) {
@@ -903,32 +899,22 @@ btc_thread_run(void *ptr) {
 
 void
 btc_thread_create(btc_thread_t *thread, void (*start)(void *), void *arg) {
-  btc_args_t *args = malloc(sizeof(btc_args_t));
-  pthread_attr_t *attr = NULL;
-
-#if defined(__APPLE__) || defined(__linux__)
-  size_t stack_size = thread_stack_size();
-  pthread_attr_t tmp;
-
-  if (stack_size > 0) {
-    attr = &tmp;
-
-    if (pthread_attr_init(attr) != 0)
-      abort(); /* LCOV_EXCL_LINE */
-
-    if (pthread_attr_setstacksize(attr, stack_size) != 0)
-      abort(); /* LCOV_EXCL_LINE */
-  }
-#endif
-
-  if (args == NULL)
-    abort(); /* LCOV_EXCL_LINE */
+  btc_args_t *args = btc_malloc(sizeof(btc_args_t));
+  size_t stack_size = btc_thread_stack_size();
+  pthread_attr_t attr;
 
   args->start = start;
   args->arg = arg;
 
-  if (pthread_create(&thread->handle, attr, btc_thread_run, args) != 0)
+  if (pthread_attr_init(&attr) != 0)
     abort(); /* LCOV_EXCL_LINE */
+
+  pthread_attr_setstacksize(&attr, stack_size);
+
+  if (pthread_create(&thread->handle, &attr, btc_thread_run, args) != 0)
+    abort(); /* LCOV_EXCL_LINE */
+
+  pthread_attr_destroy(&attr);
 }
 
 void
