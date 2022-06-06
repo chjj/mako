@@ -224,7 +224,7 @@ btc_fd_t
 btc_fs_open(const char *name) {
   return BTCCreateFile(name,
                        GENERIC_READ,
-                       FILE_SHARE_READ,
+                       FILE_SHARE_READ | FILE_SHARE_WRITE,
                        NULL,
                        OPEN_EXISTING,
                        FILE_ATTRIBUTE_NORMAL,
@@ -235,7 +235,7 @@ btc_fd_t
 btc_fs_create(const char *name) {
   return BTCCreateFile(name,
                        GENERIC_WRITE,
-                       0,
+                       FILE_SHARE_READ | FILE_SHARE_WRITE,
                        NULL,
                        CREATE_ALWAYS,
                        FILE_ATTRIBUTE_NORMAL,
@@ -246,7 +246,7 @@ btc_fd_t
 btc_fs_append(const char *name) {
   HANDLE handle = BTCCreateFile(name,
                                 GENERIC_WRITE,
-                                0,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE,
                                 NULL,
                                 OPEN_ALWAYS,
                                 FILE_ATTRIBUTE_NORMAL,
@@ -302,7 +302,7 @@ btc_fs_size(const char *name, uint64_t *size) {
 
   handle = BTCCreateFile(name,
                          0,
-                         0,
+                         FILE_SHARE_READ | FILE_SHARE_WRITE,
                          NULL,
                          OPEN_EXISTING,
                          FILE_ATTRIBUTE_NORMAL,
@@ -633,32 +633,19 @@ btc_fs_fsync(btc_fd_t fd) {
 
 btc_fd_t
 btc_fs_lock(const char *name) {
-  HANDLE handle = BTCCreateFile(name,
-                                GENERIC_READ | GENERIC_WRITE,
-                                FILE_SHARE_READ,
-                                NULL,
-                                OPEN_ALWAYS,
-                                FILE_ATTRIBUTE_NORMAL,
-                                NULL);
-
-  if (handle == INVALID_HANDLE_VALUE)
-    return INVALID_HANDLE_VALUE;
-
-  if (!LockFile(handle, 0, 0, 4096, 0)) {
-    CloseHandle(handle);
-    return INVALID_HANDLE_VALUE;
-  }
-
-  return handle;
+  return BTCCreateFile(name,
+                       GENERIC_READ | GENERIC_WRITE,
+                       0,
+                       NULL,
+                       OPEN_ALWAYS,
+                       FILE_ATTRIBUTE_NORMAL,
+                       NULL);
 }
 
 int
 btc_fs_unlock(btc_fd_t fd) {
-  BOOL result = UnlockFile(fd, 0, 0, 4096, 0);
-
   CloseHandle(fd);
-
-  return result != 0;
+  return 1;
 }
 
 /*
