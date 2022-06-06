@@ -376,7 +376,7 @@ ldb_flock(int fd, int lock) {
 
   return fcntl(fd, F_SETLK, &info) == 0;
 #elif defined(HAVE_FLOCK)
-  return flock(fd, lock ? LOCK_EX : LOCK_UN) == 0;
+  return flock(fd, lock ? (LOCK_EX | LOCK_NB) : LOCK_UN) == 0;
 #else
   (void)fd;
   (void)lock;
@@ -1098,7 +1098,7 @@ ldb_wfile_init(ldb_wfile_t *file, const char *filename, int fd) {
   file->pos = 0;
 
   if (file->manifest) {
-    size_t size = strlen(filename) + 1;
+    size_t size = strlen(filename) + 2;
 
     file->dirname = ldb_malloc(size);
 

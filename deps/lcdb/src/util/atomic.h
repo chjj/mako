@@ -15,48 +15,58 @@
  * Compiler Compat
  */
 
-/* Ignore the GCC impersonators. */
-#if defined(__GNUC__) && !defined(__clang__)        \
-                      && !defined(__llvm__)         \
-                      && !defined(__INTEL_COMPILER) \
-                      && !defined(__ICC)            \
-                      && !defined(__CC_ARM)         \
-                      && !defined(__TINYC__)        \
-                      && !defined(__PCC__)          \
-                      && !defined(__NWCC__)
-#  define LDB_GNUC_REAL LDB_GNUC_PREREQ
-#else
-#  define LDB_GNUC_REAL(maj, min) 0
-#endif
-
-#if LDB_GNUC_REAL(4, 7)
-#  define LDB_CLANG_ATOMICS
-#elif LDB_GNUC_REAL(4, 6) && defined(__arm__)
+#if defined(__clang__)
+#  ifdef __has_extension
+#    if __has_extension(c_atomic)
+#      define LDB_GNUC_ATOMICS
+#    endif
+#  endif
+#  ifndef LDB_GNUC_ATOMICS
+#    if __clang_major__ >= 3
+#      define LDB_SYNC_ATOMICS
+#    endif
+#  endif
+#elif defined(__INTEL_COMPILER) || defined(__ICC)
+#  if __INTEL_COMPILER >= 1100 /* 11.0 */
+#    define LDB_SYNC_ATOMICS
+#  endif
+#elif defined(__CC_ARM)
+/* Unknown. */
+#elif defined(__TINYC__) || defined(__PCC__) || defined(__NWCC__)
+/* Nothing. */
+#elif LDB_GNUC_PREREQ(4, 7)
 #  define LDB_GNUC_ATOMICS
-#elif LDB_GNUC_REAL(4, 5) && defined(__BFIN__)
-#  define LDB_GNUC_ATOMICS
-#elif LDB_GNUC_REAL(4, 3) && (defined(__mips__) || defined(__xtensa__))
-#  define LDB_GNUC_ATOMICS
-#elif LDB_GNUC_REAL(4, 2) && (defined(__sh__) || defined(__sparc__))
-#  define LDB_GNUC_ATOMICS
-#elif LDB_GNUC_REAL(4, 1) && (defined(__alpha__)  \
-                           || defined(__i386__)   \
-                           || defined(__amd64__)  \
-                           || defined(__x86_64__) \
-                           || defined(_IBMR2)     \
-                           || defined(__s390__)   \
-                           || defined(__s390x__))
-#  define LDB_GNUC_ATOMICS
-#elif LDB_GNUC_REAL(3, 0) && defined(__ia64__)
-#  define LDB_GNUC_ATOMICS
-#elif defined(__clang__) && defined(__ATOMIC_RELAXED)
-#  define LDB_CLANG_ATOMICS
+#elif LDB_GNUC_PREREQ(4, 6) && defined(__arm__)
+#  define LDB_SYNC_ATOMICS
+#elif LDB_GNUC_PREREQ(4, 5) && defined(__BFIN__)
+#  define LDB_SYNC_ATOMICS
+#elif LDB_GNUC_PREREQ(4, 3) && (defined(__mips__) || defined(__xtensa__))
+#  define LDB_SYNC_ATOMICS
+#elif LDB_GNUC_PREREQ(4, 2) && (defined(__sh__) || defined(__sparc__))
+#  define LDB_SYNC_ATOMICS
+#elif LDB_GNUC_PREREQ(4, 1) && (defined(__alpha__)  \
+                             || defined(__i386__)   \
+                             || defined(__x86_64__) \
+                             || defined(__amd64__)  \
+                             || defined(_IBMR2)     \
+                             || defined(__s390__)   \
+                             || defined(__s390x__))
+#  define LDB_SYNC_ATOMICS
+#elif LDB_GNUC_PREREQ(3, 0) && defined(__ia64__)
+#  define LDB_SYNC_ATOMICS
+#elif defined(__sun) && defined(__SVR4)
+#  if defined(__SUNPRO_C) && __SUNPRO_C >= 0x5110 /* 12.2 */
+#    include <atomic.h>
+#    include <mbarrier.h>
+#    define LDB_SUN_ATOMICS
+#  endif
 #elif defined(_WIN32)
 #  define LDB_MSVC_ATOMICS
 #endif
 
-#if (defined(LDB_CLANG_ATOMICS) \
-  || defined(LDB_GNUC_ATOMICS)  \
+#if (defined(LDB_GNUC_ATOMICS)  \
+  || defined(LDB_SYNC_ATOMICS)  \
+  || defined(LDB_SUN_ATOMICS)   \
   || defined(LDB_MSVC_ATOMICS))
 #  define LDB_HAVE_ATOMICS
 #endif
@@ -65,16 +75,16 @@
  * Backend Selection
  */
 
-#if defined(LDB_MSVC_ATOMICS)
-#  define ldb_atomic(type) volatile long
-#  define ldb_atomic_ptr(type) void *volatile
-#elif defined(LDB_HAVE_ATOMICS)
+#if defined(LDB_GNUC_ATOMICS) || defined(LDB_SYNC_ATOMICS)
 #  define ldb_atomic(type) volatile type
 #  define ldb_atomic_ptr(type) type *volatile
-#else /* !LDB_HAVE_ATOMICS */
+#elif defined(LDB_SUN_ATOMICS) || defined(LDB_MSVC_ATOMICS)
+#  define ldb_atomic(type) volatile long
+#  define ldb_atomic_ptr(type) void *volatile
+#else
 #  define ldb_atomic(type) long
 #  define ldb_atomic_ptr(type) void *
-#endif /* !LDB_HAVE_ATOMICS */
+#endif
 
 /*
  * Memory Order
@@ -120,24 +130,16 @@
  * Builtins
  */
 
-#if defined(LDB_CLANG_ATOMICS)
+#if defined(LDB_GNUC_ATOMICS)
 
-#define ldb_atomic_fetch_add(object, operand, order) \
-  __atomic_fetch_add(object, operand, order)
+#define ldb_atomic_fetch_add __atomic_fetch_add
+#define ldb_atomic_fetch_sub __atomic_fetch_sub
+#define ldb_atomic_load __atomic_load_n
+#define ldb_atomic_store __atomic_store_n
+#define ldb_atomic_load_ptr __atomic_load_n
+#define ldb_atomic_store_ptr __atomic_store_n
 
-#define ldb_atomic_fetch_sub(object, operand, order) \
-  __atomic_fetch_sub(object, operand, order)
-
-#define ldb_atomic_load(object, order) \
-  __atomic_load_n(object, order)
-
-#define ldb_atomic_store(object, desired, order) \
-  __atomic_store_n(object, desired, order)
-
-#define ldb_atomic_load_ptr ldb_atomic_load
-#define ldb_atomic_store_ptr ldb_atomic_store
-
-#elif defined(LDB_GNUC_ATOMICS)
+#elif defined(LDB_SYNC_ATOMICS)
 
 #define ldb_atomic_fetch_add(object, operand, order) \
   __sync_fetch_and_add(object, operand)
@@ -154,6 +156,42 @@
 } while (0)
 
 #define ldb_atomic_load_ptr ldb_atomic_load
+#define ldb_atomic_store_ptr ldb_atomic_store
+
+#elif defined(LDB_SUN_ATOMICS)
+
+static inline long
+ldb_atomic__load(volatile long *object) {
+  __machine_rw_barrier();
+  return *object;
+}
+
+static inline void *
+ldb_atomic__load_ptr(void *volatile *object) {
+  __machine_rw_barrier();
+  return *object;
+}
+
+#define ldb_atomic_add_long_nv(object, operand) \
+  ((long)atomic_add_long_nv((volatile unsigned long *)(object), operand))
+
+#define ldb_atomic_fetch_add(object, operand, order) \
+  (ldb_atomic_add_long_nv(object, operand) - (long)(operand))
+
+#define ldb_atomic_fetch_sub(object, operand, order) \
+  ldb_atomic_fetch_add(object, -((long)(operand)))
+
+#define ldb_atomic_load(object, order) \
+  ldb_atomic__load((volatile long *)(object))
+
+#define ldb_atomic_store(object, desired, order) do { \
+  *(object) = (desired);                              \
+  __machine_rw_barrier();                             \
+} while (0)
+
+#define ldb_atomic_load_ptr(object, order) \
+  ldb_atomic__load_ptr((void *volatile *)(object))
+
 #define ldb_atomic_store_ptr ldb_atomic_store
 
 #elif defined(LDB_MSVC_ATOMICS)
@@ -177,7 +215,7 @@ ldb_atomic__store_ptr(void *volatile *object, void *desired);
   ldb_atomic__fetch_add(object, operand)
 
 #define ldb_atomic_fetch_sub(object, operand, order) \
-  ldb_atomic__fetch_add(object, -(operand))
+  ldb_atomic__fetch_add(object, -((long)(operand)))
 
 #define ldb_atomic_load(object, order) \
   ldb_atomic__load((volatile long *)(object))
@@ -212,7 +250,7 @@ ldb_atomic__store_ptr(void **object, void *desired);
   ldb_atomic__fetch_add(object, operand)
 
 #define ldb_atomic_fetch_sub(object, operand, order) \
-  ldb_atomic__fetch_add(object, -(operand))
+  ldb_atomic__fetch_add(object, -((long)(operand)))
 
 #define ldb_atomic_load(object, order) \
   ldb_atomic__load((long *)(object))

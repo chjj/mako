@@ -447,6 +447,8 @@ repair_table(ldb_repair_t *rep, const char *src, ldb_tabinfo_t *t) {
 
   ldb_iter_destroy(iter);
 
+  ldb_tables_evict(rep->table_cache, t->meta.number);
+
   archive_file(rep, src);
 
   if (counter == 0) {

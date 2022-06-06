@@ -6,17 +6,7 @@
 
 #include "atomic.h"
 
-#if defined(LDB_CLANG_ATOMICS) || defined(LDB_GNUC_ATOMICS)
-
-int
-ldb_atomic_no_empty_translation_unit(void);
-
-int
-ldb_atomic_no_empty_translation_unit(void) {
-  return 0;
-}
-
-#elif defined(LDB_MSVC_ATOMICS)
+#if defined(LDB_MSVC_ATOMICS)
 
 #include <windows.h>
 
@@ -80,7 +70,17 @@ ldb_atomic__store_ptr(void *volatile *object, void *desired) {
 #endif
 }
 
-#else /* !LDB_MSVC_ATOMICS */
+#elif defined(LDB_HAVE_ATOMICS)
+
+int
+ldb_atomic_no_empty_translation_unit(void);
+
+int
+ldb_atomic_no_empty_translation_unit(void) {
+  return 0;
+}
+
+#else /* !LDB_HAVE_ATOMICS */
 
 #include "port.h"
 
@@ -128,4 +128,4 @@ ldb_atomic__store_ptr(void **object, void *desired) {
   ldb_mutex_unlock(&ldb_atomic_lock);
 }
 
-#endif /* !LDB_MSVC_ATOMICS */
+#endif /* !LDB_HAVE_ATOMICS */

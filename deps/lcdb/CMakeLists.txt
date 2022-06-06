@@ -222,7 +222,8 @@ if(MSVC)
   append_c_compiler_flag(ldb_cflags /wd4146  # negation of unsigned integer
                                     /wd4244  # implicit integer demotion
                                     /wd4267  # implicit size_t demotion
-                                    /wd4334) # implicit 32->64 bit shift
+                                    /wd4334  # implicit 32->64 bit shift
+                                    /wd4996) # unsafe/deprecated functions
 elseif(BORLAND)
 # Todo.
 elseif(CMAKE_C_COMPILER_ID MATCHES "Watcom$")
@@ -254,8 +255,8 @@ if(MINGW)
   list(APPEND ldb_ldflags -static-libgcc)
   # Much compatibility.
   if(LDB_PORTABLE AND MINGW_ARCH STREQUAL "i686")
-    list(APPEND ldb_cflags -march=i486 -mtune=i686)
-    list(APPEND ldb_ldflags -march=i486 -mtune=i686)
+    list(APPEND ldb_cflags -march=i586 -mtune=i686)
+    list(APPEND ldb_ldflags -march=i586 -mtune=i686)
   endif()
 endif()
 

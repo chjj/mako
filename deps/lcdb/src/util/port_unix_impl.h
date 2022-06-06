@@ -4,18 +4,13 @@
  * https://github.com/chjj/lcdb
  */
 
-#include <errno.h>
+#include <assert.h>
 #include <limits.h> /* PTHREAD_STACK_MIN */
 #include <stdlib.h>
-#include <string.h>
-#include <unistd.h> /* getpagesize */
+#include <unistd.h> /* sysconf, getpagesize */
 #include <pthread.h>
 #include "internal.h"
 #include "port.h"
-
-#if defined(__APPLE__) || defined(__linux__)
-#  include <sys/resource.h> /* getrlimit */
-#endif
 
 /*
  * Structs
@@ -92,35 +87,30 @@ ldb_cond_wait(ldb_cond_t *cond, ldb_mutex_t *mtx) {
  * Thread
  */
 
-/* Set a sane stack size for thread (from libuv). */
-#if defined(__APPLE__) || defined(__linux__)
 static size_t
-thread_stack_size(void) {
-  struct rlimit lim;
-
-  if (getrlimit(RLIMIT_STACK, &lim) != 0)
-    abort(); /* LCOV_EXCL_LINE */
-
-  if (lim.rlim_cur != RLIM_INFINITY) {
-    lim.rlim_cur -= (lim.rlim_cur % (rlim_t)getpagesize());
-
-#if defined(PTHREAD_STACK_MIN)
-    if (lim.rlim_cur >= (rlim_t)PTHREAD_STACK_MIN)
+ldb_thread_stack_size(void) {
+#ifdef _SC_PAGESIZE
+  long page_size = sysconf(_SC_PAGESIZE);
 #else
-    if (lim.rlim_cur >= (16 << 10))
+  long page_size = getpagesize();
 #endif
-      return lim.rlim_cur;
+  long stack_size = (1 << 20);
+
+#ifdef PTHREAD_STACK_MIN
+  long stack_min = PTHREAD_STACK_MIN;
+
+  if (stack_min > 0 && stack_size < stack_min)
+    stack_size = stack_min;
+#endif
+
+  if (page_size > 0 && (stack_size % page_size) != 0) {
+    stack_size += (page_size - (stack_size % page_size));
+
+    assert((stack_size % page_size) == 0);
   }
 
-#if !defined(__linux__)
-  return 0;
-#elif defined(__PPC__) || defined(__ppc__) || defined(__powerpc__)
-  return 4 << 20;
-#else
-  return 2 << 20;
-#endif
+  return stack_size;
 }
-#endif
 
 static void *
 ldb_thread_run(void *ptr) {
@@ -136,28 +126,21 @@ ldb_thread_run(void *ptr) {
 void
 ldb_thread_create(ldb_thread_t *thread, void (*start)(void *), void *arg) {
   ldb_args_t *args = ldb_malloc(sizeof(ldb_args_t));
-  pthread_attr_t *attr = NULL;
-
-#if defined(__APPLE__) || defined(__linux__)
-  size_t stack_size = thread_stack_size();
-  pthread_attr_t tmp;
-
-  if (stack_size > 0) {
-    attr = &tmp;
-
-    if (pthread_attr_init(attr) != 0)
-      abort(); /* LCOV_EXCL_LINE */
-
-    if (pthread_attr_setstacksize(attr, stack_size) != 0)
-      abort(); /* LCOV_EXCL_LINE */
-  }
-#endif
+  size_t stack_size = ldb_thread_stack_size();
+  pthread_attr_t attr;
 
   args->start = start;
   args->arg = arg;
 
-  if (pthread_create(&thread->handle, attr, ldb_thread_run, args) != 0)
+  if (pthread_attr_init(&attr) != 0)
     abort(); /* LCOV_EXCL_LINE */
+
+  pthread_attr_setstacksize(&attr, stack_size);
+
+  if (pthread_create(&thread->handle, &attr, ldb_thread_run, args) != 0)
+    abort(); /* LCOV_EXCL_LINE */
+
+  pthread_attr_destroy(&attr);
 }
 
 void

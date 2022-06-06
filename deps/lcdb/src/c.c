@@ -520,7 +520,7 @@ bloom_build(const ldb_bloom_t *bloom,
 
   free(data);
 
-  ldb_free(key_ptrs);
+  ldb_free((void *)key_ptrs);
   ldb_free(key_lens);
 }
 
