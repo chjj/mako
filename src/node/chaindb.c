@@ -180,7 +180,6 @@ typedef struct btc_chainfile_s {
   int32_t max_height;
   struct btc_chainfile_s *prev;
   struct btc_chainfile_s *next;
-  int dirty;
 } btc_chainfile_t;
 
 DEFINE_SERIALIZABLE_OBJECT(btc_chainfile, SCOPE_STATIC)
@@ -198,7 +197,6 @@ btc_chainfile_init(btc_chainfile_t *z) {
   z->max_height = -1;
   z->prev = NULL;
   z->next = NULL;
-  z->dirty = 0;
 }
 
 static void
@@ -219,7 +217,6 @@ btc_chainfile_copy(btc_chainfile_t *z, const btc_chainfile_t *x) {
   z->max_height = x->max_height;
   z->prev = NULL;
   z->next = NULL;
-  z->dirty = 0;
 }
 
 static size_t
@@ -773,22 +770,11 @@ btc_chaindb_read(btc_chaindb_t *db,
                  int id,
                  int pos) {
   char path[BTC_PATH_MAX];
-  btc_chainfile_t *file;
   uint8_t *data = NULL;
   uint8_t hdr[24];
   size_t size;
   int ret = 0;
   btc_fd_t fd;
-
-  if (type == BLOCK_FILE)
-    file = &db->block;
-  else
-    file = &db->undo;
-
-  if (id == file->id && file->dirty) {
-    btc_fs_fsync(file->fd);
-    file->dirty = 0;
-  }
 
   btc_chaindb_path(db, path, type, id);
 
@@ -929,7 +915,6 @@ btc_chaindb_alloc(btc_chaindb_t *db,
   file->max_time = -1;
   file->min_height = -1;
   file->max_height = -1;
-  file->dirty = 0;
 
   return 1;
 }
@@ -965,12 +950,8 @@ btc_chaindb_write_block(btc_chaindb_t *db,
   if ((size_t)btc_fs_write(db->block.fd, db->slab, len) != len)
     return 0;
 
-  db->block.dirty = 1;
-
-  if (should_sync(entry)) {
+  if (should_sync(entry))
     btc_fs_fsync(db->block.fd);
-    db->block.dirty = 0;
-  }
 
   entry->block_file = db->block.id;
   entry->block_pos = db->block.pos;
@@ -1022,12 +1003,8 @@ btc_chaindb_write_undo(btc_chaindb_t *db,
   if ((size_t)btc_fs_write(db->undo.fd, buf, len) != len)
     goto fail;
 
-  db->undo.dirty = 1;
-
-  if (should_sync(entry)) {
+  if (should_sync(entry))
     btc_fs_fsync(db->undo.fd);
-    db->undo.dirty = 0;
-  }
 
   entry->undo_file = db->undo.id;
   entry->undo_pos = db->undo.pos;
