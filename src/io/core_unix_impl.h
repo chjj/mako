@@ -438,6 +438,7 @@ btc_ps_daemon(void) {
   return 0;
 #else
   pid_t pid = fork();
+  int fd;
 
   if (pid < 0)
     return 0;
@@ -471,13 +472,13 @@ btc_ps_daemon(void) {
 
   chdir("/");
 
-  close(STDIN_FILENO);
-  close(STDOUT_FILENO);
-  close(STDERR_FILENO);
+  fd = open("/dev/null", O_RDWR);
 
-  open("/dev/null", O_RDONLY);
-  open("/dev/null", O_WRONLY);
-  open("/dev/null", O_WRONLY);
+  if (fd >= 0) {
+    dup2(fd, STDIN_FILENO);
+    dup2(fd, STDOUT_FILENO);
+    dup2(fd, STDERR_FILENO);
+  }
 
   return 1;
 #endif
