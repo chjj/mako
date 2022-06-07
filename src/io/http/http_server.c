@@ -153,19 +153,17 @@ http_gmt_date(char *buf, size_t size) {
   /* Required by the HTTP standard. */
   time_t ts = time(NULL);
   struct tm *gmt;
-#ifndef _WIN32
+#if defined(BTC_PTHREAD) && !defined(_WIN32)
   struct tm tmp;
 #endif
 
   if (ts == (time_t)-1)
     return 0;
 
-  /* Could check TIMER_ABSTIME
-     instead of _WIN32 here. */
-#if defined(_WIN32)
-  gmt = gmtime(&ts);
-#else
+#if defined(BTC_PTHREAD) && !defined(_WIN32)
   gmt = gmtime_r(&ts, &tmp);
+#else
+  gmt = gmtime(&ts);
 #endif
 
   if (gmt == NULL)
