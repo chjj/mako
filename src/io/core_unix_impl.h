@@ -389,7 +389,7 @@ btc_fs_unlock(btc_fd_t fd) {
 
 int
 btc_path_absolute(char *buf, size_t size, const char *name) {
-#if defined(__wasi__)
+#ifdef __wasi__
   size_t len = strlen(name);
 
   if (name[0] != '/')

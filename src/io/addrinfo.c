@@ -38,7 +38,7 @@
 
 int
 btc_getaddrinfo(btc_sockaddr_t **res, const char *name, int port) {
-#if defined(BTC_HAVE_RFC3493)
+#ifdef BTC_HAVE_RFC3493
   struct addrinfo hints, *info, *it;
   btc_sockaddr_t *addr = NULL;
   btc_sockaddr_t *prev = NULL;

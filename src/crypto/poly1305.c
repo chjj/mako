@@ -63,7 +63,7 @@ typedef struct poly1305_uint128_s {
   uint64_t hi;
 } poly1305_uint128_t;
 
-#if defined(HAVE_UMUL128)
+#ifdef HAVE_UMUL128
 #define poly1305_mul(z, x, y) do {      \
   (z).lo = _umul128((x), (y), &(z).hi); \
 } while (0)
@@ -95,7 +95,7 @@ typedef struct poly1305_uint128_s {
 
 void
 btc_poly1305_init(btc_poly1305_t *ctx, const uint8_t *key) {
-#if defined(POLY1305_HAVE_64BIT)
+#ifdef POLY1305_HAVE_64BIT
   struct btc_poly1305_64_s *st = &ctx->state.u64;
   uint64_t t0 = btc_read64le(key + 0);
   uint64_t t1 = btc_read64le(key + 8);
@@ -146,7 +146,7 @@ static void
 poly1305_blocks(btc_poly1305_t *ctx,
                 const uint8_t *data,
                 size_t len, int final) {
-#if defined(POLY1305_HAVE_64BIT)
+#ifdef POLY1305_HAVE_64BIT
   struct btc_poly1305_64_s *st = &ctx->state.u64;
   uint64_t hibit = final ? 0 : (UINT64_C(1) << 40); /* 1 << 128 */
   uint64_t r0 = st->r[0];
@@ -358,7 +358,7 @@ btc_poly1305_pad(btc_poly1305_t *ctx) {
 
 void
 btc_poly1305_final(btc_poly1305_t *ctx, uint8_t *mac) {
-#if defined(POLY1305_HAVE_64BIT)
+#ifdef POLY1305_HAVE_64BIT
   struct btc_poly1305_64_s *st = &ctx->state.u64;
   uint64_t h0, h1, h2, c;
   uint64_t g0, g1, g2;

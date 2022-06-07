@@ -86,7 +86,7 @@ btc_join(char *buf, size_t size, ...) {
     while (*xp)
       *zp++ = *xp++;
 
-#if defined(_WIN32)
+#ifdef _WIN32
     *zp++ = '\\';
 #else
     *zp++ = '/';
@@ -187,7 +187,7 @@ btc_match__path(char *zp, size_t zn, const char *xp, const char *yp) {
   if (!btc_match(&val, xp, yp))
     return 0;
 
-#if defined(_WIN32)
+#ifdef _WIN32
   if (val[0] == '~' && (val[1] == '/' || val[1] == '\\') && val[2] != '\0') {
     char home[MAX_PATH];
     DWORD ret;

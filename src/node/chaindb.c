@@ -313,7 +313,7 @@ static void
 btc_chaindb_path(btc_chaindb_t *db, char *path, int type, int id) {
   const char *tag = (type == BLOCK_FILE ? "blk" : "rev");
 
-#if defined(_WIN32)
+#ifdef _WIN32
   sprintf(path, "%s\\blocks\\%s%05d.dat", db->prefix, tag, id);
 #else
   sprintf(path, "%s/blocks/%s%05d.dat", db->prefix, tag, id);

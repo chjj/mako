@@ -95,7 +95,7 @@ static const sc_t field_p = {
 
 #endif
 
-#if defined(BTC_HAVE_INT128)
+#ifdef BTC_HAVE_INT128
 
 static const fe_t field_zero = {
   UINT64_C(0x0000000000000000), UINT64_C(0x0000000000000000),
@@ -241,7 +241,7 @@ static const sc_t curve_g2 = {
 
 #endif
 
-#if defined(BTC_HAVE_INT128)
+#ifdef BTC_HAVE_INT128
 
 static const fe_t curve_fe_n = {
   UINT64_C(0x0000068cd0364141), UINT64_C(0x000001140777fa4b),

@@ -1131,7 +1131,7 @@ btc_devrand(void *dst, size_t size, const char *name) {
     if (!S_ISCHR(st.st_mode) && !S_ISNAM(st.st_mode))
       goto fail;
 
-#if defined(DEV_RANDOM_POLL)
+#ifdef DEV_RANDOM_POLL
     {
       struct pollfd pfd;
 
@@ -1281,7 +1281,7 @@ btc_uuidrand(void *dst, size_t size) {
 #ifdef HAVE_EGD
 static int
 btc_egdrand(void *dst, size_t size) {
-#if defined(EGD_TEST)
+#ifdef EGD_TEST
   static const char *paths[] = { "/tmp/entropy" };
 #else
   static const char *paths[] = { "/var/run/egd-pool",
@@ -1417,7 +1417,7 @@ fail:
 
 long
 btc_getpid(void) {
-#if defined(HAVE_GETPID)
+#ifdef HAVE_GETPID
   return (long)getpid();
 #else
   return 0;

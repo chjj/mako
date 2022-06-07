@@ -112,7 +112,7 @@ BTC_BARRIER(mp_limb_t, mp_limb)
  * Assembly Compat
  */
 
-#if defined(BTC_HAVE_ASM)
+#ifdef BTC_HAVE_ASM
 #  if defined(__amd64__) || defined(__amd64) \
    || defined(__x86_64__) || defined(__x86_64)
 #    if MP_LIMB_BITS == 64
@@ -174,7 +174,7 @@ BTC_BARRIER(mp_limb_t, mp_limb)
 #define MP_MAX(x, y) ((x) > (y) ? (x) : (y))
 #define MP_ABS(x) ((x) < 0 ? -(x) : (x))
 
-#if defined(mp_alloca)
+#ifdef mp_alloca
 /* Max stack allocation size for alloca: */
 /* 1024 bytes (two 4096 bit RSA moduli). */
 #  define mp_alloca_max ((2 * 4096) / MP_LIMB_BITS + 2)
@@ -1052,7 +1052,7 @@ mp_ctz(mp_limb_t x) {
 
 static BTC_INLINE mp_bits_t
 mp_bitlen(mp_limb_t x) {
-#if defined(MP_HAVE_ASM_X64)
+#ifdef MP_HAVE_ASM_X64
   mp_limb_t z;
 
   if (x == 0)
@@ -1406,7 +1406,7 @@ mpn_add_n(mp_limb_t *zp, const mp_limb_t *xp,
 
   while (n--) {
     /* [z, c] = x + y + c */
-#if defined(mp_add_1x4)
+#ifdef mp_add_1x4
     mp_add_1x4(zp, c, xp, yp);
 #else
     mp_add_1(zp[0], c, xp[0], yp[0]);
@@ -1464,7 +1464,7 @@ mpn_sec_add_1(mp_limb_t *zp, const mp_limb_t *xp, mp_size_t xn, mp_limb_t y) {
 
   while (xn--) {
     /* [z, c] = x + c */
-#if defined(mp_add_x4)
+#ifdef mp_add_x4
     mp_add_x4(zp, c, xp);
 #else
     mp_add(zp[0], c, xp[0], c);
@@ -1540,7 +1540,7 @@ mpn_sub_n(mp_limb_t *zp, const mp_limb_t *xp,
 
   while (n--) {
     /* [z, c] = x - y - c = x - (y + c) */
-#if defined(mp_sub_1x4)
+#ifdef mp_sub_1x4
     mp_sub_1x4(zp, c, xp, yp);
 #else
     mp_sub_1(zp[0], c, xp[0], yp[0]);
@@ -1613,7 +1613,7 @@ mpn_sec_sub_1(mp_limb_t *zp, const mp_limb_t *xp, mp_size_t xn, mp_limb_t y) {
 
   while (xn--) {
     /* [z, c] = x - c */
-#if defined(mp_sub_x4)
+#ifdef mp_sub_x4
     mp_sub_x4(zp, c, xp);
 #else
     mp_sub(zp[0], c, xp[0], c);
@@ -2523,7 +2523,7 @@ mpn_divmod_precomp(mp_divisor_t *den, const mp_limb_t *dp, mp_size_t dn) {
   }
 
   /* Compute inverse of top limb. */
-#if defined(MP_USE_DIV_3BY2)
+#ifdef MP_USE_DIV_3BY2
   if (dn == 1)
     den->inv = mp_inv_2by1(den->vp[dn - 1]);
   else
@@ -2979,7 +2979,7 @@ mpn_divmod_inner(mp_limb_t *qp, mp_limb_t *rp,
   if (nn < dn)
     btc_abort(); /* LCOV_EXCL_LINE */
 
-#if defined(MP_USE_DIV_3BY2)
+#ifdef MP_USE_DIV_3BY2
   if (dn == 1)
     mpn_divmod_small_2by1(qp, rp, np, nn, den);
   else if (dn == 2)
@@ -3491,7 +3491,7 @@ mpn_neg(mp_limb_t *zp, const mp_limb_t *xp, mp_size_t xn) {
 
   while (xn--) {
     /* [z, c] = ~x + c */
-#if defined(mp_neg_1x4)
+#ifdef mp_neg_1x4
     mp_neg_1x4(zp, c, xp);
 #else
     mp_neg_1(zp[0], c, xp[0]);

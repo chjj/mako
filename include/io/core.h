@@ -62,7 +62,7 @@ typedef struct BTC_RTL_CRITICAL_SECTION {
  * Types
  */
 
-#if defined(_WIN32)
+#ifdef _WIN32
 #  define BTC_INVALID_FD ((BTC_HANDLE)-1)
 typedef BTC_HANDLE btc_fd_t;
 #else

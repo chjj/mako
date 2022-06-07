@@ -208,7 +208,7 @@ BTC_EXTENSION typedef signed __int128 btc_int128_t;
  * Value Barrier
  */
 
-#if defined(BTC_HAVE_ASM)
+#ifdef BTC_HAVE_ASM
 #define BTC_BARRIER(type, prefix) \
 static BTC_INLINE type            \
 prefix ## _barrier(type x) {      \

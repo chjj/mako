@@ -18,7 +18,7 @@
 BTC_NORETURN void
 btc_assert_fail(const char *file, int line, const char *expr) {
   /* LCOV_EXCL_START */
-#if defined(BTC_DEBUG)
+#ifdef BTC_DEBUG
   fprintf(stderr, "%s:%d: Assertion `%s' failed.\n", file, line, expr);
   fflush(stderr);
 #else

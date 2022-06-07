@@ -91,7 +91,7 @@
 #include "asn1.h"
 #include "../internal.h"
 
-#if defined(BTC_HAVE_INT128)
+#ifdef BTC_HAVE_INT128
 typedef uint64_t fe_word_t;
 #  define FIELD_WORD_BITS 64
 #  define FIELD_WORDS 6

@@ -579,7 +579,7 @@ btc_printf_core(state_t *st, const char *fmt, va_list ap) {
             break;
           }
           case 'p': {
-#if defined(UINTPTR_MAX)
+#ifdef UINTPTR_MAX
             state_grow(st, 18);
             st->ptr += btc_ptr(st->ptr, va_arg(ap, void *));
 #else

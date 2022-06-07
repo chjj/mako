@@ -66,7 +66,7 @@ btc_logger_create(void) {
 
   logger->level = BTC_LOG_SPAM;
   logger->output = 1;
-#if defined(_WIN32)
+#ifdef _WIN32
   logger->colors = 0;
 #else
   logger->colors = isatty(STDOUT_FILENO);

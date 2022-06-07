@@ -50,7 +50,7 @@
  * Compat
  */
 
-#if defined(_WIN32)
+#ifdef _WIN32
 typedef int btc_socklen_t;
 typedef SOCKET btc_sockfd_t;
 typedef char btc_sockopt_t;
@@ -295,16 +295,16 @@ struct btc_loop_s {
   btc_socket_t **sockets;
   size_t alloc;
   size_t length;
-#else
+#else /* !BTC_USE_POLL */
   fd_set fds;
   fd_set rfds, wfds;
-#if defined(_WIN32)
+#ifdef _WIN32
   fd_set efds;
 #else
   int nfds;
 #endif
   btc_list_t sockets;
-#endif
+#endif /* !BTC_USE_POLL */
   unsigned char buffer[65536];
 #ifdef _WIN32
   char errmsg[256];
@@ -395,7 +395,7 @@ sa_addrlen(const struct sockaddr *addr) {
 
 static int
 set_nonblocking(btc_sockfd_t fd) {
-#if defined(_WIN32)
+#ifdef _WIN32
   u_long yes = 1;
   return ioctlsocket(fd, FIONBIO, &yes);
 #else
@@ -411,7 +411,7 @@ set_nonblocking(btc_sockfd_t fd) {
 #ifndef _WIN32
 static int
 set_cloexec(int fd) {
-#if defined(FD_CLOEXEC)
+#ifdef FD_CLOEXEC
   int flags = fcntl(fd, F_GETFD);
 
   if (flags == -1)
@@ -460,7 +460,7 @@ static btc_sockfd_t
 safe_accept(btc_sockfd_t sockfd,
             struct sockaddr *addr,
             btc_socklen_t *addrlen) {
-#if defined(_WIN32)
+#ifdef _WIN32
   return accept(sockfd, addr, addrlen);
 #else
   socklen_t len;
@@ -480,7 +480,7 @@ safe_accept(btc_sockfd_t sockfd,
 
 static btc_sockfd_t
 safe_socket(int domain, int type, int protocol) {
-#if defined(_WIN32)
+#ifdef _WIN32
   return socket(domain, type, protocol);
 #else
   int fd;
@@ -535,7 +535,7 @@ static int
 safe_connect(btc_sockfd_t sockfd,
              const struct sockaddr *addr,
              btc_socklen_t addrlen) {
-#if defined(_WIN32)
+#ifdef _WIN32
   return connect(sockfd, addr, addrlen);
 #else
   int rc;
@@ -563,7 +563,7 @@ finalize_connect(btc_sockfd_t fd) {
   memset(&storage, 0, sizeof(storage));
 
   if (getpeername(fd, addr, &addrlen) == BTC_SOCKET_ERROR) {
-#if defined(_WIN32)
+#ifdef _WIN32
     /* Unsure if we can abuse error slippage on windows. */
     if (WSAGetLastError() == WSAENOTCONN) {
       int len = sizeof(int);
@@ -1349,7 +1349,7 @@ btc_loop_off_tick(btc_loop_t *loop, btc_loop_tick_cb *handler, void *data) {
 
 const char *
 btc_loop_strerror(btc_loop_t *loop) {
-#if defined(_WIN32)
+#ifdef _WIN32
   DWORD version = GetVersion();
   DWORD length = 0;
 
@@ -1412,7 +1412,7 @@ btc_loop_register(btc_loop_t *loop, btc_socket_t *socket) {
 
   return 1;
 #else
-#if defined(_WIN32)
+#ifdef _WIN32
   if (loop->sockets.length >= FD_SETSIZE) {
     loop->error = BTC_EMFILE;
     return 0;
@@ -1842,7 +1842,7 @@ retry:
     tp = &tv;
   }
 
-#if defined(_WIN32)
+#ifdef _WIN32
   count = select(FD_SETSIZE, &loop->rfds, &loop->wfds, &loop->efds, tp);
 #else
   count = select(loop->nfds, &loop->rfds, &loop->wfds, NULL, tp);
@@ -1854,7 +1854,7 @@ retry:
     if (error == BTC_EINTR)
       goto retry;
 
-#if defined(_WIN32)
+#ifdef _WIN32
     if (error != BTC_EINVAL)
       abort(); /* LCOV_EXCL_LINE */
 
@@ -1877,7 +1877,7 @@ retry:
       btc_socket_t *socket = it->value;
       btc_sockfd_t fd = socket->fd;
 
-#if defined(_WIN32)
+#ifdef _WIN32
       if (FD_ISSET(fd, &loop->wfds) | FD_ISSET(fd, &loop->efds))
         handle_write(loop, socket);
 #else
@@ -1897,7 +1897,7 @@ retry:
 
 void
 btc_loop_close(btc_loop_t *loop) {
-#if defined(BTC_USE_POLL)
+#ifdef BTC_USE_POLL
   size_t i;
 
   handle_deferred(loop);

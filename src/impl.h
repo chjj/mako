@@ -435,7 +435,7 @@ btc_int8_update(btc_hash256_t *ctx, int8_t x) {
 
 BTC_UNUSED static uint8_t *
 btc_uint16_write(uint8_t *zp, uint16_t x) {
-#if defined(BTC_BIGENDIAN)
+#ifdef BTC_BIGENDIAN
   *zp++ = (x >> 0);
   *zp++ = (x >> 8);
   return zp;
@@ -450,7 +450,7 @@ btc_uint16_read(uint16_t *zp, const uint8_t **xp, size_t *xn) {
   if (*xn < 2)
     return 0;
 
-#if defined(BTC_BIGENDIAN)
+#ifdef BTC_BIGENDIAN
   *zp = ((uint16_t)(*xp)[0] << 0)
       | ((uint16_t)(*xp)[1] << 8);
 #else
@@ -465,7 +465,7 @@ btc_uint16_read(uint16_t *zp, const uint8_t **xp, size_t *xn) {
 
 BTC_UNUSED static void
 btc_uint16_update(btc_hash256_t *ctx, uint16_t x) {
-#if defined(BTC_BIGENDIAN)
+#ifdef BTC_BIGENDIAN
   uint8_t tmp[2];
   btc_uint16_write(tmp, x);
   btc_hash256_update(ctx, tmp, 2);
@@ -491,7 +491,7 @@ btc_int16_update(btc_hash256_t *ctx, int16_t x) {
 
 BTC_UNUSED static uint8_t *
 btc_uint32_write(uint8_t *zp, uint32_t x) {
-#if defined(BTC_BIGENDIAN)
+#ifdef BTC_BIGENDIAN
   *zp++ = (x >>  0);
   *zp++ = (x >>  8);
   *zp++ = (x >> 16);
@@ -508,7 +508,7 @@ btc_uint32_read(uint32_t *zp, const uint8_t **xp, size_t *xn) {
   if (*xn < 4)
     return 0;
 
-#if defined(BTC_BIGENDIAN)
+#ifdef BTC_BIGENDIAN
   *zp = ((uint32_t)(*xp)[0] <<  0)
       | ((uint32_t)(*xp)[1] <<  8)
       | ((uint32_t)(*xp)[2] << 16)
@@ -525,7 +525,7 @@ btc_uint32_read(uint32_t *zp, const uint8_t **xp, size_t *xn) {
 
 BTC_UNUSED static void
 btc_uint32_update(btc_hash256_t *ctx, uint32_t x) {
-#if defined(BTC_BIGENDIAN)
+#ifdef BTC_BIGENDIAN
   uint8_t tmp[4];
   btc_uint32_write(tmp, x);
   btc_hash256_update(ctx, tmp, 4);
@@ -551,7 +551,7 @@ btc_int32_update(btc_hash256_t *ctx, int32_t x) {
 
 BTC_UNUSED static uint8_t *
 btc_uint64_write(uint8_t *zp, uint64_t x) {
-#if defined(BTC_BIGENDIAN)
+#ifdef BTC_BIGENDIAN
   *zp++ = (x >>  0);
   *zp++ = (x >>  8);
   *zp++ = (x >> 16);
@@ -572,7 +572,7 @@ btc_uint64_read(uint64_t *zp, const uint8_t **xp, size_t *xn) {
   if (*xn < 8)
     return 0;
 
-#if defined(BTC_BIGENDIAN)
+#ifdef BTC_BIGENDIAN
   *zp = ((uint64_t)(*xp)[0] <<  0)
       | ((uint64_t)(*xp)[1] <<  8)
       | ((uint64_t)(*xp)[2] << 16)
@@ -593,7 +593,7 @@ btc_uint64_read(uint64_t *zp, const uint8_t **xp, size_t *xn) {
 
 BTC_UNUSED static void
 btc_uint64_update(btc_hash256_t *ctx, uint64_t x) {
-#if defined(BTC_BIGENDIAN)
+#ifdef BTC_BIGENDIAN
   uint8_t tmp[8];
   btc_uint64_write(tmp, x);
   btc_hash256_update(ctx, tmp, 8);
@@ -736,7 +736,7 @@ btc_compact_read(uint64_t *zp, const uint8_t **xp, size_t *xn) {
 
 BTC_UNUSED static void
 btc_compact_update(btc_hash256_t *ctx, uint64_t x) {
-#if defined(BTC_BIGENDIAN)
+#ifdef BTC_BIGENDIAN
   uint8_t tmp[9];
   uint8_t *end = btc_compact_write(tmp, x);
 

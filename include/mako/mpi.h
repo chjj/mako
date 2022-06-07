@@ -307,7 +307,7 @@ extern "C" {
 #  endif
 #endif
 
-#if defined(MP_HAVE_64BIT)
+#ifdef MP_HAVE_64BIT
 typedef uint64_t mp_limb_t;
 typedef int64_t mp_long_t;
 #  define MP_LIMB_BITS 64
