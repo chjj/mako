@@ -691,11 +691,6 @@ btc_ps_daemon(void) {
   return 0;
 }
 
-int
-btc_ps_fdlimit(int minfd) {
-  return minfd < 2048 ? 2048 : minfd;
-}
-
 static BOOL WINAPI
 real_handler(DWORD type) {
   /* Note: this runs on a separate thread. */

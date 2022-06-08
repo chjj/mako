@@ -249,9 +249,6 @@ btc_path_join(char *zp, size_t zn, const char *xp, const char *yp);
 BTC_EXTERN int
 btc_ps_daemon(void);
 
-BTC_EXTERN int
-btc_ps_fdlimit(int minfd);
-
 BTC_EXTERN void
 btc_ps_onterm(void (*handler)(void *), void *arg);
 

@@ -22,10 +22,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#if !defined(__Fuchsia__) && !defined(__wasi__) && !defined(__EMSCRIPTEN__)
-#  include <sys/resource.h>
-#endif
-
 #if !defined(FD_SETSIZE) && !defined(FD_SET)
 #  include <sys/select.h>
 #endif
@@ -481,35 +477,6 @@ btc_ps_daemon(void) {
   }
 
   return 1;
-#endif
-}
-
-int
-btc_ps_fdlimit(int minfd) {
-#ifdef RLIMIT_NOFILE
-  /* From Bitcoin Core. */
-  struct rlimit lim;
-
-  if (getrlimit(RLIMIT_NOFILE, &lim) < 0)
-    return -1;
-
-  if (lim.rlim_cur < (rlim_t)minfd) {
-    lim.rlim_cur = minfd;
-
-    if (lim.rlim_cur > lim.rlim_max)
-      lim.rlim_cur = lim.rlim_max;
-
-    if (setrlimit(RLIMIT_NOFILE, &lim) < 0)
-      return -1;
-
-    if (getrlimit(RLIMIT_NOFILE, &lim) < 0)
-      return -1;
-  }
-
-  return lim.rlim_cur;
-#else
-  (void)minfd;
-  return -1;
 #endif
 }
 

@@ -207,15 +207,6 @@ btc_main(const btc_conf_t *conf) {
     }
   }
 
-  {
-    int needed = conf->max_inbound + conf->max_outbound + 1000 + 125 + 200;
-
-    if (needed < 8192)
-      needed = 8192;
-
-    btc_ps_fdlimit(needed);
-  }
-
   btc_net_startup();
 
   node = btc_node_create(conf->network);
