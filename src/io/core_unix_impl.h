@@ -580,9 +580,10 @@ btc_sysctl(int name) {
 int
 btc_sys_numcpu(void) {
   /* https://stackoverflow.com/questions/150355 */
-#if defined(__linux__) || defined(__sun) || defined(_AIX)
-  /* Linux, Solaris, AIX */
-# if defined(_SC_NPROCESSORS_ONLN)
+#if defined(__linux__) || defined(__sun) \
+ || defined(_AIX) || defined(__Fuchsia__)
+  /* Linux, Solaris, AIX, Fuchsia */
+# ifdef _SC_NPROCESSORS_ONLN
   return (int)sysconf(_SC_NPROCESSORS_ONLN);
 # else
   return -1;
@@ -590,10 +591,10 @@ btc_sys_numcpu(void) {
 #elif defined(HAVE_SYSCTL)
   /* Apple, FreeBSD, OpenBSD, NetBSD, DragonFly BSD */
   int ret = -1;
-# if defined(HW_AVAILCPU)
+# ifdef HW_AVAILCPU
   ret = btc_sysctl(HW_AVAILCPU);
 # endif
-# if defined(HW_NCPU)
+# ifdef HW_NCPU
   if (ret < 1)
     ret = btc_sysctl(HW_NCPU);
 # endif
@@ -603,7 +604,7 @@ btc_sys_numcpu(void) {
   return mpctl(MPC_GETNUMSPUS, NULL, NULL);
 #elif defined(__sgi)
   /* IRIX */
-# if defined(_SC_NPROC_ONLN)
+# ifdef _SC_NPROC_ONLN
   return (int)sysconf(_SC_NPROC_ONLN);
 # else
   return -1;
@@ -615,7 +616,7 @@ btc_sys_numcpu(void) {
 
 int
 btc_sys_datadir(char *buf, size_t size, const char *name) {
-#if defined(__wasi__)
+#ifdef __wasi__
   if (strlen(name) + 3 > size)
     return 0;
 
@@ -628,7 +629,7 @@ btc_sys_datadir(char *buf, size_t size, const char *name) {
   if (home == NULL || home[0] == '\0')
     return 0;
 
-#if defined(__APPLE__)
+#ifdef __APPLE__
   if (strlen(home) + strlen(name) + 30 > size)
     return 0;
 
@@ -655,85 +656,41 @@ btc_sys_datadir(char *buf, size_t size, const char *name) {
  * Time
  */
 
-static void
-btc_gettimeofday(struct timeval *tv) {
-  if (gettimeofday(tv, NULL) != 0)
-    abort(); /* LCOV_EXCL_LINE */
-}
+static int64_t
+btc_read_clock(void) {
+  struct timeval tv;
 
 #ifdef BTC_HAVE_CLOCK
-static void
-btc_clock_gettime(clockid_t id, struct timespec *ts) {
-  struct timeval tv;
+  struct timespec ts;
 
 #ifdef __APPLE__
   if (&clock_gettime != NULL)
 #endif
   {
-    if (clock_gettime(id, ts) == 0)
-      return;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
+      return (int64_t)ts.tv_sec * 1000000 + (ts.tv_nsec / 1000);
   }
+#endif /* BTC_HAVE_CLOCK */
 
-  btc_gettimeofday(&tv);
+  if (gettimeofday(&tv, NULL) != 0)
+    abort(); /* LCOV_EXCL_LINE */
 
-  ts->tv_sec = tv.tv_sec;
-  ts->tv_nsec = tv.tv_usec * 1000;
+  return (int64_t)tv.tv_sec * 1000000 + tv.tv_usec;
 }
-#endif
 
 int64_t
 btc_time_sec(void) {
-#ifdef BTC_HAVE_CLOCK
-  struct timespec ts;
-
-#if defined(__linux__) && defined(CLOCK_MONOTONIC_COARSE)
-  btc_clock_gettime(CLOCK_MONOTONIC_COARSE, &ts);
-#else
-  btc_clock_gettime(CLOCK_MONOTONIC, &ts);
-#endif
-
-  return ts.tv_sec;
-#else
-  struct timeval tv;
-
-  btc_gettimeofday(&tv);
-
-  return tv.tv_sec;
-#endif
+  return btc_read_clock() / 1000000;
 }
 
 int64_t
 btc_time_msec(void) {
-#ifdef BTC_HAVE_CLOCK
-  struct timespec ts;
-
-  btc_clock_gettime(CLOCK_MONOTONIC, &ts);
-
-  return ((uint64_t)ts.tv_sec * 1000) + (ts.tv_nsec / 1000000);
-#else
-  struct timeval tv;
-
-  btc_gettimeofday(&tv);
-
-  return ((uint64_t)tv.tv_sec * 1000) + (tv.tv_usec / 1000);
-#endif
+  return btc_read_clock() / 1000;
 }
 
 int64_t
 btc_time_usec(void) {
-#ifdef BTC_HAVE_CLOCK
-  struct timespec ts;
-
-  btc_clock_gettime(CLOCK_MONOTONIC, &ts);
-
-  return ((uint64_t)ts.tv_sec * 1000000) + (ts.tv_nsec / 1000);
-#else
-  struct timeval tv;
-
-  btc_gettimeofday(&tv);
-
-  return ((uint64_t)tv.tv_sec * 1000000) + tv.tv_usec;
-#endif
+  return btc_read_clock();
 }
 
 void
@@ -867,9 +824,12 @@ btc_thread_run(void *ptr) {
 
 void
 btc_thread_create(btc_thread_t *thread, void (*start)(void *), void *arg) {
-  btc_args_t *args = btc_malloc(sizeof(btc_args_t));
+  btc_args_t *args = malloc(sizeof(btc_args_t));
   size_t stack_size = btc_thread_stack_size();
   pthread_attr_t attr;
+
+  if (args == NULL)
+    abort(); /* LCOV_EXCL_LINE */
 
   args->start = start;
   args->arg = arg;

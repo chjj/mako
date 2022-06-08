@@ -877,7 +877,7 @@ btc_sys_datadir(char *buf, size_t size, const char *name) {
  */
 
 static double
-btc_time_qpf(void) {
+btc_read_freq(void) {
   static volatile long state = 0;
   static double freq_inv = 0.0;
   LARGE_INTEGER freq;
@@ -900,54 +900,41 @@ btc_time_qpf(void) {
 }
 
 static int64_t
-btc_time_qpc(unsigned int scale) {
-  static const uint64_t epoch = UINT64_C(116444736000000000);
-  double freq_inv = btc_time_qpf();
+btc_read_clock(void) {
+  double freq_inv = btc_read_freq();
   LARGE_INTEGER ctr;
 
   if (freq_inv == 0.0) {
-    ULARGE_INTEGER ul;
-    uint64_t units;
+    ULARGE_INTEGER ticks;
     FILETIME ft;
 
     GetSystemTimeAsFileTime(&ft);
 
-    ul.LowPart = ft.dwLowDateTime;
-    ul.HighPart = ft.dwHighDateTime;
+    ticks.LowPart = ft.dwLowDateTime;
+    ticks.HighPart = ft.dwHighDateTime;
 
-    units = ul.QuadPart - epoch;
-
-    if (scale == 1)
-      return units / 10000000;
-
-    if (scale == 1000)
-      return units / 10000;
-
-    if (scale == 1000000)
-      return units / 10;
-
-    return units * 100;
+    return ticks.QuadPart / 10;
   }
 
   if (!QueryPerformanceCounter(&ctr))
     abort(); /* LCOV_EXCL_LINE */
 
-  return ((double)ctr.QuadPart * freq_inv) * (double)scale;
+  return ((double)ctr.QuadPart * freq_inv) * 1000000.0;
 }
 
 int64_t
 btc_time_sec(void) {
-  return btc_time_qpc(1);
+  return btc_read_clock() / 1000000;
 }
 
 int64_t
 btc_time_msec(void) {
-  return btc_time_qpc(1000);
+  return btc_read_clock() / 1000;
 }
 
 int64_t
 btc_time_usec(void) {
-  return btc_time_qpc(1000000);
+  return btc_read_clock();
 }
 
 void
