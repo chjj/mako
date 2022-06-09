@@ -76,8 +76,8 @@ btc_remove_wide(WCHAR *path, int plen) {
         continue;
 
       if (plen + lstrlenW(name) + 2 > 4096) {
-        SetLastError(ERROR_BUFFER_OVERFLOW);
         FindClose(handle);
+        SetLastError(ERROR_BUFFER_OVERFLOW);
         return -1;
       }
 
@@ -250,8 +250,8 @@ btc_remove_ansi(char *path, int plen) {
         continue;
 
       if (plen + strlen(name) + 2 > 4096) {
-        SetLastError(ERROR_BUFFER_OVERFLOW);
         FindClose(handle);
+        SetLastError(ERROR_BUFFER_OVERFLOW);
         return -1;
       }
 
