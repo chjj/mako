@@ -430,8 +430,10 @@ btc_fs_mkdirp_wide(const char *name) {
 
   btc_wide_init(&tmp, len);
 
-  if (!btc_utf16_write(tmp.data, len, name))
+  if (!btc_utf16_write(tmp.data, len, name)) {
+    btc_wide_clear(&tmp);
     return 0;
+  }
 
   path = tmp.data;
 
