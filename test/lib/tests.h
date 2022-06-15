@@ -53,7 +53,7 @@
 #endif
 
 #ifndef BTC_PREFIX
-#  if defined(_WIN32)
+#  ifdef _WIN32
 #    define BTC_PREFIX ".\\tmp"
 #  else
 #    define BTC_PREFIX "./tmp"
