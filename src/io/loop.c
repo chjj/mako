@@ -307,7 +307,7 @@ struct btc_loop_s {
 #endif /* !BTC_USE_POLL */
   unsigned char buffer[65536];
 #ifdef _WIN32
-  char errmsg[256];
+  char errmsg[1024];
 #endif
   btc_list_t deferred;
   btc_list_t closed;
@@ -1351,25 +1351,35 @@ const char *
 btc_loop_strerror(btc_loop_t *loop) {
 #ifdef _WIN32
   DWORD version = GetVersion();
-  DWORD length = 0;
+  DWORD result = 0;
 
   /* Winsock error messages only available on Windows 2000 and up. */
   /* See: https://tangentsoft.net/wskfaq/articles/history.html */
   if (version < 0x80000000 && (version & 0xff) >= 5) {
-    static const DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM
-                             | FORMAT_MESSAGE_IGNORE_INSERTS
-                             | FORMAT_MESSAGE_MAX_WIDTH_MASK;
+    WCHAR tmp[512];
 
-    length = FormatMessageA(flags,
+    result = FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM |
+                            FORMAT_MESSAGE_IGNORE_INSERTS,
                             NULL,
                             loop->error,
-                            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                            loop->errmsg,
-                            sizeof(loop->errmsg),
+                            LANG_USER_DEFAULT,
+                            tmp,
+                            sizeof(tmp) / sizeof(tmp[0]),
                             NULL);
+
+    if (result) {
+      result = WideCharToMultiByte(CP_UTF8,
+                                   0,
+                                   tmp,
+                                   -1,
+                                   loop->errmsg,
+                                   sizeof(loop->errmsg),
+                                   NULL,
+                                   NULL);
+    }
   }
 
-  if (length == 0)
+  if (!result)
     sprintf(loop->errmsg, "WSA Error: %d", loop->error);
 
   return loop->errmsg;
