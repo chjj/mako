@@ -26,8 +26,8 @@ fn buildLib(b: *Builder,
   lib.setTarget(target);
   lib.setBuildMode(mode);
   lib.linkLibC();
-  lib.addIncludeDir("./include");
-  lib.addIncludeDir("./deps/lcdb/include");
+  lib.addIncludePath("./include");
+  lib.addIncludePath("./deps/lcdb/include");
   lib.addCSourceFiles(sources, flags);
 
   for (defines) |def| {
@@ -50,7 +50,7 @@ fn buildExe(b: *Builder,
   exe.setTarget(target);
   exe.setBuildMode(mode);
   exe.linkLibC();
-  exe.addIncludeDir("./include");
+  exe.addIncludePath("./include");
   exe.addCSourceFiles(sources, flags);
 
   for (defines) |def| {
@@ -486,7 +486,7 @@ pub fn build(b: *Builder) void {
     shared.setBuildMode(mode);
     shared.install();
     shared.linkLibC();
-    shared.addIncludeDir("./include");
+    shared.addIncludePath("./include");
     shared.addCSourceFiles(&mako_sources, flags.items);
     shared.strip = strip;
 
