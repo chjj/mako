@@ -29,6 +29,7 @@
 .deps/
 .libs/
 .dirstamp
+.DS_Store
 CMakeCache.txt
 CMakeFiles/
 DartConfiguration.tcl
