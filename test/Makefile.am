@@ -58,6 +58,7 @@ tests_lib = t-address  \
             t-base58   \
             t-bech32   \
             t-bip32    \
+            t-bip340   \
             t-bip37    \
             t-bip39    \
             t-bip152   \
