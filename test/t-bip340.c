@@ -8,8 +8,8 @@
 #include <string.h>
 #include <mako/crypto/drbg.h>
 #include <mako/crypto/ecc.h>
-#include "data/bip340_vectors.h"
 #include "lib/tests.h"
+#include "data/bip340_vectors.h"
 
 static void
 test_bip340_vectors(void) {
