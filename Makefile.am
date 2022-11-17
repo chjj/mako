@@ -21,6 +21,7 @@ pkgconfig_DATA = libmako.pc
 
 EXTRA_DIST = cmake/              \
              scripts/            \
+             test/data/          \
              autogen.sh          \
              CHANGELOG.md        \
              CMakeLists.txt      \
