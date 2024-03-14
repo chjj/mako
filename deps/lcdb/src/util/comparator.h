@@ -92,6 +92,11 @@ typedef struct ldb_comparator_s {
  * Globals
  */
 
+#ifdef _WIN32
+LDB_EXTERN const ldb_comparator_t *ldb_comparator_import(void);
+#define ldb_bytewise_comparator (ldb_comparator_import())
+#else
 LDB_EXTERN extern const ldb_comparator_t *ldb_bytewise_comparator;
+#endif
 
 #endif /* LDB_COMPARATOR_H */

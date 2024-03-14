@@ -118,7 +118,7 @@ decode_entry(uint32_t *shared,
       return NULL;
   }
 
-  if (xn < (*non_shared + *value_length))
+  if (xn < ((uint64_t)*non_shared + *value_length))
     return NULL;
 
   return xp;
@@ -157,8 +157,16 @@ next_entry_offset(const ldb_blockiter_t *iter) {
 
 static uint32_t
 get_restart_point(const ldb_blockiter_t *iter, uint32_t index) {
+  uint32_t offset;
+
   assert(index < iter->num_restarts);
-  return ldb_fixed32_decode(iter->data + iter->restarts + index * 4);
+
+  offset = ldb_fixed32_decode(iter->data + iter->restarts + index * 4);
+
+  if (UNLIKELY(offset > iter->restarts))
+    offset = iter->restarts;
+
+  return offset;
 }
 
 static void
@@ -262,7 +270,7 @@ parse_next_key(ldb_blockiter_t *iter) {
     return 0;
   }
 
-  if (is_internal && shared + non_shared < 8) {
+  if (is_internal && (uint64_t)shared + non_shared < 8) {
     ldb_blockiter_corruption(iter);
     return 0;
   }
@@ -439,5 +447,5 @@ ldb_blockiter_create(const ldb_block_t *block,
                      block->restart_offset,
                      num_restarts);
 
-  return ldb_iter_create(iter, &ldb_blockiter_table);
+  return ldb_iter_create(iter, &ldb_blockiter_table, comparator);
 }

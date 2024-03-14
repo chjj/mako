@@ -45,10 +45,11 @@ which is necessary for atomic renames. This means _lcdb_ will be more prone to
 recovery errors on Windows 95/98/ME.
 
 2. A good example of the incongruence between standards and implementation is
-`fdatasync(2)` and `pread(2)`. Both of them are X/Open extensions from the '90s
-and are also specified in the first version of SUS. In spite of this, some
-conforming OSes only began providing them in the last decade (in some cases the
-past 5 years or so).
+`fdatasync(2)` and `pread(2)`. The former was standardized by POSIX.1b (1993)
+and made mandatory by SUSv2 (1997) and POSIX.1-2001. The latter was
+standardized by SUSv2 (1997) and mandated by POSIX.1-2008. In spite of this,
+some conforming OSes only began providing them in the last decade (in some
+cases the past 5 years or so).
 
 ### Cross Compilation
 

@@ -92,7 +92,7 @@ ldb_starts_with(const char *xp, const char *yp) {
 
 char *
 ldb_basename(const char *fname) {
-#if defined(_WIN32)
+#ifdef _WIN32
   size_t len = strlen(fname);
 
   while (len > 0) {
@@ -129,7 +129,7 @@ ldb_dirname(char *buf, size_t size, const char *fname) {
   } else {
     len = base - fname;
 
-#if defined(_WIN32)
+#ifdef _WIN32
     while (len > 0 && (fname[len - 1] == '/' || fname[len - 1] == '\\'))
       len -= 1;
 #else
@@ -167,7 +167,7 @@ ldb_join(char *zp, size_t zn, const char *xp, const char *yp) {
     zp += xn;
   }
 
-#if defined(_WIN32)
+#ifdef _WIN32
   *zp++ = '\\';
 #else
   *zp++ = '/';

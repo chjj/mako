@@ -47,12 +47,14 @@
  * Constants
  */
 
-#define LDB_OK (0)
-#define LDB_NOTFOUND (-1)
-#define LDB_CORRUPTION (-2)
-#define LDB_NOSUPPORT (-3)
-#define LDB_INVALID (-4)
-#define LDB_IOERR (-5)
+#define LDB_OK             0
+#define LDB_MINERR     30000
+#define LDB_NOTFOUND   30001
+#define LDB_CORRUPTION 30002
+#define LDB_NOSUPPORT  30003
+#define LDB_INVALID    30004
+#define LDB_IOERR      30005
+#define LDB_MAXERR     30005
 
 enum ldb_compression {
   LDB_NO_COMPRESSION = 0,
@@ -176,12 +178,27 @@ struct ldb_s {
  * Globals
  */
 
+#ifdef _WIN32
+LDB_EXTERN const ldb_bloom_t *ldb_bloom_import(void);
+LDB_EXTERN const ldb_comparator_t *ldb_comparator_import(void);
+LDB_EXTERN const ldb_dbopt_t *ldb_dbopt_import(void);
+LDB_EXTERN const ldb_readopt_t *ldb_readopt_import(void);
+LDB_EXTERN const ldb_writeopt_t *ldb_writeopt_import(void);
+LDB_EXTERN const ldb_readopt_t *ldb_iteropt_import(void);
+#define ldb_bloom_default (ldb_bloom_import())
+#define ldb_bytewise_comparator (ldb_comparator_import())
+#define ldb_dbopt_default (ldb_dbopt_import())
+#define ldb_readopt_default (ldb_readopt_import())
+#define ldb_writeopt_default (ldb_writeopt_import())
+#define ldb_iteropt_default (ldb_iteropt_import())
+#else
 LDB_EXTERN extern const ldb_bloom_t *ldb_bloom_default;
 LDB_EXTERN extern const ldb_comparator_t *ldb_bytewise_comparator;
 LDB_EXTERN extern const ldb_dbopt_t *ldb_dbopt_default;
 LDB_EXTERN extern const ldb_readopt_t *ldb_readopt_default;
 LDB_EXTERN extern const ldb_writeopt_t *ldb_writeopt_default;
 LDB_EXTERN extern const ldb_readopt_t *ldb_iteropt_default;
+#endif
 
 /*
  * Functions
@@ -669,7 +686,11 @@ ldb_batch_append(ldb_batch_t *dst, const ldb_batch_t *src) {
 
 static const ldb_bloom_t bloom_default = {NULL};
 
+#ifdef _WIN32
+const ldb_bloom_t *ldb_bloom_import(void) { return &bloom_default; }
+#else
 const ldb_bloom_t *ldb_bloom_default = &bloom_default;
+#endif
 
 ldb_bloom_t *
 ldb_bloom_create(int bits_per_key) {
@@ -712,7 +733,12 @@ static const ldb_comparator_t bytewise_comparator = {
   /* .state = */ NULL
 };
 
+#ifdef _WIN32
+const ldb_comparator_t *
+ldb_comparator_import(void) { return &bytewise_comparator; }
+#else
 const ldb_comparator_t *ldb_bytewise_comparator = &bytewise_comparator;
+#endif
 
 /*
  * Database
@@ -1104,12 +1130,13 @@ ldb_destroy(const char *dbname, const ldb_dbopt_t *options) {
 #  else
 #    include <sys/types.h>
 #    include <sys/stat.h>
+#    include <unistd.h>
 #  endif
 #endif
 
 int
 ldb_test_directory(char *result, size_t size) {
-#ifdef LWDB_LATEST
+#if defined(LWDB_LATEST)
   leveldb_env_t *env = leveldb_create_default_env();
   /* Requires leveldb 1.21 (March 2019). */
   char *path = leveldb_env_get_test_directory(env);
@@ -1132,27 +1159,48 @@ ldb_test_directory(char *result, size_t size) {
   safe_free(path);
 
   return 1;
-#else /* !LWDB_LATEST */
-#ifdef _WIN32
-  static const char tmp[] = "C:/temp/leveldbtest";
-#else
-  static const char tmp[] = "/tmp/leveldbtest";
-#endif
+#elif defined(_WIN32)
+  char tmp[MAX_PATH];
+  DWORD len;
 
-  if (sizeof(tmp) > size)
+  len = GetEnvironmentVariableA("TEST_TMPDIR", result, size);
+
+  if (len > 0 && len < size)
+    return 1;
+
+  if (!GetTempPathA(sizeof(tmp), tmp))
     return 0;
 
-  memcpy(result, tmp, sizeof(tmp));
+  if (strlen(tmp) + 12 + 20 + 1 > size)
+    return 0;
 
-#ifdef _WIN32
-  CreateDirectoryA("C:/temp", NULL);
-  CreateDirectoryA(tmp, NULL);
-#else
-  mkdir(tmp, 0755);
-#endif
+  sprintf(result, "%sleveldbtest-%lu",
+          tmp, GetCurrentThreadId());
+
+  CreateDirectoryA(result, NULL);
 
   return 1;
-#endif /* !LWDB_LATEST */
+#else
+  const char *dir = getenv("TEST_TMPDIR");
+  char tmp[100];
+  size_t len;
+
+  if (dir != NULL && dir[0] != '\0') {
+    len = strlen(dir);
+  } else {
+    len = sprintf(tmp, "/tmp/leveldbtest-%d", (int)geteuid());
+    dir = tmp;
+  }
+
+  if (len + 1 > size)
+    return 0;
+
+  memcpy(result, dir, len + 1);
+
+  mkdir(result, 0755);
+
+  return 1;
+#endif
 }
 
 int
@@ -1379,10 +1427,17 @@ static const ldb_readopt_t iter_options = {
   /* .snapshot = */ NULL
 };
 
+#ifdef _WIN32
+const ldb_dbopt_t *ldb_dbopt_import(void) { return &db_options; }
+const ldb_readopt_t *ldb_readopt_import(void) { return &read_options; }
+const ldb_writeopt_t *ldb_writeopt_import(void) { return &write_options; }
+const ldb_readopt_t *ldb_iteropt_import(void) { return &iter_options; }
+#else
 const ldb_dbopt_t *ldb_dbopt_default = &db_options;
 const ldb_readopt_t *ldb_readopt_default = &read_options;
 const ldb_writeopt_t *ldb_writeopt_default = &write_options;
 const ldb_readopt_t *ldb_iteropt_default = &iter_options;
+#endif
 
 /*
  * Slice
@@ -1421,11 +1476,11 @@ static const char *ldb_errmsg[] = {
 
 const char *
 ldb_strerror(int code) {
-  if (code < 0)
-    code = -code;
+  if (code == LDB_OK)
+    return ldb_errmsg[LDB_OK];
 
-  if (code >= (int)lengthof(ldb_errmsg))
-    code = -LDB_INVALID;
+  if (code >= LDB_MINERR && code <= LDB_MAXERR)
+    return ldb_errmsg[code - LDB_MINERR];
 
-  return ldb_errmsg[code];
+  return "Unknown error";
 }

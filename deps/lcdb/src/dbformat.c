@@ -309,14 +309,19 @@ ldb_ifp_build(const ldb_bloom_t *ifp,
               ldb_buffer_t *dst,
               const ldb_slice_t *keys,
               size_t length) {
-  ldb_slice_t *ukeys = ldb_malloc(length * sizeof(ldb_slice_t));
+  /* We rely on the fact that the code in
+     table.c doesn't mind us adjusting keys. */
+  ldb_slice_t *ukeys = (ldb_slice_t *)keys;
   size_t i;
 
-  for (i = 0; i < length; i++)
-    ukeys[i] = ldb_extract_user_key(&keys[i]);
+  for (i = 0; i < length; i++) {
+    /* Inline extract_user_key. */
+    assert(ukeys[i].size >= 8);
+
+    ukeys[i].size -= 8;
+  }
 
   ldb_bloom_build(ifp->user_policy, dst, ukeys, length);
-  ldb_free(ukeys);
 }
 
 static int

@@ -68,7 +68,14 @@ static const ldb_readopt_t iter_options = {
  * Globals
  */
 
+#ifdef _WIN32
+const ldb_dbopt_t *ldb_dbopt_import(void) { return &db_options; }
+const ldb_readopt_t *ldb_readopt_import(void) { return &read_options; }
+const ldb_writeopt_t *ldb_writeopt_import(void) { return &write_options; }
+const ldb_readopt_t *ldb_iteropt_import(void) { return &iter_options; }
+#else
 const ldb_dbopt_t *ldb_dbopt_default = &db_options;
 const ldb_readopt_t *ldb_readopt_default = &read_options;
 const ldb_writeopt_t *ldb_writeopt_default = &write_options;
 const ldb_readopt_t *ldb_iteropt_default = &iter_options;
+#endif

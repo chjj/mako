@@ -44,12 +44,12 @@ typedef unsigned long long ldb_uint64_t;
  * Constants
  */
 
-#define LDB_OK (0)
-#define LDB_NOTFOUND (-1)
-#define LDB_CORRUPTION (-2)
-#define LDB_NOSUPPORT (-3)
-#define LDB_INVALID (-4)
-#define LDB_IOERR (-5)
+#define LDB_OK             0
+#define LDB_NOTFOUND   30001
+#define LDB_CORRUPTION 30002
+#define LDB_NOSUPPORT  30003
+#define LDB_INVALID    30004
+#define LDB_IOERR      30005
 
 enum ldb_compression {
   LDB_NO_COMPRESSION = 0,
@@ -147,12 +147,27 @@ struct ldb_writeopt_s {
  * Globals
  */
 
+#ifdef _WIN32
+const ldb_bloom_t *ldb_bloom_import(void);
+const ldb_comparator_t *ldb_comparator_import(void);
+const ldb_dbopt_t *ldb_dbopt_import(void);
+const ldb_readopt_t *ldb_readopt_import(void);
+const ldb_writeopt_t *ldb_writeopt_import(void);
+const ldb_readopt_t *ldb_iteropt_import(void);
+#define ldb_bloom_default (ldb_bloom_import())
+#define ldb_bytewise_comparator (ldb_comparator_import())
+#define ldb_dbopt_default (ldb_dbopt_import())
+#define ldb_readopt_default (ldb_readopt_import())
+#define ldb_writeopt_default (ldb_writeopt_import())
+#define ldb_iteropt_default (ldb_iteropt_import())
+#else
 extern const ldb_bloom_t *ldb_bloom_default;
 extern const ldb_comparator_t *ldb_bytewise_comparator;
 extern const ldb_dbopt_t *ldb_dbopt_default;
 extern const ldb_readopt_t *ldb_readopt_default;
 extern const ldb_writeopt_t *ldb_writeopt_default;
 extern const ldb_readopt_t *ldb_iteropt_default;
+#endif
 
 /*
  * Batch

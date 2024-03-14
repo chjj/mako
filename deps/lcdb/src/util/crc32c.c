@@ -42,10 +42,12 @@
 #      define HAVE_PREFETCH /* Clang 2.3 (Jun 2008) */
 #    endif
 #  elif defined(__INTEL_COMPILER) || defined(__ICC)
-#    if __INTEL_COMPILER >= 1100 /* ICC 11.0 (Nov 2008) */
+#    if __INTEL_COMPILER >= 800 /* ICC 8.0 (December 2003) */
 #      define HAVE_X64_ASM
-#      define HAVE_ATOMICS
 #      define HAVE_PREFETCH
+#    endif
+#    if __INTEL_COMPILER >= 1110 /* ICC 11.1 (June 2009) */
+#      define HAVE_ATOMICS
 #    endif
 #  elif defined(__TINYC__) || defined(__PCC__)
 #    define HAVE_X64_ASM
@@ -86,6 +88,8 @@
  */
 
 #undef HAVE_ARM64_CRC
+#undef HAVE_ARM64_ASM
+#undef HAVE_ARM64_INTRIN
 #undef HAVE_ARMV81A
 #undef HAVE_CAPCHECK
 
@@ -117,10 +121,41 @@ unsigned long getauxval(unsigned long) __attribute__((weak));
 #if defined(HAVE_ARMV81A) && defined(HAVE_CAPCHECK)
 #  include <arm_acle.h>
 #  include <arm_neon.h>
-#  ifdef LDB_PTHREAD
-#    include <pthread.h>
+#  if defined(__GNUC__) || defined(__clang__)
+#    define HAVE_ARM64_ASM
+#    define HAVE_ATOMICS
 #  endif
 #  define HAVE_ARM64_CRC
+#endif
+
+/*
+ * Spinlock
+ */
+
+#if defined(HAVE_X64_INTRIN)
+#  define ldb_pause _mm_pause
+#elif defined(HAVE_ARM64_INTRIN)
+#  define ldb_pause __yield
+#elif defined(HAVE_X64_ASM)
+#  define ldb_pause() __asm__ __volatile__ ("pause\n" ::: "memory")
+#elif defined(HAVE_ARM64_ASM)
+#  define ldb_pause() __asm__ __volatile__ ("yield\n" ::: "memory")
+#else
+#  define ldb_pause() do { } while (0)
+#endif
+
+#if defined(HAVE_X64_INTRIN) || defined(HAVE_ARM64_INTRIN)
+#  define ldb_spinlock_t volatile long
+#  define ldb_spinlock(x) while (_InterlockedExchange(x, 1)) ldb_pause()
+#  define ldb_spinunlock(x) _InterlockedExchange(x, 0)
+#elif defined(HAVE_ATOMICS)
+#  define ldb_spinlock_t volatile int
+#  define ldb_spinlock(x) while (__sync_lock_test_and_set(x, 1)) ldb_pause()
+#  define ldb_spinunlock(x) __sync_lock_release(x)
+#else
+#  define ldb_spinlock_t int
+#  define ldb_spinlock(x) ((void)(x))
+#  define ldb_spinunlock(x) ((void)(x))
 #endif
 
 /*
@@ -468,6 +503,7 @@ static const uint32_t stride_ext_table_3[256] = {
 
 #ifdef HAVE_X64_CRC
 
+#ifdef HAVE_PREFETCH
 static const uint32_t block0_skip_table[8][16] = {
   {0x00000000, 0xff770459, 0xfb027e43, 0x04757a1a,
    0xf3e88a77, 0x0c9f8e2e, 0x08eaf434, 0xf79df06d,
@@ -502,6 +538,7 @@ static const uint32_t block0_skip_table[8][16] = {
    0xaca00c83, 0xd8f29e71, 0x44052967, 0x3057bb95,
    0x780631ba, 0x0c54a348, 0x90a3145e, 0xe4f186ac}
 };
+#endif
 
 static const uint32_t block1_skip_table[8][16] = {
   {0x00000000, 0x79113270, 0xf22264e0, 0x8b335690,
@@ -610,12 +647,12 @@ crc32c_generic(uint32_t z, const uint8_t *xp, size_t xn) {
 } while (0)
 
 /* Process one of the 4 strides of 4-byte data. */
-#define STEP4(s) do {                                \
-  crc##s = ldb_fixed32_decode(p + s * 4)             \
-         ^ stride_ext_table_3[crc##s & 0xff]         \
-         ^ stride_ext_table_2[(crc##s >> 8) & 0xff]  \
-         ^ stride_ext_table_1[(crc##s >> 16) & 0xff] \
-         ^ stride_ext_table_0[crc##s >> 24];         \
+#define STEP4(s) do {                                  \
+  crc##s = ldb_fixed32_decode(p + s * 4) ^             \
+           stride_ext_table_3[crc##s & 0xff] ^         \
+           stride_ext_table_2[(crc##s >> 8) & 0xff] ^  \
+           stride_ext_table_1[(crc##s >> 16) & 0xff] ^ \
+           stride_ext_table_0[crc##s >> 24];           \
 } while (0)
 
 /* Process a 16-byte swath of 4 strides, each of which has 4 bytes of data. */
@@ -914,41 +951,21 @@ can_accelerate(void) {
 
 int
 ldb_crc32c_init(void) {
-  static volatile long state = 0;
-  static int result = 0;
-  int value;
+  static volatile int result = -1;
+  static ldb_spinlock_t lock = 0;
 
-#if defined(HAVE_X64_INTRIN)
-  while ((value = _InterlockedCompareExchange(&state, 1, 0)) == 1)
-    _mm_pause();
-#elif defined(HAVE_ATOMICS)
-  while ((value = __sync_val_compare_and_swap(&state, 0, 1)) == 1) {
-#  ifdef HAVE_X64_ASM
-    __asm__ __volatile__ ("pause\n" ::: "memory");
-#  endif
-  }
-#else
-  value = state;
-#endif
+  ldb_spinlock(&lock);
 
-  if (value == 0) {
+  if (result == -1) {
     if (has_sse42() && can_accelerate()) {
       crc32c_extend = &crc32c_sse42;
       result = 1;
+    } else {
+      result = 0;
     }
-
-#if defined(HAVE_X64_INTRIN)
-    if (_InterlockedExchange(&state, 2) != 1)
-      abort(); /* LCOV_EXCL_LINE */
-#elif defined(HAVE_ATOMICS)
-    if (__sync_lock_test_and_set(&state, 2) != 1)
-      abort(); /* LCOV_EXCL_LINE */
-#else
-    state = 2;
-#endif
-  } else {
-    assert(value == 2);
   }
+
+  ldb_spinunlock(&lock);
 
   return result;
 }
@@ -1085,31 +1102,31 @@ has_armv8_crc32(void) {
 #endif
 }
 
-static void
-crc32c_install(void) {
+static int
+can_accelerate(void) {
   static const uint8_t buf[] = "TestCRCBuffer";
-
-  if (has_armv8_crc32()) {
-    uint32_t c = crc32c_arm64(0, buf, sizeof(buf) - 1);
-
-    if (c == 0xdcbc59fa)
-      crc32c_extend = &crc32c_arm64;
-  }
+  return crc32c_arm64(0, buf, sizeof(buf) - 1) == 0xdcbc59fa;
 }
 
 int
 ldb_crc32c_init(void) {
-#if defined(LDB_PTHREAD)
-  static pthread_once_t guard = PTHREAD_ONCE_INIT;
-  pthread_once(&guard, crc32c_install);
-#else
-  static int guard = 0;
-  if (guard == 0) {
-    crc32c_install();
-    guard = 1;
+  static volatile int result = -1;
+  static ldb_spinlock_t lock = 0;
+
+  ldb_spinlock(&lock);
+
+  if (result == -1) {
+    if (has_armv8_crc32() && can_accelerate()) {
+      crc32c_extend = &crc32c_arm64;
+      result = 1;
+    } else {
+      result = 0;
+    }
   }
-#endif
-  return crc32c_extend == &crc32c_arm64;
+
+  ldb_spinunlock(&lock);
+
+  return result;
 }
 
 #else /* !HAVE_ARM64_CRC */

@@ -17,10 +17,12 @@
 #include "table/iterator.h"
 
 #include "util/arena.h"
+#include "util/atomic.h"
 #include "util/buffer.h"
 #include "util/coding.h"
 #include "util/comparator.h"
 #include "util/internal.h"
+#include "util/port.h"
 #include "util/slice.h"
 #include "util/status.h"
 
@@ -36,6 +38,9 @@ struct ldb_memtable_s {
   ldb_comparator_t comparator;
   int refs;
   ldb_arena_t arena;
+#ifndef LDB_HAVE_ATOMICS
+  ldb_mutex_t mutex;
+#endif
   ldb_skiplist_t table;
 };
 
@@ -48,12 +53,21 @@ ldb_memtable_init(ldb_memtable_t *mt, const ldb_comparator_t *comparator) {
 
   ldb_arena_init(&mt->arena);
 
-  ldb_skiplist_init(&mt->table, &mt->comparator, &mt->arena);
+#ifdef LDB_HAVE_ATOMICS
+  ldb_skiplist_init(&mt->table, &mt->comparator, &mt->arena, NULL);
+#else
+  ldb_mutex_init(&mt->mutex);
+  ldb_skiplist_init(&mt->table, &mt->comparator, &mt->arena, &mt->mutex);
+#endif
 }
 
 static void
 ldb_memtable_clear(ldb_memtable_t *mt) {
   assert(mt->refs == 0);
+
+#ifndef LDB_HAVE_ATOMICS
+  ldb_mutex_destroy(&mt->mutex);
+#endif
 
   ldb_arena_clear(&mt->arena);
 }
@@ -264,5 +278,5 @@ ldb_memiter_create(const ldb_memtable_t *mt) {
 
   ldb_memiter_init(iter, &mt->table);
 
-  return ldb_iter_create(iter, &ldb_memiter_table);
+  return ldb_iter_create(iter, &ldb_memiter_table, &mt->comparator);
 }

@@ -103,7 +103,7 @@ tabinfo_destroy(ldb_tabinfo_t *t) {
  */
 
 typedef struct ldb_repair_s {
-  char dbname[LDB_PATH_MAX];
+  const char *dbname;
   ldb_comparator_t icmp;
   ldb_bloom_t ipolicy;
   ldb_dbopt_t options;
@@ -118,15 +118,9 @@ typedef struct ldb_repair_s {
   uint64_t next_file_number;
 } ldb_repair_t;
 
-static int
+static void
 repair_init(ldb_repair_t *rep, const char *dbname, const ldb_dbopt_t *options) {
-  if (!ldb_path_absolute(rep->dbname, sizeof(rep->dbname) - 64, dbname))
-    return 0;
-
-  if (options->filter_policy != NULL) {
-    if (strlen(options->filter_policy->name) > 64)
-      return 0;
-  }
+  rep->dbname = dbname;
 
   if (options->comparator != NULL)
     ldb_ikc_init(&rep->icmp, options->comparator);
@@ -156,8 +150,6 @@ repair_init(ldb_repair_t *rep, const char *dbname, const ldb_dbopt_t *options) {
   ldb_vector_init(&rep->tables);
 
   rep->next_file_number = 1;
-
-  return 1;
 }
 
 static void
@@ -192,7 +184,7 @@ find_files(ldb_repair_t *rep) {
   len = ldb_get_children(rep->dbname, &filenames);
 
   if (len < 0)
-    return LDB_IOERR;
+    return ldb_system_error();
 
   if (len == 0) {
     ldb_free_children(filenames, len);
@@ -485,7 +477,7 @@ repair_table(ldb_repair_t *rep, const char *src, ldb_tabinfo_t *t) {
     }
   }
 
-  if (rc != LDB_OK)
+  if (rc != LDB_OK || counter == 0)
     ldb_remove_file(copy);
 
   if (t != NULL)
@@ -686,7 +678,7 @@ repair_run(ldb_repair_t *rep) {
   }
 
   if (rc == LDB_OK) {
-    uint64_t bytes = 0;
+    int64_t bytes = 0;
     size_t i;
 
     for (i = 0; i < rep->tables.length; i++) {
@@ -708,6 +700,7 @@ repair_run(ldb_repair_t *rep) {
 
 int
 ldb_repair(const char *dbname, const ldb_dbopt_t *options) {
+  char path[LDB_PATH_MAX];
   ldb_repair_t rep;
   int rc;
 
@@ -716,8 +709,15 @@ ldb_repair(const char *dbname, const ldb_dbopt_t *options) {
   if (options == NULL)
     return LDB_INVALID;
 
-  if (!repair_init(&rep, dbname, options))
+  if (options->filter_policy != NULL) {
+    if (strlen(options->filter_policy->name) > 64)
+      return LDB_INVALID;
+  }
+
+  if (!ldb_path_absolute(path, sizeof(path) - 35, dbname))
     return LDB_INVALID;
+
+  repair_init(&rep, path, options);
 
   rc = repair_run(&rep);
 

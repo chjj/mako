@@ -42,17 +42,6 @@ ldb_tablegen_create(const struct ldb_dbopt_s *options,
 void
 ldb_tablegen_destroy(ldb_tablegen_t *tb);
 
-/* Change the options used by this builder. Note: only some of the
- * option fields can be changed after construction. If a field is
- * not allowed to change dynamically and its value in the structure
- * passed to the constructor is different from its value in the
- * structure passed to this method, this method will return an error
- * without changing any fields.
- */
-int
-ldb_tablegen_change_options(ldb_tablegen_t *tb,
-                            const struct ldb_dbopt_s *options);
-
 /* Add key,value to the table being constructed. */
 /* REQUIRES: key is after any previously added key according to comparator. */
 /* REQUIRES: finish(), abandon() have not been called */
@@ -69,10 +58,6 @@ ldb_tablegen_add(ldb_tablegen_t *tb,
 void
 ldb_tablegen_flush(ldb_tablegen_t *tb);
 
-/* Return non-ok iff some error has been detected. */
-int
-ldb_tablegen_status(const ldb_tablegen_t *tb);
-
 /* Finish building the table. Stops using the file passed to the
  * constructor after this function returns.
  * REQUIRES: finish(), abandon() have not been called
@@ -88,6 +73,10 @@ ldb_tablegen_finish(ldb_tablegen_t *tb);
  */
 void
 ldb_tablegen_abandon(ldb_tablegen_t *tb);
+
+/* Return non-ok iff some error has been detected. */
+int
+ldb_tablegen_status(const ldb_tablegen_t *tb);
 
 /* Number of calls to add() so far. */
 uint64_t

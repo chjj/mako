@@ -32,8 +32,8 @@ void
 ldb_arena_init(ldb_arena_t *arena) {
   arena->data = NULL;
   arena->left = 0;
-  arena->usage = 0;
 
+  ldb_atomic_init(&arena->usage, 0);
   ldb_vector_init(&arena->blocks);
 }
 

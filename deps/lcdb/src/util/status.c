@@ -10,6 +10,7 @@
  * See LICENSE for more information.
  */
 
+#include "env.h"
 #include "internal.h"
 #include "status.h"
 
@@ -32,11 +33,11 @@ static const char *ldb_errmsg[] = {
 
 const char *
 ldb_strerror(int code) {
-  if (code < 0)
-    code = -code;
+  if (code == LDB_OK)
+    return ldb_errmsg[LDB_OK];
 
-  if (code >= (int)lengthof(ldb_errmsg))
-    code = -LDB_INVALID;
+  if (code >= LDB_MINERR && code <= LDB_MAXERR)
+    return ldb_errmsg[code - LDB_MINERR];
 
-  return ldb_errmsg[code];
+  return ldb_error_string(code);
 }

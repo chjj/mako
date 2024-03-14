@@ -280,5 +280,5 @@ ldb_mergeiter_create(const ldb_comparator_t *comparator,
 
   ldb_mergeiter_init(iter, comparator, children, n);
 
-  return ldb_iter_create(iter, &ldb_mergeiter_table);
+  return ldb_iter_create(iter, &ldb_mergeiter_table, comparator);
 }

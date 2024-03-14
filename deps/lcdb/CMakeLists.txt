@@ -46,6 +46,7 @@ include(GNUInstallDirs)
 
 option(LDB_BENCH "Build benchmarks" ON)
 option(LDB_COVERAGE "Enable coverage" OFF)
+option(LDB_EXTRA "Build extra benchmarks" OFF)
 option(LDB_FUZZER "Enable fuzzer" OFF)
 option(LDB_LWDB "Enable LWDB" OFF)
 option(LDB_PIC "Enable PIC" OFF)
@@ -83,8 +84,6 @@ set(ldb_includes)
 set(ldb_ldflags)
 set(ldb_libs)
 
-set(bench_libs)
-
 #
 # Global Flags
 #
@@ -103,32 +102,13 @@ if(LDB_GLIBC)
   set(CMAKE_C_STANDARD 90)
   set(CMAKE_C_EXTENSIONS OFF)
   set(CMAKE_C_STANDARD_REQUIRED OFF)
+  list(APPEND ldb_defines _GNU_SOURCE)
 endif()
 
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 
 if(APPLE)
   set(CMAKE_OSX_DEPLOYMENT_TARGET 10.7)
-endif()
-
-#
-# Feature Test Macros
-#
-
-if(WIN32)
-  list(APPEND ldb_defines _WIN32_WINNT=0x501)
-endif()
-
-if(LDB_GLIBC)
-  list(APPEND ldb_defines _GNU_SOURCE)
-endif()
-
-if(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
-  list(APPEND ldb_defines _TS_ERRNO)
-endif()
-
-if(CMAKE_SYSTEM_NAME STREQUAL "AIX")
-  list(APPEND ldb_defines _THREAD_SAFE_ERRNO)
 endif()
 
 #
@@ -157,6 +137,51 @@ if(LDB_PORTABLE)
 else()
   check_symbol_exists(fdatasync unistd.h LDB_HAVE_FDATASYNC)
   check_symbol_exists(pread unistd.h LDB_HAVE_PREAD)
+endif()
+
+if(CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+  set(CMAKE_REQUIRED_FLAGS "/arch:AVX")
+
+  check_c_source_compiles([=[
+#   include <intrin.h>
+#   if !defined(_M_X64) || !defined(__AVX__)
+#     error unsupported
+#   endif
+    int main(void) {
+      _mm_crc32_u8(0, 0);
+      _mm_crc32_u32(0, 0);
+      _mm_crc32_u64(0, 0);
+      return 0;
+    }
+  ]=] LDB_HAVE_MSVC_AVX)
+
+  unset(CMAKE_REQUIRED_FLAGS)
+else()
+  set(LDB_HAVE_MSVC_AVX 0)
+endif()
+
+if(CMAKE_C_COMPILER_ID MATCHES "^GNU$|^Clang$")
+  set(CMAKE_REQUIRED_FLAGS "-march=armv8-a+crc")
+
+  check_c_source_compiles([=[
+#   include <arm_acle.h>
+#   include <arm_neon.h>
+#   if !defined(__aarch64__) || !defined(__ARM_FEATURE_CRC32)
+#     error unsupported
+#   endif
+    int main(void) {
+      __crc32cb(0, 0);
+      __crc32ch(0, 0);
+      __crc32cw(0, 0);
+      __crc32cd(0, 0);
+      vmull_p64(0, 0);
+      return 0;
+    }
+  ]=] LDB_HAVE_ARM_CRC)
+
+  unset(CMAKE_REQUIRED_FLAGS)
+else()
+  set(LDB_HAVE_ARM_CRC 0)
 endif()
 
 #
@@ -260,6 +285,15 @@ if(MINGW)
   endif()
 endif()
 
+if(LDB_HAVE_MSVC_AVX)
+  set_property(SOURCE src/util/crc32c.c PROPERTY COMPILE_FLAGS "/arch:AVX")
+endif()
+
+if(LDB_HAVE_ARM_CRC)
+  set_property(SOURCE src/util/crc32c.c
+               PROPERTY COMPILE_FLAGS "-march=armv8-a+crc")
+endif()
+
 #
 # Defines
 #
@@ -284,21 +318,10 @@ endif()
 
 list(APPEND ldb_includes ${PROJECT_SOURCE_DIR}/include)
 
-#
-# Libraries
-#
+check_symbol_exists(INT8_MIN "stdint.h" LDB_HAVE_STDINT)
 
-if(LDB_BENCH)
-  check_c_source_compiles([=[
-#   include <math.h>
-    int main(int argc, char **argv) {
-      return (int)sqrt((double)argc);
-    }
-  ]=] LDB_LIBC_MATH)
-
-  if(NOT LDB_LIBC_MATH)
-    list(APPEND bench_libs m)
-  endif()
+if(NOT LDB_HAVE_STDINT)
+  list(APPEND ldb_includes ${PROJECT_SOURCE_DIR}/compat)
 endif()
 
 #
@@ -389,14 +412,63 @@ set_property(TARGET lcdb_util PROPERTY OUTPUT_NAME lcdbutil)
 # Benchmarks
 #
 
-if(LDB_BENCH)
-  add_executable(lcdb_bench bench/db_bench.c
-                            bench/histogram.c
-                            src/util/testutil.c)
+function(build_benchmark target name lib)
+  add_executable(${target} bench/${name}.c
+                           bench/histogram.c
+                           src/util/testutil.c)
 
-  target_include_directories(lcdb_bench PRIVATE ${PROJECT_SOURCE_DIR}/src)
-  target_link_libraries(lcdb_bench PRIVATE lcdb lcdb_static ${bench_libs})
-  set_property(TARGET lcdb_bench PROPERTY OUTPUT_NAME db_bench)
+  target_include_directories(${target} PRIVATE ${PROJECT_SOURCE_DIR}/src)
+  target_link_libraries(${target} PRIVATE lcdb lcdb_static ${lib})
+  set_property(TARGET ${target} PROPERTY OUTPUT_NAME ${name})
+endfunction()
+
+if(LDB_BENCH)
+  build_benchmark(lcdb_bench db_bench "")
+endif()
+
+if(LDB_BENCH AND LDB_EXTRA)
+  include(CheckIncludeFile)
+  include(CheckLibraryExists)
+
+  # Check for Berkeley DB.
+  check_include_file(db.h LDB_HAVE_BDB_H)
+  check_library_exists(db db_env_create "" LDB_HAVE_BDB_A)
+
+  if(LDB_HAVE_BDB_H AND LDB_HAVE_BDB_A)
+    build_benchmark(lcdb_bench_bdb db_bench_bdb db)
+  endif()
+
+  # Check for Kyoto Cabinet.
+  check_include_file(kclangc.h LDB_HAVE_KCDB_H)
+  check_library_exists(kyotocabinet kcdbopen "" LDB_HAVE_KCDB_A)
+
+  if(LDB_HAVE_KCDB_H AND LDB_HAVE_KCDB_A)
+    build_benchmark(lcdb_bench_tree_db db_bench_tree_db kyotocabinet)
+  endif()
+
+  # Check for LevelDB.
+  check_include_file(leveldb/c.h LDB_HAVE_LEVELDB_H)
+  check_library_exists(leveldb leveldb_open "" LDB_HAVE_LEVELDB_A)
+
+  if(LDB_HAVE_LEVELDB_H AND LDB_HAVE_LEVELDB_A)
+    build_benchmark(lcdb_bench_leveldb db_bench_leveldb leveldb)
+  endif()
+
+  # Check for LMDB.
+  check_include_file(lmdb.h LDB_HAVE_LMDB_H)
+  check_library_exists(lmdb mdb_env_open "" LDB_HAVE_LMDB_A)
+
+  if(LDB_HAVE_LMDB_H AND LDB_HAVE_LMDB_A)
+    build_benchmark(lcdb_bench_lmdb db_bench_lmdb lmdb)
+  endif()
+
+  # Check for SQLite3.
+  check_include_file(sqlite3.h LDB_HAVE_SQLITE3_H)
+  check_library_exists(sqlite3 sqlite3_open "" LDB_HAVE_SQLITE3_A)
+
+  if(LDB_HAVE_SQLITE3_H AND LDB_HAVE_SQLITE3_A)
+    build_benchmark(lcdb_bench_sqlite3 db_bench_sqlite3 sqlite3)
+  endif()
 endif()
 
 #
@@ -480,6 +552,7 @@ if(LDB_TESTS)
             status
             strutil
             table
+            util
             version_edit
             version_set
             write_batch)

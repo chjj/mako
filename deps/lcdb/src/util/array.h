@@ -28,12 +28,12 @@ void
 ldb_array_grow(ldb_array_t *z, size_t zn);
 
 void
-ldb_array_push(ldb_array_t *z, int64_t x);
+ldb_array_push(ldb_array_t *z, uint64_t x);
 
-int64_t
+uint64_t
 ldb_array_pop(ldb_array_t *z);
 
-int64_t
+uint64_t
 ldb_array_top(const ldb_array_t *z);
 
 void
@@ -46,6 +46,6 @@ void
 ldb_array_swap(ldb_array_t *x, ldb_array_t *y);
 
 void
-ldb_array_sort(ldb_array_t *z, int (*cmp)(int64_t, int64_t));
+ldb_array_sort(ldb_array_t *z, int (*cmp)(uint64_t, uint64_t));
 
 #endif /* LDB_ARRAY_H */

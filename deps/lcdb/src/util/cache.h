@@ -25,7 +25,7 @@
 typedef struct ldb_lru_s ldb_lru_t;
 
 /* Opaque handle to an entry stored in the cache. */
-typedef struct ldb_lruhandle_s ldb_lruhandle_t;
+typedef struct ldb_entry_s ldb_entry_t;
 
 /*
  * Cache
@@ -51,7 +51,7 @@ ldb_lru_destroy(ldb_lru_t *lru);
  * When the inserted entry is no longer needed, the key and
  * value will be passed to "deleter".
  */
-ldb_lruhandle_t *
+ldb_entry_t *
 ldb_lru_insert(ldb_lru_t *lru,
                const ldb_slice_t *key,
                void *value,
@@ -64,7 +64,7 @@ ldb_lru_insert(ldb_lru_t *lru,
  * must call release(handle) when the returned mapping is no
  * longer needed.
  */
-ldb_lruhandle_t *
+ldb_entry_t *
 ldb_lru_lookup(ldb_lru_t *lru, const ldb_slice_t *key);
 
 /* Release a mapping returned by a previous lookup().
@@ -72,7 +72,7 @@ ldb_lru_lookup(ldb_lru_t *lru, const ldb_slice_t *key);
  * REQUIRES: handle must have been returned by a method on *this.
  */
 void
-ldb_lru_release(ldb_lru_t *lru, ldb_lruhandle_t *handle);
+ldb_lru_release(ldb_lru_t *lru, ldb_entry_t *handle);
 
 /* If the cache contains entry for key, erase it. Note that the
  * underlying entry will be kept around until all existing handles
@@ -87,15 +87,15 @@ ldb_lru_erase(ldb_lru_t *lru, const ldb_slice_t *key);
  * REQUIRES: handle must have been returned by a method on *this.
  */
 void *
-ldb_lru_value(ldb_lruhandle_t *handle);
+ldb_lru_value(ldb_entry_t *handle);
 
 /* Return a new numeric id. May be used by multiple clients who are
  * sharing the same cache to partition the key space. Typically the
  * client will allocate a new id at startup and prepend the id to
  * its cache keys.
  */
-uint32_t
-ldb_lru_newid(ldb_lru_t *lru);
+uint64_t
+ldb_lru_id(ldb_lru_t *lru);
 
 /* Remove all cache entries that are not actively in use. Memory-constrained
  * applications may wish to call this method to reduce memory usage.
@@ -109,6 +109,6 @@ ldb_lru_prune(ldb_lru_t *lru);
 /* Return an estimate of the combined charges of all elements stored in the
    cache. */
 size_t
-ldb_lru_total_charge(ldb_lru_t *lru);
+ldb_lru_usage(ldb_lru_t *lru);
 
 #endif /* LDB_CACHE_H */

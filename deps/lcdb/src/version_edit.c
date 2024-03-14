@@ -84,8 +84,8 @@ file_entry_destroy(file_entry_t *entry) {
 
 static int
 file_entry_compare(rb_val_t x, rb_val_t y, void *arg) {
-  file_entry_t *xp = x.p;
-  file_entry_t *yp = y.p;
+  file_entry_t *xp = x.ptr;
+  file_entry_t *yp = y.ptr;
 
   (void)arg;
 
@@ -97,7 +97,7 @@ file_entry_compare(rb_val_t x, rb_val_t y, void *arg) {
 
 static void
 file_entry_destruct(rb_node_t *node) {
-  file_entry_destroy(node->key.p);
+  file_entry_destroy(node->key.ptr);
 }
 
 /*
@@ -308,7 +308,7 @@ ldb_edit_remove_file(ldb_edit_t *edit, int level, uint64_t number) {
 
 void
 ldb_edit_export(ldb_buffer_t *dst, const ldb_edit_t *edit) {
-  void *item;
+  rb_iter_t it;
   size_t i;
 
   if (edit->has_comparator) {
@@ -345,8 +345,8 @@ ldb_edit_export(ldb_buffer_t *dst, const ldb_edit_t *edit) {
     ldb_ikey_export(dst, key);
   }
 
-  rb_set_iterate(&edit->deleted_files, item) {
-    const file_entry_t *entry = item;
+  rb_set_each(&edit->deleted_files, it) {
+    const file_entry_t *entry = rb_key_ptr(it);
 
     ldb_buffer_varint32(dst, TAG_DELETED_FILE);
     ldb_buffer_varint32(dst, entry->level);
@@ -504,7 +504,7 @@ ldb_edit_import(ldb_edit_t *edit, const ldb_slice_t *src) {
 
 void
 ldb_edit_debug(ldb_buffer_t *z, const ldb_edit_t *edit) {
-  void *item;
+  rb_iter_t it;
   size_t i;
 
   ldb_buffer_string(z, "VersionEdit {");
@@ -543,8 +543,8 @@ ldb_edit_debug(ldb_buffer_t *z, const ldb_edit_t *edit) {
     ldb_ikey_debug(z, &entry->key);
   }
 
-  rb_set_iterate(&edit->deleted_files, item) {
-    const file_entry_t *entry = item;
+  rb_set_each(&edit->deleted_files, it) {
+    const file_entry_t *entry = rb_key_ptr(it);
 
     ldb_buffer_string(z, "\n  RemoveFile: ");
     ldb_buffer_number(z, entry->level);

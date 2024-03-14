@@ -17,7 +17,7 @@
 #include <string.h>
 #include <time.h>
 
-#if defined(_WIN32)
+#ifdef _WIN32
 #  include <windows.h>
 #else /* !_WIN32 */
 #  include <sys/types.h>
@@ -27,12 +27,14 @@
 #  endif
 #endif /* !_WIN32 */
 
+#include "buffer.h"
 #include "env.h"
 #include "internal.h"
 #include "port.h"
 #include "rbt.h"
 #include "slice.h"
 #include "status.h"
+#include "strutil.h"
 #include "vector.h"
 
 /*
@@ -56,8 +58,35 @@ struct ldb_filelock_s {
  */
 
 static ldb_mutex_t file_mutex = LDB_MUTEX_INITIALIZER;
-static rb_map_t file_map_;
-static rb_set_t file_set;
+
+/*
+ * Errors
+ */
+
+int
+ldb_system_error(void) {
+  return LDB_IOERR;
+}
+
+const char *
+ldb_error_string(int code) {
+  if (code == LDB_ENOENT)
+    return "No such file or directory";
+
+  if (code == LDB_ENOMEM)
+    return "Cannot allocate memory";
+
+  if (code == LDB_EINVAL)
+    return "Invalid argument";
+
+  if (code == LDB_EEXIST)
+    return "File exists";
+
+  if (code == LDB_ENOLCK)
+    return "No locks available";
+
+  return "Unknown error";
+}
 
 /*
  * Helpers
@@ -67,6 +96,12 @@ static char *
 ldb_strdup(const char *xp) {
   size_t xn = strlen(xp);
   return memcpy(ldb_malloc(xn + 1), xp, xn + 1);
+}
+
+static int
+ldb_is_manifest(const char *filename) {
+  const char *base = ldb_basename(filename);
+  return ldb_starts_with(base, "MANIFEST");
 }
 
 /*
@@ -100,9 +135,13 @@ ldb_fstate_create(const char *path) {
 
 static ldb_fstate_t *
 ldb_fstate_clone(const char *path, const ldb_fstate_t *x) {
+  ldb_mutex_t *mutex = (ldb_mutex_t *)&x->blocks_mutex;
   ldb_fstate_t *z = ldb_fstate_create(path);
-  size_t remain = x->size % BLOCK_SIZE;
-  size_t i;
+  size_t i, remain;
+
+  ldb_mutex_lock(mutex);
+
+  remain = x->size % BLOCK_SIZE;
 
   ldb_vector_grow(&z->blocks, x->blocks.length);
 
@@ -119,6 +158,8 @@ ldb_fstate_clone(const char *path, const ldb_fstate_t *x) {
   }
 
   z->size = x->size;
+
+  ldb_mutex_unlock(mutex);
 
   return z;
 }
@@ -211,7 +252,7 @@ ldb_fstate_pread(const ldb_fstate_t *state,
 
   if (offset > state->size) {
     ldb_mutex_unlock(mutex);
-    return LDB_IOERR; /* "Offset greater than file size." */
+    return LDB_EINVAL;
   }
 
   available = state->size - offset;
@@ -221,7 +262,7 @@ ldb_fstate_pread(const ldb_fstate_t *state,
 
   if (count == 0) {
     ldb_mutex_unlock(mutex);
-    *result = ldb_slice(0, 0);
+    *result = ldb_slice(buf, 0);
     return LDB_OK;
   }
 
@@ -289,24 +330,17 @@ ldb_fstate_append(ldb_fstate_t *state, const ldb_slice_t *data) {
 }
 
 /*
- * Environment
+ * File Map & Set
  */
 
 static int
 by_string(rb_val_t x, rb_val_t y, void *arg) {
   (void)arg;
-  return strcmp(x.p, y.p);
+  return strcmp(x.ptr, y.ptr);
 }
 
-static rb_map_t *
-ensure_map(void) {
-  if (file_map_.root == NULL)
-    rb_map_init(&file_map_, by_string, NULL);
-
-  return &file_map_;
-}
-
-#define file_map (*ensure_map())
+static rb_map_t file_map = RB_MAP_INIT(by_string);
+static rb_set_t file_set = RB_SET_INIT(by_string);
 
 /*
  * Filesystem
@@ -348,10 +382,10 @@ int
 ldb_get_children(const char *path, char ***out) {
   size_t plen = strlen(path);
   ldb_vector_t names;
-  void *key;
+  rb_iter_t it;
 
-#if defined(_WIN32)
-  while (plen > 0 && (path[plen - 1] == '/' || path[plen - 1] == '\\')
+#ifdef _WIN32
+  while (plen > 0 && (path[plen - 1] == '/' || path[plen - 1] == '\\'))
     plen -= 1;
 #else
   while (plen > 0 && path[plen - 1] == '/')
@@ -359,15 +393,15 @@ ldb_get_children(const char *path, char ***out) {
 #endif
 
   ldb_vector_init(&names);
-  ldb_vector_grow(&names, 1);
+  ldb_vector_grow(&names, 8);
 
   ldb_mutex_lock(&file_mutex);
 
-  rb_map_keys(&file_map, key) {
-    const char *name = key;
+  rb_map_each(&file_map, it) {
+    const char *name = rb_key_ptr(it);
     size_t nlen = strlen(name);
 
-#if defined(_WIN32)
+#ifdef _WIN32
     if (nlen > plen + 1 && (name[plen] == '/' || name[plen] == '\\'))
 #else
     if (nlen > plen + 1 && name[plen] == '/')
@@ -392,16 +426,16 @@ ldb_free_children(char **list, int len) {
   for (i = 0; i < len; i++)
     ldb_free(list[i]);
 
-  ldb_free(list);
+  if (list != NULL)
+    ldb_free(list);
 }
 
 static int
 ldb_delete_file(const char *filename) {
-  rb_node_t *node = rb_map_del(&file_map, filename);
+  rb_entry_t entry;
 
-  if (node != NULL) {
-    ldb_fstate_unref(node->value.p);
-    rb_node_destroy(node);
+  if (rb_map_del(&file_map, filename, &entry)) {
+    ldb_fstate_unref(entry.val);
     return 1;
   }
 
@@ -418,7 +452,7 @@ ldb_remove_file(const char *filename) {
 
   ldb_mutex_unlock(&file_mutex);
 
-  return result ? LDB_OK : LDB_NOTFOUND; /* "File not found" */
+  return result ? LDB_OK : LDB_ENOENT;
 }
 
 int
@@ -452,54 +486,54 @@ ldb_file_size(const char *filename, uint64_t *size) {
 
   ldb_mutex_unlock(&file_mutex);
 
-  return state ? LDB_OK : LDB_NOTFOUND; /* "File not found" */
+  return state ? LDB_OK : LDB_ENOENT;
 }
 
 int
 ldb_rename_file(const char *from, const char *to) {
-  rb_node_t *node;
+  int rc = LDB_ENOENT;
+  rb_entry_t entry;
 
   ldb_mutex_lock(&file_mutex);
 
-  node = rb_map_del(&file_map, from);
-
-  if (node != NULL) {
-    ldb_fstate_t *state = node->value.p;
+  if (rb_map_del(&file_map, from, &entry)) {
+    ldb_fstate_t *state = entry.val;
 
     ldb_fstate_rename(state, to);
-
     ldb_delete_file(to);
+
     rb_map_put(&file_map, state->path, state);
-    rb_node_destroy(node);
+
+    rc = LDB_OK;
   }
 
   ldb_mutex_unlock(&file_mutex);
 
-  return node ? LDB_OK : LDB_NOTFOUND; /* "File not found" */
+  return rc;
 }
 
 int
 ldb_copy_file(const char *from, const char *to) {
-  rb_node_t *node;
+  ldb_fstate_t *state;
 
   ldb_mutex_lock(&file_mutex);
 
   if (rb_map_has(&file_map, to)) {
     ldb_mutex_unlock(&file_mutex);
-    return LDB_IOERR;
+    return LDB_EEXIST;
   }
 
-  node = rb_map_get(&file_map, from);
+  state = rb_map_get(&file_map, from);
 
-  if (node != NULL) {
-    ldb_fstate_t *state = ldb_fstate_clone(to, node->value.p);
+  if (state != NULL) {
+    ldb_fstate_t *copy = ldb_fstate_clone(to, state);
 
-    rb_map_put(&file_map, state->path, ldb_fstate_ref(state));
+    rb_map_put(&file_map, copy->path, ldb_fstate_ref(copy));
   }
 
   ldb_mutex_unlock(&file_mutex);
 
-  return node ? LDB_OK : LDB_NOTFOUND; /* "File not found" */
+  return state ? LDB_OK : LDB_ENOENT;
 }
 
 int
@@ -511,12 +545,9 @@ int
 ldb_lock_file(const char *filename, ldb_filelock_t **lock) {
   ldb_mutex_lock(&file_mutex);
 
-  if (file_set.root == NULL)
-    rb_set_init(&file_set, by_string, NULL);
-
   if (rb_set_has(&file_set, filename)) {
     ldb_mutex_unlock(&file_mutex);
-    return LDB_IOERR;
+    return LDB_ENOLCK;
   }
 
   *lock = ldb_malloc(sizeof(ldb_filelock_t));
@@ -546,7 +577,7 @@ ldb_unlock_file(ldb_filelock_t *lock) {
 
 int
 ldb_test_directory(char *result, size_t size) {
-#if defined(_WIN32)
+#ifdef _WIN32
   if (size < 8)
     return 0;
 
@@ -562,7 +593,7 @@ ldb_test_directory(char *result, size_t size) {
 }
 
 /*
- * Readable File
+ * ReadableFile (backend)
  */
 
 struct ldb_rfile_s {
@@ -574,6 +605,25 @@ static void
 ldb_rfile_init(ldb_rfile_t *file, ldb_fstate_t *state) {
   file->state = ldb_fstate_ref(state);
   file->pos = 0;
+}
+
+static int
+ldb_rfile_create(const char *filename, ldb_rfile_t **file) {
+  ldb_fstate_t *state;
+
+  ldb_mutex_lock(&file_mutex);
+
+  state = rb_map_get(&file_map, filename);
+
+  if (state != NULL) {
+    *file = ldb_malloc(sizeof(ldb_rfile_t));
+
+    ldb_rfile_init(*file, state);
+  }
+
+  ldb_mutex_unlock(&file_mutex);
+
+  return state ? LDB_OK : LDB_ENOENT;
 }
 
 int
@@ -597,12 +647,13 @@ ldb_rfile_read(ldb_rfile_t *file,
 
 int
 ldb_rfile_skip(ldb_rfile_t *file, uint64_t offset) {
+  uint64_t size = ldb_fstate_size(file->state);
   uint64_t available;
 
-  if (file->pos > ldb_fstate_size(file->state))
-    return LDB_IOERR;
+  if (file->pos > size)
+    return LDB_EINVAL;
 
-  available = ldb_fstate_size(file->state) - file->pos;
+  available = size - file->pos;
 
   if (offset > available)
     offset = available;
@@ -612,42 +663,13 @@ ldb_rfile_skip(ldb_rfile_t *file, uint64_t offset) {
   return LDB_OK;
 }
 
-int
-ldb_rfile_pread(ldb_rfile_t *file,
-                ldb_slice_t *result,
-                void *buf,
-                size_t count,
-                uint64_t offset) {
+static LDB_INLINE int
+ldb_rfile_pread0(ldb_rfile_t *file,
+                 ldb_slice_t *result,
+                 void *buf,
+                 size_t count,
+                 uint64_t offset) {
   return ldb_fstate_pread(file->state, result, buf, count, offset);
-}
-
-/*
- * Readable File Instantiation
- */
-
-int
-ldb_seqfile_create(const char *filename, ldb_rfile_t **file) {
-  ldb_fstate_t *state;
-
-  ldb_mutex_lock(&file_mutex);
-
-  state = rb_map_get(&file_map, filename);
-
-  if (state != NULL) {
-    *file = ldb_malloc(sizeof(ldb_rfile_t));
-
-    ldb_rfile_init(*file, state);
-  }
-
-  ldb_mutex_unlock(&file_mutex);
-
-  return state ? LDB_OK : LDB_NOTFOUND; /* "File not found" */
-}
-
-int
-ldb_randfile_create(const char *filename, ldb_rfile_t **file, int use_mmap) {
-  (void)use_mmap;
-  return ldb_seqfile_create(filename, file);
 }
 
 void
@@ -657,26 +679,41 @@ ldb_rfile_destroy(ldb_rfile_t *file) {
 }
 
 /*
- * Writable File
+ * SequentialFile
+ */
+
+int
+ldb_seqfile_create(const char *filename, ldb_rfile_t **file) {
+  return ldb_rfile_create(filename, file);
+}
+
+/*
+ * RandomAccessFile
+ */
+
+int
+ldb_randfile_create(const char *filename, ldb_rfile_t **file, int use_mmap) {
+  (void)use_mmap;
+  return ldb_rfile_create(filename, file);
+}
+
+/*
+ * WritableFile (backend)
  */
 
 struct ldb_wfile_s {
   ldb_fstate_t *state;
+  int manifest;
 };
 
 static void
-ldb_wfile_init(ldb_wfile_t *file, ldb_fstate_t *state) {
+ldb_wfile_init(ldb_wfile_t *file, const char *filename, ldb_fstate_t *state) {
   file->state = ldb_fstate_ref(state);
+  file->manifest = ldb_is_manifest(filename);
 }
 
-int
-ldb_wfile_close(ldb_wfile_t *file) {
-  (void)file;
-  return LDB_OK;
-}
-
-int
-ldb_wfile_append(ldb_wfile_t *file, const ldb_slice_t *data) {
+static LDB_INLINE int
+ldb_wfile_append0(ldb_wfile_t *file, const ldb_slice_t *data) {
   return ldb_fstate_append(file->state, data);
 }
 
@@ -686,18 +723,30 @@ ldb_wfile_flush(ldb_wfile_t *file) {
   return LDB_OK;
 }
 
-int
-ldb_wfile_sync(ldb_wfile_t *file) {
+static LDB_INLINE int
+ldb_wfile_sync0(ldb_wfile_t *file) {
   (void)file;
   return LDB_OK;
 }
 
+int
+ldb_wfile_close(ldb_wfile_t *file) {
+  (void)file;
+  return LDB_OK;
+}
+
+void
+ldb_wfile_destroy(ldb_wfile_t *file) {
+  ldb_fstate_unref(file->state);
+  ldb_free(file);
+}
+
 /*
- * Writable File Instantiation
+ * WritableFile
  */
 
-int
-ldb_truncfile_create(const char *filename, ldb_wfile_t **file) {
+static LDB_INLINE int
+ldb_truncfile_create0(const char *filename, ldb_wfile_t **file) {
   ldb_fstate_t *state;
 
   ldb_mutex_lock(&file_mutex);
@@ -713,15 +762,19 @@ ldb_truncfile_create(const char *filename, ldb_wfile_t **file) {
 
   *file = ldb_malloc(sizeof(ldb_wfile_t));
 
-  ldb_wfile_init(*file, state);
+  ldb_wfile_init(*file, filename, state);
 
   ldb_mutex_unlock(&file_mutex);
 
   return LDB_OK;
 }
 
-int
-ldb_appendfile_create(const char *filename, ldb_wfile_t **file) {
+/*
+ * AppendableFile
+ */
+
+static LDB_INLINE int
+ldb_appendfile_create0(const char *filename, ldb_wfile_t **file) {
   ldb_fstate_t *state;
 
   ldb_mutex_lock(&file_mutex);
@@ -735,17 +788,11 @@ ldb_appendfile_create(const char *filename, ldb_wfile_t **file) {
 
   *file = ldb_malloc(sizeof(ldb_wfile_t));
 
-  ldb_wfile_init(*file, state);
+  ldb_wfile_init(*file, filename, state);
 
   ldb_mutex_unlock(&file_mutex);
 
   return LDB_OK;
-}
-
-void
-ldb_wfile_destroy(ldb_wfile_t *file) {
-  ldb_fstate_unref(file->state);
-  ldb_free(file);
 }
 
 /*
@@ -765,15 +812,17 @@ ldb_logger_open(const char *filename, ldb_logger_t **result) {
 
 int64_t
 ldb_now_usec(void) {
-#if defined(_WIN32)
-  uint64_t ticks;
+#ifdef _WIN32
+  static const uint64_t epoch = UINT64_C(116444736000000000);
+  ULARGE_INTEGER ticks;
   FILETIME ft;
 
   GetSystemTimeAsFileTime(&ft);
 
-  ticks = ((uint64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
+  ticks.LowPart = ft.dwLowDateTime;
+  ticks.HighPart = ft.dwHighDateTime;
 
-  return ticks / 10;
+  return (ticks.QuadPart - epoch) / 10;
 #else /* !_WIN32 */
   struct timeval tv;
 
@@ -786,7 +835,7 @@ ldb_now_usec(void) {
 
 void
 ldb_sleep_usec(int64_t usec) {
-#if defined(_WIN32)
+#ifdef _WIN32
   if (usec < 0)
     usec = 0;
 

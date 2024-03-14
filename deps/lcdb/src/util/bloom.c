@@ -21,37 +21,6 @@
 #include "slice.h"
 
 /*
- * Default
- */
-
-static void
-bloom_build(const ldb_bloom_t *bloom,
-            ldb_buffer_t *dst,
-            const ldb_slice_t *keys,
-            size_t length);
-
-static int
-bloom_match(const ldb_bloom_t *bloom,
-            const ldb_slice_t *filter,
-            const ldb_slice_t *key);
-
-static const ldb_bloom_t bloom_default = {
-  /* .name = */ "leveldb.BuiltinBloomFilter2",
-  /* .build = */ bloom_build,
-  /* .match = */ bloom_match,
-  /* .bits_per_key = */ 10,
-  /* .k = */ 6, /* (size_t)(10 * 0.69) == 6 */
-  /* .user_policy = */ NULL,
-  /* .state = */ NULL
-};
-
-/*
- * Globals
- */
-
-const ldb_bloom_t *ldb_bloom_default = &bloom_default;
-
-/*
  * Bloom
  */
 
@@ -70,9 +39,9 @@ ldb_bloom_destroy(ldb_bloom_t *bloom) {
 void
 ldb_bloom_init(ldb_bloom_t *bloom, int bits_per_key) {
   /* We intentionally round down to reduce probing cost a little bit. */
-  bloom->name = bloom_default.name;
-  bloom->build = bloom_default.build;
-  bloom->match = bloom_default.match;
+  bloom->name = ldb_bloom_default->name;
+  bloom->build = ldb_bloom_default->build;
+  bloom->match = ldb_bloom_default->match;
   bloom->bits_per_key = bits_per_key;
   bloom->k = bits_per_key * 0.69; /* 0.69 =~ ln(2). */
   bloom->user_policy = NULL;
@@ -195,3 +164,27 @@ bloom_match(const ldb_bloom_t *bloom,
 
   return 1;
 }
+
+/*
+ * Default
+ */
+
+static const ldb_bloom_t bloom_default = {
+  /* .name = */ "leveldb.BuiltinBloomFilter2",
+  /* .build = */ bloom_build,
+  /* .match = */ bloom_match,
+  /* .bits_per_key = */ 10,
+  /* .k = */ 6, /* (size_t)(10 * 0.69) == 6 */
+  /* .user_policy = */ NULL,
+  /* .state = */ NULL
+};
+
+/*
+ * Globals
+ */
+
+#ifdef _WIN32
+const ldb_bloom_t *ldb_bloom_import(void) { return &bloom_default; }
+#else
+const ldb_bloom_t *ldb_bloom_default = &bloom_default;
+#endif

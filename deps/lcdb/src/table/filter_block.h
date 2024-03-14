@@ -33,6 +33,8 @@ struct ldb_bloom_s;
  */
 typedef struct ldb_filtergen_s {
   const ldb_bloom_t *policy;
+  ldb_slice_t *tmp_keys;      /* ldb_bloom_build() argument. */
+  size_t num_keys;            /* Size tracking for tmp_keys. */
   ldb_buffer_t keys;          /* Flattened key contents. */
   ldb_array_t start;          /* Starting index in keys of each key (size_t). */
   ldb_buffer_t result;        /* Filter data computed so far. */

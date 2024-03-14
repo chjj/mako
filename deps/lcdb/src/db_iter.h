@@ -14,7 +14,6 @@
 #define LDB_DB_ITER_H
 
 #include <stdint.h>
-#include "util/extern.h"
 #include "util/types.h"
 
 struct ldb_s;
@@ -27,20 +26,5 @@ ldb_dbiter_create(struct ldb_s *db,
                   struct ldb_iter_s *internal_iter,
                   uint64_t sequence,
                   uint32_t seed);
-
-LDB_EXTERN int
-ldb_iter_compare(const struct ldb_iter_s *iter, const ldb_slice_t *key);
-
-LDB_EXTERN void
-ldb_iter_seek_ge(struct ldb_iter_s *iter, const ldb_slice_t *target);
-
-LDB_EXTERN void
-ldb_iter_seek_gt(struct ldb_iter_s *iter, const ldb_slice_t *target);
-
-LDB_EXTERN void
-ldb_iter_seek_le(struct ldb_iter_s *iter, const ldb_slice_t *target);
-
-LDB_EXTERN void
-ldb_iter_seek_lt(struct ldb_iter_s *iter, const ldb_slice_t *target);
 
 #endif /* LDB_DB_ITER_H */

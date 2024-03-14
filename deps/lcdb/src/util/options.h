@@ -215,9 +215,20 @@ typedef struct ldb_writeopt_s {
  * Globals
  */
 
+#ifdef _WIN32
+LDB_EXTERN const ldb_dbopt_t *ldb_dbopt_import(void);
+LDB_EXTERN const ldb_readopt_t *ldb_readopt_import(void);
+LDB_EXTERN const ldb_writeopt_t *ldb_writeopt_import(void);
+LDB_EXTERN const ldb_readopt_t *ldb_iteropt_import(void);
+#define ldb_dbopt_default (ldb_dbopt_import())
+#define ldb_readopt_default (ldb_readopt_import())
+#define ldb_writeopt_default (ldb_writeopt_import())
+#define ldb_iteropt_default (ldb_iteropt_import())
+#else
 LDB_EXTERN extern const ldb_dbopt_t *ldb_dbopt_default;
 LDB_EXTERN extern const ldb_readopt_t *ldb_readopt_default;
 LDB_EXTERN extern const ldb_writeopt_t *ldb_writeopt_default;
 LDB_EXTERN extern const ldb_readopt_t *ldb_iteropt_default;
+#endif
 
 #endif /* LDB_OPTIONS_H */

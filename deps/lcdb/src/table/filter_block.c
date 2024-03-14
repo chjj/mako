@@ -51,6 +51,8 @@ ldb_filtergen_destroy(ldb_filtergen_t *fb) {
 void
 ldb_filtergen_init(ldb_filtergen_t *fb, const ldb_bloom_t *policy) {
   fb->policy = policy;
+  fb->tmp_keys = NULL;
+  fb->num_keys = 0;
 
   ldb_buffer_init(&fb->keys);
   ldb_array_init(&fb->start);
@@ -60,10 +62,22 @@ ldb_filtergen_init(ldb_filtergen_t *fb, const ldb_bloom_t *policy) {
 
 void
 ldb_filtergen_clear(ldb_filtergen_t *fb) {
+  if (fb->num_keys > 0)
+    ldb_free(fb->tmp_keys);
+
   ldb_buffer_clear(&fb->keys);
   ldb_array_clear(&fb->start);
   ldb_buffer_clear(&fb->result);
   ldb_array_clear(&fb->filter_offsets);
+}
+
+static ldb_slice_t *
+ldb_filtergen_alloc(ldb_filtergen_t *fb, size_t num_keys) {
+  if (num_keys > fb->num_keys) {
+    fb->tmp_keys = ldb_realloc(fb->tmp_keys, num_keys * sizeof(ldb_slice_t));
+    fb->num_keys = num_keys;
+  }
+  return fb->tmp_keys;
 }
 
 static void
@@ -81,7 +95,7 @@ ldb_filtergen_generate(ldb_filtergen_t *fb) {
   /* Make list of keys from flattened key structure. */
   ldb_array_push(&fb->start, fb->keys.size); /* Simplify length computation. */
 
-  tmp_keys = ldb_malloc(num_keys * sizeof(ldb_slice_t));
+  tmp_keys = ldb_filtergen_alloc(fb, num_keys);
 
   for (i = 0; i < num_keys; i++) {
     const uint8_t *base = fb->keys.data + fb->start.items[i];
@@ -94,7 +108,6 @@ ldb_filtergen_generate(ldb_filtergen_t *fb) {
   ldb_array_push(&fb->filter_offsets, fb->result.size);
   ldb_bloom_build(fb->policy, &fb->result, tmp_keys, num_keys);
 
-  ldb_free(tmp_keys);
   ldb_buffer_reset(&fb->keys);
   ldb_array_reset(&fb->start);
 }
@@ -111,10 +124,8 @@ ldb_filtergen_start_block(ldb_filtergen_t *fb, uint64_t block_offset) {
 
 void
 ldb_filtergen_add_key(ldb_filtergen_t *fb, const ldb_slice_t *key) {
-  ldb_slice_t k = *key;
-
   ldb_array_push(&fb->start, fb->keys.size);
-  ldb_buffer_append(&fb->keys, k.data, k.size);
+  ldb_buffer_append(&fb->keys, key->data, key->size);
 }
 
 ldb_slice_t

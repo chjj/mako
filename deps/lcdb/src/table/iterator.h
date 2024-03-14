@@ -22,6 +22,8 @@
  * Types
  */
 
+struct ldb_comparator_s;
+
 /* Clients are allowed to register function/arg1/arg2 triples that
  * will be invoked when this iterator is destroyed.
  *
@@ -52,6 +54,9 @@ typedef struct ldb_iter_s {
 
   /* Iterator function table. */
   const ldb_itertbl_t *table;
+
+  /* Comparator. */
+  const struct ldb_comparator_s *cmp;
 } ldb_iter_t;
 
 /*
@@ -213,7 +218,9 @@ static const ldb_itertbl_t name ## _table = {                  \
  */
 
 ldb_iter_t *
-ldb_iter_create(void *ptr, const ldb_itertbl_t *table);
+ldb_iter_create(void *ptr,
+                const ldb_itertbl_t *table,
+                const struct ldb_comparator_s *cmp);
 
 LDB_EXTERN void
 ldb_iter_destroy(ldb_iter_t *iter);
@@ -266,6 +273,21 @@ ldb_iter_status(const ldb_iter_t *iter);
 #define ldb_iter_status(x) (x)->table->status((x)->ptr)
 
 #endif /* !LDB_ITERATOR_C */
+
+LDB_EXTERN int
+ldb_iter_compare(const ldb_iter_t *iter, const ldb_slice_t *key);
+
+LDB_EXTERN void
+ldb_iter_seek_ge(ldb_iter_t *iter, const ldb_slice_t *target);
+
+LDB_EXTERN void
+ldb_iter_seek_gt(ldb_iter_t *iter, const ldb_slice_t *target);
+
+LDB_EXTERN void
+ldb_iter_seek_le(ldb_iter_t *iter, const ldb_slice_t *target);
+
+LDB_EXTERN void
+ldb_iter_seek_lt(ldb_iter_t *iter, const ldb_slice_t *target);
 
 /*
  * Empty Iterator

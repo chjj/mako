@@ -11,20 +11,31 @@
  */
 
 #include <assert.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <windows.h>
 
+#include "atomic.h"
+#include "buffer.h"
 #include "env.h"
 #include "internal.h"
 #include "slice.h"
 #include "status.h"
 #include "strutil.h"
 
+/*
+ * Fixes
+ */
+
 #ifdef __GNUC__
 #  pragma GCC diagnostic ignored "-Wcast-function-type"
+#endif
+
+#ifndef INVALID_FILE_ATTRIBUTES
+#  define INVALID_FILE_ATTRIBUTES ((DWORD)-1)
 #endif
 
 /*
@@ -33,7 +44,6 @@
 
 #define LDB_WRITE_BUFFER 65536
 #define LDB_MMAP_LIMIT (sizeof(void *) >= 8 ? 1000 : 0)
-#define LDB_WIN32_ERROR ldb_convert_error
 
 /*
  * Types
@@ -45,7 +55,7 @@ typedef struct ldb_wide_s {
 } ldb_wide_t;
 
 typedef struct ldb_limiter_s {
-  volatile long acquires_allowed;
+  ldb_atomic(int) acquires_allowed;
   int max_acquires;
 } ldb_limiter_t;
 
@@ -129,17 +139,17 @@ ldb_wide_export(char *zp, size_t zn, const ldb_wide_t *x) {
 
 static int
 LDBIsWindowsNT(void) {
-  static volatile long state = 0;
+  static ldb_atomic(int) state = 0;
   static DWORD version = 0;
-  long value;
+  int value;
 
-  while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
+  while ((value = ldb_atomic_compare_exchange(&state, 0, 1)) == 1)
     Sleep(0);
 
   if (value == 0) {
     version = GetVersion();
 
-    if (InterlockedExchange(&state, 2) != 1)
+    if (ldb_atomic_exchange(&state, 2) != 1)
       abort(); /* LCOV_EXCL_LINE */
   } else {
     assert(value == 2);
@@ -156,7 +166,7 @@ LDBSetFilePointerEx(HANDLE file,
   pos.LowPart = SetFilePointer(file, pos.LowPart, &pos.HighPart, method);
 
   if (pos.LowPart == (DWORD)-1) { /* INVALID_SET_FILE_POINTER */
-    if (GetLastError() != NO_ERROR)
+    if (GetLastError() != ERROR_SUCCESS)
       return FALSE;
   }
 
@@ -174,7 +184,7 @@ LDBGetFileSizeEx(HANDLE file, LARGE_INTEGER *size) {
   size->HighPart = HighPart;
 
   if (size->LowPart == (DWORD)-1) { /* INVALID_FILE_SIZE */
-    if (GetLastError() != NO_ERROR)
+    if (GetLastError() != ERROR_SUCCESS)
       return FALSE;
   }
 
@@ -287,11 +297,11 @@ LDBGetTempPathW(ldb_wide_t *result) {
 static BOOL
 LDBCreateHardLinkW(LPCWSTR to, LPCWSTR from, LPSECURITY_ATTRIBUTES attr) {
   typedef BOOL (WINAPI *P)(LPCWSTR, LPCWSTR, LPSECURITY_ATTRIBUTES);
-  static volatile long state = 0;
+  static ldb_atomic(int) state = 0;
   static P HardLinkW = NULL;
-  long value;
+  int value;
 
-  while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
+  while ((value = ldb_atomic_compare_exchange(&state, 0, 1)) == 1)
     Sleep(0);
 
   if (value == 0) {
@@ -302,7 +312,7 @@ LDBCreateHardLinkW(LPCWSTR to, LPCWSTR from, LPSECURITY_ATTRIBUTES attr) {
 
     HardLinkW = (P)GetProcAddress(h, "CreateHardLinkW");
 
-    if (InterlockedExchange(&state, 2) != 1)
+    if (ldb_atomic_exchange(&state, 2) != 1)
       abort(); /* LCOV_EXCL_LINE */
   } else {
     assert(value == 2);
@@ -324,12 +334,12 @@ static int
 ldb_limiter_acquire(ldb_limiter_t *lim) {
   int old;
 
-  old = InterlockedExchangeAdd(&lim->acquires_allowed, -1);
+  old = ldb_atomic_fetch_sub(&lim->acquires_allowed, 1, ldb_order_relaxed);
 
   if (old > 0)
     return 1;
 
-  old = InterlockedExchangeAdd(&lim->acquires_allowed, 1);
+  old = ldb_atomic_fetch_add(&lim->acquires_allowed, 1, ldb_order_relaxed);
 
   assert(old < lim->max_acquires);
 
@@ -340,7 +350,7 @@ ldb_limiter_acquire(ldb_limiter_t *lim) {
 
 static void
 ldb_limiter_release(ldb_limiter_t *lim) {
-  int old = InterlockedExchangeAdd(&lim->acquires_allowed, 1);
+  int old = ldb_atomic_fetch_add(&lim->acquires_allowed, 1, ldb_order_relaxed);
 
   assert(old < lim->max_acquires);
 
@@ -348,15 +358,101 @@ ldb_limiter_release(ldb_limiter_t *lim) {
 }
 
 /*
+ * Errors
+ */
+
+static DWORD
+tls_index_get(void) {
+  static ldb_atomic(int) state = 0;
+  static DWORD tls_index = 0;
+  int value;
+
+  while ((value = ldb_atomic_compare_exchange(&state, 0, 1)) == 1)
+    Sleep(0);
+
+  if (value == 0) {
+    tls_index = TlsAlloc();
+
+    if (tls_index == TLS_OUT_OF_INDEXES)
+      abort(); /* LCOV_EXCL_LINE */
+
+    if (ldb_atomic_exchange(&state, 2) != 1)
+      abort(); /* LCOV_EXCL_LINE */
+  } else {
+    assert(value == 2);
+  }
+
+  return tls_index;
+}
+
+static char *
+tls_buffer_get(size_t size) {
+  DWORD tls_index = tls_index_get();
+  void *ptr;
+
+  ptr = TlsGetValue(tls_index);
+
+  if (ptr == NULL) {
+    if (GetLastError() != ERROR_SUCCESS)
+      abort(); /* LCOV_EXCL_LINE */
+
+    ptr = ldb_malloc(size);
+
+    if (!TlsSetValue(tls_index, ptr))
+      abort(); /* LCOV_EXCL_LINE */
+  }
+
+  return ptr;
+}
+
+static int
+ldb_convert_error(DWORD code) {
+  if (code == ERROR_SUCCESS || code > INT_MAX)
+    return LDB_IOERR;
+
+  if (code == ERROR_PATH_NOT_FOUND)
+    return ERROR_FILE_NOT_FOUND;
+
+  return code;
+}
+
+int
+ldb_system_error(void) {
+  return ldb_convert_error(GetLastError());
+}
+
+const char *
+ldb_error_string(int code) {
+  char *errbuf = tls_buffer_get(1024);
+  DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM |
+                FORMAT_MESSAGE_IGNORE_INSERTS;
+  DWORD result;
+
+  if (LDBIsWindowsNT()) {
+    WCHAR tmpbuf[512];
+
+    result = FormatMessageW(flags, NULL, code, 0, tmpbuf, 512, NULL);
+
+    if (result)
+      result = ldb_utf8_write(errbuf, 1024, tmpbuf);
+  } else {
+    result = FormatMessageA(flags, NULL, code, 0, errbuf, 1024, NULL);
+  }
+
+  if (!result)
+    sprintf(errbuf, "Unknown error %d", code);
+
+  return errbuf;
+}
+
+/*
  * Helpers
  */
 
 static int
-ldb_convert_error(DWORD code) {
-  if (code == ERROR_FILE_NOT_FOUND || code == ERROR_PATH_NOT_FOUND)
-    return LDB_NOTFOUND;
-
-  return LDB_IOERR;
+ldb_is_manifest(const char *filename) {
+  const char *base = ldb_basename(filename);
+  return ldb_starts_with(base, "MANIFEST");
 }
 
 static WCHAR *
@@ -405,7 +501,7 @@ ldb_pread(HANDLE handle, void *dst, size_t len, uint64_t off) {
 
   while (len > 0) {
     DWORD max = LDB_MIN(len, 1 << 30);
-    DWORD nread;
+    DWORD nread = 0;
 
     memset(&ol, 0, sizeof(ol));
 
@@ -413,8 +509,10 @@ ldb_pread(HANDLE handle, void *dst, size_t len, uint64_t off) {
     ol.OffsetHigh = ul.HighPart;
     ol.Offset = ul.LowPart;
 
-    if (!ReadFile(handle, buf, max, &nread, &ol))
-      return -1;
+    if (!ReadFile(handle, buf, max, &nread, &ol)) {
+      if (GetLastError() != ERROR_HANDLE_EOF)
+        return -1;
+    }
 
     if (nread == 0)
       break;
@@ -509,6 +607,7 @@ ldb_get_children_wide(const char *path, char ***out) {
   ldb_wide_t buf;
   size_t i = 0;
   DWORD attrs;
+  void *ptr;
   size_t j;
 
   if (len == 0) {
@@ -523,13 +622,20 @@ ldb_get_children_wide(const char *path, char ***out) {
 
   attrs = GetFileAttributesW(buf.data);
 
-  if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY))
+  if (attrs == INVALID_FILE_ATTRIBUTES)
     goto fail;
+
+  if (!(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+    SetLastError(ERROR_DIRECTORY);
+    goto fail;
+  }
 
   list = (char **)malloc(size * sizeof(char *));
 
-  if (list == NULL)
+  if (list == NULL) {
+    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
     goto fail;
+  }
 
   len--;
 
@@ -569,18 +675,24 @@ ldb_get_children_wide(const char *path, char ***out) {
 
     name = (char *)malloc(len);
 
-    if (name == NULL)
+    if (name == NULL) {
+      SetLastError(ERROR_NOT_ENOUGH_MEMORY);
       goto fail;
+    }
 
     if (!ldb_utf8_write(name, len, base))
       goto fail;
 
     if (i == size) {
       size = (size * 3) / 2;
-      list = (char **)realloc(list, size * sizeof(char *));
+      ptr = realloc(list, size * sizeof(char *));
 
-      if (list == NULL)
+      if (ptr == NULL) {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
         goto fail;
+      }
+
+      list = (char **)ptr;
     }
 
     list[i++] = name;
@@ -600,13 +712,13 @@ succeed:
   return i;
 fail:
   for (j = 0; j < i; j++)
-    ldb_free(list[j]);
+    free(list[j]);
 
   if (list != NULL)
-    ldb_free(list);
+    free(list);
 
   if (name != NULL)
-    ldb_free(name);
+    free(name);
 
   if (handle != INVALID_HANDLE_VALUE)
     FindClose(handle);
@@ -630,20 +742,30 @@ ldb_get_children_ansi(const char *path, char ***out) {
   size_t size = 8;
   size_t i = 0;
   DWORD attrs;
+  void *ptr;
   size_t j;
 
-  if (len + 4 > sizeof(buf))
+  if (len + 4 > sizeof(buf)) {
+    SetLastError(ERROR_BUFFER_OVERFLOW);
     goto fail;
+  }
 
   attrs = GetFileAttributesA(path);
 
-  if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY))
+  if (attrs == INVALID_FILE_ATTRIBUTES)
     goto fail;
+
+  if (!(attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+    SetLastError(ERROR_DIRECTORY);
+    goto fail;
+  }
 
   list = (char **)malloc(size * sizeof(char *));
 
-  if (list == NULL)
+  if (list == NULL) {
+    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
     goto fail;
+  }
 
   memcpy(buf, path, len);
 
@@ -679,17 +801,23 @@ ldb_get_children_ansi(const char *path, char ***out) {
     len = strlen(base);
     name = (char *)malloc(len + 1);
 
-    if (name == NULL)
+    if (name == NULL) {
+      SetLastError(ERROR_NOT_ENOUGH_MEMORY);
       goto fail;
+    }
 
     memcpy(name, base, len + 1);
 
     if (i == size) {
       size = (size * 3) / 2;
-      list = (char **)realloc(list, size * sizeof(char *));
+      ptr = realloc(list, size * sizeof(char *));
 
-      if (list == NULL)
+      if (ptr == NULL) {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
         goto fail;
+      }
+
+      list = (char **)ptr;
     }
 
     list[i++] = name;
@@ -707,13 +835,13 @@ succeed:
   return i;
 fail:
   for (j = 0; j < i; j++)
-    ldb_free(list[j]);
+    free(list[j]);
 
   if (list != NULL)
-    ldb_free(list);
+    free(list);
 
   if (name != NULL)
-    ldb_free(name);
+    free(name);
 
   if (handle != INVALID_HANDLE_VALUE)
     FindClose(handle);
@@ -736,9 +864,10 @@ ldb_free_children(char **list, int len) {
   int i;
 
   for (i = 0; i < len; i++)
-    ldb_free(list[i]);
+    free(list[i]);
 
-  ldb_free(list);
+  if (list != NULL)
+    free(list);
 }
 
 int
@@ -748,10 +877,10 @@ ldb_remove_file(const char *filename) {
     int rc = LDB_OK;
 
     if (!ldb_wide_import(&path, filename))
-      return LDB_INVALID;
+      return ldb_system_error();
 
     if (!DeleteFileW(path.data))
-      rc = LDB_WIN32_ERROR(GetLastError());
+      rc = ldb_system_error();
 
     ldb_wide_clear(&path);
 
@@ -759,7 +888,7 @@ ldb_remove_file(const char *filename) {
   }
 
   if (!DeleteFileA(filename))
-    return LDB_WIN32_ERROR(GetLastError());
+    return ldb_system_error();
 
   return LDB_OK;
 }
@@ -771,10 +900,10 @@ ldb_create_dir(const char *dirname) {
     int rc = LDB_OK;
 
     if (!ldb_wide_import(&path, dirname))
-      return LDB_INVALID;
+      return ldb_system_error();
 
     if (!CreateDirectoryW(path.data, NULL))
-      rc = LDB_WIN32_ERROR(GetLastError());
+      rc = ldb_system_error();
 
     ldb_wide_clear(&path);
 
@@ -782,7 +911,7 @@ ldb_create_dir(const char *dirname) {
   }
 
   if (!CreateDirectoryA(dirname, NULL))
-    return LDB_WIN32_ERROR(GetLastError());
+    return ldb_system_error();
 
   return LDB_OK;
 }
@@ -794,10 +923,10 @@ ldb_remove_dir(const char *dirname) {
     int rc = LDB_OK;
 
     if (!ldb_wide_import(&path, dirname))
-      return LDB_INVALID;
+      return ldb_system_error();
 
     if (!RemoveDirectoryW(path.data))
-      rc = LDB_WIN32_ERROR(GetLastError());
+      rc = ldb_system_error();
 
     ldb_wide_clear(&path);
 
@@ -805,7 +934,7 @@ ldb_remove_dir(const char *dirname) {
   }
 
   if (!RemoveDirectoryA(dirname))
-    return LDB_WIN32_ERROR(GetLastError());
+    return ldb_system_error();
 
   return LDB_OK;
 }
@@ -830,12 +959,12 @@ ldb_file_size(const char *filename, uint64_t *size) {
                          NULL);
 
   if (handle == INVALID_HANDLE_VALUE)
-    return LDB_WIN32_ERROR(GetLastError());
+    return ldb_system_error();
 
   if (!LDBGetFileSizeEx(handle, &result)) {
-    DWORD code = GetLastError();
+    int rc = ldb_system_error();
     CloseHandle(handle);
-    return LDB_WIN32_ERROR(code);
+    return rc;
   }
 
   CloseHandle(handle);
@@ -852,16 +981,16 @@ ldb_rename_file(const char *from, const char *to) {
     int rc = LDB_OK;
 
     if (!ldb_wide_import(&src, from))
-      return LDB_INVALID;
+      return ldb_system_error();
 
     if (!ldb_wide_import(&dst, to)) {
       ldb_wide_clear(&src);
-      return LDB_INVALID;
+      return ldb_system_error();
     }
 
     /* Windows NT only. */
     if (!MoveFileExW(src.data, dst.data, MOVEFILE_REPLACE_EXISTING))
-      rc = LDB_WIN32_ERROR(GetLastError());
+      rc = ldb_system_error();
 
     ldb_wide_clear(&src);
     ldb_wide_clear(&dst);
@@ -874,13 +1003,13 @@ ldb_rename_file(const char *from, const char *to) {
     DWORD code = GetLastError();
 
     if (code != ERROR_ALREADY_EXISTS)
-      return LDB_WIN32_ERROR(code);
+      return ldb_convert_error(code);
 
     if (!DeleteFileA(to))
-      return LDB_WIN32_ERROR(GetLastError());
+      return ldb_system_error();
 
     if (!MoveFileA(from, to))
-      return LDB_WIN32_ERROR(GetLastError());
+      return ldb_system_error();
   }
 
   return LDB_OK;
@@ -893,15 +1022,15 @@ ldb_copy_file(const char *from, const char *to) {
     int rc = LDB_OK;
 
     if (!ldb_wide_import(&src, from))
-      return LDB_INVALID;
+      return ldb_system_error();
 
     if (!ldb_wide_import(&dst, to)) {
       ldb_wide_clear(&src);
-      return LDB_INVALID;
+      return ldb_system_error();
     }
 
     if (!CopyFileW(src.data, dst.data, TRUE))
-      rc = LDB_WIN32_ERROR(GetLastError());
+      rc = ldb_system_error();
 
     ldb_wide_clear(&src);
     ldb_wide_clear(&dst);
@@ -910,7 +1039,7 @@ ldb_copy_file(const char *from, const char *to) {
   }
 
   if (!CopyFileA(from, to, TRUE))
-    return LDB_WIN32_ERROR(GetLastError());
+    return ldb_system_error();
 
   return LDB_OK;
 }
@@ -922,24 +1051,24 @@ ldb_link_file(const char *from, const char *to) {
     int rc = LDB_OK;
 
     if (!ldb_wide_import(&src, from))
-      return LDB_INVALID;
+      return ldb_system_error();
 
     if (!ldb_wide_import(&dst, to)) {
       ldb_wide_clear(&src);
-      return LDB_INVALID;
+      return ldb_system_error();
     }
 
     /* Windows 2000 and above (NTFS only). */
     if (!LDBCreateHardLinkW(dst.data, src.data, NULL)) {
-      int code = GetLastError();
+      DWORD code = GetLastError();
 
       if (code == ERROR_INVALID_FUNCTION || /* Not NTFS. */
           code == ERROR_NOT_SAME_DEVICE ||
           code == ERROR_CALL_NOT_IMPLEMENTED) {
         if (!CopyFileW(src.data, dst.data, TRUE))
-          rc = LDB_WIN32_ERROR(GetLastError());
+          rc = ldb_system_error();
       } else {
-        rc = LDB_WIN32_ERROR(code);
+        rc = ldb_convert_error(code);
       }
     }
 
@@ -950,7 +1079,7 @@ ldb_link_file(const char *from, const char *to) {
   }
 
   if (!CopyFileA(from, to, TRUE))
-    return LDB_WIN32_ERROR(GetLastError());
+    return ldb_system_error();
 
   return LDB_OK;
 }
@@ -959,14 +1088,20 @@ int
 ldb_lock_file(const char *filename, ldb_filelock_t **lock) {
   HANDLE handle = LDBCreateFile(filename,
                                 GENERIC_READ | GENERIC_WRITE,
-                                0,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE,
                                 NULL,
                                 OPEN_ALWAYS,
                                 FILE_ATTRIBUTE_NORMAL,
                                 NULL);
 
   if (handle == INVALID_HANDLE_VALUE)
-    return LDB_WIN32_ERROR(GetLastError());
+    return ldb_system_error();
+
+  if (!LockFile(handle, 0, 0, 1, 0)) {
+    int rc = ldb_system_error();
+    CloseHandle(handle);
+    return rc;
+  }
 
   *lock = ldb_malloc(sizeof(ldb_filelock_t));
 
@@ -977,9 +1112,16 @@ ldb_lock_file(const char *filename, ldb_filelock_t **lock) {
 
 int
 ldb_unlock_file(ldb_filelock_t *lock) {
+  int rc = LDB_OK;
+
+  if (!UnlockFile(lock->handle, 0, 0, 1, 0))
+    rc = ldb_system_error();
+
   CloseHandle(lock->handle);
+
   ldb_free(lock);
-  return LDB_OK;
+
+  return rc;
 }
 
 static int
@@ -991,12 +1133,11 @@ ldb_test_directory_wide(char *result, size_t size) {
     ret = ldb_wide_export(result, size, &path);
     ldb_wide_clear(&path);
   } else if (LDBGetTempPathW(&tmp)) {
-    DWORD n = lstrlenW(tmp.data) + 12 + 20 + 1;
+    DWORD n = lstrlenW(tmp.data) + 11 + 1;
 
     ldb_wide_init(&path, n);
 
-    _snwprintf(path.data, n, L"%sleveldbtest-%lu",
-               tmp.data, GetCurrentThreadId());
+    _snwprintf(path.data, n, L"%sleveldbtest", tmp.data);
 
     CreateDirectoryW(path.data, NULL);
 
@@ -1022,11 +1163,10 @@ ldb_test_directory_ansi(char *result, size_t size) {
   if (!GetTempPathA(sizeof(tmp), tmp))
     return 0;
 
-  if (strlen(tmp) + 12 + 20 + 1 > size)
+  if (strlen(tmp) + 11 + 1 > size)
     return 0;
 
-  sprintf(result, "%sleveldbtest-%lu",
-          tmp, GetCurrentThreadId());
+  sprintf(result, "%sleveldbtest", tmp);
 
   CreateDirectoryA(result, NULL);
 
@@ -1042,7 +1182,7 @@ ldb_test_directory(char *result, size_t size) {
 }
 
 /*
- * Readable File
+ * ReadableFile (backend)
  */
 
 struct ldb_rfile_s {
@@ -1106,7 +1246,7 @@ ldb_rfile_read(ldb_rfile_t *file,
   int64_t nread = ldb_read(file->handle, buf, count);
 
   if (nread < 0)
-    return LDB_IOERR;
+    return ldb_system_error();
 
   ldb_slice_set(result, buf, nread);
 
@@ -1117,25 +1257,31 @@ int
 ldb_rfile_skip(ldb_rfile_t *file, uint64_t offset) {
   LARGE_INTEGER dist;
 
+  if (offset > _I64_MAX)
+    return ERROR_INVALID_PARAMETER;
+
   dist.QuadPart = offset;
 
   if (!LDBSetFilePointerEx(file->handle, dist, NULL, FILE_CURRENT))
-    return LDB_IOERR;
+    return ldb_system_error();
 
   return LDB_OK;
 }
 
-int
-ldb_rfile_pread(ldb_rfile_t *file,
-                ldb_slice_t *result,
-                void *buf,
-                size_t count,
-                uint64_t offset) {
-  int64_t nread;
+static LDB_INLINE int
+ldb_rfile_pread0(ldb_rfile_t *file,
+                 ldb_slice_t *result,
+                 void *buf,
+                 size_t count,
+                 uint64_t offset) {
+  int64_t nread = -1;
 
   if (file->mapped) {
+    if (offset + count < count)
+      return ERROR_INVALID_PARAMETER;
+
     if (offset + count > file->length)
-      return LDB_INVALID;
+      return ERROR_INVALID_PARAMETER;
 
     ldb_slice_set(result, file->base + offset, count);
 
@@ -1146,14 +1292,15 @@ ldb_rfile_pread(ldb_rfile_t *file,
     /* Windows 9x. */
     LARGE_INTEGER dist;
 
+    if (offset > _I64_MAX)
+      return ERROR_INVALID_PARAMETER;
+
     dist.QuadPart = offset;
 
     EnterCriticalSection(&file->mutex);
 
     if (LDBSetFilePointerEx(file->handle, dist, NULL, FILE_BEGIN))
       nread = ldb_read(file->handle, buf, count);
-    else
-      nread = -1;
 
     LeaveCriticalSection(&file->mutex);
   } else {
@@ -1161,10 +1308,12 @@ ldb_rfile_pread(ldb_rfile_t *file,
     nread = ldb_pread(file->handle, buf, count, offset);
   }
 
-  if (nread >= 0)
-    ldb_slice_set(result, buf, nread);
+  if (nread < 0)
+    return ldb_system_error();
 
-  return nread < 0 ? LDB_IOERR : LDB_OK;
+  ldb_slice_set(result, buf, nread);
+
+  return LDB_OK;
 }
 
 static int
@@ -1173,14 +1322,14 @@ ldb_rfile_close(ldb_rfile_t *file) {
 
   if (file->handle != INVALID_HANDLE_VALUE) {
     if (!CloseHandle(file->handle))
-      rc = LDB_IOERR;
+      rc = ldb_system_error();
   }
-
-  if (file->limiter != NULL)
-    ldb_limiter_release(file->limiter);
 
   if (file->mapped)
     UnmapViewOfFile((void *)file->base);
+
+  if (file->limiter != NULL)
+    ldb_limiter_release(file->limiter);
 
   file->handle = INVALID_HANDLE_VALUE;
   file->limiter = NULL;
@@ -1196,8 +1345,14 @@ ldb_rfile_close(ldb_rfile_t *file) {
   return rc;
 }
 
+void
+ldb_rfile_destroy(ldb_rfile_t *file) {
+  ldb_rfile_close(file);
+  ldb_free(file);
+}
+
 /*
- * Readable File Instantiation
+ * SequentialFile
  */
 
 int
@@ -1212,7 +1367,7 @@ ldb_seqfile_create(const char *filename, ldb_rfile_t **file) {
                                 NULL);
 
   if (handle == INVALID_HANDLE_VALUE)
-    return LDB_WIN32_ERROR(GetLastError());
+    return ldb_system_error();
 
   *file = ldb_malloc(sizeof(ldb_rfile_t));
 
@@ -1221,10 +1376,15 @@ ldb_seqfile_create(const char *filename, ldb_rfile_t **file) {
   return LDB_OK;
 }
 
+/*
+ * RandomAccessFile
+ */
+
 int
 ldb_randfile_create(const char *filename, ldb_rfile_t **file, int use_mmap) {
   HANDLE mapping = NULL;
   LARGE_INTEGER size;
+  void *base = NULL;
   int rc = LDB_OK;
   HANDLE handle;
 
@@ -1237,7 +1397,7 @@ ldb_randfile_create(const char *filename, ldb_rfile_t **file, int use_mmap) {
                          NULL);
 
   if (handle == INVALID_HANDLE_VALUE)
-    return LDB_WIN32_ERROR(GetLastError());
+    return ldb_system_error();
 
   if (!use_mmap || !ldb_limiter_acquire(&ldb_mmap_limiter)) {
     *file = ldb_malloc(sizeof(ldb_rfile_t));
@@ -1248,22 +1408,31 @@ ldb_randfile_create(const char *filename, ldb_rfile_t **file, int use_mmap) {
   }
 
   if (!LDBGetFileSizeEx(handle, &size))
-    rc = LDB_WIN32_ERROR(GetLastError());
+    rc = ldb_system_error();
 
   if (rc == LDB_OK) {
-    mapping = CreateFileMappingA(handle, NULL, PAGE_READONLY, 0, 0, NULL);
+    mapping = CreateFileMappingA(handle,
+                                 NULL,
+                                 PAGE_READONLY,
+                                 size.HighPart,
+                                 size.LowPart,
+                                 NULL);
 
-    if (mapping != NULL) {
-      void *base = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
+    if (mapping == NULL)
+      rc = ldb_system_error();
+  }
 
-      if (base != NULL) {
-        *file = ldb_malloc(sizeof(ldb_rfile_t));
+  if (rc == LDB_OK) {
+    base = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
 
-        ldb_mapfile_init(*file, base, size.QuadPart, &ldb_mmap_limiter);
-      } else {
-        rc = LDB_IOERR;
-      }
-    }
+    if (base == NULL)
+      rc = ldb_system_error();
+  }
+
+  if (rc == LDB_OK) {
+    *file = ldb_malloc(sizeof(ldb_rfile_t));
+
+    ldb_mapfile_init(*file, base, size.QuadPart, &ldb_mmap_limiter);
   }
 
   if (mapping != NULL)
@@ -1277,50 +1446,34 @@ ldb_randfile_create(const char *filename, ldb_rfile_t **file, int use_mmap) {
   return rc;
 }
 
-void
-ldb_rfile_destroy(ldb_rfile_t *file) {
-  ldb_rfile_close(file);
-  ldb_free(file);
-}
-
 /*
- * Writable File
+ * WritableFile (backend)
  */
 
 struct ldb_wfile_s {
   HANDLE handle;
+  int manifest;
   unsigned char buf[LDB_WRITE_BUFFER];
   size_t pos;
 };
 
 static void
-ldb_wfile_init(ldb_wfile_t *file, HANDLE handle) {
+ldb_wfile_init(ldb_wfile_t *file, const char *filename, HANDLE handle) {
   file->handle = handle;
+  file->manifest = ldb_is_manifest(filename);
   file->pos = 0;
-}
-
-int
-ldb_wfile_close(ldb_wfile_t *file) {
-  int rc = ldb_wfile_flush(file);
-
-  if (!CloseHandle(file->handle) && rc == LDB_OK)
-    rc = LDB_IOERR;
-
-  file->handle = INVALID_HANDLE_VALUE;
-
-  return rc;
 }
 
 static int
 ldb_wfile_write(ldb_wfile_t *file, const unsigned char *data, size_t size) {
   if (ldb_write(file->handle, data, size) < 0)
-    return LDB_IOERR;
+    return ldb_system_error();
 
   return LDB_OK;
 }
 
-int
-ldb_wfile_append(ldb_wfile_t *file, const ldb_slice_t *data) {
+static LDB_INLINE int
+ldb_wfile_append0(ldb_wfile_t *file, const ldb_slice_t *data) {
   const unsigned char *write_data = data->data;
   size_t write_size = data->size;
   size_t copy_size;
@@ -1328,11 +1481,13 @@ ldb_wfile_append(ldb_wfile_t *file, const ldb_slice_t *data) {
 
   copy_size = LDB_MIN(write_size, LDB_WRITE_BUFFER - file->pos);
 
-  memcpy(file->buf + file->pos, write_data, copy_size);
+  if (copy_size > 0) {
+    memcpy(file->buf + file->pos, write_data, copy_size);
 
-  write_data += copy_size;
-  write_size -= copy_size;
-  file->pos += copy_size;
+    write_data += copy_size;
+    write_size -= copy_size;
+    file->pos += copy_size;
+  }
 
   if (write_size == 0)
     return LDB_OK;
@@ -1356,69 +1511,29 @@ ldb_wfile_flush(ldb_wfile_t *file) {
   return rc;
 }
 
-int
-ldb_wfile_sync(ldb_wfile_t *file) {
+static LDB_INLINE int
+ldb_wfile_sync0(ldb_wfile_t *file) {
   int rc;
 
   if ((rc = ldb_wfile_flush(file)))
     return rc;
 
   if (!FlushFileBuffers(file->handle))
-    return LDB_IOERR;
-
-  return LDB_OK;
-}
-
-/*
- * Writable File Instantiation
- */
-
-int
-ldb_truncfile_create(const char *filename, ldb_wfile_t **file) {
-  HANDLE handle = LDBCreateFile(filename,
-                                GENERIC_WRITE,
-                                FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                NULL,
-                                CREATE_ALWAYS,
-                                FILE_ATTRIBUTE_NORMAL,
-                                NULL);
-
-  if (handle == INVALID_HANDLE_VALUE)
-    return LDB_WIN32_ERROR(GetLastError());
-
-  *file = ldb_malloc(sizeof(ldb_wfile_t));
-
-  ldb_wfile_init(*file, handle);
+    return ldb_system_error();
 
   return LDB_OK;
 }
 
 int
-ldb_appendfile_create(const char *filename, ldb_wfile_t **file) {
-  HANDLE handle = LDBCreateFile(filename,
-                                GENERIC_WRITE,
-                                FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                NULL,
-                                OPEN_ALWAYS,
-                                FILE_ATTRIBUTE_NORMAL,
-                                NULL);
+ldb_wfile_close(ldb_wfile_t *file) {
+  int rc = ldb_wfile_flush(file);
 
-  if (handle == INVALID_HANDLE_VALUE)
-    return LDB_WIN32_ERROR(GetLastError());
+  if (!CloseHandle(file->handle) && rc == LDB_OK)
+    rc = ldb_system_error();
 
-  if (SetFilePointer(handle, 0, NULL, FILE_END) == (DWORD)-1) {
-    DWORD code = GetLastError();
-    if (code != NO_ERROR) {
-      CloseHandle(handle);
-      return LDB_WIN32_ERROR(code);
-    }
-  }
+  file->handle = INVALID_HANDLE_VALUE;
 
-  *file = ldb_malloc(sizeof(ldb_wfile_t));
-
-  ldb_wfile_init(*file, handle);
-
-  return LDB_OK;
+  return rc;
 }
 
 void
@@ -1430,6 +1545,63 @@ ldb_wfile_destroy(ldb_wfile_t *file) {
 }
 
 /*
+ * WritableFile
+ */
+
+static LDB_INLINE int
+ldb_truncfile_create0(const char *filename, ldb_wfile_t **file) {
+  HANDLE handle = LDBCreateFile(filename,
+                                GENERIC_WRITE,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                NULL,
+                                CREATE_ALWAYS,
+                                FILE_ATTRIBUTE_NORMAL,
+                                NULL);
+
+  if (handle == INVALID_HANDLE_VALUE)
+    return ldb_system_error();
+
+  *file = ldb_malloc(sizeof(ldb_wfile_t));
+
+  ldb_wfile_init(*file, filename, handle);
+
+  return LDB_OK;
+}
+
+/*
+ * AppendableFile
+ */
+
+static LDB_INLINE int
+ldb_appendfile_create0(const char *filename, ldb_wfile_t **file) {
+  HANDLE handle = LDBCreateFile(filename,
+                                GENERIC_WRITE,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                NULL,
+                                OPEN_ALWAYS,
+                                FILE_ATTRIBUTE_NORMAL,
+                                NULL);
+
+  if (handle == INVALID_HANDLE_VALUE)
+    return ldb_system_error();
+
+  if (SetFilePointer(handle, 0, NULL, FILE_END) == (DWORD)-1) {
+    DWORD code = GetLastError();
+
+    if (code != ERROR_SUCCESS) {
+      CloseHandle(handle);
+      return ldb_convert_error(code);
+    }
+  }
+
+  *file = ldb_malloc(sizeof(ldb_wfile_t));
+
+  ldb_wfile_init(*file, filename, handle);
+
+  return LDB_OK;
+}
+
+/*
  * Logging
  */
 
@@ -1437,21 +1609,29 @@ int
 ldb_logger_open(const char *filename, ldb_logger_t **result) {
   FILE *stream;
 
+  SetLastError(ERROR_SUCCESS);
+
   if (LDBIsWindowsNT()) {
     ldb_wide_t path;
 
     if (!ldb_wide_import(&path, filename))
-      return LDB_INVALID;
+      return ldb_system_error();
 
-    stream = _wfopen(path.data, L"w"); /* L"wN" */
+    stream = _wfopen(path.data, L"w");
 
     ldb_wide_clear(&path);
   } else {
-    stream = fopen(filename, "w"); /* "wN" */
+    stream = fopen(filename, "w");
   }
 
-  if (stream == NULL)
-    return LDB_WIN32_ERROR(GetLastError());
+  if (stream == NULL) {
+    DWORD code = GetLastError();
+
+    if (code == ERROR_SUCCESS)
+      code = ERROR_TOO_MANY_OPEN_FILES;
+
+    return ldb_convert_error(code);
+  }
 
   *result = ldb_logger_fopen(stream);
 
@@ -1464,14 +1644,16 @@ ldb_logger_open(const char *filename, ldb_logger_t **result) {
 
 int64_t
 ldb_now_usec(void) {
-  uint64_t ticks;
+  static const uint64_t epoch = UINT64_C(116444736000000000);
+  ULARGE_INTEGER ticks;
   FILETIME ft;
 
   GetSystemTimeAsFileTime(&ft);
 
-  ticks = ((uint64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
+  ticks.LowPart = ft.dwLowDateTime;
+  ticks.HighPart = ft.dwHighDateTime;
 
-  return ticks / 10;
+  return (ticks.QuadPart - epoch) / 10;
 }
 
 void

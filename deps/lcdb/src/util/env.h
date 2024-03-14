@@ -18,6 +18,9 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#ifndef NDEBUG
+#include "atomic.h"
+#endif
 #include "extern.h"
 #include "slice.h"
 
@@ -35,6 +38,45 @@ typedef struct ldb_filelock_s ldb_filelock_t;
 typedef struct ldb_logger_s ldb_logger_t;
 typedef struct ldb_rfile_s ldb_rfile_t;
 typedef struct ldb_wfile_s ldb_wfile_t;
+
+/*
+ * Globals
+ */
+
+#ifndef NDEBUG
+extern struct ldb_env_state_s {
+  /* Whether to enable error injection. */
+  int enable_testing;
+  /* sstable/log sync() calls are blocked. */
+  ldb_atomic(int) delay_data_sync;
+  /* sstable/log sync() calls return an error. */
+  ldb_atomic(int) data_sync_error;
+  /* Simulate no-space errors. */
+  ldb_atomic(int) no_space;
+  /* Simulate non-writable file system. */
+  ldb_atomic(int) non_writable;
+  /* Force sync of manifest files to fail. */
+  ldb_atomic(int) manifest_sync_error;
+  /* Force write to manifest files to fail. */
+  ldb_atomic(int) manifest_write_error;
+  /* Count random reads. */
+  int count_random_reads;
+  ldb_atomic(int) random_read_counter;
+  /* Writable file errors. */
+  int writable_file_error;
+  int num_writable_file_errors;
+} ldb_env_state;
+#endif
+
+/*
+ * Errors
+ */
+
+int
+ldb_system_error(void);
+
+const char *
+ldb_error_string(int code);
 
 /*
  * Filesystem
@@ -82,6 +124,12 @@ ldb_lock_file(const char *filename, ldb_filelock_t **lock);
 int
 ldb_unlock_file(ldb_filelock_t *lock);
 
+int
+ldb_write_file(const char *fname, const ldb_slice_t *data, int should_sync);
+
+int
+ldb_read_file(const char *fname, ldb_buffer_t *data);
+
 LDB_EXTERN int
 ldb_test_directory(char *result, size_t size);
 
@@ -89,7 +137,7 @@ LDB_EXTERN int
 ldb_test_filename(char *result, size_t size, const char *name);
 
 /*
- * Readable File
+ * ReadableFile
  */
 
 int
@@ -97,9 +145,6 @@ ldb_seqfile_create(const char *filename, ldb_rfile_t **file);
 
 int
 ldb_randfile_create(const char *filename, ldb_rfile_t **file, int use_mmap);
-
-void
-ldb_rfile_destroy(ldb_rfile_t *file);
 
 int
 ldb_rfile_mapped(ldb_rfile_t *file);
@@ -120,8 +165,11 @@ ldb_rfile_pread(ldb_rfile_t *file,
                 size_t count,
                 uint64_t offset);
 
+void
+ldb_rfile_destroy(ldb_rfile_t *file);
+
 /*
- * Writable File
+ * WritableFile
  */
 
 int
@@ -129,12 +177,6 @@ ldb_truncfile_create(const char *filename, ldb_wfile_t **file);
 
 int
 ldb_appendfile_create(const char *filename, ldb_wfile_t **file);
-
-void
-ldb_wfile_destroy(ldb_wfile_t *file);
-
-int
-ldb_wfile_close(ldb_wfile_t *file);
 
 int
 ldb_wfile_append(ldb_wfile_t *file, const ldb_slice_t *data);
@@ -144,6 +186,12 @@ ldb_wfile_flush(ldb_wfile_t *file);
 
 int
 ldb_wfile_sync(ldb_wfile_t *file);
+
+int
+ldb_wfile_close(ldb_wfile_t *file);
+
+void
+ldb_wfile_destroy(ldb_wfile_t *file);
 
 /*
  * Logging
@@ -173,15 +221,5 @@ ldb_now_usec(void);
 
 void
 ldb_sleep_usec(int64_t usec);
-
-/*
- * Extra
- */
-
-int
-ldb_write_file(const char *fname, const ldb_slice_t *data, int should_sync);
-
-int
-ldb_read_file(const char *fname, ldb_buffer_t *data);
 
 #endif /* LDB_ENV_H */

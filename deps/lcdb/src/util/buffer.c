@@ -39,6 +39,21 @@ ldb_buffer_reset(ldb_buffer_t *z) {
   z->size = 0;
 }
 
+void
+ldb_buffer_reinit(ldb_buffer_t *z, size_t zn) {
+  uint8_t *zp = NULL;
+
+  if (z->alloc > 0)
+    ldb_free(z->data);
+
+  if (zn > 0)
+    zp = (uint8_t *)ldb_malloc(zn);
+
+  z->data = zp;
+  z->size = 0;
+  z->alloc = zn;
+}
+
 uint8_t *
 ldb_buffer_grow(ldb_buffer_t *z, size_t zn) {
   if (zn > z->alloc) {
@@ -170,10 +185,9 @@ ldb_buffer_number(ldb_buffer_t *z, uint64_t x) {
 
 void
 ldb_buffer_escape(ldb_buffer_t *z, const ldb_slice_t *x) {
+  static const char *nibble = "0123456789abcdef";
   uint8_t *zp = ldb_buffer_expand(z, x->size * 4 + 1);
   size_t i;
-
-#define nibble(x) ((x) < 10 ? (x) + '0' : (x) - 10 + 'a')
 
   for (i = 0; i < x->size; i++) {
     int ch = x->data[i];
@@ -183,12 +197,10 @@ ldb_buffer_escape(ldb_buffer_t *z, const ldb_slice_t *x) {
     } else {
       *zp++ = '\\';
       *zp++ = 'x';
-      *zp++ = nibble(ch >> 4);
-      *zp++ = nibble(ch & 15);
+      *zp++ = nibble[ch >> 4];
+      *zp++ = nibble[ch & 15];
     }
   }
-
-#undef nibble
 
   z->size = zp - z->data;
 }

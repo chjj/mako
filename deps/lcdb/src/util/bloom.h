@@ -101,7 +101,7 @@ ldb_bloom_create(int bits_per_key);
 LDB_EXTERN void
 ldb_bloom_destroy(ldb_bloom_t *bloom);
 
-void
+LDB_EXTERN void
 ldb_bloom_init(ldb_bloom_t *bloom, int bits_per_key);
 
 int
@@ -117,6 +117,11 @@ ldb_bloom_name(char *buf, size_t size, const ldb_bloom_t *bloom);
  * Globals
  */
 
+#ifdef _WIN32
+LDB_EXTERN const ldb_bloom_t *ldb_bloom_import(void);
+#define ldb_bloom_default (ldb_bloom_import())
+#else
 LDB_EXTERN extern const ldb_bloom_t *ldb_bloom_default;
+#endif
 
 #endif /* LDB_BLOOM_H */

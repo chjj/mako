@@ -225,5 +225,5 @@ ldb_twoiter_create(ldb_iter_t *index_iter,
 
   ldb_twoiter_init(iter, index_iter, block_function, arg, options);
 
-  return ldb_iter_create(iter, &ldb_twoiter_table);
+  return ldb_iter_create(iter, &ldb_twoiter_table, index_iter->cmp);
 }

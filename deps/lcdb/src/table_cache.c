@@ -61,7 +61,7 @@ delete_entry(const ldb_slice_t *key, void *value) {
 static void
 unref_entry(void *arg1, void *arg2) {
   ldb_lru_t *lru = (ldb_lru_t *)arg1;
-  ldb_lruhandle_t *h = (ldb_lruhandle_t *)arg2;
+  ldb_entry_t *h = (ldb_entry_t *)arg2;
 
   ldb_lru_release(lru, h);
 }
@@ -91,7 +91,7 @@ static int
 find_table(ldb_tables_t *cache,
            uint64_t file_number,
            uint64_t file_size,
-           ldb_lruhandle_t **handle) {
+           ldb_entry_t **handle) {
   ldb_slice_t key;
   int rc = LDB_OK;
   uint8_t buf[8];
@@ -129,7 +129,8 @@ find_table(ldb_tables_t *cache,
     if (rc != LDB_OK) {
       assert(table == NULL);
 
-      ldb_rfile_destroy(file);
+      if (file != NULL)
+        ldb_rfile_destroy(file);
 
       /* We do not cache error results so that if the error is transient,
          or somebody repairs the file, we recover automatically. */
@@ -152,7 +153,7 @@ ldb_tables_iterate(ldb_tables_t *cache,
                    uint64_t file_number,
                    uint64_t file_size,
                    ldb_table_t **tableptr) {
-  ldb_lruhandle_t *handle = NULL;
+  ldb_entry_t *handle = NULL;
   ldb_table_t *table;
   ldb_iter_t *result;
   int rc;
@@ -186,7 +187,7 @@ ldb_tables_get(ldb_tables_t *cache,
                void (*handle_result)(void *,
                                      const ldb_slice_t *,
                                      const ldb_slice_t *)) {
-  ldb_lruhandle_t *handle = NULL;
+  ldb_entry_t *handle = NULL;
   int rc;
 
   rc = find_table(cache, file_number, file_size, &handle);

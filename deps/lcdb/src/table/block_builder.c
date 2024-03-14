@@ -92,24 +92,21 @@ void
 ldb_blockgen_add(ldb_blockgen_t *bb,
                  const ldb_slice_t *key,
                  const ldb_slice_t *value) {
-  const ldb_comparator_t *comparator = bb->options->comparator;
+  const ldb_slice_t *last = &bb->last_key;
   const uint8_t *key_offset = key->data;
-  ldb_slice_t last = bb->last_key;
-  size_t shared, non_shared;
+  size_t shared = 0;
+  size_t non_shared;
 
   assert(!bb->finished);
   assert(bb->counter <= bb->options->block_restart_interval);
-  assert(ldb_blockgen_empty(bb) || ldb_compare(comparator, key, &last) > 0);
-
-  (void)comparator;
-
-  shared = 0;
+  assert(ldb_blockgen_empty(bb) ||
+         ldb_compare(bb->options->comparator, key, last) > 0);
 
   if (bb->counter < bb->options->block_restart_interval) {
     /* See how much sharing to do with previous string. */
-    size_t min_length = LDB_MIN(last.size, key->size);
+    size_t min_length = LDB_MIN(last->size, key->size);
 
-    while (shared < min_length && last.data[shared] == key->data[shared])
+    while (shared < min_length && last->data[shared] == key->data[shared])
       shared++;
   } else {
     /* Restart compression. */

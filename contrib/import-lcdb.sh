@@ -15,6 +15,10 @@ if test ! -d deps/lcdb; then
   mkdir deps/lcdb
 fi
 
+if test ! -d deps/lcdb/compat; then
+  mkdir deps/lcdb/compat
+fi
+
 if test ! -d deps/lcdb/contrib; then
   mkdir deps/lcdb/contrib
 fi
@@ -33,6 +37,7 @@ cp -f "$prefix/contrib/Makefile.am" deps/lcdb/
 cp -f "$prefix/LICENSE" deps/lcdb/
 cp -f "$prefix/README.md" deps/lcdb/
 
+rsync -av "$prefix/compat/" deps/lcdb/compat/
 rsync -av "$prefix/contrib/" deps/lcdb/contrib/
 rsync -av "$prefix/include/" deps/lcdb/include/
 
@@ -51,3 +56,4 @@ rm -f deps/lcdb/contrib/Makefile.am
 rm -f deps/lcdb/contrib/fuzzer.c
 
 sed -i 's;include(cmake/;include(../../cmake/;g' deps/lcdb/CMakeLists.txt
+# sed -i 's;/compat);/../../compat);g' deps/lcdb/CMakeLists.txt

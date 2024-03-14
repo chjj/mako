@@ -23,15 +23,15 @@
  */
 
 /* Maximum encoding length of a BlockHandle. */
-#define LDB_BLOCKHANDLE_MAX (10 + 10) /* kMaxEncodedLength */
+#define LDB_HANDLE_SIZE (10 + 10) /* kMaxEncodedLength */
 
 /* Encoded length of a Footer. Note that the serialization of a
    Footer will always occupy exactly this many bytes. It consists
    of two block handles and a magic number. */
-#define LDB_FOOTER_SIZE (2 * LDB_BLOCKHANDLE_MAX + 8) /* kEncodedLength */
+#define LDB_FOOTER_SIZE (2 * LDB_HANDLE_SIZE + 8) /* kEncodedLength */
 
 /* 1-byte type + 32-bit crc. */
-#define LDB_BLOCK_TRAILER_SIZE 5 /* kBlockTrailerSize */
+#define LDB_TRAILER_SIZE 5 /* kBlockTrailerSize */
 
 /* kTableMagicNumber was picked by running
       echo http://code.google.com/p/leveldb/ | sha1sum
@@ -114,7 +114,7 @@ void
 ldb_contents_init(ldb_contents_t *x);
 
 /*
- * Block Read
+ * ReadBlock
  */
 
 int

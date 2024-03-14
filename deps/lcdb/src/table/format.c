@@ -13,6 +13,7 @@
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "../util/buffer.h"
 #include "../util/coding.h"
@@ -55,7 +56,7 @@ ldb_handle_write(uint8_t *zp, const ldb_handle_t *x) {
 
 void
 ldb_handle_export(ldb_buffer_t *z, const ldb_handle_t *x) {
-  uint8_t *zp = ldb_buffer_expand(z, LDB_BLOCKHANDLE_MAX);
+  uint8_t *zp = ldb_buffer_expand(z, LDB_HANDLE_SIZE);
   size_t xn = ldb_handle_write(zp, x) - zp;
 
   z->size += xn;
@@ -96,7 +97,7 @@ ldb_footer_write(uint8_t *zp, const ldb_footer_t *x) {
   zp = ldb_handle_write(zp, &x->metaindex_handle);
   zp = ldb_handle_write(zp, &x->index_handle);
 
-  pad = (2 * LDB_BLOCKHANDLE_MAX) - (zp - tp);
+  pad = (2 * LDB_HANDLE_SIZE) - (zp - tp);
 
   zp = ldb_padding_write(zp, pad);
   zp = ldb_fixed64_write(zp, LDB_TABLE_MAGIC);
@@ -154,7 +155,7 @@ ldb_contents_init(ldb_contents_t *x) {
 }
 
 /*
- * Block Read
+ * ReadBlock
  */
 
 int
@@ -170,13 +171,19 @@ ldb_read_block(ldb_contents_t *result,
 
   ldb_contents_init(result);
 
+  /* Check for overflow. */
+  if (handle->size > SIZE_MAX - LDB_TRAILER_SIZE)
+    return LDB_CORRUPTION;
+
   /* Read the block contents as well as the type/crc footer. */
   /* See table_builder.c for the code that built this structure. */
   n = handle->size;
-  len = n + LDB_BLOCK_TRAILER_SIZE;
+  len = n + LDB_TRAILER_SIZE;
 
-  if (!ldb_rfile_mapped(file))
-    buf = ldb_malloc(len);
+  if (!ldb_rfile_mapped(file)) {
+    if ((buf = malloc(len)) == NULL)
+      return LDB_ENOMEM;
+  }
 
   rc = ldb_rfile_pread(file, &contents, buf, len, handle->offset);
 
@@ -232,7 +239,10 @@ ldb_read_block(ldb_contents_t *result,
         return LDB_CORRUPTION; /* "corrupted compressed block contents" */
       }
 
-      ubuf = ldb_malloc(ulength);
+      if ((ubuf = malloc(ulength)) == NULL) {
+        ldb_free(buf);
+        return LDB_ENOMEM;
+      }
 
       if (!snappy_decode(ubuf, data, n)) {
         ldb_free(buf);

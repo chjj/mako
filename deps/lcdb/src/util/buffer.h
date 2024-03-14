@@ -24,6 +24,9 @@ ldb_buffer_clear(ldb_buffer_t *z);
 void
 ldb_buffer_reset(ldb_buffer_t *z);
 
+void
+ldb_buffer_reinit(ldb_buffer_t *z, size_t zn);
+
 uint8_t *
 ldb_buffer_grow(ldb_buffer_t *z, size_t zn);
 

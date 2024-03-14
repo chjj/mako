@@ -15,6 +15,7 @@
 #include <assert.h>
 #include <stddef.h>
 
+#include "../util/comparator.h"
 #include "../util/internal.h"
 #include "../util/types.h"
 
@@ -25,11 +26,15 @@
  */
 
 static void
-ldb_iter_init(ldb_iter_t *iter, void *ptr, const ldb_itertbl_t *table) {
+ldb_iter_init(ldb_iter_t *iter,
+              void *ptr,
+              const ldb_itertbl_t *table,
+              const ldb_comparator_t *cmp) {
   iter->ptr = ptr;
   iter->cleanup_head.func = NULL;
   iter->cleanup_head.next = NULL;
   iter->table = table;
+  iter->cmp = cmp;
 }
 
 static void
@@ -52,9 +57,11 @@ ldb_iter_clear(ldb_iter_t *iter) {
 }
 
 ldb_iter_t *
-ldb_iter_create(void *ptr, const ldb_itertbl_t *table) {
+ldb_iter_create(void *ptr,
+                const ldb_itertbl_t *table,
+                const ldb_comparator_t *cmp) {
   ldb_iter_t *iter = ldb_malloc(sizeof(ldb_iter_t));
-  ldb_iter_init(iter, ptr, table);
+  ldb_iter_init(iter, ptr, table, cmp);
   return iter;
 }
 
@@ -128,6 +135,73 @@ int
 ldb_iter_status(const ldb_iter_t *iter) {
   return iter->table->status(iter->ptr);
 }
+
+int
+ldb_iter_compare(const ldb_iter_t *iter, const ldb_slice_t *key) {
+  ldb_slice_t x = iter->table->key(iter->ptr);
+  return ldb_compare(iter->cmp, &x, key);
+}
+
+void
+ldb_iter_seek_ge(ldb_iter_t *iter, const ldb_slice_t *target) {
+  iter->table->seek(iter->ptr, target);
+}
+
+void
+ldb_iter_seek_gt(ldb_iter_t *iter, const ldb_slice_t *target) {
+  iter->table->seek(iter->ptr, target);
+
+  if (iter->table->valid(iter->ptr)) {
+    if (ldb_iter_compare(iter, target) == 0)
+      iter->table->next(iter->ptr);
+  }
+}
+
+void
+ldb_iter_seek_le(ldb_iter_t *iter, const ldb_slice_t *target) {
+  iter->table->seek(iter->ptr, target);
+
+  if (iter->table->valid(iter->ptr)) {
+    if (ldb_iter_compare(iter, target) > 0)
+      iter->table->prev(iter->ptr);
+  } else {
+    iter->table->last(iter->ptr);
+  }
+}
+
+void
+ldb_iter_seek_lt(ldb_iter_t *iter, const ldb_slice_t *target) {
+  iter->table->seek(iter->ptr, target);
+
+  if (iter->table->valid(iter->ptr))
+    iter->table->prev(iter->ptr);
+  else
+    iter->table->last(iter->ptr);
+}
+
+/*
+ * Empty Comparator
+ */
+
+static int
+empty_compare(const ldb_comparator_t *comparator,
+              const ldb_slice_t *x,
+              const ldb_slice_t *y) {
+  (void)comparator;
+  (void)x;
+  (void)y;
+  assert(0);
+  return -1;
+}
+
+static const ldb_comparator_t empty_comparator = {
+  /* .name = */ "leveldb.EmptyComparator",
+  /* .compare = */ empty_compare,
+  /* .shortest_separator = */ NULL,
+  /* .short_successor = */ NULL,
+  /* .user_comparator = */ NULL,
+  /* .state = */ NULL
+};
 
 /*
  * Empty Iterator
@@ -203,5 +277,5 @@ ldb_emptyiter_create(int status) {
 
   iter->status = status;
 
-  return ldb_iter_create(iter, &ldb_emptyiter_table);
+  return ldb_iter_create(iter, &ldb_emptyiter_table, &empty_comparator);
 }

@@ -16,13 +16,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef struct ldb_buffer_s {
+typedef struct ldb_slice_s {
   uint8_t *data;
   size_t size;
   size_t alloc;
-} ldb_buffer_t;
+} ldb_slice_t;
 
-typedef ldb_buffer_t ldb_slice_t;
+typedef ldb_slice_t ldb_buffer_t;
 
 /* A range of keys. */
 typedef struct ldb_range_s {
@@ -31,7 +31,7 @@ typedef struct ldb_range_s {
 } ldb_range_t;
 
 typedef struct ldb_array_s {
-  int64_t *items;
+  uint64_t *items;
   size_t length;
   size_t alloc;
 } ldb_array_t;

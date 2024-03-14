@@ -4,6 +4,8 @@
 
 EXTRA_DIST = CMakeLists.txt LICENSE README.md
 
+noinst_HEADERS = compat/stdint.h # For the cmake build.
+
 liblcdb_la_SOURCES = include/lcdb.h                 \
                      include/lcdb_c.h               \
                      src/util/arena.c               \

@@ -100,4 +100,9 @@ static const ldb_comparator_t bytewise_comparator = {
  * Globals
  */
 
+#ifdef _WIN32
+const ldb_comparator_t *
+ldb_comparator_import(void) { return &bytewise_comparator; }
+#else
 const ldb_comparator_t *ldb_bytewise_comparator = &bytewise_comparator;
+#endif

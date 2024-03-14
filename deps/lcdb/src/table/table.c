@@ -131,8 +131,8 @@ ldb_table_open(const ldb_dbopt_t *options,
                uint64_t size,
                ldb_table_t **table) {
   ldb_readopt_t opt = *ldb_readopt_default;
-  ldb_contents_t contents;
   uint8_t buf[LDB_FOOTER_SIZE];
+  ldb_contents_t contents;
   ldb_footer_t footer;
   ldb_slice_t input;
   int rc;
@@ -149,7 +149,7 @@ ldb_table_open(const ldb_dbopt_t *options,
                        size - LDB_FOOTER_SIZE);
 
   if (rc != LDB_OK)
-    return LDB_CORRUPTION;
+    return rc;
 
   if (!ldb_footer_import(&footer, &input))
     return LDB_CORRUPTION;
@@ -179,7 +179,7 @@ ldb_table_open(const ldb_dbopt_t *options,
     tbl->index_block = index_block;
 
     if (options->block_cache != NULL)
-      tbl->cache_id = ldb_lru_newid(options->block_cache);
+      tbl->cache_id = ldb_lru_id(options->block_cache);
 
     ldb_table_read_meta(tbl, &footer);
 
@@ -219,7 +219,7 @@ delete_cached_block(const ldb_slice_t *key, void *value) {
 static void
 release_block(void *arg, void *h) {
   ldb_lru_t *cache = (ldb_lru_t *)arg;
-  ldb_lruhandle_t *handle = (ldb_lruhandle_t *)h;
+  ldb_entry_t *handle = (ldb_entry_t *)h;
 
   ldb_lru_release(cache, handle);
 }
@@ -232,8 +232,8 @@ ldb_table_blockreader(void *arg,
                       const ldb_slice_t *index_value) {
   ldb_table_t *table = (ldb_table_t *)arg;
   ldb_lru_t *block_cache = table->options.block_cache;
+  ldb_entry_t *cache_handle = NULL;
   ldb_block_t *block = NULL;
-  ldb_lruhandle_t *cache_handle = NULL;
   ldb_handle_t handle;
   ldb_iter_t *iter;
   int rc = LDB_OK;

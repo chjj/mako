@@ -19,6 +19,7 @@
 #include "util/atomic.h"
 #include "util/comparator.h"
 #include "util/internal.h"
+#include "util/port.h"
 #include "util/random.h"
 #include "util/slice.h"
 
@@ -47,6 +48,14 @@
  * ... prev vs. next pointer ordering ...
  */
 
+#ifdef LDB_HAVE_ATOMICS
+#  define SKIP_LOCK(x) do { } while (0)
+#  define SKIP_UNLOCK SKIP_LOCK
+#else
+#  define SKIP_LOCK ldb_mutex_lock
+#  define SKIP_UNLOCK ldb_mutex_unlock
+#endif
+
 /*
  * Constants
  */
@@ -61,7 +70,11 @@ struct ldb_skipnode_s {
   const uint8_t *key;
   /* Array of length equal to the node height.
      next[0] is lowest level link. */
+#ifdef LDB_HAVE_ATOMICS
   ldb_atomic_ptr(struct ldb_skipnode_s) next[1];
+#else
+  struct ldb_skipnode_s *next[1];
+#endif
 };
 
 static void
@@ -72,36 +85,57 @@ ldb_skipnode_init(ldb_skipnode_t *node, const uint8_t *key) {
 static ldb_skipnode_t *
 ldb_skipnode_next(ldb_skipnode_t *node, int n) {
   assert(n >= 0);
+#ifdef LDB_HAVE_ATOMICS
   /* Use an 'acquire load' so that we observe a fully initialized
      version of the returned Node. */
   return ldb_atomic_load_ptr(&node->next[n], ldb_order_acquire);
+#else
+  return node->next[n];
+#endif
 }
 
 static void
 ldb_skipnode_set(ldb_skipnode_t *node, int n, ldb_skipnode_t *x) {
   assert(n >= 0);
+#ifdef LDB_HAVE_ATOMICS
   /* Use a 'release store' so that anybody who reads through this
      pointer observes a fully initialized version of the inserted node. */
   ldb_atomic_store_ptr(&node->next[n], x, ldb_order_release);
+#else
+  node->next[n] = x;
+#endif
 }
 
 /* No-barrier variants that can be safely used in a few locations. */
 static ldb_skipnode_t *
 ldb_skipnode_next_nb(ldb_skipnode_t *node, int n) {
   assert(n >= 0);
+#ifdef LDB_HAVE_ATOMICS
   return ldb_atomic_load_ptr(&node->next[n], ldb_order_relaxed);
+#else
+  return node->next[n];
+#endif
 }
 
 static void
 ldb_skipnode_set_nb(ldb_skipnode_t *node, int n, ldb_skipnode_t *x) {
   assert(n >= 0);
+#ifdef LDB_HAVE_ATOMICS
   ldb_atomic_store_ptr(&node->next[n], x, ldb_order_relaxed);
+#else
+  node->next[n] = x;
+#endif
 }
 
 static ldb_skipnode_t *
 ldb_skipnode_create(ldb_skiplist_t *list, const uint8_t *key, int height) {
+#ifdef LDB_HAVE_ATOMICS
   size_t size = (sizeof(ldb_skipnode_t) +
                  sizeof(ldb_atomic_ptr(ldb_skipnode_t)) * (height - 1));
+#else
+  size_t size = (sizeof(ldb_skipnode_t) +
+                 sizeof(ldb_skipnode_t *) * (height - 1));
+#endif
 
   ldb_skipnode_t *node = ldb_arena_alloc_aligned(list->arena, size);
 
@@ -117,13 +151,21 @@ ldb_skipnode_create(ldb_skiplist_t *list, const uint8_t *key, int height) {
 void
 ldb_skiplist_init(ldb_skiplist_t *list,
                   const ldb_comparator_t *cmp,
-                  ldb_arena_t *arena) {
+                  ldb_arena_t *arena,
+                  ldb_mutex_t *mutex) {
   int i;
 
   list->comparator = cmp;
   list->arena = arena;
   list->head = ldb_skipnode_create(list, NULL, LDB_MAX_HEIGHT);
+
+#ifdef LDB_HAVE_ATOMICS
+  ldb_atomic_init(&list->max_height, 1);
+  (void)mutex;
+#else
   list->max_height = 1;
+  list->mutex = mutex;
+#endif
 
   ldb_rand_init(&list->rnd, 0xdeadbeef);
 
@@ -133,7 +175,11 @@ ldb_skiplist_init(ldb_skiplist_t *list,
 
 static int
 ldb_skiplist_maxheight(const ldb_skiplist_t *list) {
+#ifdef LDB_HAVE_ATOMICS
   return ldb_atomic_load(&list->max_height, ldb_order_relaxed);
+#else
+  return list->max_height;
+#endif
 }
 
 /* MemTable::KeyComparator::operator() */
@@ -260,8 +306,12 @@ ldb_skiplist_find_last(const ldb_skiplist_t *list) {
 void
 ldb_skiplist_insert(ldb_skiplist_t *list, const uint8_t *key) {
   ldb_skipnode_t *prev[LDB_MAX_HEIGHT];
-  ldb_skipnode_t *x = ldb_skiplist_find_ge(list, key, prev);
+  ldb_skipnode_t *x;
   int i, height;
+
+  SKIP_LOCK(list->mutex);
+
+  x = ldb_skiplist_find_ge(list, key, prev);
 
   /* Our data structure does not allow duplicate insertion. */
   assert(x == NULL || !ldb_skiplist_equal(list, key, x->key));
@@ -272,6 +322,7 @@ ldb_skiplist_insert(ldb_skiplist_t *list, const uint8_t *key) {
     for (i = ldb_skiplist_maxheight(list); i < height; i++)
       prev[i] = list->head;
 
+#ifdef LDB_HAVE_ATOMICS
     /* It is ok to mutate max_height without any synchronization
        with concurrent readers. A concurrent reader that observes
        the new value of max_height will see either the old value of
@@ -280,6 +331,9 @@ ldb_skiplist_insert(ldb_skiplist_t *list, const uint8_t *key) {
        immediately drop to the next level since NULL sorts after all
        keys. In the latter case the reader will use the new node. */
     ldb_atomic_store(&list->max_height, height, ldb_order_relaxed);
+#else
+    list->max_height = height;
+#endif
   }
 
   x = ldb_skipnode_create(list, key, height);
@@ -290,11 +344,19 @@ ldb_skiplist_insert(ldb_skiplist_t *list, const uint8_t *key) {
     ldb_skipnode_set_nb(x, i, ldb_skipnode_next_nb(prev[i], i));
     ldb_skipnode_set(prev[i], i, x);
   }
+
+  SKIP_UNLOCK(list->mutex);
 }
 
 int
 ldb_skiplist_contains(const ldb_skiplist_t *list, const uint8_t *key) {
-  ldb_skipnode_t *x = ldb_skiplist_find_ge(list, key, NULL);
+  ldb_skipnode_t *x;
+
+  SKIP_LOCK(list->mutex);
+
+  x = ldb_skiplist_find_ge(list, key, NULL);
+
+  SKIP_UNLOCK(list->mutex);
 
   if (x != NULL && ldb_skiplist_equal(list, key, x->key))
     return 1;
@@ -327,7 +389,11 @@ void
 ldb_skipiter_next(ldb_skipiter_t *iter) {
   assert(ldb_skipiter_valid(iter));
 
+  SKIP_LOCK(iter->list->mutex);
+
   iter->node = ldb_skipnode_next(iter->node, 0);
+
+  SKIP_UNLOCK(iter->list->mutex);
 }
 
 void
@@ -336,26 +402,42 @@ ldb_skipiter_prev(ldb_skipiter_t *iter) {
      search for the last node that falls before key. */
   assert(ldb_skipiter_valid(iter));
 
+  SKIP_LOCK(iter->list->mutex);
+
   iter->node = ldb_skiplist_find_lt(iter->list, iter->node->key);
 
   if (iter->node == iter->list->head)
     iter->node = NULL;
+
+  SKIP_UNLOCK(iter->list->mutex);
 }
 
 void
 ldb_skipiter_seek(ldb_skipiter_t *iter, const uint8_t *target) {
+  SKIP_LOCK(iter->list->mutex);
+
   iter->node = ldb_skiplist_find_ge(iter->list, target, NULL);
+
+  SKIP_UNLOCK(iter->list->mutex);
 }
 
 void
 ldb_skipiter_first(ldb_skipiter_t *iter) {
+  SKIP_LOCK(iter->list->mutex);
+
   iter->node = ldb_skipnode_next(iter->list->head, 0);
+
+  SKIP_UNLOCK(iter->list->mutex);
 }
 
 void
 ldb_skipiter_last(ldb_skipiter_t *iter) {
+  SKIP_LOCK(iter->list->mutex);
+
   iter->node = ldb_skiplist_find_last(iter->list);
 
   if (iter->node == iter->list->head)
     iter->node = NULL;
+
+  SKIP_UNLOCK(iter->list->mutex);
 }

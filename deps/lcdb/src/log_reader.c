@@ -238,8 +238,10 @@ skip_to_initial_block(ldb_reader_t *lr) {
     if (lr->src != NULL) {
       uint64_t nskip = LDB_MIN(block_start, lr->src->size);
 
-      lr->src->data += nskip;
-      lr->src->size -= nskip;
+      if (nskip > 0) {
+        lr->src->data += nskip;
+        lr->src->size -= nskip;
+      }
     } else {
       rc = ldb_rfile_skip(lr->file, block_start);
     }
@@ -277,10 +279,10 @@ ldb_reader_read_record(ldb_reader_t *lr,
     /* read_physical_record may have only had an empty trailer remaining in its
        internal buffer. Calculate the offset of the next physical record now
        that it has returned, properly accounting for its header size. */
-    uint64_t physical_offset = (lr->end_offset
-                              - lr->buffer.size
-                              - LDB_HEADER_SIZE
-                              - fragment.size);
+    uint64_t physical_offset = (lr->end_offset -
+                                lr->buffer.size -
+                                LDB_HEADER_SIZE -
+                                fragment.size);
 
     if (lr->resyncing) {
       if (record_type == LDB_TYPE_MIDDLE)
@@ -297,10 +299,10 @@ ldb_reader_read_record(ldb_reader_t *lr,
     switch (record_type) {
       case LDB_TYPE_FULL: {
         if (in_fragmented_record) {
-          /* Handle bug in earlier versions of LogWriter where
-            it could emit an empty LDB_TYPE_FIRST record at the tail end
-            of a block followed by a LDB_TYPE_FULL or LDB_TYPE_FIRST record
-            at the beginning of the next block. */
+          /* Handle bug in earlier versions of LogWriter where it could
+             emit an empty LDB_TYPE_FIRST record at the tail end of a
+             block followed by a LDB_TYPE_FULL or LDB_TYPE_FIRST record
+             at the beginning of the next block. */
           if (scratch->size > 0) {
             report_corruption(lr, scratch->size,
                               "partial record without end(1)");
@@ -378,7 +380,7 @@ ldb_reader_read_record(ldb_reader_t *lr,
         return 0;
       }
 
-      case LDB_BAD_RECORD:
+      case LDB_BAD_RECORD: {
         if (in_fragmented_record) {
           report_corruption(lr, scratch->size, "error in middle of record");
 
@@ -388,6 +390,7 @@ ldb_reader_read_record(ldb_reader_t *lr,
         }
 
         break;
+      }
 
       default: {
         char buf[40];

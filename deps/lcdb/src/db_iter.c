@@ -100,12 +100,10 @@ parse_key(ldb_dbiter_t *iter, ldb_pkey_t *ikey) {
 
 static LDB_INLINE void
 clear_saved_value(ldb_dbiter_t *iter) {
-  if (iter->saved_value.alloc > 1048576) {
-    ldb_buffer_clear(&iter->saved_value);
-    ldb_buffer_init(&iter->saved_value);
-  } else {
+  if (iter->saved_value.alloc > 1048576)
+    ldb_buffer_reinit(&iter->saved_value, 1);
+  else
     ldb_buffer_reset(&iter->saved_value);
-  }
 }
 
 static void
@@ -151,6 +149,9 @@ find_prev_user_entry(ldb_dbiter_t *iter) {
 
   assert(iter->direction == LDB_REVERSE);
 
+  ldb_buffer_grow(&iter->saved_key, 1);
+  ldb_buffer_grow(&iter->saved_value, 1);
+
   if (ldb_iter_valid(iter->iter)) {
     do {
       ldb_pkey_t ikey;
@@ -172,10 +173,8 @@ find_prev_user_entry(ldb_dbiter_t *iter) {
           ldb_slice_t ukey = ldb_extract_user_key(&key);
           ldb_slice_t value = ldb_iter_value(iter->iter);
 
-          if (iter->saved_value.alloc > value.size + 1048576) {
-            ldb_buffer_clear(&iter->saved_value);
-            ldb_buffer_init(&iter->saved_value);
-          }
+          if (iter->saved_value.alloc > value.size + 1048576)
+            ldb_buffer_reinit(&iter->saved_value, LDB_MAX(value.size, 1));
 
           ldb_buffer_copy(&iter->saved_key, &ukey);
           ldb_buffer_copy(&iter->saved_value, &value);
@@ -404,49 +403,5 @@ ldb_dbiter_create(ldb_t *db,
                   uint32_t seed) {
   ldb_dbiter_t *iter = ldb_malloc(sizeof(ldb_dbiter_t));
   ldb_dbiter_init(iter, db, user_comparator, internal_iter, sequence, seed);
-  return ldb_iter_create(iter, &ldb_dbiter_table);
-}
-
-int
-ldb_iter_compare(const ldb_iter_t *iter, const ldb_slice_t *key) {
-  const ldb_dbiter_t *it = iter->ptr;
-  ldb_slice_t x = ldb_dbiter_key(it);
-  return ldb_compare(it->ucmp, &x, key);
-}
-
-void
-ldb_iter_seek_ge(ldb_iter_t *iter, const ldb_slice_t *target) {
-  ldb_iter_seek(iter, target);
-}
-
-void
-ldb_iter_seek_gt(ldb_iter_t *iter, const ldb_slice_t *target) {
-  ldb_iter_seek(iter, target);
-
-  if (ldb_iter_valid(iter)) {
-    if (ldb_iter_compare(iter, target) == 0)
-      ldb_iter_next(iter);
-  }
-}
-
-void
-ldb_iter_seek_le(ldb_iter_t *iter, const ldb_slice_t *target) {
-  ldb_iter_seek(iter, target);
-
-  if (ldb_iter_valid(iter)) {
-    if (ldb_iter_compare(iter, target) > 0)
-      ldb_iter_prev(iter);
-  } else {
-    ldb_iter_last(iter);
-  }
-}
-
-void
-ldb_iter_seek_lt(ldb_iter_t *iter, const ldb_slice_t *target) {
-  ldb_iter_seek(iter, target);
-
-  if (ldb_iter_valid(iter))
-    ldb_iter_prev(iter);
-  else
-    ldb_iter_last(iter);
+  return ldb_iter_create(iter, &ldb_dbiter_table, user_comparator);
 }

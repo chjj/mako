@@ -24,6 +24,7 @@
 
 struct ldb_arena_s;
 struct ldb_comparator_s;
+struct ldb_mutex_s;
 
 typedef struct ldb_skipnode_s ldb_skipnode_t;
 
@@ -33,9 +34,14 @@ typedef struct ldb_skiplist_s {
   struct ldb_arena_s *arena;
   ldb_skipnode_t *head;
 
+#ifdef LDB_HAVE_ATOMICS
   /* Modified only by insert(). Read racily by readers, but stale
      values are ok. */
   ldb_atomic(int) max_height; /* Height of the entire list. */
+#else
+  int max_height; /* Height of the entire list. */
+  struct ldb_mutex_s *mutex;
+#endif
 
   /* Read/written only by insert(). */
   ldb_rand_t rnd;
@@ -45,6 +51,7 @@ typedef struct ldb_skipiter_s {
   const ldb_skiplist_t *list;
   ldb_skipnode_t *node;
 } ldb_skipiter_t;
+
 
 /*
  * SkipList
@@ -57,7 +64,8 @@ typedef struct ldb_skipiter_s {
 void
 ldb_skiplist_init(ldb_skiplist_t *list,
                   const struct ldb_comparator_s *cmp,
-                  struct ldb_arena_s *arena);
+                  struct ldb_arena_s *arena,
+                  struct ldb_mutex_s *mutex);
 
 /* Insert key into the list. */
 /* REQUIRES: nothing that compares equal to key is currently in the list. */

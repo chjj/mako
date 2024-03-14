@@ -44,8 +44,10 @@ typedef struct LDB_RTL_CRITICAL_SECTION {
 
 #if defined(_WIN32)
 
+#include "atomic.h"
+
 typedef struct ldb_mutex_s {
-  volatile long state;
+  ldb_atomic(int) state;
   LDB_CRITICAL_SECTION handle;
 } ldb_mutex_t;
 
@@ -59,6 +61,8 @@ typedef struct ldb_cond_s {
 typedef struct ldb_thread_s {
   LDB_HANDLE handle;
 } ldb_thread_t;
+
+typedef unsigned long ldb_tid_t;
 
 #define LDB_MUTEX_INITIALIZER {0, {0, 0, 0, 0, 0, 0}}
 
@@ -76,6 +80,8 @@ typedef struct ldb_thread_s {
   pthread_t handle;
 } ldb_thread_t;
 
+typedef pthread_t ldb_tid_t;
+
 #define LDB_MUTEX_INITIALIZER { PTHREAD_MUTEX_INITIALIZER }
 
 #else /* !LDB_PTHREAD */
@@ -91,6 +97,8 @@ typedef struct ldb_cond_s {
 typedef struct ldb_thread_s {
   void *handle;
 } ldb_thread_t;
+
+typedef unsigned long ldb_tid_t;
 
 #define LDB_MUTEX_INITIALIZER {0}
 
@@ -145,5 +153,16 @@ ldb_thread_detach(ldb_thread_t *thread);
 
 void
 ldb_thread_join(ldb_thread_t *thread);
+
+#if defined(_WIN32)
+ldb_tid_t ldb_thread_self(void);
+#  define ldb_thread_equal(x, y) ((x) == (y))
+#elif defined(LDB_PTHREAD)
+#  define ldb_thread_self pthread_self
+#  define ldb_thread_equal pthread_equal
+#else
+#  define ldb_thread_self() 0
+#  define ldb_thread_equal(x, y) ((x) == (y))
+#endif
 
 #endif /* LDB_PORT_H */

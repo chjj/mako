@@ -89,12 +89,15 @@ save_error(char **errptr, int status) {
   msg = ldb_strerror(status);
   len = strlen(msg);
 
-  *errptr = malloc(len + 1);
+  *errptr = malloc(len + 10 + 1);
 
   if (*errptr == NULL)
     abort(); /* LCOV_EXCL_LINE */
 
-  memcpy(*errptr, msg, len + 1);
+  if (!LDB_IS_STATUS(status))
+    sprintf(*errptr, "IO error: %s", msg);
+  else
+    memcpy(*errptr, msg, len + 1);
 
   return 1;
 }
