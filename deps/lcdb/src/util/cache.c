@@ -127,7 +127,9 @@ static void
 lru_table_resize(lru_table_t *tbl) {
   lru_handle_t **new_list;
   uint32_t new_length = 4;
+#ifndef NDEBUG
   uint32_t count = 0;
+#endif
   uint32_t i;
 
   while (new_length < tbl->elems)
@@ -149,7 +151,9 @@ lru_table_resize(lru_table_t *tbl) {
       h->next_hash = *ptr;
       *ptr = h;
       h = next;
+#ifndef NDEBUG
       count++;
+#endif
     }
   }
 
