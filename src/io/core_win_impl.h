@@ -17,8 +17,16 @@
 #include <shlobj.h>
 #include <io/core.h>
 
+/*
+ * Fixes
+ */
+
 #ifdef __GNUC__
 #  pragma GCC diagnostic ignored "-Wcast-function-type"
+#endif
+
+#ifndef INVALID_FILE_ATTRIBUTES
+#  define INVALID_FILE_ATTRIBUTES ((DWORD)-1)
 #endif
 
 /*
@@ -103,19 +111,54 @@ btc_wide_export(char *zp, size_t zn, const btc_wide_t *x) {
  * Compat
  */
 
+#undef USE_INLINE_ASM
+
+#if defined(_MSC_VER) && !defined(__clang__)        \
+                      && !defined(__INTEL_COMPILER) \
+                      && !defined(__ICL)
+#  if defined(_M_IX86) && _MSC_VER < 1400 /* VS 2005 */
+#    define USE_INLINE_ASM
+#  endif
+#endif
+
+#ifdef USE_INLINE_ASM
+static long
+BTCInterlockedExchange(volatile long *object, long desired) {
+  __asm {
+    mov ecx, object
+    mov eax, desired
+    xchg [ecx], eax
+  }
+}
+static long
+BTCInterlockedCompareExchange(volatile long *object,
+                              long desired,
+                              long expected) {
+  __asm {
+    mov ecx, object
+    mov eax, expected
+    mov edx, desired
+    lock cmpxchg [ecx], edx
+  }
+}
+#else
+#define BTCInterlockedExchange InterlockedExchange
+#define BTCInterlockedCompareExchange InterlockedCompareExchange
+#endif
+
 static int
 BTCIsWindowsNT(void) {
   static volatile long state = 0;
   static DWORD version = 0;
   long value;
 
-  while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
+  while ((value = BTCInterlockedCompareExchange(&state, 1, 0)) == 1)
     Sleep(0);
 
   if (value == 0) {
     version = GetVersion();
 
-    if (InterlockedExchange(&state, 2) != 1)
+    if (BTCInterlockedExchange(&state, 2) != 1)
       abort(); /* LCOV_EXCL_LINE */
   } else {
     assert(value == 2);
@@ -132,7 +175,7 @@ BTCSetFilePointerEx(HANDLE file,
   pos.LowPart = SetFilePointer(file, pos.LowPart, &pos.HighPart, method);
 
   if (pos.LowPart == (DWORD)-1) { /* INVALID_SET_FILE_POINTER */
-    if (GetLastError() != NO_ERROR)
+    if (GetLastError() != ERROR_SUCCESS)
       return FALSE;
   }
 
@@ -150,7 +193,7 @@ BTCGetFileSizeEx(HANDLE file, LARGE_INTEGER *size) {
   size->HighPart = HighPart;
 
   if (size->LowPart == (DWORD)-1) { /* INVALID_FILE_SIZE */
-    if (GetLastError() != NO_ERROR)
+    if (GetLastError() != ERROR_SUCCESS)
       return FALSE;
   }
 
@@ -256,7 +299,7 @@ btc_fs_append(const char *name) {
     return INVALID_HANDLE_VALUE;
 
   if (SetFilePointer(handle, 0, NULL, FILE_END) == (DWORD)-1) {
-    if (GetLastError() != NO_ERROR) {
+    if (GetLastError() != ERROR_SUCCESS) {
       CloseHandle(handle);
       return INVALID_HANDLE_VALUE;
     }
@@ -635,19 +678,30 @@ btc_fs_fsync(btc_fd_t fd) {
 
 btc_fd_t
 btc_fs_lock(const char *name) {
-  return BTCCreateFile(name,
-                       GENERIC_READ | GENERIC_WRITE,
-                       0,
-                       NULL,
-                       OPEN_ALWAYS,
-                       FILE_ATTRIBUTE_NORMAL,
-                       NULL);
+  HANDLE handle = BTCCreateFile(name,
+                                GENERIC_READ | GENERIC_WRITE,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                NULL,
+                                OPEN_ALWAYS,
+                                FILE_ATTRIBUTE_NORMAL,
+                                NULL);
+
+  if (handle == INVALID_HANDLE_VALUE)
+    return INVALID_HANDLE_VALUE;
+
+  if (!LockFile(handle, 0, 0, 1, 0)) {
+    CloseHandle(handle);
+    return INVALID_HANDLE_VALUE;
+  }
+
+  return handle;
 }
 
 int
 btc_fs_unlock(btc_fd_t fd) {
+  BOOL result = UnlockFile(fd, 0, 0, 1, 0);
   CloseHandle(fd);
-  return 1;
+  return result != 0;
 }
 
 /*
@@ -743,7 +797,7 @@ btc_ps_rss_nt(void) {
   BTC_PROCESS_MEMORY_COUNTERS pmc;
   long value;
 
-  while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
+  while ((value = BTCInterlockedCompareExchange(&state, 1, 0)) == 1)
     Sleep(0);
 
   if (value == 0) {
@@ -763,7 +817,7 @@ btc_ps_rss_nt(void) {
         GetMemoryInfo = (P)GetProcAddress(h2, "GetProcessMemoryInfo");
     }
 
-    if (InterlockedExchange(&state, 2) != 1)
+    if (BTCInterlockedExchange(&state, 2) != 1)
       abort(); /* LCOV_EXCL_LINE */
   } else {
     assert(value == 2);
@@ -824,7 +878,7 @@ btc_sys_datadir(char *buf, size_t size, const char *name) {
   char path[MAX_PATH * 4];
   long value;
 
-  while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
+  while ((value = BTCInterlockedCompareExchange(&state, 1, 0)) == 1)
     Sleep(0);
 
   if (value == 0) {
@@ -835,7 +889,7 @@ btc_sys_datadir(char *buf, size_t size, const char *name) {
       SpecialA = (PA)GetProcAddress(h, "SHGetSpecialFolderPathA");
     }
 
-    if (InterlockedExchange(&state, 2) != 1)
+    if (BTCInterlockedExchange(&state, 2) != 1)
       abort(); /* LCOV_EXCL_LINE */
   } else {
     assert(value == 2);
@@ -885,14 +939,14 @@ btc_read_freq(void) {
   LARGE_INTEGER freq;
   long value;
 
-  while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
+  while ((value = BTCInterlockedCompareExchange(&state, 1, 0)) == 1)
     Sleep(0);
 
   if (value == 0) {
     if (QueryPerformanceFrequency(&freq) && freq.QuadPart > 0)
       freq_inv = 1.0 / (double)freq.QuadPart;
 
-    if (InterlockedExchange(&state, 2) != 1)
+    if (BTCInterlockedExchange(&state, 2) != 1)
       abort(); /* LCOV_EXCL_LINE */
   } else {
     assert(value == 2);
@@ -960,13 +1014,13 @@ btc_mutex_tryinit(btc_mutex_t *mtx) {
   /* Logic from libsodium/core.c */
   long state;
 
-  while ((state = InterlockedCompareExchange(&mtx->state, 1, 0)) == 1)
+  while ((state = BTCInterlockedCompareExchange(&mtx->state, 1, 0)) == 1)
     Sleep(0);
 
   if (state == 0) {
     InitializeCriticalSection(&mtx->handle);
 
-    if (InterlockedExchange(&mtx->state, 2) != 1)
+    if (BTCInterlockedExchange(&mtx->state, 2) != 1)
       abort(); /* LCOV_EXCL_LINE */
   } else {
     assert(state == 2);
@@ -1002,14 +1056,13 @@ btc_mutex_unlock(btc_mutex_t *mtx) {
 void
 btc_cond_init(btc_cond_t *cond) {
   cond->waiters = 0;
-
-  InitializeCriticalSection(&cond->lock);
-
   cond->signal = CreateEventA(NULL, FALSE, FALSE, NULL);
   cond->broadcast = CreateEventA(NULL, TRUE, FALSE, NULL);
 
-  if (!cond->signal || !cond->broadcast)
+  if (cond->signal == NULL || cond->broadcast == NULL)
     abort(); /* LCOV_EXCL_LINE */
+
+  InitializeCriticalSection(&cond->lock);
 }
 
 void
