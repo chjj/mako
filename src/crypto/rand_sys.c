@@ -821,12 +821,12 @@ static FARPROC
 LoadRtlGenRandom(void) {
   static volatile long state = 0;
   static FARPROC addr = NULL;
-  long value;
+  static int loaded = 0;
 
-  while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
+  while (InterlockedExchange(&state, 1) == 1)
     Sleep(0);
 
-  if (value == 0) {
+  if (loaded == 0) {
     HMODULE handle = GetModuleHandleA("advapi32.dll");
 
     /* Should be loaded. */
@@ -838,10 +838,11 @@ LoadRtlGenRandom(void) {
 
     /* Available on Windows XP and above. */
     addr = GetProcAddress(handle, "SystemFunction036");
-
-    if (InterlockedExchange(&state, 2) != 1)
-      abort(); /* LCOV_EXCL_LINE */
+    loaded = 1;
   }
+
+  if (InterlockedExchange(&state, 0) != 1)
+    abort(); /* LCOV_EXCL_LINE */
 
   return addr;
 }

@@ -171,21 +171,19 @@ static CRITICAL_SECTION rng_lock;
 
 static void
 rng_global_lock(void) {
-  /* Logic from libsodium/core.c */
   static volatile long state = 0;
-  long value;
+  static int loaded = 0;
 
-  while ((value = InterlockedCompareExchange(&state, 1, 0)) == 1)
+  while (InterlockedExchange(&state, 1) == 1)
     Sleep(0);
 
-  if (value == 0) {
+  if (loaded == 0) {
     InitializeCriticalSection(&rng_lock);
-
-    if (InterlockedExchange(&state, 2) != 1)
-      btc_abort(); /* LCOV_EXCL_LINE */
-  } else {
-    ASSERT(value == 2);
+    loaded = 1;
   }
+
+  if (InterlockedExchange(&state, 0) != 1)
+    btc_abort(); /* LCOV_EXCL_LINE */
 
   EnterCriticalSection(&rng_lock);
 }
