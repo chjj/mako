@@ -60,7 +60,7 @@ btc_rdtsc(void) {
                       && !defined(__llvm__)         \
                       && !defined(__INTEL_COMPILER) \
                       && !defined(__ICL)
-  _asm rdtsc
+  __asm rdtsc
 #elif (defined(__GNUC__) || defined(__clang__)) \
    && (defined(__i386__) || defined(_M_IX86))
   unsigned long long ts;
