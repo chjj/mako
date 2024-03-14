@@ -37,12 +37,6 @@
 #include <io/core.h>
 
 /*
- * Macros
- */
-
-#define BTC_MIN(x, y) ((x) < (y) ? (x) : (y))
-
-/*
  * Compat
  */
 
@@ -94,6 +88,12 @@
 /* clock_gettime(2) can be a weak symbol on apple. */
 #  pragma GCC diagnostic ignored "-Waddress"
 #endif
+
+/*
+ * Macros
+ */
+
+#define BTC_MIN(x, y) ((x) < (y) ? (x) : (y))
 
 /*
  * Filesystem
