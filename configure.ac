@@ -150,6 +150,7 @@ AX_CHECK_DEFINE([limits.h], [__GLIBC__], [
   AX_CHECK_COMPILE_FLAG([-std=c90], [CFLAGS="$CFLAGS -std=c90"], [
     AX_CHECK_COMPILE_FLAG([-std=c89], [CFLAGS="$CFLAGS -std=c89"])
   ])
+  AC_DEFINE([_GNU_SOURCE])
 ])
 
 AC_COMPILE_IFELSE([
@@ -166,26 +167,6 @@ AC_COMPILE_IFELSE([
 AS_CASE([$host_os], [darwin*], [
   AX_CHECK_COMPILE_FLAG([-mmacosx-version-min=10.7],
                         [CFLAGS="$CFLAGS -mmacosx-version-min=10.7"])
-])
-
-#
-# Feature Test Macros
-#
-
-AS_IF([test x"$MINGW" != x''], [
-  AC_DEFINE([_WIN32_WINNT], [0x501])
-])
-
-AX_CHECK_DEFINE([limits.h], [__GLIBC__], [
-  AC_DEFINE([_GNU_SOURCE])
-])
-
-AS_CASE([$host_os], [solaris*], [
-  AC_DEFINE([_TS_ERRNO])
-])
-
-AS_CASE([$host_os], [aix*], [
-  AC_DEFINE([_THREAD_SAFE_ERRNO])
 ])
 
 #

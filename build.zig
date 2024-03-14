@@ -118,6 +118,7 @@ pub fn build(b: *Builder) void {
   //
   if (target.isGnuLibC()) {
     flags.append("-std=c89") catch unreachable;
+    defines.append("_GNU_SOURCE") catch unreachable;
   }
 
   flags.append("-fvisibility=hidden") catch unreachable;
@@ -128,25 +129,6 @@ pub fn build(b: *Builder) void {
 
   if (mode == .ReleaseFast) {
     flags.append("-O3") catch unreachable;
-  }
-
-  //
-  // Feature Test Macros
-  //
-  if (target.isWindows()) {
-    defines.append("_WIN32_WINNT=0x501") catch unreachable;
-  }
-
-  if (target.isGnuLibC()) {
-    defines.append("_GNU_SOURCE") catch unreachable;
-  }
-
-  if (target.getOsTag() == .solaris) {
-    defines.append("_TS_ERRNO") catch unreachable;
-  }
-
-  if (target.getOsTag() == .aix) {
-    defines.append("_THREAD_SAFE_ERRNO") catch unreachable;
   }
 
   //
