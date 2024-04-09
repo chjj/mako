@@ -780,6 +780,9 @@ btc_chain_get_state(btc_chain_t *chain,
   int i, state, cached;
   int64_t time;
 
+  if (deployment->start_time == -1)
+    return BTC_STATE_ACTIVE;
+
   if (deployment->threshold != -1)
     threshold = deployment->threshold;
 

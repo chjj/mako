@@ -78,7 +78,7 @@ static const btc_deployment_t regtest_deployments[] = {
   {
     /* .name = */ "segwit",
     /* .bit = */ 1,
-    /* .start_time = */ 0,
+    /* .start_time = */ -1,
     /* .timeout = */ 0xffffffff,
     /* .threshold = */ -1,
     /* .window = */ -1,
