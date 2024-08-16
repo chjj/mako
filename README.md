@@ -30,7 +30,7 @@ The node itself is currently incomplete for various reasons, including:
 ## Build & Usage (for experimentation only)
 
 So far, mako has only been tested on Linux and Win32 (cross-compiled with
-mingw).
+mingw) and MacOS (arm64).
 
 ``` sh
 $ cmake . -DCMAKE_C_FLAGS=-g -DCMAKE_BUILD_TYPE=Release
