@@ -30,14 +30,18 @@ The node itself is currently incomplete for various reasons, including:
 ## Build & Usage (for experimentation only)
 
 So far, mako has only been tested on Linux and Win32 (cross-compiled with
-mingw).
+mingw) and Windows 64-bits.
 
 ``` sh
 $ cmake . -DCMAKE_C_FLAGS=-g -DCMAKE_BUILD_TYPE=Release
 $ make
 ```
-
-The above will produce two binaries: `mako and makod`. The arguments mimic
+For Windows
+```
+> cmake -G "MinGW Makefiles"
+> cmake --build .
+```
+The above will produce two binaries: `mako` and `makod`. The arguments mimic
 `bitcoin-cli` and `bitcoind` respectively.
 
 ## Background
